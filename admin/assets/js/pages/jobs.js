@@ -211,11 +211,13 @@
     }
 
     function setDirectionForLang(lang) {
+        const rtlLanguages = ['ar', 'he', 'fa', 'ur'];
+        const isRtl = rtlLanguages.includes(lang);
         const container = document.getElementById('jobsPageContainer');
         if (container) {
-            container.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+            container.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
         }
-        state.direction = lang === 'ar' ? 'rtl' : 'ltr';
+        state.direction = isRtl ? 'rtl' : 'ltr';
     }
 
     // ════════════════════════════════════════════════════════════
@@ -390,15 +392,15 @@
         const canDelete = state.permissions.canDelete !== false;
 
         el.tbody.innerHTML = items.map(job => {
-            const statusBadge = job.is_active == 1 
+            const statusBadge = job.is_active === 1 
                 ? '<span class="badge badge-success">Active</span>' 
                 : '<span class="badge badge-secondary">Inactive</span>';
 
-            const featuredBadge = job.is_featured == 1 
+            const featuredBadge = job.is_featured === 1 
                 ? '<span class="badge badge-warning ml-1">Featured</span>' 
                 : '';
 
-            const remoteBadge = job.is_remote == 1 
+            const remoteBadge = job.is_remote === 1 
                 ? '<span class="badge badge-info ml-1">Remote</span>' 
                 : '';
 
@@ -764,8 +766,8 @@
                             <div class="form-group">
                                 <label>${t('form.skills.is_required', 'Required')}</label>
                                 <select class="form-control" onchange="Jobs.updateSkillField(${idx}, 'is_required', this.value)">
-                                    <option value="0" ${skill.is_required == 0 ? 'selected' : ''}>No</option>
-                                    <option value="1" ${skill.is_required == 1 ? 'selected' : ''}>Yes</option>
+                                    <option value="0" ${skill.is_required === 0 ? 'selected' : ''}>No</option>
+                                    <option value="1" ${skill.is_required === 1 ? 'selected' : ''}>Yes</option>
                                 </select>
                             </div>
                         </div>
@@ -1073,7 +1075,7 @@
     // UTILITIES
     // ════════════════════════════════════════════════════════════
     function esc(str) {
-        if (str == null) return '';
+        if (str === null || str === undefined) return '';
         const div = document.createElement('div');
         div.textContent = String(str);
         return div.innerHTML;
