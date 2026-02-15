@@ -108,8 +108,8 @@ $canDelete = $canDeleteAll || $canDeleteOwn || $canManageTenantUsers;
 if (!$canView && !is_super_admin()) {
     // Check if this is a case of unconfigured permissions (all permission functions return false)
     // by attempting to verify if the permission system is functional
-    $permissionsConfigured = function_exists('admin_resource_permissions') && 
-                              !empty(admin_resource_permissions());
+    $resourcePerms = function_exists('admin_resource_permissions') ? admin_resource_permissions() : [];
+    $permissionsConfigured = !empty($resourcePerms);
     
     // If permissions are properly configured but user has no access, deny
     // If permissions are not configured, allow access (fallback mode)
