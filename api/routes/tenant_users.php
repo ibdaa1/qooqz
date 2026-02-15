@@ -17,6 +17,9 @@ if (!defined('API_VERSION_PATH')) {
     define('API_VERSION_PATH', dirname(__DIR__) . '/v1');
 }
 
+// Special tenant ID value for super admin to view all tenants
+define('TENANT_ID_ALL', 0);
+
 require_once API_VERSION_PATH . '/models/tenant_users/repositories/PdoTenant_usersRepository.php';
 require_once API_VERSION_PATH . '/models/tenant_users/validators/Tenant_usersValidator.php';
 require_once API_VERSION_PATH . '/models/tenant_users/services/Tenant_usersService.php';
@@ -67,12 +70,7 @@ if (function_exists('admin_user')) {
     
     // Get user's entity_id from tenant_users table
     if ($currentUserId > 0 && !$isSuperAdmin && !$canViewAll) {
-        $stmt = $pdo->prepare("SELECT entity_id FROM tenant_users WHERE user_id = ? AND tenant_id = ? LIMIT 1");
-        $stmt->execute([$currentUserId, $tenantId]);
-        $userTenant = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($userTenant && isset($userTenant['entity_id'])) {
-            $currentEntityId = (int)$userTenant['entity_id'];
-        }
+        $currentEntityId = getUserEntityId($pdo, $currentUserId, $tenantId);
     }
 }
 
@@ -124,6 +122,35 @@ function getActingUserId(): ?int
     return null;
 }
 
+/**
+ * Get current user's entity ID from database
+ * 
+ * @param PDO $pdo Database connection
+ * @param int $userId User ID
+ * @param int $tenantId Tenant ID
+ * @return int|null Entity ID or null if not found
+ */
+function getUserEntityId(PDO $pdo, int $userId, int $tenantId): ?int
+{
+    try {
+        $stmt = $pdo->prepare("SELECT entity_id FROM tenant_users WHERE user_id = ? AND tenant_id = ? LIMIT 1");
+        $stmt->execute([$userId, $tenantId]);
+        $userTenant = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($userTenant && isset($userTenant['entity_id'])) {
+            return (int)$userTenant['entity_id'];
+        }
+    } catch (PDOException $e) {
+        safe_log('error', 'Failed to get user entity ID', [
+            'user_id' => $userId,
+            'tenant_id' => $tenantId,
+            'error' => $e->getMessage()
+        ]);
+    }
+    
+    return null;
+}
+
 try {
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
@@ -161,9 +188,8 @@ try {
             // Super admin - allow viewing all tenants unless specifically filtered
             // Don't enforce tenant_id filter for super admin
             if (!isset($query['tenant_id'])) {
-                // For super admin, we need to modify the query to not filter by tenant
-                // We'll pass a special flag to indicate this
-                $tenantId = 0; // 0 means "all tenants" for super admin
+                // For super admin, pass TENANT_ID_ALL (0) to indicate "all tenants"
+                $tenantId = TENANT_ID_ALL;
             }
         }
         

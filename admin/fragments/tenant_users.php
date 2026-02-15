@@ -103,8 +103,8 @@ $canView = $canViewAll || $canViewOwn || $canViewTenant;
 $canEdit = $canEditAll || $canEditOwn || $canManageTenantUsers;
 $canDelete = $canDeleteAll || $canDeleteOwn || $canManageTenantUsers;
 
-// If user has no view permission at all, deny access
-if (!$canView && !is_super_admin()) {
+// If user has no view permission at all, deny access (super admin always has access)
+if (!$canView) {
     if ($isFragment) {
         http_response_code(403);
         echo json_encode(['error' => 'Access denied']);

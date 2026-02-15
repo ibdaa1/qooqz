@@ -30,6 +30,8 @@ final class PdoTenant_usersRepository
      *  - user_id (int)
      *  - tenant_id (int)  <-- if provided will override $tenantId
      *
+     * NOTE: If $tenantId is 0, it means "all tenants" (super admin only)
+     *
      * Returns array of associative rows.
      */
     public function all(int $tenantId, int $perPage = 10, int $offset = 0, array $filters = []): array
@@ -39,7 +41,7 @@ final class PdoTenant_usersRepository
         $whereParts = [];
         $params = [];
 
-        // Only filter by tenant_id if not 0 (0 means super admin viewing all tenants)
+        // Only filter by tenant_id if > 0 (0 means super admin viewing all tenants)
         if ($effectiveTenantId > 0) {
             $whereParts[] = 'tu.tenant_id = :tenantId';
             $params[':tenantId'] = $effectiveTenantId;
@@ -139,6 +141,8 @@ final class PdoTenant_usersRepository
 
     /**
      * Count tenant users with filters
+     * 
+     * NOTE: If $tenantId is 0, it means "all tenants" (super admin only)
      */
     public function count(int $tenantId, array $filters = []): int
     {
@@ -147,7 +151,7 @@ final class PdoTenant_usersRepository
         $whereParts = [];
         $params = [];
 
-        // Only filter by tenant_id if not 0 (0 means super admin viewing all tenants)
+        // Only filter by tenant_id if > 0 (0 means super admin viewing all tenants)
         if ($effectiveTenantId > 0) {
             $whereParts[] = 'tu.tenant_id = :tenantId';
             $params[':tenantId'] = $effectiveTenantId;
