@@ -549,7 +549,8 @@
     // ----------------------------
     async function editCategory(id) {
         try {
-            const res = await AF.get(`${API}/${id}`);
+            // Load category with translations
+            const res = await AF.get(`${API}/${id}?with_translations=1&tenant_id=${state.tenantId || 1}&lang=${state.language}`);
             if (!res.success || !res.data) {
                 throw new Error('Failed to load category');
             }
@@ -559,6 +560,7 @@
 
             if (el.formId) el.formId.value = cat.id;
             if (el.formTitle) el.formTitle.textContent = t('form.edit_title');
+            if (el.categoryTenantId) el.categoryTenantId.value = cat.tenant_id || state.tenantId || 1;
             if (el.categoryParent) el.categoryParent.value = cat.parent_id || '';
             if (el.categorySlug) el.categorySlug.value = cat.slug || '';
             if (el.categorySortOrder) el.categorySortOrder.value = cat.sort_order || 0;
@@ -674,7 +676,8 @@
         
         if (el.mediaModal && el.mediaFrame) {
             el.mediaModal.style.display = 'block';
-            const categoryId = el.formId?.value || 'new';
+            // Use actual category ID if editing, or generate a temporary ID for new categories
+            const categoryId = el.formId?.value || `temp_${Date.now()}`;
             el.mediaFrame.src = `/admin/fragments/media_studio.php?embedded=1&tenant_id=${state.tenantId || 1}&lang=${state.language}&owner_id=${categoryId}&image_type_id=${IMAGE_TYPE_ID}`;
             el.mediaFrame.dataset.targetField = targetField;
         }

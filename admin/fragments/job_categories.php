@@ -61,7 +61,8 @@ $userId = admin_user_id();
 // ════════════════════════════════════════════════════════════
 // CHECK PERMISSIONS
 // ════════════════════════════════════════════════════════════
-$canManageJobCategories = can('job_categories.manage') || can('job_categories.create');
+// Support both job_categories.manage and job_categories_manage for backwards compatibility
+$canManageJobCategories = can('job_categories.manage') || can('job_categories_manage') || can('job_categories.create');
 $canViewAll = can_view_all('job_categories');
 $canViewOwn = can_view_own('job_categories');
 $canViewTenant = can_view_tenant('job_categories');
