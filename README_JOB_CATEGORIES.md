@@ -17,13 +17,22 @@ job-categories/
 │   └── JobCategoriesService.php                 # منطق الأعمال
 ├── controllers/
 │   └── JobCategoriesController.php              # التحكم بالطلبات
-└──                                      # نقطة الدخول الرئيسية
-api/routes/job-categories.php
+├── api/routes/
+│   └── job-categories.php                       # نقطة الدخول الرئيسية
+└── admin/                                       # واجهة الإدارة
+    ├── fragments/
+    │   └── job_categories.php                   # صفحة الإدارة الرئيسية
+    ├── assets/js/pages/
+    │   └── job_categories.js                    # منطق واجهة المستخدم
+    └── assets/css/pages/
+        └── job_categories.css                   # تنسيقات الواجهة
+```
 
 ---
 
 ## 🌟 الميزات الرئيسية
 
+### API Features
 - ✅ **هيكل شجري** (Parent-Child Hierarchy)
 - ✅ **دعم متعدد اللغات** (Multilingual)
 - ✅ **الترتيب المخصص** (Custom Sort Order)
@@ -31,6 +40,16 @@ api/routes/job-categories.php
 - ✅ **البحث والفلترة** المتقدمة
 - ✅ **نقل الفئات** بين المستويات
 - ✅ **إعادة الترتيب** Batch Reordering
+
+### Admin UI Features
+- ✅ **واجهة إدارة متقدمة** (Modern Admin Interface)
+- ✅ **دعم RTL/LTR** تلقائي حسب اللغة
+- ✅ **إدارة الترجمات المرئية** (Visual Translation Management)
+- ✅ **تكامل مع Media Studio** (image_types.id=11)
+- ✅ **اختيار الفئة الأب** (Parent Category Selection)
+- ✅ **فلترة وبحث متقدم** (Advanced Filtering & Search)
+- ✅ **صلاحيات متعددة المستويات** (Permission Checks)
+- ✅ **تصميم متجاوب** (Responsive Design)
 
 ---
 
@@ -43,6 +62,130 @@ api/routes/job-categories.php
 │   └── فئة فرعية 1.2
 └── فئة فرعية 2 (parent_id = 1)
     └── فئة فرعية 2.1
+```
+
+---
+
+## 🎨 واجهة الإدارة (Admin UI)
+
+### الوصول إلى الواجهة
+
+```
+/admin/fragments/job_categories.php
+```
+
+### الميزات الرئيسية
+
+1. **إدارة الفئات:**
+   - إنشاء فئة جديدة
+   - تعديل فئة موجودة
+   - حذف فئة
+   - اختيار الفئة الأب (هرمية)
+
+2. **إدارة الترجمات:**
+   - إضافة ترجمات لغات متعددة
+   - تعديل الترجمات
+   - حذف ترجمات
+   - عرض اللغات المتاحة
+
+3. **إدارة الوسائط:**
+   - تحميل صورة الفئة
+   - تحميل أيقونة الفئة
+   - تكامل مع Media Studio
+   - نوع الصورة المخصص (image_types.id=11)
+
+4. **الفلترة والبحث:**
+   - البحث بالاسم أو Slug
+   - الفلترة حسب الفئة الأب
+   - الفلترة حسب الحالة (نشط/غير نشط)
+
+5. **الصلاحيات:**
+   - صلاحيات المشاهدة (View All, View Own, View Tenant)
+   - صلاحيات الإنشاء (Create)
+   - صلاحيات التعديل (Edit All, Edit Own)
+   - صلاحيات الحذف (Delete All, Delete Own)
+
+### لقطات شاشة للواجهة
+
+#### 1. قائمة الفئات
+- جدول يعرض جميع الفئات
+- أعمدة: ID, الصورة, الاسم, Slug, الفئة الأب, الترتيب, الحالة, الإجراءات
+- فلترة وبحث متقدم
+- ترقيم الصفحات
+
+#### 2. نموذج الإضافة/التعديل
+- **تبويب المعلومات الأساسية:**
+  - الفئة الأب (اختياري)
+  - Slug (يتم توليده تلقائياً)
+  - ترتيب العرض
+  - الحالة (نشط/غير نشط)
+
+- **تبويب الترجمات:**
+  - اختيار اللغة
+  - إضافة ترجمة جديدة
+  - حقول: الاسم، الوصف
+  - حذف ترجمة
+
+- **تبويب الوسائط:**
+  - صورة الفئة
+  - أيقونة الفئة
+  - نوع الصورة (Job Category - ID: 11)
+
+### استخدام الواجهة
+
+```javascript
+// مثال على الوصول إلى الواجهة من القائمة الجانبية
+<a href="/admin/fragments/job_categories.php">
+    <i class="fas fa-briefcase"></i>
+    <span>Job Categories</span>
+</a>
+```
+
+### التكامل مع AdminFramework
+
+الواجهة تستخدم `AdminFramework (AF)` للعمليات التالية:
+- طلبات AJAX (`AF.ajax()`)
+- الإشعارات (`AF.notify()`)
+- إدارة الحالة
+- التحقق من النماذج
+
+### دعم RTL/LTR
+
+الواجهة تدعم تلقائياً:
+- RTL للغات: العربية (ar), العبرية (he), الفارسية (fa), الأوردو (ur)
+- LTR لبقية اللغات
+- تبديل الاتجاه تلقائياً حسب اللغة المختارة
+
+### Database Schema
+
+```sql
+-- جدول الفئات الرئيسي
+CREATE TABLE job_categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    parent_id INT NULL,
+    slug VARCHAR(255) NOT NULL,
+    sort_order INT DEFAULT 0,
+    is_active TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+    FOREIGN KEY (parent_id) REFERENCES job_categories(id),
+    UNIQUE KEY unique_tenant_slug (tenant_id, slug)
+);
+
+-- جدول الترجمات
+CREATE TABLE job_category_translations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    category_id INT NOT NULL,
+    language_code VARCHAR(10) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES job_categories(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_category_language (category_id, language_code)
+);
 ```
 
 ---
