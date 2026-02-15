@@ -1,0 +1,198 @@
+{
+  "jobs": {
+    "title": "الوظائف",
+    "subtitle": "إدارة الوظائف",
+    "add_new": "إضافة وظيفة",
+    "loading": "جارٍ التحميل...",
+    "no_data": "لا توجد بيانات",
+    "error": "حدث خطأ",
+    "retry": "إعادة المحاولة"
+  },
+  "table": {
+    "headers": {
+      "id": "المعرف",
+      "job_title": "عنوان الوظيفة",
+      "category": "الفئة",
+      "job_type": "نوع الوظيفة",
+      "experience_level": "مستوى الخبرة",
+      "salary": "الراتب",
+      "location": "الموقع",
+      "status": "الحالة",
+      "applications": "التقديمات",
+      "deadline": "الموعد النهائي",
+      "actions": "الإجراءات"
+    },
+    "actions": {
+      "edit": "تعديل",
+      "delete": "حذف",
+      "view": "عرض",
+      "publish": "نشر",
+      "close": "إغلاق",
+      "confirm_delete": "هل أنت متأكد من حذف هذه الوظيفة؟",
+      "export": "تصدير Excel"
+    },
+    "status": {
+      "draft": "مسودة",
+      "published": "منشورة",
+      "closed": "مغلقة",
+      "filled": "مملوءة",
+      "cancelled": "ملغية"
+    },
+    "job_type": {
+      "full_time": "دوام كامل",
+      "part_time": "دوام جزئي",
+      "contract": "عقد",
+      "temporary": "مؤقت",
+      "internship": "تدريب",
+      "freelance": "عمل حر",
+      "remote": "عن بعد"
+    },
+    "experience_level": {
+      "entry": "مبتدئ",
+      "junior": "مستوى مبتدئ",
+      "mid": "متوسط",
+      "senior": "أول",
+      "executive": "تنفيذي",
+      "director": "مدير"
+    },
+    "empty": {
+      "title": "لا توجد وظائف",
+      "message": "ابدأ بإضافة الوظائف",
+      "add_first": "إضافة الوظيفة الأولى"
+    }
+  },
+  "filters": {
+    "search": "البحث",
+    "search_placeholder": "البحث في الوظائف...",
+    "status": "الحالة",
+    "job_type": "نوع الوظيفة",
+    "experience_level": "مستوى الخبرة",
+    "category": "الفئة",
+    "entity": "الكيان",
+    "apply": "تطبيق",
+    "reset": "إعادة تعيين"
+  },
+  "form": {
+    "add_title": "إضافة وظيفة",
+    "edit_title": "تعديل الوظيفة",
+    "tabs": {
+      "basic": "معلومات أساسية",
+      "translations": "الترجمات",
+      "application": "التقديم",
+      "salary": "الراتب",
+      "location": "الموقع",
+      "skills": "المهارات",
+      "status": "الحالة والعلامات"
+    },
+    "fields": {
+      "job_title": {
+        "label": "عنوان الوظيفة",
+        "placeholder": "أدخل عنوان الوظيفة"
+      },
+      "slug": {
+        "label": "الرابط المختصر",
+        "placeholder": "سيتم إنشاؤه تلقائيًا"
+      },
+      "job_type": {
+        "label": "نوع الوظيفة",
+        "placeholder": "اختر نوع الوظيفة"
+      },
+      "employment_type": {
+        "label": "نوع التوظيف",
+        "placeholder": "اختر نوع التوظيف"
+      },
+      "experience_level": {
+        "label": "مستوى الخبرة",
+        "placeholder": "اختر مستوى الخبرة"
+      },
+      "category": {
+        "label": "الفئة",
+        "placeholder": "اختر الفئة"
+      },
+      "department": {
+        "label": "القسم",
+        "placeholder": "أدخل القسم"
+      },
+      "positions_available": {
+        "label": "المناصب المتاحة",
+        "placeholder": "عدد المناصب"
+      },
+      "application_deadline": {
+        "label": "الموعد النهائي للتقديم",
+        "placeholder": "اختر التاريخ"
+      },
+      "start_date": {
+        "label": "تاريخ البدء",
+        "placeholder": "اختر التاريخ"
+      },
+      "is_featured": {
+        "label": "وظيفة مميزة"
+      },
+      "is_urgent": {
+        "label": "وظيفة عاجلة"
+      },
+      "is_remote": {
+        "label": "عمل عن بعد"
+      },
+      "salary_negotiable": {
+        "label": "الراتب قابل للتفاوض"
+      }
+    },
+    "translations": {
+      "title": "الترجمات",
+      "add_translation": "إضافة ترجمة",
+      "choose_lang": "اختر اللغة",
+      "job_title": "عنوان الوظيفة",
+      "description": "الوصف",
+      "requirements": "المتطلبات",
+      "responsibilities": "المسؤوليات",
+      "benefits": "المزايا"
+    },
+    "skills": {
+      "title": "المهارات",
+      "add_skill": "إضافة مهارة",
+      "skill_name": "اسم المهارة",
+      "proficiency_level": "مستوى الكفاءة",
+      "is_required": "مطلوبة",
+      "levels": {
+        "basic": "أساسي",
+        "intermediate": "متوسط",
+        "advanced": "متقدم",
+        "expert": "خبير"
+      }
+    },
+    "buttons": {
+      "save": "حفظ",
+      "cancel": "إلغاء",
+      "saving": "جارٍ الحفظ...",
+      "publish": "نشر",
+      "close": "إغلاق",
+      "mark_filled": "تحديد كمملوءة"
+    }
+  },
+  "messages": {
+    "success": {
+      "created": "تم إنشاء الوظيفة بنجاح",
+      "updated": "تم تحديث الوظيفة بنجاح",
+      "deleted": "تم حذف الوظيفة بنجاح",
+      "published": "تم نشر الوظيفة بنجاح",
+      "closed": "تم إغلاق الوظيفة بنجاح"
+    },
+    "error": {
+      "load_failed": "فشل تحميل البيانات",
+      "save_failed": "فشل حفظ البيانات",
+      "delete_failed": "فشل حذف الوظيفة",
+      "required_fields": "الرجاء ملء جميع الحقول المطلوبة"
+    }
+  },
+  "pagination": {
+    "showing": "عرض",
+    "of": "من",
+    "results": "نتيجة",
+    "page": "صفحة"
+  },
+  "validation": {
+    "required": "هذا الحقل مطلوب",
+    "invalid": "قيمة غير صالحة"
+  }
+}

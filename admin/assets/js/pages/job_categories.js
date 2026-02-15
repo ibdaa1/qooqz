@@ -318,7 +318,7 @@
     // ----------------------------
     async function loadParentCategories() {
         try {
-            const res = await AF.ajax('GET', `${API}?per_page=1000&is_active=1`);
+            const res = await AF.get(`${API}?per_page=1000&is_active=1`);
             if (res.success && res.data) {
                 state.parents = res.data.items || res.data || [];
                 populateParentSelect(el.categoryParent, state.parents);
@@ -370,7 +370,7 @@
                 ...state.filters
             });
 
-            const res = await AF.ajax('GET', `${API}?${params}`);
+            const res = await AF.get(`${API}?${params}`);
             
             if (!res.success) {
                 throw new Error(res.message || 'Failed to load categories');
@@ -549,7 +549,7 @@
     // ----------------------------
     async function editCategory(id) {
         try {
-            const res = await AF.ajax('GET', `${API}/${id}`);
+            const res = await AF.get(`${API}/${id}`);
             if (!res.success || !res.data) {
                 throw new Error('Failed to load category');
             }
@@ -626,7 +626,7 @@
                 deleted_translations: deletedTranslations
             };
 
-            const res = await AF.ajax(method, url, payload);
+            const res = id ? await AF.put(url, payload) : await AF.post(url, payload);
 
             if (res.success) {
                 AF.notify('success', id ? t('messages.category_updated') : t('messages.category_created'));
@@ -650,7 +650,7 @@
         if (!confirm(t('table.actions.confirm_delete'))) return;
 
         try {
-            const res = await AF.ajax('DELETE', `${API}/${id}`);
+            const res = await AF.delete(`${API}/${id}`);
             if (res.success) {
                 AF.notify('success', t('messages.category_deleted'));
                 loadCategories();
