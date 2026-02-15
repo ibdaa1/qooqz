@@ -10,7 +10,10 @@
     const AF = window.AdminFramework;
     const API = '/api/job_categories';
     const LANG_API = '/api/languages';
-    const IMAGE_TYPE_ID = 11; // Job Category image type
+    
+    // Get image type ID from page meta tag (set in PHP)
+    const metaTag = document.querySelector('meta[data-page="job_categories"]');
+    const IMAGE_TYPE_ID = metaTag ? parseInt(metaTag.dataset.imageTypeId) : 11;
 
     const state = {
         page: 1,
@@ -30,9 +33,11 @@
 
     // ----------------------------
     // Direction helper
+    // Note: RTL language list should match the backend configuration
     // ----------------------------
     function setDirectionForLang(lang) {
         if (!lang) return;
+        // RTL languages - should be synchronized with backend
         const rtlLangs = ['ar', 'he', 'fa', 'ur', 'ps'];
         const isRtl = rtlLangs.includes(String(lang).toLowerCase().substring(0, 2));
         const dir = isRtl ? 'rtl' : 'ltr';
@@ -270,6 +275,13 @@
                 all_statuses: "All Statuses",
                 active: "Active",
                 inactive: "Inactive"
+            },
+            messages: {
+                category_created: "Category created successfully",
+                category_updated: "Category updated successfully",
+                category_deleted: "Category deleted successfully",
+                delete_failed: "Failed to delete category",
+                media_studio_unavailable: "Media Studio not available. Please enter URL manually."
             }
         };
     }
@@ -326,7 +338,9 @@
             : `<option value="">${t('form.fields.parent.none')}</option>`;
         
         parents.forEach(cat => {
-            if (currentId && cat.id === currentId) return; // Don't show self as parent
+            // Prevent circular references: don't show self as parent option
+            // Note: Backend should validate deep hierarchical loops (A->B->C->A)
+            if (currentId && cat.id === currentId) return;
             const o = document.createElement('option');
             o.value = cat.id;
             o.textContent = cat.name || `Category ${cat.id}`;
@@ -615,7 +629,7 @@
             const res = await AF.ajax(method, url, payload);
 
             if (res.success) {
-                AF.notify('success', id ? 'Category updated successfully' : 'Category created successfully');
+                AF.notify('success', id ? t('messages.category_updated') : t('messages.category_created'));
                 hideForm();
                 loadCategories();
                 loadParentCategories();
@@ -638,7 +652,7 @@
         try {
             const res = await AF.ajax('DELETE', `${API}/${id}`);
             if (res.success) {
-                AF.notify('success', 'Category deleted successfully');
+                AF.notify('success', t('messages.category_deleted'));
                 loadCategories();
                 loadParentCategories();
             } else {
@@ -646,7 +660,7 @@
             }
         } catch (error) {
             console.error('[JobCategories] Delete error:', error);
-            AF.notify('error', error.message || 'Failed to delete category');
+            AF.notify('error', error.message || t('messages.delete_failed'));
         }
     }
 
@@ -675,7 +689,7 @@
                 }
             });
         } else {
-            AF.notify('warning', 'Media Studio not available. Please enter URL manually.');
+            AF.notify('warning', t('messages.media_studio_unavailable'));
         }
     }
 

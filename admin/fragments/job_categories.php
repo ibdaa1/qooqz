@@ -13,6 +13,11 @@ declare(strict_types=1);
  */
 
 // ════════════════════════════════════════════════════════════
+// CONFIGURATION
+// ════════════════════════════════════════════════════════════
+define('JOB_CATEGORY_IMAGE_TYPE_ID', 11);
+
+// ════════════════════════════════════════════════════════════
 // DETECT REQUEST TYPE
 // ════════════════════════════════════════════════════════════
 $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
@@ -113,7 +118,8 @@ $apiBase = '/api';
 
 <!-- Page Meta -->
 <meta data-page="job_categories"
-      data-i18n-files="/admin/languages/JobCategories/<?= rawurlencode($lang) ?>.json">
+      data-i18n-files="/admin/languages/JobCategories/<?= rawurlencode($lang) ?>.json"
+      data-image-type-id="<?= JOB_CATEGORY_IMAGE_TYPE_ID ?>">
 
 <!-- Page Container -->
 <div class="page-container" id="jobCategoriesPageContainer" dir="<?= htmlspecialchars($dir) ?>">
@@ -264,7 +270,7 @@ $apiBase = '/api';
                             </button>
                             <div id="categoryImagePreview" class="image-preview"></div>
                             <small class="form-text" data-i18n="form.media.image_help">
-                                <?= __t('form.media.image_help', 'Select an image from Media Studio (image_types.id=11)') ?>
+                                <?= __t('form.media.image_help', 'Select an image from Media Studio (image_types.id=' . JOB_CATEGORY_IMAGE_TYPE_ID . ')') ?>
                             </small>
                         </div>
                     </div>
@@ -288,10 +294,10 @@ $apiBase = '/api';
                             <?= __t('form.media.image_type', 'Image Type') ?>
                         </label>
                         <select id="imageTypeSelect" class="form-control" disabled>
-                            <option value="11">Job Category</option>
+                            <option value="<?= JOB_CATEGORY_IMAGE_TYPE_ID ?>">Job Category</option>
                         </select>
                         <small id="imageTypeDesc" class="form-text" data-i18n="form.media.image_type_help">
-                            <?= __t('form.media.image_type_help', 'This is automatically set to Job Category (ID: 11)') ?>
+                            <?= __t('form.media.image_type_help', 'This is automatically set to Job Category (ID: ' . JOB_CATEGORY_IMAGE_TYPE_ID . ')') ?>
                         </small>
                     </div>
                 </div>
