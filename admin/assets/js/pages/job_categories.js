@@ -584,7 +584,7 @@
 
         } catch (error) {
             console.error('[JobCategories] Edit error:', error);
-            AF.notify('error', error.message || 'Failed to load category');
+            AF.error(error.message || 'Failed to load category');
         }
     }
 
@@ -629,7 +629,7 @@
             const res = id ? await AF.put(url, payload) : await AF.post(url, payload);
 
             if (res.success) {
-                AF.notify('success', id ? t('messages.category_updated') : t('messages.category_created'));
+                AF.success(id ? t('messages.category_updated') : t('messages.category_created'));
                 hideForm();
                 loadCategories();
                 loadParentCategories();
@@ -639,7 +639,7 @@
 
         } catch (error) {
             console.error('[JobCategories] Save error:', error);
-            AF.notify('error', error.message || 'Failed to save category');
+            AF.error(error.message || 'Failed to save category');
         }
     }
 
@@ -652,7 +652,7 @@
         try {
             const res = await AF.delete(`${API}/${id}`);
             if (res.success) {
-                AF.notify('success', t('messages.category_deleted'));
+                AF.success(t('messages.category_deleted'));
                 loadCategories();
                 loadParentCategories();
             } else {
@@ -660,7 +660,7 @@
             }
         } catch (error) {
             console.error('[JobCategories] Delete error:', error);
-            AF.notify('error', error.message || t('messages.delete_failed'));
+            AF.error(error.message || t('messages.delete_failed'));
         }
     }
 
@@ -689,7 +689,7 @@
                 }
             });
         } else {
-            AF.notify('warning', t('messages.media_studio_unavailable'));
+            AF.warning(t('messages.media_studio_unavailable'));
         }
     }
 
@@ -792,7 +792,7 @@
         document.getElementById('btnAddTranslation')?.addEventListener('click', () => {
             const lang = el.langSelect?.value;
             if (!lang) {
-                AF.notify('warning', t('form.translations.choose_lang'));
+                AF.warning(t('form.translations.choose_lang'));
                 return;
             }
             createTranslationPanel(lang);
