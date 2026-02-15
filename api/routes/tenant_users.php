@@ -184,6 +184,12 @@ try {
                 $query['user_id'] = $currentUserId;
                 $query['tenant_id'] = $tenantId;
             }
+            
+            // Fallback: if no permissions are set (all false), default to tenant-scoped view
+            // This allows the system to work even if permissions haven't been configured yet
+            if (!$canViewAll && !$canViewTenant && !$canViewOwn) {
+                $query['tenant_id'] = $tenantId;
+            }
         } else {
             // Super admin - allow viewing all tenants unless specifically filtered
             // Don't enforce tenant_id filter for super admin

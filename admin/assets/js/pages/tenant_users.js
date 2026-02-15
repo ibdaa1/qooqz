@@ -828,7 +828,8 @@
                 return;
             }
             
-            AF.loading(t('export.exporting', 'Exporting...'));
+            // Show notification that export is starting
+            AF.info(t('export.exporting', 'Exporting...'));
 
             // Build query params with current filters
             const params = new URLSearchParams({

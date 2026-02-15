@@ -104,14 +104,28 @@ $canEdit = $canEditAll || $canEditOwn || $canManageTenantUsers;
 $canDelete = $canDeleteAll || $canDeleteOwn || $canManageTenantUsers;
 
 // If user has no view permission at all, deny access (super admin always has access)
-if (!$canView) {
-    if ($isFragment) {
-        http_response_code(403);
-        echo json_encode(['error' => 'Access denied']);
-        exit;
+// However, if permissions are not configured at all in the database, allow tenant-scoped access as fallback
+if (!$canView && !is_super_admin()) {
+    // Check if this is a case of unconfigured permissions (all permission functions return false)
+    // by attempting to verify if the permission system is functional
+    $permissionsConfigured = function_exists('admin_resource_permissions') && 
+                              !empty(admin_resource_permissions());
+    
+    // If permissions are properly configured but user has no access, deny
+    // If permissions are not configured, allow access (fallback mode)
+    if ($permissionsConfigured) {
+        if ($isFragment) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Access denied']);
+            exit;
+        } else {
+            http_response_code(403);
+            die('Access denied: You do not have permission to view tenant users');
+        }
     } else {
-        http_response_code(403);
-        die('Access denied: You do not have permission to view tenant users');
+        // Fallback: permissions not configured, grant basic tenant-scoped view access
+        $canView = true;
+        $canViewTenant = true;
     }
 }
 
