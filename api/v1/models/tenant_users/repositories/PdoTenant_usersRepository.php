@@ -39,8 +39,11 @@ final class PdoTenant_usersRepository
         $whereParts = [];
         $params = [];
 
-        $whereParts[] = 'tu.tenant_id = :tenantId';
-        $params[':tenantId'] = $effectiveTenantId;
+        // Only filter by tenant_id if not 0 (0 means super admin viewing all tenants)
+        if ($effectiveTenantId > 0) {
+            $whereParts[] = 'tu.tenant_id = :tenantId';
+            $params[':tenantId'] = $effectiveTenantId;
+        }
 
         if (!empty($filters['search'])) {
             // use distinct parameter names for each LIKE occurrence to avoid PDO named-parameter repetition issues
@@ -144,8 +147,11 @@ final class PdoTenant_usersRepository
         $whereParts = [];
         $params = [];
 
-        $whereParts[] = 'tu.tenant_id = :tenantId';
-        $params[':tenantId'] = $effectiveTenantId;
+        // Only filter by tenant_id if not 0 (0 means super admin viewing all tenants)
+        if ($effectiveTenantId > 0) {
+            $whereParts[] = 'tu.tenant_id = :tenantId';
+            $params[':tenantId'] = $effectiveTenantId;
+        }
 
         if (!empty($filters['search'])) {
             // same distinct placeholders here

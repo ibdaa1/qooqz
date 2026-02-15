@@ -148,11 +148,22 @@ try {
             // If user can only view their entity's data, add entity filter
             if (!$canViewAll && !$canViewTenant && $canViewOwn && $currentEntityId !== null) {
                 $query['entity_id'] = $currentEntityId;
+                // Also ensure tenant_id is set for entity users
+                $query['tenant_id'] = $tenantId;
             }
             
             // If user can only view own data and not others, filter by user_id
             if (!$canViewAll && !$canViewTenant && $canViewOwn && $currentEntityId === null && $currentUserId > 0) {
                 $query['user_id'] = $currentUserId;
+                $query['tenant_id'] = $tenantId;
+            }
+        } else {
+            // Super admin - allow viewing all tenants unless specifically filtered
+            // Don't enforce tenant_id filter for super admin
+            if (!isset($query['tenant_id'])) {
+                // For super admin, we need to modify the query to not filter by tenant
+                // We'll pass a special flag to indicate this
+                $tenantId = 0; // 0 means "all tenants" for super admin
             }
         }
         
