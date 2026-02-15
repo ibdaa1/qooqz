@@ -378,9 +378,12 @@
 
             const data = res.data;
             state.categories = data.items || data || [];
-            const total = data.total || state.categories.length;
-            const currentPage = data.current_page || state.page;
-            const totalPages = data.total_pages || Math.ceil(total / state.perPage);
+            
+            // Extract pagination metadata from data.meta
+            const meta = data.meta || {};
+            const total = meta.total || data.total || state.categories.length;
+            const currentPage = meta.page || data.current_page || state.page;
+            const totalPages = meta.total_pages || data.total_pages || Math.ceil(total / state.perPage);
 
             renderTable(state.categories);
             renderPagination(currentPage, totalPages, total);
