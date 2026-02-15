@@ -134,6 +134,12 @@ $apiBase = '/api';
         </div>
     </div>
 
+    <!-- Error Container -->
+    <div id="errorContainer" class="alert alert-error" style="display:none; margin-bottom:16px;">
+        <i class="fas fa-exclamation-circle"></i>
+        <span id="errorMessage"></span>
+    </div>
+
     <!-- Form Container -->
     <div id="jobFormContainer" class="card form-card" style="display:none">
         <div class="card-header">

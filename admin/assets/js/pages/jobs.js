@@ -1114,11 +1114,11 @@
         el = {
             // Containers
             formContainer: $id('jobFormContainer'),
-            tableContainer: $id('jobTableContainer'),
-            errorContainer: $id('jobErrorContainer'),
-            errorMessage: $id('jobErrorMessage'),
+            tableContainer: $id('tableContainer'),
+            errorContainer: $id('errorContainer'),
+            errorMessage: $id('errorMessage'),
             form: $id('jobForm'),
-            formTitle: $id('jobFormTitle'),
+            formTitle: $id('formTitle'),
 
             // Form fields - General
             jobTitle: $id('jobTitle'),
@@ -1158,7 +1158,7 @@
             categoryFilter: $id('categoryFilter'),
 
             // Buttons
-            btnSubmit: $id('btnSubmitForm'),
+            btnSubmit: $id('btnSubmit'),
             btnAdd: $id('btnAddJob'),
             btnClose: $id('btnCloseForm'),
             btnCancel: $id('btnCancelForm'),
