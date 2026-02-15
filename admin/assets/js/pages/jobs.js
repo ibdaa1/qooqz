@@ -451,7 +451,7 @@
         if (!el.tbody) return;
         el.tbody.innerHTML = `
             <tr>
-                <td colspan="8" class="text-center py-5">
+                <td colspan="10" class="text-center py-5">
                     <div class="spinner-border text-primary" role="status">
                         <span class="sr-only">${t('jobs.loading', 'Loading...')}</span>
                     </div>
@@ -459,23 +459,23 @@
             </tr>
         `;
         
-        if (el.tableContainer) el.tableContainer.classList.remove('d-none');
-        if (el.errorContainer) el.errorContainer.classList.add('d-none');
+        if (el.tableContainer) el.tableContainer.style.display = 'block';
+        if (el.errorContainer) el.errorContainer.style.display = 'none';
     }
 
     function showTable() {
-        if (el.tableContainer) el.tableContainer.classList.remove('d-none');
-        if (el.errorContainer) el.errorContainer.classList.add('d-none');
+        if (el.tableContainer) el.tableContainer.style.display = 'block';
+        if (el.errorContainer) el.errorContainer.style.display = 'none';
     }
 
     function showError(message) {
         if (el.errorContainer) {
-            el.errorContainer.classList.remove('d-none');
+            el.errorContainer.style.display = 'block';
             if (el.errorMessage) {
                 el.errorMessage.textContent = message;
             }
         }
-        if (el.tableContainer) el.tableContainer.classList.add('d-none');
+        if (el.tableContainer) el.tableContainer.style.display = 'none';
     }
 
     // ════════════════════════════════════════════════════════════
@@ -563,8 +563,8 @@
         state.currentSkills = [];
         state.currentTranslations = [];
 
-        if (el.formContainer) el.formContainer.classList.remove('d-none');
-        if (el.tableContainer) el.tableContainer.classList.add('d-none');
+        if (el.formContainer) el.formContainer.style.display = 'block';
+        if (el.tableContainer) el.tableContainer.style.display = 'none';
 
         // Reset form
         if (el.form) el.form.reset();
@@ -607,8 +607,8 @@
     }
 
     function hideForm() {
-        if (el.formContainer) el.formContainer.classList.add('d-none');
-        if (el.tableContainer) el.tableContainer.classList.remove('d-none');
+        if (el.formContainer) el.formContainer.style.display = 'none';
+        if (el.tableContainer) el.tableContainer.style.display = 'block';
         state.currentJob = null;
         state.currentSkills = [];
         state.currentTranslations = [];
