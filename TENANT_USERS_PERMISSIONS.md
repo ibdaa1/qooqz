@@ -4,6 +4,8 @@
 
 The tenant_users management module has been updated with a comprehensive permission system that provides strict, granular control over who can view, create, edit, and delete tenant user assignments.
 
+**Important**: The system includes a fallback mode that allows tenant-scoped access when permissions haven't been configured yet, ensuring the module works out-of-the-box while maintaining security when permissions are properly set up.
+
 ## Changes Made
 
 ### 1. Permission System Implementation ✅
@@ -13,8 +15,9 @@ The tenant_users management module has been updated with a comprehensive permiss
 - Implemented dual-layer permission control:
   - **Role-based permissions** via `can()` function
   - **Resource-based permissions** via `can_view_all()`, `can_view_tenant()`, etc.
-- Added access denial for users without proper permissions
+- Added access denial for users without proper permissions (when configured)
 - Super admin automatically gets full access to all features
+- **Fallback mode**: When permissions aren't configured, grants basic tenant-scoped access
 
 #### API Route (`api/routes/tenant_users.php`)
 - Integrated with `admin_context.php` for permission checks
@@ -23,6 +26,7 @@ The tenant_users management module has been updated with a comprehensive permiss
   - **Tenant users** (`can_view_tenant`): See only their tenant's data
   - **Entity users** (`can_view_own` + entity_id): See only their entity's data
   - **Regular users** (`can_view_own`): See only their own records
+  - **Fallback**: If no permissions configured, defaults to tenant-scoped view
 
 #### Repository (`api/v1/models/tenant_users/repositories/PdoTenant_usersRepository.php`)
 - Modified `all()` and `count()` methods to support tenant filtering
@@ -31,6 +35,7 @@ The tenant_users management module has been updated with a comprehensive permiss
 ### 2. Excel Export Enhancement ✅
 
 #### JavaScript (`admin/assets/js/pages/tenant_users.js`)
+- Fixed export error: Changed `AF.loading()` to `AF.info()` for proper notification
 - Export now requires filters to be applied (prevents full database dump)
 - Exports respect current filters automatically
 - Shows warning if no filters are applied
@@ -39,6 +44,31 @@ The tenant_users management module has been updated with a comprehensive permiss
 - Users with entity assignments automatically see only their entity's data
 - Entity filtering is enforced at the API level
 - Cannot be bypassed through frontend manipulation
+
+## Fallback Mode (Permissions Not Configured)
+
+**What is Fallback Mode?**
+When the permission system detects that permissions haven't been configured in the database (via the SQL setup script), it automatically grants basic tenant-scoped access to logged-in users.
+
+**Benefits:**
+- Module works immediately after installation
+- No 403 errors or blank screens
+- Users can view data from their tenant by default
+- Graceful degradation until permissions are properly set up
+
+**Behavior in Fallback Mode:**
+- All logged-in users get `can_view_tenant` access
+- Data is scoped to user's current tenant
+- Super admins still get full access
+- No create/edit/delete permissions granted (UI hides these buttons)
+
+**When Fallback Mode is Active:**
+- No resource_permissions entries exist for tenant_users
+- `admin_resource_permissions()` returns empty
+- User is logged in but has no explicit permissions
+
+**How to Exit Fallback Mode:**
+Run the SQL setup script at `sql/tenant_users_permissions.sql` to configure proper permissions.
 
 ## Permission Levels
 
@@ -205,13 +235,21 @@ The tenant_users management module has been updated with a comprehensive permiss
 2. Check if filters match existing data
 3. Verify data exists: Check with SQL query
 
+### Export Fails with "AF.loading is not a function"
+**Cause:** AdminFramework doesn't have a `loading()` method
+
+**Solution:** ✅ FIXED
+- Updated to use `AF.info()` instead
+- Export now works correctly with proper notification
+
 ## Files Modified
 
-1. `/admin/fragments/tenant_users.php` - Added permission checks
-2. `/api/routes/tenant_users.php` - Added permission-based filtering
+1. `/admin/fragments/tenant_users.php` - Added permission checks with fallback mode
+2. `/api/routes/tenant_users.php` - Added permission-based filtering with fallback
 3. `/api/v1/models/tenant_users/repositories/PdoTenant_usersRepository.php` - Support for super admin viewing all
-4. `/admin/assets/js/pages/tenant_users.js` - Excel export filter requirement
+4. `/admin/assets/js/pages/tenant_users.js` - Fixed export error, added filter requirement
 5. `/sql/tenant_users_permissions.sql` - New permission setup script
+6. `/TENANT_USERS_PERMISSIONS.md` - Comprehensive documentation
 
 ## Maintenance
 
