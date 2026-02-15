@@ -15,9 +15,9 @@ final class JobCategoriesValidator
                 throw new InvalidArgumentException("Field 'tenant_id' is required.");
             }
 
-            if (empty($data['name'])) {
-                throw new InvalidArgumentException("Field 'name' is required.");
-            }
+            // Note: 'name' is not a field in job_categories table
+            // It only exists in job_category_translations table
+            // Translations are validated separately via validateTranslation()
         }
 
         // التحقق من tenant_id
