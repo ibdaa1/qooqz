@@ -143,8 +143,14 @@
 
 .filter-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
     align-items: flex-end;
+    justify-content: flex-start;
+}
+
+.filter-actions button {
+    white-space: nowrap;
 }
 
 /* Responsive */

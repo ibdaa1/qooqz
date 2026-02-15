@@ -231,16 +231,24 @@
     // ----------------------------
     function normalizeApiResponse(response) {
         // Accept shapes:
-        // - { success:true, message:'OK', data: [...], meta: {...} }
+        // - { success:true, message:'OK', data: {...}, meta: {...} } (ResponseFormatter)
         // - { items: [...], meta: {...} }
         // - [...] (array)
         // - { ...single object... }
-        let wrapper = null;
-        if (response && typeof response === 'object' && response.data !== undefined) wrapper = response;
-        const topMeta = response && typeof response === 'object' && response.meta ? response.meta : null;
-        const payload = wrapper ? wrapper.data : response;
-        const metaFromPayload = payload && typeof payload === 'object' && payload.meta ? payload.meta : null;
-        const meta = topMeta || metaFromPayload || null;
+        
+        let payload = response;
+        let meta = null;
+        
+        // If response has a 'data' property, it's likely wrapped by ResponseFormatter
+        if (response && typeof response === 'object' && response.data !== undefined) {
+            payload = response.data;
+        }
+        
+        // Extract meta from the payload (not from ResponseFormatter's meta)
+        if (payload && typeof payload === 'object' && payload.meta) {
+            meta = payload.meta;
+        }
+        
         return { payload, meta };
     }
 
@@ -816,12 +824,25 @@
     // ----------------------------
     async function exportToExcel() {
         try {
-            AF.loading(t('export.exporting', 'Exporting...'));
+            // Check if any filters with meaningful values are applied
+            const hasFilters = Object.keys(state.filters).length > 0 && 
+                Object.values(state.filters).some(value => 
+                    value !== null && value !== undefined && String(value).trim() !== ''
+                );
+            
+            // Require filters to be applied before exporting (prevent full data dump)
+            if (!hasFilters) {
+                AF.warning(t('export.no_filters', 'Please apply filters before exporting data'));
+                return;
+            }
+            
+            // Show notification that export is starting
+            AF.info(t('export.exporting', 'Exporting...'));
 
             // Build query params with current filters
             const params = new URLSearchParams({
                 ...state.filters,
-                per_page: 10000 // Request all records
+                per_page: 10000 // Request all records that match filters
             });
 
             // Fetch all data
@@ -900,10 +921,14 @@
             if (el.error) el.error.style.display = 'none';
             state.page = page;
             const params = new URLSearchParams({ page: page, per_page: state.perPage, ...state.filters });
+            console.log('[TenantUsers] API URL:', `${API}?${params}`);
+            console.log('[TenantUsers] Current filters:', state.filters);
             const response = await AF.get(`${API}?${params}`);
 
+            console.log('[TenantUsers] Raw API Response:', response);
             const { payload, meta } = normalizeApiResponse(response);
-            console.log('[TenantUsers] API Response:', payload);
+            console.log('[TenantUsers] Normalized payload:', payload);
+            console.log('[TenantUsers] Normalized meta:', meta);
 
             if (payload && payload.meta) {
                 state.meta = payload.meta;
@@ -925,11 +950,14 @@
 
             console.log('[TenantUsers] Loaded', items.length, 'items', 'meta=', finalMeta);
 
-            // Update pagination UI if helper exists
+            // Update pagination UI
             if (el.pagination && typeof AF.Table !== 'undefined' && typeof AF.Table.renderPagination === 'function') {
                 AF.Table.renderPagination(el.pagination, el.paginationInfo, finalMeta);
             } else if (el.paginationInfo) {
-                el.paginationInfo.textContent = `${finalMeta.page || page} / ${finalMeta.pages || 1} — ${finalMeta.total || 0}`;
+                // Calculate the range of items being displayed
+                const start = items.length > 0 ? ((finalMeta.page - 1) * finalMeta.per_page) + 1 : 0;
+                const end = Math.min(start + items.length - 1, finalMeta.total);
+                el.paginationInfo.textContent = `${start}-${end} of ${finalMeta.total}`;
             }
 
             renderTable(items || []);

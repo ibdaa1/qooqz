@@ -49,6 +49,16 @@ try {
     $raw = file_get_contents('php://input');
     $data = $raw ? json_decode($raw, true) : [];
 
+    // Parse RESTful URL for ID (e.g., /api/job_categories/3)
+    $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+    $uri = preg_replace('#^/api#', '', $uri);
+    $parts = array_filter(explode('/', trim($uri, '/')));
+    $parts = array_values($parts);
+    // If we have job_categories/123, extract the ID
+    if (count($parts) >= 2 && $parts[0] === 'job_categories' && is_numeric($parts[1])) {
+        $_GET['id'] = (int)$parts[1];
+    }
+
     $lang = $_GET['lang'] ?? 'ar';
     $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
     $limit = isset($_GET['limit']) ? min(1000, max(1, (int)$_GET['limit'])) : 100;

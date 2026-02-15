@@ -30,6 +30,8 @@ final class PdoTenant_usersRepository
      *  - user_id (int)
      *  - tenant_id (int)  <-- if provided will override $tenantId
      *
+     * NOTE: If $tenantId is 0, it means "all tenants" (super admin only)
+     *
      * Returns array of associative rows.
      */
     public function all(int $tenantId, int $perPage = 10, int $offset = 0, array $filters = []): array
@@ -39,8 +41,11 @@ final class PdoTenant_usersRepository
         $whereParts = [];
         $params = [];
 
-        $whereParts[] = 'tu.tenant_id = :tenantId';
-        $params[':tenantId'] = $effectiveTenantId;
+        // Only filter by tenant_id if > 0 (0 means super admin viewing all tenants)
+        if ($effectiveTenantId > 0) {
+            $whereParts[] = 'tu.tenant_id = :tenantId';
+            $params[':tenantId'] = $effectiveTenantId;
+        }
 
         if (!empty($filters['search'])) {
             // use distinct parameter names for each LIKE occurrence to avoid PDO named-parameter repetition issues
@@ -136,6 +141,8 @@ final class PdoTenant_usersRepository
 
     /**
      * Count tenant users with filters
+     * 
+     * NOTE: If $tenantId is 0, it means "all tenants" (super admin only)
      */
     public function count(int $tenantId, array $filters = []): int
     {
@@ -144,8 +151,11 @@ final class PdoTenant_usersRepository
         $whereParts = [];
         $params = [];
 
-        $whereParts[] = 'tu.tenant_id = :tenantId';
-        $params[':tenantId'] = $effectiveTenantId;
+        // Only filter by tenant_id if > 0 (0 means super admin viewing all tenants)
+        if ($effectiveTenantId > 0) {
+            $whereParts[] = 'tu.tenant_id = :tenantId';
+            $params[':tenantId'] = $effectiveTenantId;
+        }
 
         if (!empty($filters['search'])) {
             // same distinct placeholders here

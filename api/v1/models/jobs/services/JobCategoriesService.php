@@ -120,10 +120,25 @@ final class JobCategoriesService
         // Save category
         $categoryId = $this->repo->save($tenantId, $data);
 
-        // Save translation if provided
-        if ($categoryId && !empty($data['name'])) {
+        // Save translations if provided as array
+        if ($categoryId && !empty($data['translations']) && is_array($data['translations'])) {
+            foreach ($data['translations'] as $translation) {
+                if (!empty($translation['language_code']) && !empty($translation['name'])) {
+                    $this->saveTranslation($categoryId, $translation['language_code'], $translation);
+                }
+            }
+        }
+        // Legacy: Save single translation if provided
+        elseif ($categoryId && !empty($data['name'])) {
             $lang = $data['language_code'] ?? 'ar';
             $this->saveTranslation($categoryId, $lang, $data);
+        }
+
+        // Handle deleted translations if provided
+        if (!empty($data['deleted_translations']) && is_array($data['deleted_translations'])) {
+            foreach ($data['deleted_translations'] as $lang) {
+                $this->deleteTranslation($categoryId, $lang);
+            }
         }
 
         return $categoryId;
@@ -146,10 +161,25 @@ final class JobCategoriesService
         // Update category
         $categoryId = $this->repo->save($tenantId, $data);
 
-        // Update translation if provided
-        if (!empty($data['name'])) {
+        // Save translations if provided as array
+        if (!empty($data['translations']) && is_array($data['translations'])) {
+            foreach ($data['translations'] as $translation) {
+                if (!empty($translation['language_code']) && !empty($translation['name'])) {
+                    $this->saveTranslation($categoryId, $translation['language_code'], $translation);
+                }
+            }
+        }
+        // Legacy: Update single translation if provided
+        elseif (!empty($data['name'])) {
             $lang = $data['language_code'] ?? 'ar';
             $this->saveTranslation($categoryId, $lang, $data);
+        }
+
+        // Handle deleted translations if provided
+        if (!empty($data['deleted_translations']) && is_array($data['deleted_translations'])) {
+            foreach ($data['deleted_translations'] as $lang) {
+                $this->deleteTranslation($categoryId, $lang);
+            }
         }
 
         return $categoryId;

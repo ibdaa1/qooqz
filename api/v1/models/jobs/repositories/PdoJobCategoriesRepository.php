@@ -277,7 +277,7 @@ final class PdoJobCategoriesRepository
     // Create / Update Category
     // ================================
     private const CATEGORY_COLUMNS = [
-        'parent_id', 'slug', 'sort_order', 'is_active'
+        'parent_id', 'slug', 'sort_order', 'is_active', 'image_url', 'icon_url'
     ];
 
     public function save(int $tenantId, array $data): int
@@ -317,7 +317,9 @@ final class PdoJobCategoriesRepository
                     parent_id = :parent_id,
                     slug = :slug,
                     sort_order = :sort_order,
-                    is_active = :is_active
+                    is_active = :is_active,
+                    image_url = :image_url,
+                    icon_url = :icon_url
                 WHERE tenant_id = :tenant_id AND id = :id
             ");
             $stmt->execute($params);
@@ -328,9 +330,9 @@ final class PdoJobCategoriesRepository
 
         $stmt = $this->pdo->prepare("
             INSERT INTO job_categories (
-                tenant_id, parent_id, slug, sort_order, is_active
+                tenant_id, parent_id, slug, sort_order, is_active, image_url, icon_url
             ) VALUES (
-                :tenant_id, :parent_id, :slug, :sort_order, :is_active
+                :tenant_id, :parent_id, :slug, :sort_order, :is_active, :image_url, :icon_url
             )
         ");
         $stmt->execute($params);
