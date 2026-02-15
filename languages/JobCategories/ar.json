@@ -8,10 +8,19 @@
     "error": "حدث خطأ",
     "retry": "إعادة المحاولة"
   },
+  "tabs": {
+    "basic": "معلومات أساسية",
+    "translations": "الترجمات",
+    "media": "الوسائط"
+  },
+  "results": {
+    "count": "عرض {count} نتيجة"
+  },
   "table": {
     "headers": {
       "id": "المعرف",
       "tenant": "المستأجر",
+      "image": "الصورة",
       "name": "الاسم",
       "slug": "الرابط",
       "parent": "الفئة الأب",
@@ -39,11 +48,16 @@
     "search": "البحث",
     "search_placeholder": "البحث في الفئات...",
     "tenant_id": "معرف المستأجر",
+    "parent": "الفئة الأب",
     "parent_id": "الفئة الأب",
+    "all_parents": "جميع الفئات",
     "parent_options": {
       "all": "جميع الفئات"
     },
     "status": "الحالة",
+    "all_statuses": "جميع الحالات",
+    "active": "نشط",
+    "inactive": "غير نشط",
     "status_options": {
       "all": "الكل",
       "active": "نشط",
@@ -65,30 +79,45 @@
         "label": "المستأجر",
         "placeholder": "اختر المستأجر"
       },
+      "parent": {
+        "label": "الفئة الأب",
+        "placeholder": "اختر الفئة الأب (اختياري)",
+        "none": "بدون (مستوى أعلى)",
+        "help": "اختر فئة أب لبناء هيكل هرمي"
+      },
       "parent_id": {
         "label": "الفئة الأب",
         "placeholder": "اختر الفئة الأب (اختياري)"
       },
       "slug": {
         "label": "الرابط المختصر",
-        "placeholder": "ادخل الرابط المختصر"
+        "placeholder": "ادخل الرابط المختصر",
+        "help": "اتركه فارغاً للتوليد التلقائي"
       },
       "sort_order": {
         "label": "ترتيب الفرز",
-        "placeholder": "0"
+        "placeholder": "0",
+        "help": "الأرقام الأقل تظهر أولاً"
       },
       "is_active": {
-        "label": "نشط",
+        "label": "الحالة",
+        "active": "نشط",
+        "inactive": "غير نشط",
         "yes": "نعم",
         "no": "لا"
       }
     },
     "translations": {
       "title": "الترجمات",
+      "description": "أضف ترجمات بلغات مختلفة",
+      "language": "اللغة",
       "add_translation": "إضافة ترجمة",
       "choose_lang": "اختر اللغة",
       "name": "الاسم",
+      "name_placeholder": "أدخل اسم الفئة",
       "description": "الوصف",
+      "description_placeholder": "أدخل وصف الفئة",
+      "remove": "إزالة",
       "save": "حفظ",
       "cancel": "إلغاء",
       "delete": "حذف"

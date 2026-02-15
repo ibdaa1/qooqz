@@ -117,9 +117,15 @@ $apiBase = '/api';
 <link rel="stylesheet" href="/admin/assets/css/pages/job_categories.css?v=<?= time() ?>">
 <?php endif; ?>
 
+<!-- Set User Language for JavaScript -->
+<script>
+window.USER_LANGUAGE = window.USER_LANGUAGE || '<?= addslashes($lang) ?>';
+window.USER_DIR = window.USER_DIR || '<?= addslashes($dir) ?>';
+</script>
+
 <!-- Page Meta -->
 <meta data-page="job_categories"
-      data-i18n-files="/admin/languages/JobCategories/<?= rawurlencode($lang) ?>.json"
+      data-i18n-files="/languages/JobCategories/<?= rawurlencode($lang) ?>.json"
       data-image-type-id="<?= JOB_CATEGORY_IMAGE_TYPE_ID ?>">
 
 <!-- Page Container -->
