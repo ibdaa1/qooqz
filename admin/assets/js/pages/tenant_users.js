@@ -231,16 +231,24 @@
     // ----------------------------
     function normalizeApiResponse(response) {
         // Accept shapes:
-        // - { success:true, message:'OK', data: [...], meta: {...} }
+        // - { success:true, message:'OK', data: {...}, meta: {...} } (ResponseFormatter)
         // - { items: [...], meta: {...} }
         // - [...] (array)
         // - { ...single object... }
-        let wrapper = null;
-        if (response && typeof response === 'object' && response.data !== undefined) wrapper = response;
-        const topMeta = response && typeof response === 'object' && response.meta ? response.meta : null;
-        const payload = wrapper ? wrapper.data : response;
-        const metaFromPayload = payload && typeof payload === 'object' && payload.meta ? payload.meta : null;
-        const meta = topMeta || metaFromPayload || null;
+        
+        let payload = response;
+        let meta = null;
+        
+        // If response has a 'data' property, it's likely wrapped by ResponseFormatter
+        if (response && typeof response === 'object' && response.data !== undefined) {
+            payload = response.data;
+        }
+        
+        // Extract meta from the payload (not from ResponseFormatter's meta)
+        if (payload && typeof payload === 'object' && payload.meta) {
+            meta = payload.meta;
+        }
+        
         return { payload, meta };
     }
 
