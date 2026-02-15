@@ -409,6 +409,14 @@ $apiBase = '/api';
         </div>
     </div>
 
+    <!-- Media Studio Modal -->
+    <div id="mediaStudioModal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width:90%; height:90vh;">
+            <span class="close" id="mediaStudioClose" style="font-size:2rem; cursor:pointer; float:right;">&times;</span>
+            <iframe id="mediaStudioFrame" style="width:100%; height:calc(100% - 40px); border:none;"></iframe>
+        </div>
+    </div>
+
 </div>
 
 <!-- Load JavaScript -->

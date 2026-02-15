@@ -667,30 +667,55 @@
     // ----------------------------
     // MEDIA STUDIO INTEGRATION
     // ----------------------------
+    let _currentImageType = null;
+    
     function openMediaStudio(targetField) {
-        if (typeof window.MediaStudio !== 'undefined' && window.MediaStudio.open) {
-            window.MediaStudio.open({
-                mode: 'select',
-                imageType: IMAGE_TYPE_ID,
-                onSelect: (selected) => {
-                    if (selected && selected.url) {
-                        if (targetField === 'image') {
-                            if (el.categoryImageUrl) el.categoryImageUrl.value = selected.url;
-                            if (el.categoryImagePreview) {
-                                el.categoryImagePreview.innerHTML = `<img src="${esc(selected.url)}" alt="Category Image" style="max-width:200px;border-radius:8px;">`;
-                            }
-                        } else if (targetField === 'icon') {
-                            if (el.categoryIconUrl) el.categoryIconUrl.value = selected.url;
-                            if (el.categoryIconPreview) {
-                                el.categoryIconPreview.innerHTML = `<img src="${esc(selected.url)}" alt="Category Icon" style="max-width:100px;border-radius:8px;">`;
-                            }
-                        }
+        _currentImageType = targetField;
+        
+        if (el.mediaModal && el.mediaFrame) {
+            el.mediaModal.style.display = 'block';
+            const categoryId = el.formId?.value || 'new';
+            el.mediaFrame.src = `/admin/fragments/media_studio.php?embedded=1&tenant_id=${state.tenantId || 1}&lang=${state.language}&owner_id=${categoryId}&image_type_id=${IMAGE_TYPE_ID}`;
+            el.mediaFrame.dataset.targetField = targetField;
+        }
+    }
+    
+    function closeMediaStudio() {
+        if (el.mediaModal) {
+            el.mediaModal.style.display = 'none';
+            _currentImageType = null;
+        }
+    }
+    
+    function handleMediaMessage(event) {
+        if (!event.data || typeof event.data !== 'object') return;
+        
+        if (event.data.type === 'media-selected' || event.data.type === 'image-selected') {
+            const imageUrl = event.data.url || event.data.imageUrl;
+            const targetField = _currentImageType;
+            
+            if (imageUrl && targetField) {
+                if (targetField === 'image') {
+                    if (el.categoryImageUrl) el.categoryImageUrl.value = imageUrl;
+                    if (el.categoryImagePreview) {
+                        el.categoryImagePreview.innerHTML = `<img src="${esc(imageUrl)}" alt="Category Image" style="max-width:200px;border-radius:8px;">`;
+                    }
+                } else if (targetField === 'icon') {
+                    if (el.categoryIconUrl) el.categoryIconUrl.value = imageUrl;
+                    if (el.categoryIconPreview) {
+                        el.categoryIconPreview.innerHTML = `<img src="${esc(imageUrl)}" alt="Category Icon" style="max-width:100px;border-radius:8px;">`;
                     }
                 }
-            });
-        } else {
-            AF.warning(t('messages.media_studio_unavailable'));
+                closeMediaStudio();
+            }
         }
+    }
+
+    function esc(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
     }
 
     // ----------------------------
@@ -757,8 +782,16 @@
             paginationRange: document.getElementById('paginationRange'),
             paginationTotal: document.getElementById('paginationTotal'),
             paginationButtons: document.getElementById('paginationButtons'),
-            resultsCount: document.getElementById('resultsCount')
+            resultsCount: document.getElementById('resultsCount'),
+            mediaModal: document.getElementById('mediaStudioModal'),
+            mediaFrame: document.getElementById('mediaStudioFrame'),
+            mediaClose: document.getElementById('mediaStudioClose')
         };
+
+        // Get tenant_id from window config or meta tag
+        const metaTag = document.querySelector('meta[data-page="job_categories"]');
+        state.tenantId = (window.APP_CONFIG && window.APP_CONFIG.TENANT_ID) || 
+                        (metaTag && metaTag.dataset.tenantId) || 1;
 
         // Load translations and set direction
         await loadTranslations(state.language);
@@ -812,6 +845,12 @@
         el.filterSearch?.addEventListener('keyup', (e) => {
             if (e.key === 'Enter') applyFilters();
         });
+        
+        // Media studio close button
+        if (el.mediaClose) el.mediaClose.onclick = closeMediaStudio;
+        
+        // Media studio message listener
+        window.addEventListener('message', handleMediaMessage);
 
         console.log('[JobCategories] Initialized successfully');
     }
