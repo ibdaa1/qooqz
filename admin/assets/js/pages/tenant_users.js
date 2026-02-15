@@ -816,8 +816,11 @@
     // ----------------------------
     async function exportToExcel() {
         try {
-            // Check if any filters are applied
-            const hasFilters = Object.keys(state.filters).length > 0;
+            // Check if any filters with meaningful values are applied
+            const hasFilters = Object.keys(state.filters).length > 0 && 
+                Object.values(state.filters).some(value => 
+                    value !== null && value !== undefined && String(value).trim() !== ''
+                );
             
             // Require filters to be applied before exporting (prevent full data dump)
             if (!hasFilters) {
