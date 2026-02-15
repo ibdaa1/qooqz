@@ -3,14 +3,41 @@ declare(strict_types=1);
 
 /**
  * /admin/fragments/tenant_users.php
- * Production Version - Embedded-friendly
+ * Production Version - Embedded-friendly with Strict Permission Control
  *
+ * PERMISSION SYSTEM:
+ * This page implements dual-layer permission control:
+ * 
+ * 1. Role-based permissions (permissions table + role_permissions):
+ *    - tenant_users.manage
+ *    - tenant_users.create
+ *    - tenant_users.view
+ *    - tenant_users.edit
+ *    - tenant_users.delete
+ * 
+ * 2. Resource-based permissions (resource_permissions table):
+ *    - can_view_all: View all tenant users across all tenants (super admin)
+ *    - can_view_tenant: View all users within current tenant
+ *    - can_view_own: View only own user record
+ *    - can_create: Create new tenant user assignments
+ *    - can_edit_all: Edit any tenant user
+ *    - can_edit_own: Edit only own user record
+ *    - can_delete_all: Delete any tenant user
+ *    - can_delete_own: Delete only own user record
+ * 
+ * DATA FILTERING:
+ * - Super admins see all data across all tenants
+ * - Users with can_view_tenant see only their tenant's data
+ * - Users with entity_id assignment see only their entity's data
+ * - Users with can_view_own see only their own records
+ * 
  * Changes made:
  * - When loaded as fragment/embedded or AJAX we now load admin_context.php so helper functions (admin_user, admin_csrf, is_super_admin, admin_roles, admin_permissions, etc.) are available.
  * - Expose client-side globals: window.APP_CONFIG, window.CSRF_TOKEN, window.USER_LANGUAGE, window.USER_DIRECTION, and pagePermissions JSON.
  * - Robust translation loader that runs early (before module init) and stores translations at window.TENANT_USERS_TRANSLATIONS.
  * - Embedded init polling waits for AdminFramework + TenantUsers and initializes the module.
  * - Preserves standalone header/footer behavior.
+ * - Strict permission enforcement with proper access denial
  */
 
 // ════════════════════════════════════════════════════════════
