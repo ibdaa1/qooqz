@@ -913,10 +913,14 @@
             if (el.error) el.error.style.display = 'none';
             state.page = page;
             const params = new URLSearchParams({ page: page, per_page: state.perPage, ...state.filters });
+            console.log('[TenantUsers] API URL:', `${API}?${params}`);
+            console.log('[TenantUsers] Current filters:', state.filters);
             const response = await AF.get(`${API}?${params}`);
 
+            console.log('[TenantUsers] Raw API Response:', response);
             const { payload, meta } = normalizeApiResponse(response);
-            console.log('[TenantUsers] API Response:', payload);
+            console.log('[TenantUsers] Normalized payload:', payload);
+            console.log('[TenantUsers] Normalized meta:', meta);
 
             if (payload && payload.meta) {
                 state.meta = payload.meta;
@@ -938,11 +942,14 @@
 
             console.log('[TenantUsers] Loaded', items.length, 'items', 'meta=', finalMeta);
 
-            // Update pagination UI if helper exists
+            // Update pagination UI
             if (el.pagination && typeof AF.Table !== 'undefined' && typeof AF.Table.renderPagination === 'function') {
                 AF.Table.renderPagination(el.pagination, el.paginationInfo, finalMeta);
             } else if (el.paginationInfo) {
-                el.paginationInfo.textContent = `${finalMeta.page || page} / ${finalMeta.pages || 1} — ${finalMeta.total || 0}`;
+                // Calculate the range of items being displayed
+                const start = items.length > 0 ? ((finalMeta.page - 1) * finalMeta.per_page) + 1 : 0;
+                const end = Math.min(start + items.length - 1, finalMeta.total);
+                el.paginationInfo.textContent = `${start}-${end} of ${finalMeta.total}`;
             }
 
             renderTable(items || []);
