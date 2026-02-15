@@ -816,12 +816,21 @@
     // ----------------------------
     async function exportToExcel() {
         try {
+            // Check if any filters are applied
+            const hasFilters = Object.keys(state.filters).length > 0;
+            
+            // Require filters to be applied before exporting (prevent full data dump)
+            if (!hasFilters) {
+                AF.warning(t('export.no_filters', 'Please apply filters before exporting data'));
+                return;
+            }
+            
             AF.loading(t('export.exporting', 'Exporting...'));
 
             // Build query params with current filters
             const params = new URLSearchParams({
                 ...state.filters,
-                per_page: 10000 // Request all records
+                per_page: 10000 // Request all records that match filters
             });
 
             // Fetch all data

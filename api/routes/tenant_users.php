@@ -32,6 +32,50 @@ if (!$pdo instanceof PDO) {
 // Current tenant from session (or default)
 $tenantId = isset($_SESSION['tenant_id']) ? (int)$_SESSION['tenant_id'] : 1;
 
+// Load admin context to get permission functions
+if (file_exists(dirname(__DIR__, 2) . '/admin/includes/admin_context.php')) {
+    require_once dirname(__DIR__, 2) . '/admin/includes/admin_context.php';
+}
+
+// Get current user's entity_id and determine permission scope
+$currentUserId = null;
+$currentEntityId = null;
+$isSuperAdmin = false;
+$canViewAll = false;
+$canViewTenant = false;
+$canViewOwn = false;
+
+if (function_exists('admin_user')) {
+    $adminUser = admin_user();
+    $currentUserId = (int)($adminUser['id'] ?? 0);
+    
+    // Check if super admin
+    if (function_exists('is_super_admin')) {
+        $isSuperAdmin = is_super_admin();
+    }
+    
+    // Get resource permissions
+    if (function_exists('can_view_all')) {
+        $canViewAll = can_view_all('tenant_users');
+    }
+    if (function_exists('can_view_tenant')) {
+        $canViewTenant = can_view_tenant('tenant_users');
+    }
+    if (function_exists('can_view_own')) {
+        $canViewOwn = can_view_own('tenant_users');
+    }
+    
+    // Get user's entity_id from tenant_users table
+    if ($currentUserId > 0 && !$isSuperAdmin && !$canViewAll) {
+        $stmt = $pdo->prepare("SELECT entity_id FROM tenant_users WHERE user_id = ? AND tenant_id = ? LIMIT 1");
+        $stmt->execute([$currentUserId, $tenantId]);
+        $userTenant = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($userTenant && isset($userTenant['entity_id'])) {
+            $currentEntityId = (int)$userTenant['entity_id'];
+        }
+    }
+}
+
 // Instantiate dependencies
 $repo = new PdoTenant_usersRepository($pdo);
 $validator = new Tenant_usersValidator();
@@ -93,6 +137,25 @@ try {
 
         // list with filters and pagination — pass $_GET to controller
         $query = $_GET ?? [];
+        
+        // Apply permission-based filtering
+        if (!$isSuperAdmin) {
+            // If user can only view tenant data, ensure tenant_id is set
+            if ($canViewTenant && !$canViewAll) {
+                $query['tenant_id'] = $tenantId;
+            }
+            
+            // If user can only view their entity's data, add entity filter
+            if (!$canViewAll && !$canViewTenant && $canViewOwn && $currentEntityId !== null) {
+                $query['entity_id'] = $currentEntityId;
+            }
+            
+            // If user can only view own data and not others, filter by user_id
+            if (!$canViewAll && !$canViewTenant && $canViewOwn && $currentEntityId === null && $currentUserId > 0) {
+                $query['user_id'] = $currentUserId;
+            }
+        }
+        
         $result = $controller->list($tenantId, $query);
         ResponseFormatter::success($result);
         return;

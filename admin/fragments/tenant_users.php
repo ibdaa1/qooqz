@@ -32,23 +32,65 @@ if ($isFragment) {
 }
 
 // ════════════════════════════════════════════════════════════
-// READ CONTEXT / PAYLOAD
+// VERIFY USER IS LOGGED IN
 // ════════════════════════════════════════════════════════════
-$payload = $GLOBALS['ADMIN_UI'] ?? [];
-$user = $payload['user'] ?? (function_exists('admin_user') ? admin_user() : []);
-$permissions = $user['permissions'] ?? [];
-$roles = $user['roles'] ?? [];
-$lang = $payload['lang'] ?? ($user['preferred_language'] ?? 'en');
-$dir = $payload['direction'] ?? ($lang === 'ar' ? 'rtl' : 'ltr');
-$csrf = $payload['csrf_token'] ?? (function_exists('admin_csrf') ? admin_csrf() : '');
+if (!is_admin_logged_in()) {
+    if ($isFragment) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Not authenticated']);
+        exit;
+    } else {
+        header('Location: /admin/login.php');
+        exit;
+    }
+}
 
-// Permissions
-$isSuperAdmin = in_array('super_admin', $roles, true) || (function_exists('is_super_admin') && is_super_admin());
-$canCreate = $isSuperAdmin || in_array('manage_tenant_users', $permissions, true);
-$canEdit = $canCreate;
-$canDelete = $canCreate;
+// ════════════════════════════════════════════════════════════
+// GET USER CONTEXT & PERMISSIONS
+// ════════════════════════════════════════════════════════════
+$user = admin_user();
+$lang = admin_lang();
+$dir = admin_dir();
+$csrf = admin_csrf();
+$tenantId = admin_tenant_id();
 
-// Translation helpers (use existing i18n_get if available)
+// ════════════════════════════════════════════════════════════
+// CHECK PERMISSIONS
+// ════════════════════════════════════════════════════════════
+
+// Method 1: Using role-based permissions
+$canManageTenantUsers = can('tenant_users.manage') || can('tenant_users.create');
+
+// Method 2: Using resource-based permissions (recommended for granular control)
+$canViewAll = can_view_all('tenant_users');
+$canViewOwn = can_view_own('tenant_users');
+$canViewTenant = can_view_tenant('tenant_users');
+$canCreate = can_create('tenant_users');
+$canEditAll = can_edit_all('tenant_users');
+$canEditOwn = can_edit_own('tenant_users');
+$canDeleteAll = can_delete_all('tenant_users');
+$canDeleteOwn = can_delete_own('tenant_users');
+
+// Combined permissions for UI
+$canView = $canViewAll || $canViewOwn || $canViewTenant;
+$canEdit = $canEditAll || $canEditOwn || $canManageTenantUsers;
+$canDelete = $canDeleteAll || $canDeleteOwn || $canManageTenantUsers;
+
+// If user has no view permission at all, deny access
+if (!$canView && !is_super_admin()) {
+    if ($isFragment) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Access denied']);
+        exit;
+    } else {
+        http_response_code(403);
+        die('Access denied: You do not have permission to view tenant users');
+    }
+}
+
+// ════════════════════════════════════════════════════════════
+// TRANSLATION HELPERS
+// ════════════════════════════════════════════════════════════
 function __t($key, $fallback = '') {
     if (function_exists('i18n_get')) {
         $v = i18n_get($key);
@@ -65,8 +107,10 @@ function __tr($key, $replacements = []) {
     return $text;
 }
 
-// API base (make sure it's consistent with your platform)
-$apiBase = $payload['api_base'] ?? '/api';
+// ════════════════════════════════════════════════════════════
+// API BASE
+// ════════════════════════════════════════════════════════════
+$apiBase = '/api';
 
 ?>
 <!-- Force load CSS if embedded -->
@@ -410,16 +454,29 @@ $apiBase = $payload['api_base'] ?? '/api';
 <script type="text/javascript">
 window.APP_CONFIG = window.APP_CONFIG || {};
 window.APP_CONFIG.API_BASE = window.APP_CONFIG.API_BASE || <?= json_encode($apiBase) ?>;
-window.APP_CONFIG.TENANT_ID = window.APP_CONFIG.TENANT_ID || 0;
+window.APP_CONFIG.TENANT_ID = window.APP_CONFIG.TENANT_ID || <?= json_encode($tenantId) ?>;
 window.APP_CONFIG.CSRF_TOKEN = window.APP_CONFIG.CSRF_TOKEN || <?= json_encode($csrf) ?>;
-window.APP_CONFIG.IS_SUPER_ADMIN = window.APP_CONFIG.IS_SUPER_ADMIN || <?= $isSuperAdmin ? 'true' : 'false' ?>;
+window.APP_CONFIG.IS_SUPER_ADMIN = window.APP_CONFIG.IS_SUPER_ADMIN || <?= is_super_admin() ? 'true' : 'false' ?>;
 
 window.USER_LANGUAGE = window.USER_LANGUAGE || <?= json_encode($lang) ?>;
 window.USER_DIRECTION = window.USER_DIRECTION || <?= json_encode($dir) ?>;
 window.CSRF_TOKEN = window.CSRF_TOKEN || <?= json_encode($csrf) ?>;
 
-// Page permissions available to JS
-window.PAGE_PERMISSIONS = <?= json_encode(['canCreate' => $canCreate, 'canEdit' => $canEdit, 'canDelete' => $canDelete], JSON_UNESCAPED_UNICODE) ?>;
+// Page permissions available to JS - Granular permissions
+window.PAGE_PERMISSIONS = <?= json_encode([
+    'canCreate' => $canCreate,
+    'canEdit' => $canEdit,
+    'canDelete' => $canDelete,
+    'canView' => $canView,
+    'canViewAll' => $canViewAll,
+    'canViewOwn' => $canViewOwn,
+    'canViewTenant' => $canViewTenant,
+    'canEditAll' => $canEditAll,
+    'canEditOwn' => $canEditOwn,
+    'canDeleteAll' => $canDeleteAll,
+    'canDeleteOwn' => $canDeleteOwn,
+    'isSuperAdmin' => is_super_admin()
+], JSON_UNESCAPED_UNICODE) ?>;
 </script>
 
 <!-- Translation loader (runs early) -->
