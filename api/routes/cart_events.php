@@ -135,7 +135,9 @@ try {
                 exit;
             }
 
-            $entityId = isset($data['entity_id']) && is_numeric($data['entity_id']) ? (int)$data['entity_id'] : 1;
+            $entityId = isset($data['entity_id']) && is_numeric($data['entity_id'])
+                ? (int)$data['entity_id']
+                : (isset($_SESSION['entity_id']) ? (int)$_SESSION['entity_id'] : (int)($tenantId ?? 1));
 
             $stmt = $pdo->prepare("
                 INSERT INTO cart_events (entity_id, cart_id, event_type, actor_type, actor_id, related_item_id, old_value, new_value, note)

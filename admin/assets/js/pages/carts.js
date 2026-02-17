@@ -290,7 +290,15 @@
                 document.getElementById('editCartId').value = c.id || id;
                 document.getElementById('editCartStatus').value = c.status || 'active';
                 document.getElementById('editCartCoupon').value = c.coupon_code || '';
-                var exp = c.expires_at ? c.expires_at.replace(' ', 'T').substring(0, 16) : '';
+                var exp = '';
+                if (c.expires_at) {
+                    try {
+                        var dt = new Date(c.expires_at);
+                        if (!isNaN(dt.getTime())) {
+                            exp = dt.toISOString().substring(0, 16);
+                        }
+                    } catch (ex) { exp = ''; }
+                }
                 document.getElementById('editCartExpires').value = exp;
                 document.getElementById('editCartTitle').textContent = 'Edit Cart #' + id;
                 document.getElementById('editCartModal').style.display = 'block';
