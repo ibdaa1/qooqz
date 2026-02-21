@@ -548,9 +548,62 @@ function __cm_t($key, $fallback = '') {
                 <span data-i18n="detail.actions.audit">Audit This Request</span>
             </button>
             <?php endif; ?>
+            <?php if ($canIssue): ?>
+            <button class="btn btn-success" id="btnIssueFromDetail" style="display:none">
+                <i class="fas fa-stamp"></i>
+                <span data-i18n="detail.actions.issue">Issue Certificate</span>
+            </button>
+            <?php endif; ?>
         </div>
     </div>
 </div>
+
+<!-- ══ MODAL: ISSUE CERTIFICATE ════════════════════════════════════════ -->
+<?php if ($canIssue): ?>
+<div id="modalIssue" class="cm-modal-backdrop" style="display:none">
+    <div class="cm-modal">
+        <div class="cm-modal-header">
+            <h3 class="cm-modal-title" data-i18n="issue.modal.title">Issue Certificate</h3>
+            <button class="cm-modal-close" id="btnCloseIssueModal"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="cm-modal-body">
+            <div class="cm-request-summary" id="issueSummary"></div>
+            <form id="issueForm" novalidate>
+                <input type="hidden" id="issueFormRequestId">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-i18n="issue.form.issued_at">Issue Date <span class="req">*</span></label>
+                        <input type="datetime-local" id="issueFormIssuedAt" name="issued_at" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="issue.form.printable_until">Valid Until <span class="req">*</span></label>
+                        <input type="datetime-local" id="issueFormPrintableUntil" name="printable_until" class="form-control" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="issue.form.language">Language</label>
+                    <select id="issueFormLanguage" name="language_code" class="form-control">
+                        <option value="ar">Arabic (AR)</option>
+                        <option value="en">English (EN)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="issue.form.notes">Notes</label>
+                    <textarea id="issueFormNotes" name="notes" class="form-control" rows="2"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="cm-modal-footer">
+            <button class="btn btn-outline" id="btnCancelIssue" data-i18n="common.cancel">Cancel</button>
+            <button class="btn btn-success" id="btnSubmitIssue">
+                <i class="fas fa-stamp"></i>
+                <span data-i18n="issue.form.submit">Issue Certificate</span>
+            </button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- ══ TOAST ════════════════════════════════════════════════════════════ -->
 <div id="cmToast" class="cm-toast" style="display:none"></div>
@@ -574,6 +627,7 @@ window.CERT_MGMT_CFG = {
     apiProductsTrans: '/api/certificates_products_translations',
     apiVersions     : '/api/certificates_versions',
     apiTenantUsers  : '/api/tenant_users',
+    apiNotifications: '/api/notifications',
     apiLanguages    : '/api/languages',
     apiTenants      : '/api/tenants',
     csrfToken       : '<?= addslashes($csrf) ?>',
