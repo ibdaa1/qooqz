@@ -19,6 +19,11 @@
     const API_PROD = CFG.apiProducts || '/api/certificates_products';
     const API_PT = CFG.apiProductsTrans || '/api/certificates_products_translations';
     const API_TU = CFG.apiTenantUsers || '/api/tenant_users';
+    const API_NOTIF = CFG.apiNotifications || '/api/notifications';
+
+    /* ── Notification type IDs (from notification_types table) ─────── */
+    const NOTIF_TYPE_AUDIT_COMPLETED = CFG.notifTypeAuditCompleted || 12;
+    const NOTIF_TYPE_AUDIT_REJECTED  = CFG.notifTypeAuditRejected  || 13;
 
     /* ── Low-level HTTP ─────────────────────────────────────────────── */
     const CSRF = () => window.CERT_MGMT_CFG?.csrfToken
@@ -61,7 +66,9 @@
         pages: { requests: 1, audits: 1, payments: 1, issued: 1, logs: 1 },
         filters: { requests: {}, audits: {}, payments: {}, issued: {}, logs: {} },
         currentAuditRequestId: null,
+        currentAuditEntityId: null,
         currentPaymentId: null,
+        currentIssueRequestId: null,
     };
 
     /* ── Helpers ───────────────────────────────────────────────────── */
@@ -168,7 +175,7 @@
             const p = { limit: 1000, lang: S.lang };
             if (!S.perms.isSuperAdmin) p.tenant_id = S.tenantId;
             S.entities = pick(await apiGet(buildUrl(API_ENT, p)))
-                .map(e => ({ id: e.id, name: e.store_name || e.name || `#${e.id}` }));
+                .map(e => ({ id: e.id, name: e.store_name || e.name || `#${e.id}`, user_id: e.user_id || null }));
             populateEntityFilter();
         } catch (e) { console.warn('entities:', e.message); }
     }
@@ -206,6 +213,7 @@
     }
 
     const getEntityName = id => S.entities.find(e => e.id == id)?.name || `#${id}`;
+    const getEntityUserId = id => S.entities.find(e => e.id == id)?.user_id || null;
     const getCertName = id => { const c = S.certificates.find(c => c.id == id); return c ? (c.code || c.description || `#${id}`) : `#${id}`; };
     const getProductName = id => S.products.find(p => p.id == id)?.name || `#${id}`;
     const getUserName = id => {
@@ -281,7 +289,8 @@ ${isSA ? `<td>${esc(r.tenant_name || r.tenant_id || '')}</td>` : ''}
 <td>
   <div class="td-actions">
     <button class="btn btn-sm btn-outline" onclick="CertificateManagement.viewDetail(${r.id})" title="${t('common.view', 'View')}"><i class="fas fa-eye"></i></button>
-    ${S.perms.canAudit && r.status === 'under_review' ? `<button class="btn btn-sm btn-secondary" onclick="CertificateManagement.openAudit(${r.id})"><i class="fas fa-search"></i></button>` : ''}
+    ${S.perms.canAudit && r.status === 'under_review' ? `<button class="btn btn-sm btn-secondary" onclick="CertificateManagement.openAudit(${r.id})" title="${t('tabs.audits', 'Audit')}"><i class="fas fa-search"></i></button>` : ''}
+    ${S.perms.canIssue && r.status === 'approved' ? `<button class="btn btn-sm btn-success" onclick="CertificateManagement.openIssue(${r.id})" title="${t('issue.modal.title', 'Issue Certificate')}"><i class="fas fa-stamp"></i></button>` : ''}
   </div>
 </td>
 </tr>`;
@@ -491,6 +500,12 @@ ${isSA ? `<td>${esc(r.tenant_name || r.tenant_id || '')}</td>` : ''}
                 auditBtn.onclick = () => { closeModal('modalDetail'); openAudit(id); };
             }
 
+            const issueBtn = q('btnIssueFromDetail');
+            if (issueBtn) {
+                issueBtn.style.display = (S.perms.canIssue && req.status === 'approved') ? '' : 'none';
+                issueBtn.onclick = () => { closeModal('modalDetail'); openIssue(id); };
+            }
+
             const itemsHtml = items.length ? `
 <table class="cm-detail-table"><thead><tr>
   <th>#</th><th>${t('req_table.product', 'Product')}</th>
@@ -557,6 +572,7 @@ ${itemsHtml}`;
             const raw = await apiGet(buildUrl(API_REQ, { id: requestId, lang: S.lang }));
             const req = pick(raw)[0] || (raw?.id ? raw : null);
             if (req) {
+                S.currentAuditEntityId = req.entity_id || null;
                 q('auditRequestSummary').innerHTML = `
 <div class="cm-summary-row"><i class="fas fa-building"></i> <strong>${esc(getEntityName(req.entity_id))}</strong></div>
 <div class="cm-summary-row"><i class="fas fa-certificate"></i> ${esc(getCertName(req.certificate_id))}</div>
@@ -614,6 +630,26 @@ ${itemsHtml}`;
             toast(t('audit.success', 'Audit submitted successfully'));
             loadRequests(S.pages.requests);
             if (S.activeTab === 'audits') loadAudits(S.pages.audits);
+
+            // Send audit notification to entity owner
+            try {
+                const entityUserId = getEntityUserId(S.currentAuditEntityId);
+                if (entityUserId) {
+                    const notifTypeId = status === 'approved' ? NOTIF_TYPE_AUDIT_COMPLETED : NOTIF_TYPE_AUDIT_REJECTED;
+                    const notifTitle = status === 'approved'
+                        ? t('audit.notif.approved_title', 'تم التدقيق')
+                        : t('audit.notif.rejected_title', 'تم رفض التدقيق');
+                    const notifMsg = `${notifTitle} - ${t('req_table.id', 'Request')} #${reqId}${notes ? ' - ' + notes.slice(0, 200) : ''}`;
+                    await apiPost(API_NOTIF, {
+                        user_id: entityUserId,
+                        entity_id: S.currentAuditEntityId,
+                        title: notifTitle,
+                        message: notifMsg,
+                        notification_type_id: notifTypeId,
+                        data: JSON.stringify({ request_id: reqId, audit_status: status }),
+                    });
+                }
+            } catch (ne) { console.warn('audit notification:', ne.message); }
         } catch (e) {
             toast(t('common.error', 'Error: ') + e.message, false);
         } finally {
@@ -679,6 +715,69 @@ ${itemsHtml}`;
 
     /* ── Modals ─────────────────────────────────────────────────────── */
     function closeModal(id) { const m = q(id); if (m) m.style.display = 'none'; }
+
+    /* ══════════════════════════════════════════════════════════════════
+       MODAL: ISSUE CERTIFICATE
+    ══════════════════════════════════════════════════════════════════ */
+    async function openIssue(requestId) {
+        const modal = q('modalIssue'); if (!modal) return;
+        S.currentIssueRequestId = requestId;
+        const dateNow = new Date().toISOString().slice(0, 16);
+        const msInYear = 365 * 24 * 60 * 60 * 1000;
+        const dateIn1Year = new Date(Date.now() + msInYear).toISOString().slice(0, 16);
+        const dt = q('issueFormIssuedAt'); if (dt) dt.value = dateNow;
+        const pu = q('issueFormPrintableUntil'); if (pu) pu.value = dateIn1Year;
+        const lf = q('issueFormLanguage'); if (lf) lf.value = S.lang;
+        const nf = q('issueFormNotes'); if (nf) nf.value = '';
+
+        try {
+            const raw = await apiGet(buildUrl(API_REQ, { id: requestId, lang: S.lang }));
+            const req = pick(raw)[0] || (raw?.id ? raw : null);
+            if (req) {
+                const su = q('issueSummary');
+                if (su) su.innerHTML = `
+<div class="cm-summary-row"><i class="fas fa-building"></i> <strong>${esc(getEntityName(req.entity_id))}</strong></div>
+<div class="cm-summary-row"><i class="fas fa-certificate"></i> ${esc(getCertName(req.certificate_id))}</div>
+<div class="cm-summary-row"><i class="fas fa-user-tie"></i> ${esc(req.importer_name || '—')}</div>
+<div class="cm-summary-row">${statusBadge(req.status)} ${payBadge(req.payment_status)}</div>`;
+            }
+        } catch (e) { console.warn('openIssue:', e.message); }
+
+        modal.style.display = 'flex';
+    }
+
+    async function submitIssue() {
+        const btn = q('btnSubmitIssue');
+        const reqId = S.currentIssueRequestId;
+        const issuedAt = q('issueFormIssuedAt')?.value;
+        const printableUntil = q('issueFormPrintableUntil')?.value;
+        const language = q('issueFormLanguage')?.value || S.lang;
+        const notes = q('issueFormNotes')?.value || '';
+
+        if (!issuedAt || !printableUntil) { toast(t('common.validation', 'Fill required fields'), false); return; }
+        const issuedById = window.APP_CONFIG?.USER_ID;
+        if (!issuedById) { toast(t('common.error', 'User session unavailable'), false); return; }
+        if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i>`; }
+
+        try {
+            await apiPost(API_ISSUED, {
+                request_id: reqId,
+                issued_at: issuedAt.replace('T', ' '),
+                printable_until: printableUntil.replace('T', ' '),
+                language_code: language,
+                issued_by: issuedById,
+                notes,
+            });
+            closeModal('modalIssue');
+            toast(t('issue.success', 'Certificate issued successfully'));
+            loadRequests(S.pages.requests);
+            if (S.activeTab === 'issued') loadIssued(S.pages.issued);
+        } catch (e) {
+            toast(t('common.error', 'Error: ') + e.message, false);
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = `<i class="fas fa-stamp"></i> ${t('issue.form.submit', 'Issue Certificate')}`; }
+        }
+    }
 
     function tabState(tab, state) {
         const prefix = { requests: 'req', audits: 'audit', payments: 'pay', issued: 'issued', logs: 'log' }[tab];
@@ -754,10 +853,13 @@ ${itemsHtml}`;
         q('btnSubmitPay')?.addEventListener('click', submitPaymentVerify);
         q('btnCancelPay')?.addEventListener('click', () => closeModal('modalPayment'));
         q('btnClosePayModal')?.addEventListener('click', () => closeModal('modalPayment'));
+        q('btnSubmitIssue')?.addEventListener('click', submitIssue);
+        q('btnCancelIssue')?.addEventListener('click', () => closeModal('modalIssue'));
+        q('btnCloseIssueModal')?.addEventListener('click', () => closeModal('modalIssue'));
         q('btnCloseDetail')?.addEventListener('click', () => closeModal('modalDetail'));
         q('btnCloseDetailFooter')?.addEventListener('click', () => closeModal('modalDetail'));
 
-        ['modalAudit', 'modalPayment', 'modalDetail'].forEach(id => {
+        ['modalAudit', 'modalPayment', 'modalDetail', 'modalIssue'].forEach(id => {
             const m = q(id);
             if (m) m.addEventListener('click', e => { if (e.target === m) closeModal(id); });
         });
@@ -772,7 +874,7 @@ ${itemsHtml}`;
     }
 
     /* ── Public ─────────────────────────────────────────────────────── */
-    window.CertificateManagement = { init, switchTab, viewDetail, openAudit, openPaymentVerify };
+    window.CertificateManagement = { init, switchTab, viewDetail, openAudit, openPaymentVerify, openIssue };
 
     // Named functions for pagination inline onclick
     window.loadRequests = loadRequests;
