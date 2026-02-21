@@ -556,7 +556,7 @@
             const canDelete = state.permissions.canDelete || state.permissions.canDeleteAll ||
                 (state.permissions.canDeleteOwn && entity.user_id == state.userId);
 
-            const typeBadge = entity.parent_id
+            const typeBadge = (entity.parent_id !== null && entity.parent_id !== undefined && entity.parent_id !== '' && parseInt(entity.parent_id, 10) > 0)
                 ? `<span class="badge badge-info">${t('form.fields.entity_type.branch', 'Branch')}</span><br><small style="color:var(--text-secondary,#94a3b8);">#${esc(entity.parent_id)}</small>`
                 : `<span class="badge badge-primary">${t('form.fields.entity_type.main', 'Main')}</span>`;
 
