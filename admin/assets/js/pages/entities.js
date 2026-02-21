@@ -150,7 +150,8 @@
                 fields: {
                     store_name: { label: g.store_name, placeholder: g.store_name, required: val.name_required },
                     slug: { label: g.slug, placeholder: g.slug },
-                    is_main: { label: g.is_main, yes: g.yes, no: g.no },
+                    entity_type: { label: g.entity_type || 'Entity Type', main: g.main_entity || 'Main Entity', branch: g.branch || 'Branch' },
+                    parent_id: { label: g.parent_id || 'Parent Entity ID', placeholder: g.parent_id_placeholder || 'Enter parent entity ID', required: g.parent_id_required || 'Parent ID is required for branches', validate: g.validate || 'Validate' },
                     branch_code: { label: g.branch_code, placeholder: g.branch_code },
                     vendor_type: { label: vendor.vendor_type },
                     store_type: { label: store.store_type },
@@ -555,6 +556,10 @@
             const canDelete = state.permissions.canDelete || state.permissions.canDeleteAll ||
                 (state.permissions.canDeleteOwn && entity.user_id == state.userId);
 
+            const typeBadge = entity.parent_id
+                ? `<span class="badge badge-info">${t('form.fields.entity_type.branch', 'Branch')}</span><br><small style="color:var(--text-secondary,#94a3b8);">#${esc(entity.parent_id)}</small>`
+                : `<span class="badge badge-primary">${t('form.fields.entity_type.main', 'Main')}</span>`;
+
             return `
                 <tr data-id="${entity.id}">
                     <td>${esc(entity.id)}</td>
@@ -563,6 +568,7 @@
                         ${logo ? `<img src="${esc(logo)}" alt="${esc(name)}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;">` : '🏢'}
                     </td>
                     <td><strong>${esc(name)}</strong><br><small style="color:var(--text-secondary,#94a3b8);">${esc(entity.branch_code || '')}</small></td>
+                    <td>${typeBadge}</td>
                     <td>${esc(entity.branch_code || '-')}</td>
                     <td>${esc(entity.vendor_type || '-')}</td>
                     <td>${esc(phone)}</td>
@@ -619,7 +625,15 @@
 
             if (el.entityStoreName) el.entityStoreName.value = entity.original_store_name || entity.store_name || '';
             if (el.entitySlug) el.entitySlug.value = entity.slug || '';
-            if (el.entityIsMain) el.entityIsMain.value = entity.is_main ?? '1';
+            if (el.entityType) {
+                const hasParent = entity.parent_id && entity.parent_id !== '0' && entity.parent_id !== 0;
+                el.entityType.value = hasParent ? 'branch' : 'main';
+                toggleParentIdField(hasParent);
+            }
+            if (el.entityParentId) el.entityParentId.value = entity.parent_id || '';
+            if (entity.parent_id) {
+                validateParentId(entity.parent_id);
+            }
             if (el.entityBranchCode) el.entityBranchCode.value = entity.branch_code || '';
             if (el.entityVendorType) el.entityVendorType.value = entity.vendor_type || 'product_seller';
             if (el.entityStoreType) el.entityStoreType.value = entity.store_type || 'individual';
@@ -697,6 +711,72 @@
     }
 
     // ════════════════════════════════════════════════════════════
+    // PARENT ID MANAGEMENT
+    // ════════════════════════════════════════════════════════════
+    function toggleParentIdField(showParent) {
+        const group = el.parentIdGroup || document.getElementById('parentIdGroup');
+        if (group) {
+            group.style.display = showParent ? '' : 'none';
+        }
+        if (!showParent && el.entityParentId) {
+            el.entityParentId.value = '';
+            const result = el.parentValidationResult || document.getElementById('parentValidationResult');
+            if (result) {
+                result.style.display = 'none';
+                result.innerHTML = '';
+            }
+        }
+    }
+
+    async function validateParentId(parentId) {
+        const resultEl = el.parentValidationResult || document.getElementById('parentValidationResult');
+        if (!resultEl) return false;
+
+        if (!parentId || isNaN(parentId) || parseInt(parentId, 10) <= 0) {
+            resultEl.style.display = 'block';
+            resultEl.className = 'parent-validation-result validation-error';
+            resultEl.innerHTML = '<i class="fas fa-times-circle"></i> ' + t('form.fields.parent_id.required', 'Please enter a valid parent ID');
+            return false;
+        }
+
+        // لا يمكن أن يكون الكيان أبًا لنفسه
+        const currentId = el.formId ? el.formId.value : '';
+        if (currentId && parseInt(parentId, 10) === parseInt(currentId, 10)) {
+            resultEl.style.display = 'block';
+            resultEl.className = 'parent-validation-result validation-error';
+            resultEl.innerHTML = '<i class="fas fa-times-circle"></i> ' + t('messages.parent_self_error', 'Entity cannot be its own parent');
+            return false;
+        }
+
+        try {
+            resultEl.style.display = 'block';
+            resultEl.className = 'parent-validation-result validation-loading';
+            resultEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + t('messages.validating', 'Validating...');
+
+            const result = await apiCall(`${API.entities}?validate_parent=${encodeURIComponent(parentId)}&tenant_id=${state.tenantId}&lang=${state.language}`);
+
+            if (result.success && result.data && result.data.valid) {
+                const parent = result.data.parent;
+                resultEl.className = 'parent-validation-result validation-success';
+                resultEl.innerHTML = '<i class="fas fa-check-circle"></i> ' +
+                    esc(parent.store_name) +
+                    (parent.branch_code ? ' (' + esc(parent.branch_code) + ')' : '') +
+                    ' <small>#' + esc(parent.id) + '</small>';
+                return true;
+            } else {
+                resultEl.className = 'parent-validation-result validation-error';
+                resultEl.innerHTML = '<i class="fas fa-times-circle"></i> ' + t('messages.parent_not_found', 'Parent entity not found');
+                return false;
+            }
+        } catch (err) {
+            console.error('[Entities] Parent validation failed:', err);
+            resultEl.className = 'parent-validation-result validation-error';
+            resultEl.innerHTML = '<i class="fas fa-times-circle"></i> ' + t('messages.validation_error', 'Validation failed');
+            return false;
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════
     // FORM SUBMISSION
     // ════════════════════════════════════════════════════════════
     async function saveEntity(e) {
@@ -712,6 +792,25 @@
             const entityId = el.formId.value;
             const isEdit = !!entityId;
 
+            // التحقق من parent_id عند اختيار فرع
+            if (formData.get('entity_type') === 'branch') {
+                const parentId = formData.get('parent_id');
+                if (!parentId || isNaN(parentId) || parseInt(parentId, 10) <= 0) {
+                    showNotification(t('form.fields.parent_id.required', 'Parent ID is required for branches'), 'error');
+                    return;
+                }
+                if (entityId && parseInt(parentId, 10) === parseInt(entityId, 10)) {
+                    showNotification(t('messages.parent_self_error', 'Entity cannot be its own parent'), 'error');
+                    return;
+                }
+                // التحقق من صحة الأب عبر API
+                const isValid = await validateParentId(parentId);
+                if (!isValid) {
+                    showNotification(t('messages.parent_not_found', 'Parent entity not found'), 'error');
+                    return;
+                }
+            }
+
             // Get address data from iframe if available
             let addressDataFromIframe = null;
             const activeTab = document.querySelector('.tab-btn.active');
@@ -725,7 +824,7 @@
             const entityData = {
                 store_name: formData.get('store_name'),
                 slug: formData.get('slug') || generateSlug(formData.get('store_name')),
-                is_main: formData.get('is_main') ?? '1',
+                parent_id: (formData.get('entity_type') === 'branch' && formData.get('parent_id')) ? parseInt(formData.get('parent_id'), 10) : null,
                 branch_code: formData.get('branch_code') || null,
                 vendor_type: formData.get('vendor_type') || 'product_seller',
                 store_type: formData.get('store_type') || 'individual',
@@ -2035,7 +2134,11 @@
             // Form fields - Basic
             entityStoreName: $id('entityStoreName'),
             entitySlug: $id('entitySlug'),
-            entityIsMain: $id('entityIsMain'),
+            entityType: $id('entityType'),
+            entityParentId: $id('entityParentId'),
+            parentIdGroup: $id('parentIdGroup'),
+            btnValidateParent: $id('btnValidateParent'),
+            parentValidationResult: $id('parentValidationResult'),
             entityBranchCode: $id('entityBranchCode'),
             entityVendorType: $id('entityVendorType'),
             entityStoreType: $id('entityStoreType'),
@@ -2137,6 +2240,24 @@
         // Working Hours
         if (el.btnApplyToAll) el.btnApplyToAll.onclick = applyToAllDays;
         if (el.btnResetHours) el.btnResetHours.onclick = resetWorkingHours;
+
+        // Entity Type / Parent ID
+        if (el.entityType) {
+            el.entityType.onchange = function() {
+                toggleParentIdField(this.value === 'branch');
+            };
+        }
+        if (el.btnValidateParent) {
+            el.btnValidateParent.onclick = function() {
+                const parentId = el.entityParentId ? el.entityParentId.value : '';
+                validateParentId(parentId);
+            };
+        }
+        if (el.entityParentId) {
+            el.entityParentId.onblur = function() {
+                if (this.value) validateParentId(this.value);
+            };
+        }
 
         // Attributes
         if (el.btnAddEntityAttribute) el.btnAddEntityAttribute.onclick = addAttribute;

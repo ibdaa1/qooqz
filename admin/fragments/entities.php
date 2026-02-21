@@ -222,15 +222,35 @@ $apiBase = '/api';
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="entityIsMain" data-i18n="form.fields.is_main.label">
-                                <?= __t('form.fields.is_main.label', 'Is Main Entity') ?>
+                            <label for="entityType" data-i18n="form.fields.entity_type.label">
+                                <?= __t('form.fields.entity_type.label', 'Entity Type') ?>
                             </label>
-                            <select id="entityIsMain" name="is_main" class="form-control">
-                                <option value="1" data-i18n="form.fields.is_main.yes">Yes</option>
-                                <option value="0" data-i18n="form.fields.is_main.no">No</option>
+                            <select id="entityType" name="entity_type" class="form-control">
+                                <option value="main" data-i18n="form.fields.entity_type.main">Main Entity</option>
+                                <option value="branch" data-i18n="form.fields.entity_type.branch">Branch</option>
                             </select>
                         </div>
 
+                        <div class="form-group" id="parentIdGroup" style="display:none">
+                            <label for="entityParentId" class="required" data-i18n="form.fields.parent_id.label">
+                                <?= __t('form.fields.parent_id.label', 'Parent Entity ID') ?>
+                            </label>
+                            <div class="parent-id-input-wrapper">
+                                <input type="number" id="entityParentId" name="parent_id" class="form-control" min="1"
+                                       data-i18n-placeholder="form.fields.parent_id.placeholder"
+                                       placeholder="<?= __t('form.fields.parent_id.placeholder', 'Enter parent entity ID') ?>">
+                                <button type="button" id="btnValidateParent" class="btn btn-sm btn-secondary" title="<?= __t('form.fields.parent_id.validate', 'Validate') ?>">
+                                    <i class="fas fa-check-circle"></i>
+                                </button>
+                            </div>
+                            <div id="parentValidationResult" class="parent-validation-result" style="display:none"></div>
+                            <div class="invalid-feedback" data-i18n="form.fields.parent_id.required">
+                                <?= __t('form.fields.parent_id.required', 'Parent ID is required for branches') ?>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
                         <div class="form-group">
                             <label for="entityBranchCode" data-i18n="form.fields.branch_code.label">
                                 <?= __t('form.fields.branch_code.label', 'Branch Code') ?>
@@ -709,6 +729,7 @@ $apiBase = '/api';
                                 <?php endif; ?>
                                 <th data-i18n="table.headers.logo">Logo</th>
                                 <th data-i18n="table.headers.store_name">Store Name</th>
+                                <th data-i18n="table.headers.type">Type</th>
                                 <th data-i18n="table.headers.branch_code">Branch Code</th>
                                 <th data-i18n="table.headers.vendor_type">Vendor Type</th>
                                 <th data-i18n="table.headers.phone">Phone</th>

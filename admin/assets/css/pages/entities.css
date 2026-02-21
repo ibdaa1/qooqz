@@ -717,3 +717,55 @@ textarea.form-control {
         display: none !important;
     }
 }
+
+/* Parent ID Input */
+.parent-id-input-wrapper {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.parent-id-input-wrapper .form-control {
+    flex: 1;
+}
+
+.parent-id-input-wrapper .btn {
+    flex-shrink: 0;
+    height: 38px;
+    min-width: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.parent-validation-result {
+    margin-top: 6px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.parent-validation-result.validation-success {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.parent-validation-result.validation-error {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.parent-validation-result.validation-loading {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.parent-validation-result small {
+    opacity: 0.7;
+}
