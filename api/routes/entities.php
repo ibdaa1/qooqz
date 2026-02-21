@@ -66,7 +66,8 @@ try {
         'status'        => $_GET['status'] ?? null,
         'vendor_type'   => $_GET['vendor_type'] ?? null,
         'store_type'    => $_GET['store_type'] ?? null,
-        'is_verified'   => isset($_GET['is_verified']) ? (int)$_GET['is_verified'] : null
+        'is_verified'   => isset($_GET['is_verified']) ? (int)$_GET['is_verified'] : null,
+        'parent_id'     => isset($_GET['parent_id']) ? (int)$_GET['parent_id'] : null
     ];
 
     switch ($method) {
@@ -85,7 +86,26 @@ try {
         // GET
         // ================================
         case 'GET':
-            if (isset($_GET['id']) && is_numeric($_GET['id'])) {
+            // التحقق من وجود كيان أب (للتحقق في النموذج)
+            if (isset($_GET['validate_parent']) && is_numeric($_GET['validate_parent'])) {
+                $parentId = (int)$_GET['validate_parent'];
+                $parent = $controller->get($tenantId, $parentId, $lang);
+                if ($parent) {
+                    ResponseFormatter::success([
+                        'valid' => true,
+                        'parent' => [
+                            'id' => $parent['id'],
+                            'store_name' => $parent['store_name'],
+                            'branch_code' => $parent['branch_code'] ?? null
+                        ]
+                    ]);
+                } else {
+                    ResponseFormatter::success([
+                        'valid' => false,
+                        'message' => 'Parent entity not found'
+                    ]);
+                }
+            } elseif (isset($_GET['id']) && is_numeric($_GET['id'])) {
                 $item = $controller->get(
                     $tenantId,
                     (int)$_GET['id'],
