@@ -8,10 +8,10 @@ require_once $baseDir . '/shared/helpers/safe_helpers.php';
 require_once $baseDir . '/shared/config/db.php';
 
 $modelsPath = API_VERSION_PATH . '/models/notification';
-require_once $modelsPath . '/repositories/PdoNotificationsRepository.php';
-require_once $modelsPath . '/validators/NotificationsValidator.php';
-require_once $modelsPath . '/services/NotificationsService.php';
-require_once $modelsPath . '/controllers/NotificationsController.php';
+require_once $modelsPath . '/repositories/PdoNotificationTypesRepository.php';
+require_once $modelsPath . '/validators/NotificationTypesValidator.php';
+require_once $modelsPath . '/services/NotificationTypesService.php';
+require_once $modelsPath . '/controllers/NotificationTypesController.php';
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 
@@ -22,10 +22,11 @@ if (!$pdo instanceof PDO) {
     exit;
 }
 
-$repo       = new PdoNotificationsRepository($pdo);
-$validator  = new NotificationsValidator();
-$service    = new NotificationsService($repo, $validator);
-$controller = new NotificationsController($service);
+// No tenant isolation for notification_types (global table)
+$repo       = new PdoNotificationTypesRepository($pdo);
+$validator  = new NotificationTypesValidator();
+$service    = new NotificationTypesService($repo, $validator);
+$controller = new NotificationTypesController($service);
 
 // CORS headers
 header('Access-Control-Allow-Origin: *');
@@ -41,48 +42,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 try {
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
-    // Extract path for special actions like /unread-count
-    $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-    $segments = explode('/', trim($uri, '/'));
-    $lastSegment = end($segments);
-
     if ($method === 'GET') {
-        // Special endpoint: /notifications/unread-count?user_id=...
-        if ($lastSegment === 'unread-count') {
-            $userId = isset($_GET['user_id']) && is_numeric($_GET['user_id']) ? (int)$_GET['user_id'] : null;
-            if (!$userId) {
-                ResponseFormatter::error('user_id is required', 400);
-                exit;
-            }
-            $count = $controller->unreadCount($userId);
-            ResponseFormatter::success(['unread_count' => $count]);
-            exit;
-        }
-
-        // Single notification by id
         if (isset($_GET['id']) && is_numeric($_GET['id'])) {
             $item = $controller->get((int)$_GET['id']);
             ResponseFormatter::success($item);
             exit;
         }
 
-        // List with filters
         $filters = [
-            'user_id'            => isset($_GET['user_id']) && is_numeric($_GET['user_id']) ? (int)$_GET['user_id'] : null,
-            'entity_id'          => isset($_GET['entity_id']) && is_numeric($_GET['entity_id']) ? (int)$_GET['entity_id'] : null,
-            'is_read'            => isset($_GET['is_read']) && is_numeric($_GET['is_read']) ? (int)$_GET['is_read'] : null,
-            'notification_type_id' => isset($_GET['notification_type_id']) && is_numeric($_GET['notification_type_id']) ? (int)$_GET['notification_type_id'] : null,
+            'code'      => $_GET['code']      ?? null,
+            'name'      => $_GET['name']      ?? null,
+            'is_active' => isset($_GET['is_active']) && is_numeric($_GET['is_active']) ? (int)$_GET['is_active'] : null,
         ];
 
-        // Date range for sent_at
-        if (isset($_GET['date_from']) && preg_match('/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/', $_GET['date_from'])) {
-            $filters['date_from'] = $_GET['date_from'];
-        }
-        if (isset($_GET['date_to']) && preg_match('/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/', $_GET['date_to'])) {
-            $filters['date_to'] = $_GET['date_to'];
-        }
-
-        $orderBy  = $_GET['order_by']  ?? 'sent_at';
+        $orderBy  = $_GET['order_by']  ?? 'id';
         $orderDir = $_GET['order_dir'] ?? 'DESC';
         $page     = isset($_GET['page'])  ? max(1, (int)$_GET['page']) : 1;
         $limit    = isset($_GET['limit']) ? min(1000, max(1, (int)$_GET['limit'])) : 25;
@@ -109,13 +82,6 @@ try {
     $data = ($raw !== false && $raw !== '') ? (json_decode($raw, true) ?? []) : [];
 
     if ($method === 'POST') {
-        // Check for mark-as-read action
-        if ($lastSegment === 'mark-read' && isset($data['id'])) {
-            $controller->markAsRead((int)$data['id']);
-            ResponseFormatter::success(['marked_read' => true], 'Marked as read');
-            exit;
-        }
-
         $newId = $controller->create($data);
         ResponseFormatter::success(['id' => $newId], 'Created successfully', 201);
         exit;
@@ -141,13 +107,13 @@ try {
     ResponseFormatter::error('Method not allowed', 405);
 
 } catch (InvalidArgumentException $e) {
-    safe_log('warning', 'notifications.validation', ['error' => $e->getMessage()]);
+    safe_log('warning', 'notification_types.validation', ['error' => $e->getMessage()]);
     ResponseFormatter::error($e->getMessage(), 422);
 } catch (RuntimeException $e) {
-    safe_log('error', 'notifications.runtime', ['error' => $e->getMessage()]);
+    safe_log('error', 'notification_types.runtime', ['error' => $e->getMessage()]);
     ResponseFormatter::error($e->getMessage(), 400);
 } catch (Throwable $e) {
-    safe_log('critical', 'notifications.fatal', [
+    safe_log('critical', 'notification_types.fatal', [
         'error' => $e->getMessage(),
         'file'  => $e->getFile(),
         'line'  => $e->getLine(),
