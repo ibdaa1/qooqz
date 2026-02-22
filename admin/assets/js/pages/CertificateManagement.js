@@ -1,15 +1,19 @@
 /**
  * /admin/assets/js/pages/CertificateManagement.js
  * Certificate Management — Audit workflow, payment verification, issuance & logs
- * VERSION: 3.2 — FINAL FIXES
+ * VERSION: 5.1 — ALLOCATION FIELD FIX
  *
  * FIXES IN THIS VERSION:
- * 1. Added validation to ensure request_id is never null when submitting audits.
- * 2. Exposed closeModal globally so modal close buttons in settings tabs work.
- * 3. All hardcoded strings replaced with t() i18n calls.
- * 4. issued_id correctly saved to certificates_requests after issuance.
- * 5. auditor_user_id correctly updated (null values filtered from extraFields).
- * 6. Issue button removed from requests table (issuance only via Allocations tab).
+ * 1. Allocation API now sends `certificate_id` (version ID) instead of `version_id`.
+ * 2. Numeric values (fee_id, amount) are properly converted to numbers.
+ * 3. Removed automatic payment creation after audit (payments are now entered manually).
+ * 4. Allocation modal receipt input accepts letters and numbers (alphanumeric).
+ * 5. Added validation to ensure request_id is never null when submitting audits.
+ * 6. Exposed closeModal globally so modal close buttons in settings tabs work.
+ * 7. All hardcoded strings replaced with t() i18n calls.
+ * 8. issued_id correctly saved to certificates_requests after issuance.
+ * 9. auditor_user_id correctly updated (null values filtered from extraFields).
+ * 10. Issue button removed from requests table (issuance only via Allocations tab).
  */
 (function () {
     'use strict';
@@ -783,7 +787,7 @@ ${isSA ? `<td>${esc(r.tenant_name||r.tenant_id||'')}</td>` : ''}
 <div class="form-group">
     <label style="font-weight:600;">${t('allocation.receipt_id_label','رقم الإيصال (Payment ID)')} <span class="req" style="color:red;">*</span></label>
     <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
-        <input type="number" id="allocReceiptInput" class="form-control" placeholder="${t('allocation.receipt_placeholder','أدخل رقم الإيصال...')}" style="flex:1;" min="1">
+        <input type="text" id="allocReceiptInput" class="form-control" placeholder="${t('allocation.receipt_placeholder','أدخل رقم الإيصال...')}" style="flex:1;">
         <button type="button" class="btn btn-primary" onclick="CertificateManagement.searchAllocReceipt()">
             <i class="fas fa-search"></i> ${t('common.search','بحث')}
         </button>
@@ -841,7 +845,7 @@ ${isSA ? `<td>${esc(r.tenant_name||r.tenant_id||'')}</td>` : ''}
 
     async function searchAllocReceipt() {
         const receiptId = q('allocReceiptInput')?.value?.trim();
-        if (!receiptId || isNaN(receiptId)) { toast(t('message.receipt_required','يرجى إدخال رقم إيصال صحيح'), false); return; }
+        if (!receiptId) { toast(t('message.receipt_required','يرجى إدخال رقم إيصال صحيح'), false); return; }
 
         const infoEl = q('allocReceiptInfo');
         const certsSection = q('allocCertsSection');
@@ -995,9 +999,19 @@ ${isSA ? `<td>${esc(r.tenant_name||r.tenant_id||'')}</td>` : ''}
         try {
             for (const reqId of selected) {
                 try {
+                    // 1. Create version
                     const vId = await createVersion(reqId);
-                    await apiPost(API_ALLOC, { receipt_id:receiptId, certificate_id:vId, fee_id:feeId, allocated_amount:amount });
+                    // 2. Create allocation linking payment (receipt) to version
+                    // FIX: Send certificate_id = version ID (as required by API)
+                    await apiPost(API_ALLOC, { 
+                        receipt_id: receiptId, 
+                        certificate_id: vId, 
+                        fee_id: parseInt(feeId), 
+                        allocated_amount: parseFloat(amount) 
+                    });
+                    // 3. Issue certificate from version
                     const iId = await issueCertFromVersion(vId, reqId);
+                    // 4. Update request status to issued and save issued_id
                     if (iId) {
                         await patchRequestStatus(reqId, 'issued', { issued_id: iId });
                     }
@@ -1314,7 +1328,6 @@ ${S.perms.canAudit && (req.status==='under_review'||req.status==='draft') ? `
     }
 
     async function submitInlineAudit() {
-        // FIX: Ensure request_id is not null
         const reqIdInput = q('inlineAuditReqId');
         if (!reqIdInput) {
             toast(t('message.error', 'Audit form error: missing request ID'), false);
@@ -1355,35 +1368,7 @@ ${S.perms.canAudit && (req.status==='under_review'||req.status==='draft') ? `
             const newStatus = status==='approved' ? 'payment_pending' : 'rejected';
             await patchRequestStatus(reqId, newStatus, { auditor_user_id: auditorId });
 
-            if (status==='approved') {
-                let vId = null;
-                try { vId = await createVersion(reqId, auditorId); } catch(ve) { console.warn('createVersion:', ve.message); }
-
-                let iId = null;
-                if (vId) {
-                    try { iId = await issueCertFromVersion(vId, reqId); } catch(ie) { console.warn('issueCert:', ie.message); }
-                }
-                if (iId) {
-                    try { await patchRequestStatus(reqId, null, { issued_id: iId }); } catch(ie) { console.warn('issued_id patch:', ie.message); }
-                }
-
-                try {
-                    const reqRaw2    = await apiGet(buildUrl(API_REQ, {id: reqId, tenant_id: S.tenantId}), false);
-                    const rData2     = extractSingle(reqRaw2) || pick(reqRaw2)[0];
-                    const itemsCount = rData2?.items_count||rData2?.request_items_count||0;
-                    const entityId   = rData2?.entity_id;
-                    if (!entityId) throw new Error('entity_id not found on request');
-                    const rule = findMatchingFeeRule(itemsCount, S.fees);
-                    const now  = new Date().toISOString().slice(0,19).replace('T',' ');
-                    await apiPost(API_PAY, {
-                        request_id:reqId, entity_id:entityId, tenant_id:S.tenantId,
-                        amount:rule ? (rule.fee_amount||rule.amount) : 100,
-                        currency:rule?.currency||'AED', payment_type:'initial',
-                        payment_reference:`AUD-${reqId}-${Date.now()}`, payment_date:now,
-                        verification_status:'waiting_verification'
-                    });
-                } catch(pe) { console.warn('Auto-payment:', pe.message); }
-            }
+            // No version creation or issuance here – done only in allocation
 
             CACHE.invalidate(API_REQ);
             CACHE.invalidate(API_AUDITS);
@@ -1449,7 +1434,6 @@ ${S.perms.canAudit && (req.status==='under_review'||req.status==='draft') ? `
     }
 
     async function submitAudit() {
-        // FIX: Ensure request_id is valid
         const reqId = S.currentAuditRequestId;
         if (!reqId || typeof reqId !== 'number' || reqId <= 0) {
             toast(t('message.error', 'No request selected for audit'), false);
@@ -1487,35 +1471,7 @@ ${S.perms.canAudit && (req.status==='under_review'||req.status==='draft') ? `
             const newStatus = status==='approved' ? 'payment_pending' : 'rejected';
             await patchRequestStatus(reqId, newStatus, { auditor_user_id: auditorId });
 
-            if (status==='approved') {
-                let vId = null;
-                try { vId = await createVersion(reqId, auditorId); } catch(ve) { console.warn('createVersion:', ve.message); }
-
-                let iId = null;
-                if (vId) {
-                    try { iId = await issueCertFromVersion(vId, reqId); } catch(ie) { console.warn('issueCert:', ie.message); }
-                }
-                if (iId) {
-                    try { await patchRequestStatus(reqId, null, { issued_id: iId }); } catch(ie) { console.warn('issued_id patch:', ie.message); }
-                }
-
-                try {
-                    const reqRaw2    = await apiGet(buildUrl(API_REQ, {id: reqId, tenant_id: S.tenantId}), false);
-                    const rData2     = extractSingle(reqRaw2) || pick(reqRaw2)[0];
-                    const itemsCount = rData2?.items_count||rData2?.request_items_count||0;
-                    const entityId   = rData2?.entity_id;
-                    if (!entityId) throw new Error('entity_id not found');
-                    const rule = findMatchingFeeRule(itemsCount, S.fees);
-                    const now  = new Date().toISOString().slice(0,19).replace('T',' ');
-                    await apiPost(API_PAY, {
-                        request_id:reqId, entity_id:entityId, tenant_id:S.tenantId,
-                        amount:rule ? (rule.fee_amount||rule.amount) : 100,
-                        currency:rule?.currency||'AED', payment_type:'initial',
-                        payment_reference:`AUD-${reqId}-${Date.now()}`, payment_date:now,
-                        verification_status:'waiting_verification'
-                    });
-                } catch(pe) { console.warn('Auto-payment:', pe.message); }
-            }
+            // No version creation or issuance here – done only in allocation
 
             CACHE.invalidate(API_REQ);
             CACHE.invalidate(API_AUDITS);
@@ -2064,11 +2020,10 @@ ${S.perms.canAudit && (req.status==='under_review'||req.status==='draft') ? `
         openAllocationModal, closeAllocModal, searchAllocReceipt,
         saveAllocation, deleteAllocation,
         updateSelectedAllocCount, onAllocRequestChange, onFeeRuleChange,
-        translateStaticUI, closeModal, // expose closeModal for onclick handlers
+        translateStaticUI, closeModal,
         noop: () => {}
     };
 
-    // Also make closeModal globally available for inline onclick handlers in modals
     window.closeModal = closeModal;
 
     window.loadRequests    = loadRequests;
