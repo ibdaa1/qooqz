@@ -241,32 +241,56 @@ class CertificatePdfHelper
             return '';
         }
 
-        // For Arabic / RTL languages, inject the Amiri font as a base64 @font-face rule.
-        // Amiri has full Arabic OpenType shaping tables (init/medi/fina/isol) that dompdf's
-        // Cpdf::doArabicShaping() requires for correct connected letter rendering.
-        if (in_array($lang, ['ar', 'ar-SA', 'ar-AE'], true)) {
-            $fontCss = self::arabicFontCss();
-            if ($fontCss !== '') {
-                // Inject before </head> so it is available to all elements
-                $html = str_replace('</head>', $fontCss . '</head>', $html);
-            }
+        // Determine dompdf vendor dir.  $vendorDir is the composer vendor root
+        // (e.g. ~/vendor on this cPanel host).
+        $vendorDir = dirname($autoload);
+
+        // fontDir  — where dompdf finds TTF/OTF/AFM source files (vendor lib/fonts)
+        // fontCache — where dompdf writes/reads generated .ufm metric files.
+        //             Must be writable; use api/storage/fonts/ so metrics persist
+        //             across requests instead of being discarded every time /tmp is cleared.
+        $builtinFontDir = $vendorDir . '/dompdf/dompdf/lib/fonts';
+        $fontCacheDir   = self::apiDir() . '/storage/fonts';
+        if (!is_dir($fontCacheDir) && !@mkdir($fontCacheDir, 0755, true)) {
+            error_log('[CertificatePdfHelper] Cannot create font cache dir: ' . $fontCacheDir);
         }
 
-        // Determine the vendor dir that contains the dompdf fonts
-        $vendorDir = dirname($autoload);
         /** @var \Dompdf\Options $options */
         $options = new \Dompdf\Options();
         $options->set('isRemoteEnabled', false);
         $options->set('isHtml5ParserEnabled', true);
         $options->set('defaultFont', 'DejaVu Sans');
-        $fontDir = $vendorDir . '/dompdf/dompdf/lib/fonts';
-        if (is_dir($fontDir)) {
-            $options->set('fontDir', $fontDir);
+        if (is_dir($builtinFontDir)) {
+            // Source font files live here (DejaVuSans.ttf etc.)
+            $options->set('fontDir', $builtinFontDir);
         }
-        $options->set('fontCache', sys_get_temp_dir());
+        // Persistent, writable cache for generated .ufm files
+        $options->set('fontCache', $fontCacheDir);
         $options->set('logOutputFile', '');
 
         $pdf = new \Dompdf\Dompdf($options);
+
+        // Register Amiri font for proper Arabic letter shaping.
+        // Uses dompdf's file-based registerFont() API rather than injecting a
+        // huge base64 @font-face string into the HTML (which is unreliable if the
+        // CDN download fails or dompdf's CSS parser chokes on a 667 KB data URI).
+        if (in_array($lang, ['ar', 'ar-SA', 'ar-AE'], true)) {
+            // getArabicFontPath() downloads Amiri-Regular.ttf from CDN on first use
+            // and caches it in api/storage/fonts/. Returns '' if unavailable.
+            $arabicFontPath = self::getArabicFontPath();
+            if ($arabicFontPath !== '') {
+                try {
+                    $pdf->getFontMetrics()->registerFont(
+                        ['family' => 'Amiri', 'weight' => 'normal', 'style' => 'normal'],
+                        $arabicFontPath
+                    );
+                } catch (\Throwable $fontEx) {
+                    error_log('[CertificatePdfHelper] Amiri registerFont: ' . $fontEx->getMessage());
+                    // Falls back gracefully to DejaVu Sans which also supports Arabic Unicode
+                }
+            }
+        }
+
         $pdf->loadHtml($html, 'UTF-8');
         $pdf->setPaper('A4', 'portrait');
         $pdf->render();

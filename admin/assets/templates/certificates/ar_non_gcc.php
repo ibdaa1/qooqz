@@ -12,8 +12,11 @@ if (empty($L) && class_exists('CertificatePdfHelper', false)) {
 $fontFamily = htmlspecialchars($template['font_family'] ?? 'DejaVu Sans');
 $fontSize   = htmlspecialchars($template['font_size']   ?? '11');
 $lang       = $lang ?? 'ar';
-// Amiri is injected by CertificatePdfHelper::htmlToPdf() as a base64 @font-face.
-$cssFontFamily = '"Amiri", "' . $fontFamily . '", "DejaVu Sans", sans-serif';
+// In PDF mode: use Amiri (registered via registerFont API) + DejaVu Sans fallback.
+// Exclude Arial (DB font_family) from PDF stack — it does not exist in dompdf.
+$cssFontFamily = $isPdfMode
+    ? '"Amiri", "DejaVu Sans", sans-serif'
+    : '"Amiri", "' . $fontFamily . '", "DejaVu Sans", sans-serif';
 
 $bgSrc = '';
 if (!empty($template['background_image_data_uri'])) {
@@ -49,7 +52,7 @@ body {
     font-family: <?= $cssFontFamily ?>;
     font-size: <?= $fontSize ?>pt;
     direction: rtl;
-    unicode-bidi: bidi-override;
+    text-align: right;
 }
 .page {
     width: 210mm;
