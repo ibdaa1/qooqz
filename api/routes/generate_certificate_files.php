@@ -116,6 +116,7 @@ try {
     $pdfWebPath  = '/uploads/certificates/pdf/' . $pdfFileName;
 
     $pdfPath = '';
+    $pdfError = '';
     if (!file_exists($pdfFullPath)) {
         $result = CertificatePdfHelper::generate([
             'pdo'             => $pdo,
@@ -126,7 +127,11 @@ try {
             'pdf_output_path' => $pdfFullPath,
             'doc_root'        => $docRoot,
         ]);
-        $pdfPath = $result !== '' ? $pdfWebPath : '';
+        if ($result !== '') {
+            $pdfPath = $pdfWebPath;
+        } else {
+            $pdfError = 'PDF generation failed — see server error_log for details';
+        }
     } else {
         $pdfPath = $pdfWebPath;
     }
@@ -146,14 +151,19 @@ try {
         ':id'  => $issuedId,
     ]);
 
+    $responseData = [
+        'issued_id'    => $issuedId,
+        'qr_code_path' => $qrCodePath,
+        'pdf_path'     => $pdfPath,
+    ];
+    if ($pdfError !== '') {
+        $responseData['pdf_error'] = $pdfError;
+    }
+
     echo json_encode([
         'success' => true,
         'message' => 'OK',
-        'data'    => [
-            'issued_id'    => $issuedId,
-            'qr_code_path' => $qrCodePath,
-            'pdf_path'     => $pdfPath,
-        ],
+        'data'    => $responseData,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 } catch (Throwable $e) {

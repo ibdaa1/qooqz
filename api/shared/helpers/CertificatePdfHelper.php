@@ -206,25 +206,41 @@ class CertificatePdfHelper
      */
     public static function htmlToPdf(string $html, string $outputPath, string $lang = 'ar'): string
     {
-        $autoload = self::apiDir() . '/vendor/autoload.php';
-        if (!file_exists($autoload)) {
-            error_log('[CertificatePdfHelper] dompdf autoload not found at ' . $autoload);
+        // Try the vendor autoload in the api/ directory first, then fall back to
+        // one level up (common on cPanel hosts where composer was run from ~/)
+        $autoloadCandidates = [
+            self::apiDir() . '/vendor/autoload.php',
+            dirname(self::apiDir()) . '/vendor/autoload.php',
+        ];
+        $autoload = null;
+        foreach ($autoloadCandidates as $candidate) {
+            if (file_exists($candidate)) {
+                $autoload = $candidate;
+                break;
+            }
+        }
+        if ($autoload === null) {
+            error_log('[CertificatePdfHelper] dompdf autoload not found. Checked: ' . implode(', ', $autoloadCandidates));
             return '';
         }
         require_once $autoload;
 
         if (!class_exists('Dompdf\Dompdf')) {
-            error_log('[CertificatePdfHelper] Dompdf\Dompdf class not found');
+            error_log('[CertificatePdfHelper] Dompdf\Dompdf class not found after loading ' . $autoload);
             return '';
         }
 
+        // Determine the vendor dir that contains the dompdf fonts
+        $vendorDir = dirname($autoload);
         /** @var \Dompdf\Options $options */
         $options = new \Dompdf\Options();
         $options->set('isRemoteEnabled', false);
         $options->set('isHtml5ParserEnabled', true);
         $options->set('defaultFont', 'DejaVu Sans');
-        // Allow loading font files from vendor
-        $options->set('fontDir', self::apiDir() . '/vendor/dompdf/dompdf/lib/fonts');
+        $fontDir = $vendorDir . '/dompdf/dompdf/lib/fonts';
+        if (is_dir($fontDir)) {
+            $options->set('fontDir', $fontDir);
+        }
         $options->set('fontCache', sys_get_temp_dir());
         $options->set('logOutputFile', '');
 
