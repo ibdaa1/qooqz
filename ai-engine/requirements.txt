@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+mysql-connector-python
+python-dotenv
+pydantic
+python-multipart
+Pillow
+scikit-learn
+numpy
+aiofiles
+a2wsgi
