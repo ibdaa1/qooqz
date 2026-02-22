@@ -102,12 +102,29 @@ try {
         $qrCodePath = '/api/generate_qr?code=' . rawurlencode($verificationCode);
     }
 
-    // ── PDF path: rendered via print_certificate ─────────────────────────
-    // The actual PDF is produced by the browser's print-to-PDF when visiting:
-    //   /api/print_certificate?id=REQUEST_ID&lang=LANG
-    // We store a canonical path so the download link is always available.
+    // ── PDF path: trigger server-side PDF generation via save_certificate_pdf ──
     $lang    = $issued['language_code'] ?? 'ar';
-    $pdfPath = '/api/print_certificate?id=' . (int)$reqId . '&lang=' . rawurlencode($lang);
+    $pdfPath = '';
+
+    // Re-use the same logic as save_certificate_pdf (inline, to avoid HTTP self-call)
+    $pdfDir = $docRoot . '/uploads/certificates/pdf';
+    if (!is_dir($pdfDir)) {
+        @mkdir($pdfDir, 0755, true);
+    }
+    $pdfFileName = 'cert_' . (int)$reqId . '_' . $issuedId . '.pdf';
+    $pdfFullPath = $pdfDir . '/' . $pdfFileName;
+    $pdfWebPath  = '/uploads/certificates/pdf/' . $pdfFileName;
+
+    // Only generate if not already on disk
+    if (!file_exists($pdfFullPath)) {
+        $pdfPath = _gcf_generate_pdf($pdo, $issuedId, (int)$reqId, $lang, $qrCodePath, $pdfFullPath, $docRoot);
+    }
+    if ($pdfPath === '' || $pdfPath === null) {
+        // Fallback: point to the HTML print view
+        $pdfPath = '/api/print_certificate?id=' . (int)$reqId . '&lang=' . rawurlencode($lang);
+    } else {
+        $pdfPath = $pdfWebPath;
+    }
 
     // ── Persist changes to certificates_issued ──────────────────────────
     $update = $pdo->prepare(
@@ -135,4 +152,183 @@ try {
         'success' => false,
         'message' => $e->getMessage(),
     ], JSON_UNESCAPED_UNICODE);
+}
+
+/* ── PDF generation helper ───────────────────────────────────────────────── */
+
+/**
+ * Render the certificate HTML template and convert it to a PDF file using
+ * Chromium headless. Returns the output file path on success, or '' on failure.
+ */
+function _gcf_generate_pdf(
+    PDO    $pdo,
+    int    $issuedId,
+    int    $requestId,
+    string $lang,
+    string $qrSavedPath,
+    string $pdfOutputPath,
+    string $docRoot
+): string {
+    try {
+        // Fetch request data
+        $sql = "
+            SELECT cr.*,
+                   c_imp.name AS importer_country,
+                   e.store_name AS exporter_name,
+                   ce.certificate_version,
+                   ce.scope,
+                   ci.certificate_number,
+                   ci.issued_at,
+                   ci.verification_code,
+                   ci.qr_code_path,
+                   ci.pdf_path
+            FROM certificates_requests cr
+            LEFT JOIN countries c_imp ON c_imp.id = cr.importer_country_id
+            LEFT JOIN entities e ON e.id = cr.entity_id
+            LEFT JOIN certificate_editions ce ON ce.id = cr.certificate_edition_id
+            LEFT JOIN certificates_issued ci ON ci.id = cr.issued_id
+            WHERE cr.id = :id
+        ";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':id' => $requestId]);
+        $data = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$data) return '';
+
+        // Fetch items
+        $itemsRepoFile = API_VERSION_PATH . '/models/certificates/repositories/Pdocertificatesrequestitemsrepository.php';
+        if (!file_exists($itemsRepoFile)) return '';
+        require_once $itemsRepoFile;
+        $itemRepo = new PdoCertificatesRequestItemsRepository($pdo);
+        $items = $itemRepo->getItemsWithDetails($requestId, $lang);
+
+        // Template version
+        $version = $data['certificate_version'] ?? null;
+        if (!$version && isset($data['scope'])) {
+            $version = $lang . '_' . $data['scope'];
+        }
+        if (!$version) $version = 'ar_gcc';
+
+        // Template config
+        $tplRepoFile = API_VERSION_PATH . '/models/certificates/repositories/PdoCertificatesTemplatesRepository.php';
+        if (!file_exists($tplRepoFile)) return '';
+        require_once $tplRepoFile;
+        $templateRepo = new PdoCertificatesTemplatesRepository($pdo);
+        $template = $templateRepo->findByCode($version) ?? [
+            'font_family' => 'Arial', 'font_size' => '12.00',
+            'background_image' => null,
+            'table_start_x' => '10.00', 'table_start_y' => '50.00',
+            'table_row_height' => '12.00', 'table_max_rows' => 12,
+            'qr_x' => '180.00', 'qr_y' => '250.00',
+            'qr_width' => '50.00', 'qr_height' => '50.00',
+            'signature_x' => '100.00', 'signature_y' => '250.00',
+            'signature_width' => '50.00', 'signature_height' => '50.00',
+            'stamp_x' => '150.00', 'stamp_y' => '250.00',
+            'stamp_width' => '50.00', 'stamp_height' => '50.00',
+            'logo_x' => '10.00', 'logo_y' => '10.00',
+            'logo_width' => '50.00', 'logo_height' => '50.00',
+        ];
+
+        // Normalise background image path
+        if (!empty($template['background_image'])) {
+            $bgAlt = str_replace('admin/templates/', 'admin/assets/templates/', $template['background_image']);
+            if (!file_exists($docRoot . '/' . $template['background_image']) && file_exists($docRoot . '/' . $bgAlt)) {
+                $template['background_image'] = $bgAlt;
+            }
+            $bgFull = $docRoot . '/' . $template['background_image'];
+            if (file_exists($bgFull)) {
+                $template['background_image_data_uri'] = _gcf_data_uri($bgFull);
+            }
+        }
+
+        // QR as data URI
+        $qrPath = '';
+        if ($qrSavedPath !== '') {
+            $qrAbsolute = $docRoot . $qrSavedPath;
+            if (file_exists($qrAbsolute)) {
+                $qrPath = _gcf_data_uri($qrAbsolute);
+            }
+        }
+        if ($qrPath === '') {
+            $verificationCode = $data['verification_code'] ?? '';
+            if ($verificationCode !== '') {
+                $scheme    = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $host      = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                $verifyUrl = $scheme . '://' . $host . '/api/verify_certificate?code=' . rawurlencode($verificationCode);
+                $qrApiUrl  = 'https://api.qrserver.com/v1/create-qr-code/?'
+                           . http_build_query(['data' => $verifyUrl, 'size' => '200x200', 'format' => 'png']);
+                $ctx       = stream_context_create(['http' => ['timeout' => 10, 'ignore_errors' => true]]);
+                $qrPng     = @file_get_contents($qrApiUrl, false, $ctx);
+                if ($qrPng !== false && strlen($qrPng) > 10) {
+                    $qrPath = 'data:image/png;base64,' . base64_encode($qrPng);
+                }
+            }
+        }
+
+        $signaturePath = '';
+        $stampPath     = '';
+
+        // Locate template file
+        $adminDir     = dirname($docRoot) . '/admin';
+        // If docRoot already contains 'public' or 'htdocs', step back
+        $templateFile = $adminDir . "/assets/templates/certificates/{$version}.php";
+        if (!file_exists($templateFile)) {
+            // Try sibling: api/../admin/
+            $templateFile = dirname(dirname(__DIR__)) . "/admin/assets/templates/certificates/{$version}.php";
+        }
+        if (!file_exists($templateFile)) {
+            $templateFile = dirname(dirname(__DIR__)) . "/admin/assets/templates/certificates/ar_gcc.php";
+        }
+        if (!file_exists($templateFile)) return '';
+
+        // Render to HTML string
+        if (!defined('CERT_PDF_MODE')) define('CERT_PDF_MODE', true);
+        ob_start();
+        include $templateFile;
+        $html = ob_get_clean();
+
+        // Write temp HTML
+        $tmpHtml = sys_get_temp_dir() . '/cert_' . $issuedId . '_' . getmypid() . '.html';
+        if (file_put_contents($tmpHtml, $html) === false) return '';
+
+        // Find Chromium
+        $chromiumBin = null;
+        foreach ([getenv('CHROMIUM_BIN') ?: '', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable'] as $b) {
+            if ($b !== '' && is_executable($b)) { $chromiumBin = $b; break; }
+        }
+        if (!$chromiumBin) { @unlink($tmpHtml); return ''; }
+
+        $cmd = escapeshellarg($chromiumBin)
+             . ' --headless --no-sandbox --disable-gpu'
+             . ' --run-all-compositor-stages-before-draw'
+             . ' --virtual-time-budget=5000'
+             . ' --print-to-pdf=' . escapeshellarg($pdfOutputPath)
+             . ' ' . escapeshellarg('file://' . $tmpHtml)
+             . ' 2>/dev/null';
+
+        exec($cmd, $out, $exitCode);
+        @unlink($tmpHtml);
+
+        if ($exitCode !== 0 || !file_exists($pdfOutputPath) || filesize($pdfOutputPath) < 100) {
+            return '';
+        }
+        return $pdfOutputPath;
+
+    } catch (Throwable $ex) {
+        return '';
+    }
+}
+
+function _gcf_data_uri(string $filePath): string
+{
+    $content = @file_get_contents($filePath);
+    if ($content === false) return '';
+    $ext  = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+    $mime = match ($ext) {
+        'png'  => 'image/png',
+        'jpg', 'jpeg' => 'image/jpeg',
+        'gif'  => 'image/gif',
+        'webp' => 'image/webp',
+        default => 'application/octet-stream',
+    };
+    return 'data:' . $mime . ';base64,' . base64_encode($content);
 }

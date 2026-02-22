@@ -1704,13 +1704,13 @@ ${S.perms.canAudit && (req.status==='under_review'||req.status==='draft') ? `
         });
         CACHE.invalidate(API_ISSUED);
         const issuedId = iRes?.data?.id||iRes?.data||iRes?.id||iRes;
-        // Generate QR code file and update pdf_path on the server (non-blocking)
+        // Generate QR + PDF files server-side (fire-and-forget; Chromium may take a few seconds)
         if (issuedId) {
             fetch('/api/generate_certificate_files', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ issued_id: issuedId, request_id: reqId })
-            }).catch(() => {}); // fire-and-forget; failures are non-critical
+                body: JSON.stringify({ issued_id: issuedId, request_id: reqId, lang })
+            }).catch(() => {});
         }
         return issuedId;
     }

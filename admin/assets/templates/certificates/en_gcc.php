@@ -5,12 +5,20 @@
  */
 $fontFamily = htmlspecialchars($template['font_family'] ?? 'Arial');
 $fontSize   = htmlspecialchars($template['font_size'] ?? '12');
+$isPdfMode  = defined('CERT_PDF_MODE') && CERT_PDF_MODE;
+$bgSrc = '';
+if (!empty($template['background_image_data_uri'])) {
+    $bgSrc = $template['background_image_data_uri'];
+} elseif (!empty($template['background_image'])) {
+    $bgSrc = '/' . htmlspecialchars($template['background_image']);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
 <meta charset="UTF-8">
 <style>
+    @page { size: A4 portrait; margin: 0; }
     body {
         margin:0;
         padding:0;
@@ -41,7 +49,7 @@ $fontSize   = htmlspecialchars($template['font_size'] ?? '12');
         text-align: center;
     }
 
-    .no-print { display: block; }
+    .no-print { display: <?= $isPdfMode ? 'none' : 'block' ?>; }
 
     @media print {
         .no-print { display: none !important; }
@@ -51,18 +59,19 @@ $fontSize   = htmlspecialchars($template['font_size'] ?? '12');
 </head>
 <body>
 
-<!-- Print / PDF button (hidden when printing) -->
+<?php if (!$isPdfMode): ?>
 <div class="no-print" style="padding:8px; background:#f0f0f0; text-align:center;">
     <button onclick="window.print()" style="padding:8px 24px; font-size:14px; cursor:pointer;">
         &#128438; Print / Export PDF
     </button>
 </div>
+<?php endif; ?>
 
 <div class="page">
 
     <!-- Official Background -->
-    <?php if (!empty($template['background_image'])): ?>
-    <img src="/<?= htmlspecialchars($template['background_image']) ?>"
+    <?php if ($bgSrc !== ''): ?>
+    <img src="<?= $bgSrc ?>"
          style="position:absolute; top:0; left:0; width:210mm; height:297mm; z-index:0;">
     <?php endif; ?>
 
