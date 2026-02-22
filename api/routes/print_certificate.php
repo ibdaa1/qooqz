@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 $baseDir = dirname(__DIR__);
 require_once $baseDir . '/bootstrap.php';
+require_once $baseDir . '/shared/helpers/CertificatePdfHelper.php';
 // Session check
 if (session_status() === PHP_SESSION_NONE) session_start();
 header('Content-Type: text/html; charset=utf-8');
@@ -44,12 +45,15 @@ try {
                ci.issued_at,
                ci.verification_code,
                ci.qr_code_path,
-               ci.pdf_path
+               ci.pdf_path,
+               mo.name     AS official_name,
+               mo.position AS official_position
         FROM certificates_requests cr
         LEFT JOIN countries c_imp ON c_imp.id = cr.importer_country_id
         LEFT JOIN entities e ON e.id = cr.entity_id
         LEFT JOIN certificate_editions ce ON ce.id = cr.certificate_edition_id
         LEFT JOIN certificates_issued ci ON ci.id = cr.issued_id
+        LEFT JOIN municipality_officials mo ON mo.id = cr.municipality_official_id
         WHERE cr.id = :id
     ";
     $stmt = $pdo->prepare($sql);
@@ -123,7 +127,7 @@ try {
         }
     }
 
-    // QR code path: use stored path, or build a data URL via the generate_qr endpoint
+    // QR code path: use stored path, or build a dynamic URL via the generate_qr endpoint
     $verificationCode = $data['verification_code'] ?? '';
     $qrPath = '';
     if (!empty($data['qr_code_path'])) {
@@ -132,11 +136,18 @@ try {
         $qrPath = '/api/generate_qr?code=' . rawurlencode($verificationCode);
     }
 
-    // Signature and stamp paths (from uploads if available, else empty)
-    $signaturePath = '';
-    $stampPath     = '';
+    // Stamp and signature — loaded from private storage as data URIs
+    $signaturePath = CertificatePdfHelper::assetDataUri('signature');
+    $stampPath     = CertificatePdfHelper::assetDataUri('stamp');
 
-    $adminDir = dirname($baseDir) . '/admin';
+    // Labels for this language
+    $labels = CertificatePdfHelper::labels($lang);
+
+    // Official info
+    $officialName     = $data['official_name']     ?? '';
+    $officialPosition = $data['official_position'] ?? '';
+
+    $adminDir     = dirname($baseDir) . '/admin';
     $templatePath = $adminDir . "/assets/templates/certificates/{$version}.php";
 
     if (!file_exists($templatePath)) {
@@ -148,7 +159,9 @@ try {
     }
 
     // Render Template
-    // Variables available inside template: $data, $items, $template, $qrPath, $signaturePath, $stampPath
+    // Variables available inside template:
+    //   $data, $items, $template, $qrPath, $signaturePath, $stampPath
+    //   $labels, $officialName, $officialPosition, $lang
     include $templatePath;
 
 } catch (Throwable $e) {
