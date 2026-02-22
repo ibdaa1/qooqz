@@ -53,7 +53,8 @@ try {
         LEFT JOIN entities e ON e.id = cr.entity_id
         LEFT JOIN certificate_editions ce ON ce.id = cr.certificate_edition_id
         LEFT JOIN certificates_issued ci ON ci.id = cr.issued_id
-        LEFT JOIN municipality_officials mo ON mo.id = cr.municipality_official_id
+        LEFT JOIN certificates_versions cv ON cv.id = ci.version_id
+        LEFT JOIN municipality_officials mo ON mo.id = cv.municipality_official_id
         WHERE cr.id = :id
     ";
     $stmt = $pdo->prepare($sql);
