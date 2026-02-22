@@ -7,91 +7,136 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <title>شهادة صحية - دول خارج مجلس التعاون</title>
-    <style>
-        body { font-family: 'Arial', sans-serif; margin: 0; padding: 20px; color: #333; }
-        .cert-container { border: 5px solid #444; padding: 30px; max-width: 800px; margin: auto; }
-        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #444; padding-bottom: 10px; }
-        .header h1 { margin: 10px 0; font-size: 24px; }
-        .section-title { font-weight: bold; background: #eee; padding: 5px 10px; margin: 20px 0 10px; border-right: 5px solid #444; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .info-item { display: flex; border-bottom: 1px dotted #ccc; padding: 5px 0; }
-        .label { font-weight: bold; width: 140px; }
-        .items-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        .items-table th, .items-table td { border: 1px solid #444; padding: 8px; text-align: center; }
-        .items-table th { background: #eee; }
-        .footer { margin-top: 50px; display: flex; justify-content: space-between; }
-        .signature-box { text-align: center; width: 200px; }
-        .signature-line { border-top: 1px solid #444; margin-top: 40px; }
-        
-        @media print {
-            body { padding: 0; }
-            .cert-container { border: none; max-width: 100%; }
-            @page { size: A4; margin: 1cm; }
-        }
-    </style>
+<meta charset="UTF-8">
+<style>
+    body {
+        margin:0;
+        padding:0;
+        font-family: <?= $template['font_family'] ?>;
+        font-size: <?= $template['font_size'] ?>pt;
+    }
+
+    .page {
+        position: relative;
+        width: 210mm;
+        height: 297mm;
+    }
+
+    .abs {
+        position: absolute;
+    }
+
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 10pt;
+    }
+
+    th, td {
+        border: 1px solid #000;
+        padding: 4px;
+        text-align: center;
+    }
+</style>
 </head>
 <body>
-    <div class="cert-container">
-        <div class="header">
-            <h1>شهادة صحية للمنتجات الغذائية</h1>
-            <h3>دول خارج مجلس التعاون الخليجي (Non-GCC)</h3>
-        </div>
 
-        <div class="section-title">بيانات الشهادة</div>
-        <div class="info-grid">
-            <div class="info-item"><span class="label">رقم الشهادة:</span> <span><?= htmlspecialchars($data['certificate_number'] ?? '---') ?></span></div>
-            <div class="info-item"><span class="label">تاريخ الإصدار:</span> <span><?= htmlspecialchars($data['issued_at'] ?? '---') ?></span></div>
-        </div>
+<div class="page">
 
-        <div class="section-title">بيانات المصدر والمستورد</div>
-        <div class="info-grid">
-            <div class="info-item"><span class="label">اسم المصدر:</span> <span><?= htmlspecialchars($data['exporter_name'] ?? '---') ?></span></div>
-            <div class="info-item"><span class="label">اسم المستورد:</span> <span><?= htmlspecialchars($data['importer_name'] ?? '---') ?></span></div>
-            <div class="info-item"><span class="label">بلد المقصد:</span> <span><?= htmlspecialchars($data['importer_country'] ?? '---') ?></span></div>
-        </div>
+    <!-- الخلفية الرسمية -->
+    <img src="<?= $_SERVER['DOCUMENT_ROOT'].'/'.$template['background_image'] ?>"
+         style="position:absolute; top:0; left:0; width:210mm; height:297mm;">
 
-        <div class="section-title">تفاصيل الشحنة</div>
-        <table class="items-table">
+    <!-- رقم الشهادة -->
+    <div class="abs" style="top:42mm; right:28mm;">
+        <?= htmlspecialchars($data['certificate_number'] ?? '') ?>
+    </div>
+
+    <!-- تاريخ الإصدار -->
+    <div class="abs" style="top:50mm; right:28mm;">
+        <?= htmlspecialchars($data['issued_at'] ?? '') ?>
+    </div>
+
+    <!-- اسم المصدر -->
+    <div class="abs" style="top:70mm; right:30mm; width:80mm;">
+        <?= htmlspecialchars($data['exporter_name'] ?? '') ?>
+    </div>
+
+    <!-- اسم المستورد -->
+    <div class="abs" style="top:78mm; right:30mm; width:80mm;">
+        <?= htmlspecialchars($data['importer_name'] ?? '') ?>
+    </div>
+
+    <!-- بلد المقصد -->
+    <div class="abs" style="top:86mm; right:30mm; width:80mm;">
+        <?= htmlspecialchars($data['importer_country'] ?? '') ?>
+    </div>
+
+    <!-- جدول المنتجات -->
+    <div class="abs"
+         style="top:<?= $template['table_start_y'] ?>mm;
+                right:<?= $template['table_start_x'] ?>mm;
+                width:170mm;">
+
+        <table>
             <thead>
                 <tr>
                     <th>#</th>
                     <th>المنتج</th>
                     <th>الكمية</th>
-                    <th>الوزن الصافي</th>
+                    <th>الوزن</th>
                     <th>بلد المنشأ</th>
-                    <th>تاريخ الإنتاج</th>
-                    <th>تاريخ الانتهاء</th>
+                    <th>الإنتاج</th>
+                    <th>الانتهاء</th>
                 </tr>
             </thead>
             <tbody>
-                <?php if (!empty($items)): foreach($items as $idx => $item): ?>
-                <tr>
-                    <td><?= $idx + 1 ?></td>
-                    <td><?= htmlspecialchars($item['name'] ?? '---') ?></td>
-                    <td><?= htmlspecialchars($item['quantity'] ?? '0') ?></td>
-                    <td><?= htmlspecialchars($item['net_weight'] ?? '0') ?> <?= htmlspecialchars($item['weight_unit_code'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($item['country_of_origin'] ?? '---') ?></td>
-                    <td><?= htmlspecialchars($item['production_date'] ?? '---') ?></td>
-                    <td><?= htmlspecialchars($item['expiry_date'] ?? '---') ?></td>
+            <?php
+            $rowHeight = $template['table_row_height'];
+            $maxRows   = $template['table_max_rows'];
+
+            for ($i = 0; $i < $maxRows; $i++):
+                $item = $items[$i] ?? null;
+            ?>
+                <tr style="height:<?= $rowHeight ?>mm;">
+                    <td><?= $i+1 ?></td>
+                    <td><?= htmlspecialchars($item['name'] ?? '') ?></td>
+                    <td><?= htmlspecialchars($item['quantity'] ?? '') ?></td>
+                    <td><?= htmlspecialchars($item['net_weight'] ?? '') ?></td>
+                    <td><?= htmlspecialchars($item['country_of_origin'] ?? '') ?></td>
+                    <td><?= htmlspecialchars($item['production_date'] ?? '') ?></td>
+                    <td><?= htmlspecialchars($item['expiry_date'] ?? '') ?></td>
                 </tr>
-                <?php endforeach; else: ?>
-                <tr><td colspan="7">لا توجد بيانات متاحة</td></tr>
-                <?php endif; ?>
+            <?php endfor; ?>
             </tbody>
         </table>
-
-        <div class="footer">
-            <div class="signature-box">
-                <p>توقيع المفتش المختص</p>
-                <div class="signature-line"></div>
-            </div>
-            <div class="signature-box">
-                <p>الختم الرسمي</p>
-                <div class="signature-line"></div>
-            </div>
-        </div>
     </div>
+
+    <!-- QR -->
+    <img src="<?= $qrPath ?>"
+         class="abs"
+         style="left:<?= $template['qr_x'] ?>mm;
+                top:<?= $template['qr_y'] ?>mm;
+                width:<?= $template['qr_width'] ?>mm;
+                height:<?= $template['qr_height'] ?>mm;">
+
+    <!-- التوقيع -->
+    <img src="<?= $signaturePath ?>"
+         class="abs"
+         style="left:<?= $template['signature_x'] ?>mm;
+                top:<?= $template['signature_y'] ?>mm;
+                width:<?= $template['signature_width'] ?>mm;
+                height:<?= $template['signature_height'] ?>mm;">
+
+    <!-- الختم -->
+    <img src="<?= $stampPath ?>"
+         class="abs"
+         style="left:<?= $template['stamp_x'] ?>mm;
+                top:<?= $template['stamp_y'] ?>mm;
+                width:<?= $template['stamp_width'] ?>mm;
+                height:<?= $template['stamp_height'] ?>mm;">
+
+</div>
+
 </body>
 </html>
