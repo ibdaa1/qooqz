@@ -206,21 +206,25 @@ class CertificatePdfHelper
      */
     public static function htmlToPdf(string $html, string $outputPath, string $lang = 'ar'): string
     {
-        // Try the vendor autoload in the api/ directory first, then fall back to
-        // one level up (common on cPanel hosts where composer was run from ~/)
-        $autoloadCandidates = [
-            self::apiDir() . '/vendor/autoload.php',
-            dirname(self::apiDir()) . '/vendor/autoload.php',
-        ];
+        // Walk up from the api/ directory looking for vendor/autoload.php.
+        // This handles three common cPanel layouts:
+        //   ~/public_html/api/vendor/autoload.php   (git-deployed vendor)
+        //   ~/public_html/vendor/autoload.php        (composer run from public_html)
+        //   ~/vendor/autoload.php                    (composer run from home dir — most common on this host)
         $autoload = null;
-        foreach ($autoloadCandidates as $candidate) {
+        $dir = self::apiDir();
+        for ($i = 0; $i < 4; $i++) {
+            $candidate = $dir . '/vendor/autoload.php';
             if (file_exists($candidate)) {
                 $autoload = $candidate;
                 break;
             }
+            $parent = dirname($dir);
+            if ($parent === $dir) break; // reached filesystem root
+            $dir = $parent;
         }
         if ($autoload === null) {
-            error_log('[CertificatePdfHelper] dompdf autoload not found. Checked: ' . implode(', ', $autoloadCandidates));
+            error_log('[CertificatePdfHelper] dompdf vendor/autoload.php not found. Searched up to 4 levels above: ' . self::apiDir());
             return '';
         }
         require_once $autoload;

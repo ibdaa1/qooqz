@@ -1,3 +1,6 @@
+# Dependencies — use the server's existing ~/vendor (dompdf is pre-installed on the host)
+/vendor/
+
 # Environment
 .env
 .env.local
