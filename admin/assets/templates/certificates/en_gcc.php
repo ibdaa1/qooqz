@@ -7,53 +7,78 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
-    <meta charset="UTF-8">
-    <title>Health Certificate - GCC Countries</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; color: #333; }
-        .cert-container { border: 5px double #333; padding: 30px; max-width: 800px; margin: auto; }
-        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-        .header h1 { margin: 10px 0; font-size: 24px; }
-        .section-title { font-weight: bold; background: #f0f0f0; padding: 5px 10px; margin: 20px 0 10px; border-left: 5px solid #333; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .info-item { display: flex; border-bottom: 1px dotted #ccc; padding: 5px 0; }
-        .label { font-weight: bold; width: 160px; }
-        .items-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        .items-table th, .items-table td { border: 1px solid #333; padding: 8px; text-align: center; }
-        .items-table th { background: #f0f0f0; }
-        .footer { margin-top: 50px; display: flex; justify-content: space-between; }
-        .signature-box { text-align: center; width: 200px; }
-        .signature-line { border-top: 1px solid #333; margin-top: 40px; }
-        
-        @media print {
-            body { padding: 0; }
-            .cert-container { border: none; max-width: 100%; }
-            @page { size: A4; margin: 1cm; }
-        }
-    </style>
+<meta charset="UTF-8">
+<style>
+    body {
+        margin:0;
+        padding:0;
+        font-family: <?= $template['font_family'] ?>;
+        font-size: <?= $template['font_size'] ?>pt;
+    }
+
+    .page {
+        position: relative;
+        width: 210mm;
+        height: 297mm;
+    }
+
+    .abs {
+        position: absolute;
+    }
+
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 10pt;
+    }
+
+    th, td {
+        border: 1px solid #000;
+        padding: 4px;
+        text-align: center;
+    }
+</style>
 </head>
 <body>
-    <div class="cert-container">
-        <div class="header">
-            <h1>Health Certificate for Food Products</h1>
-            <h3>GCC Countries</h3>
-        </div>
 
-        <div class="section-title">Certificate Information</div>
-        <div class="info-grid">
-            <div class="info-item"><span class="label">Certificate No:</span> <span><?= htmlspecialchars($data['certificate_number'] ?? '---') ?></span></div>
-            <div class="info-item"><span class="label">Issued Date:</span> <span><?= htmlspecialchars($data['issued_at'] ?? '---') ?></span></div>
-        </div>
+<div class="page">
 
-        <div class="section-title">Exporter & Importer Information</div>
-        <div class="info-grid">
-            <div class="info-item"><span class="label">Exporter Name:</span> <span><?= htmlspecialchars($data['exporter_name'] ?? '---') ?></span></div>
-            <div class="info-item"><span class="label">Importer Name:</span> <span><?= htmlspecialchars($data['importer_name'] ?? '---') ?></span></div>
-            <div class="info-item"><span class="label">Destination Country:</span> <span><?= htmlspecialchars($data['importer_country'] ?? '---') ?></span></div>
-        </div>
+    <!-- Official Background -->
+    <img src="<?= $_SERVER['DOCUMENT_ROOT'].'/'.$template['background_image'] ?>"
+         style="position:absolute; top:0; left:0; width:210mm; height:297mm;">
 
-        <div class="section-title">Shipment Details</div>
-        <table class="items-table">
+    <!-- Certificate Number -->
+    <div class="abs" style="top:42mm; left:30mm;">
+        <?= htmlspecialchars($data['certificate_number'] ?? '') ?>
+    </div>
+
+    <!-- Issue Date -->
+    <div class="abs" style="top:50mm; left:30mm;">
+        <?= htmlspecialchars($data['issued_at'] ?? '') ?>
+    </div>
+
+    <!-- Exporter Name -->
+    <div class="abs" style="top:70mm; left:30mm; width:90mm;">
+        <?= htmlspecialchars($data['exporter_name'] ?? '') ?>
+    </div>
+
+    <!-- Importer Name -->
+    <div class="abs" style="top:78mm; left:30mm; width:90mm;">
+        <?= htmlspecialchars($data['importer_name'] ?? '') ?>
+    </div>
+
+    <!-- Destination Country -->
+    <div class="abs" style="top:86mm; left:30mm; width:90mm;">
+        <?= htmlspecialchars($data['importer_country'] ?? '') ?>
+    </div>
+
+    <!-- Items Table -->
+    <div class="abs"
+         style="top:<?= $template['table_start_y'] ?>mm;
+                left:<?= $template['table_start_x'] ?>mm;
+                width:170mm;">
+
+        <table>
             <thead>
                 <tr>
                     <th>#</th>
@@ -66,32 +91,55 @@
                 </tr>
             </thead>
             <tbody>
-                <?php if (!empty($items)): foreach($items as $idx => $item): ?>
-                <tr>
-                    <td><?= $idx + 1 ?></td>
-                    <td><?= htmlspecialchars($item['name'] ?? '---') ?></td>
-                    <td><?= htmlspecialchars($item['quantity'] ?? '0') ?></td>
-                    <td><?= htmlspecialchars($item['net_weight'] ?? '0') ?> <?= htmlspecialchars($item['weight_unit_code'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($item['country_of_origin'] ?? '---') ?></td>
-                    <td><?= htmlspecialchars($item['production_date'] ?? '---') ?></td>
-                    <td><?= htmlspecialchars($item['expiry_date'] ?? '---') ?></td>
+            <?php
+            $rowHeight = $template['table_row_height'];
+            $maxRows   = $template['table_max_rows'];
+
+            for ($i = 0; $i < $maxRows; $i++):
+                $item = $items[$i] ?? null;
+            ?>
+                <tr style="height:<?= $rowHeight ?>mm;">
+                    <td><?= $i+1 ?></td>
+                    <td><?= htmlspecialchars($item['name'] ?? '') ?></td>
+                    <td><?= htmlspecialchars($item['quantity'] ?? '') ?></td>
+                    <td>
+                        <?= htmlspecialchars($item['net_weight'] ?? '') ?>
+                        <?= htmlspecialchars($item['weight_unit_code'] ?? '') ?>
+                    </td>
+                    <td><?= htmlspecialchars($item['country_of_origin'] ?? '') ?></td>
+                    <td><?= htmlspecialchars($item['production_date'] ?? '') ?></td>
+                    <td><?= htmlspecialchars($item['expiry_date'] ?? '') ?></td>
                 </tr>
-                <?php endforeach; else: ?>
-                <tr><td colspan="7">No items available</td></tr>
-                <?php endif; ?>
+            <?php endfor; ?>
             </tbody>
         </table>
-
-        <div class="footer">
-            <div class="signature-box">
-                <p>Authorized Signature</p>
-                <div class="signature-line"></div>
-            </div>
-            <div class="signature-box">
-                <p>Official Stamp</p>
-                <div class="signature-line"></div>
-            </div>
-        </div>
     </div>
+
+    <!-- QR Code -->
+    <img src="<?= $qrPath ?>"
+         class="abs"
+         style="left:<?= $template['qr_x'] ?>mm;
+                top:<?= $template['qr_y'] ?>mm;
+                width:<?= $template['qr_width'] ?>mm;
+                height:<?= $template['qr_height'] ?>mm;">
+
+    <!-- Authorized Signature -->
+    <img src="<?= $signaturePath ?>"
+         class="abs"
+         style="left:<?= $template['signature_x'] ?>mm;
+                top:<?= $template['signature_y'] ?>mm;
+                width:<?= $template['signature_width'] ?>mm;
+                height:<?= $template['signature_height'] ?>mm;">
+
+    <!-- Official Stamp -->
+    <img src="<?= $stampPath ?>"
+         class="abs"
+         style="left:<?= $template['stamp_x'] ?>mm;
+                top:<?= $template['stamp_y'] ?>mm;
+                width:<?= $template['stamp_width'] ?>mm;
+                height:<?= $template['stamp_height'] ?>mm;">
+
+</div>
+
 </body>
 </html>
