@@ -3,6 +3,8 @@
  * Template: Arabic GCC Certificate
  * Version: ar_gcc
  */
+$fontFamily = htmlspecialchars($template['font_family'] ?? 'Arial');
+$fontSize   = htmlspecialchars($template['font_size'] ?? '12');
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -12,14 +14,15 @@
     body {
         margin:0;
         padding:0;
-        font-family: <?= $template['font_family'] ?>;
-        font-size: <?= $template['font_size'] ?>pt;
+        font-family: <?= $fontFamily ?>;
+        font-size: <?= $fontSize ?>pt;
     }
 
     .page {
         position: relative;
         width: 210mm;
         height: 297mm;
+        overflow: hidden;
     }
 
     .field {
@@ -37,33 +40,49 @@
         padding: 4px;
         text-align: center;
     }
+
+    .no-print { display: block; }
+
+    @media print {
+        .no-print { display: none !important; }
+        body { margin: 0; }
+    }
 </style>
 </head>
 <body>
 
+<!-- Print / PDF button (hidden when printing) -->
+<div class="no-print" style="padding:8px; background:#f0f0f0; text-align:center;">
+    <button onclick="window.print()" style="padding:8px 24px; font-size:14px; cursor:pointer;">
+        &#128438; طباعة / تصدير PDF
+    </button>
+</div>
+
 <div class="page">
 
     <!-- الخلفية -->
-    <img src="<?= $_SERVER['DOCUMENT_ROOT'].'/'.$template['background_image'] ?>"
-         style="position:absolute; top:0; left:0; width:210mm; height:297mm;">
+    <?php if (!empty($template['background_image'])): ?>
+    <img src="/<?= htmlspecialchars($template['background_image']) ?>"
+         style="position:absolute; top:0; left:0; width:210mm; height:297mm; z-index:0;">
+    <?php endif; ?>
 
     <!-- رقم الشهادة -->
     <div class="field"
-         style="top:40mm; right:30mm;">
-        <?= htmlspecialchars($data['certificate_number']) ?>
+         style="top:40mm; right:30mm; z-index:1;">
+        <?= htmlspecialchars($data['certificate_number'] ?? '') ?>
     </div>
 
     <!-- تاريخ الإصدار -->
     <div class="field"
-         style="top:48mm; right:30mm;">
-        <?= htmlspecialchars($data['issued_at']) ?>
+         style="top:48mm; right:30mm; z-index:1;">
+        <?= htmlspecialchars($data['issued_at'] ?? '') ?>
     </div>
 
     <!-- جدول المنتجات -->
     <div class="field"
-         style="top:<?= $template['table_start_y'] ?>mm;
-                right:<?= $template['table_start_x'] ?>mm;
-                width:170mm;">
+         style="top:<?= htmlspecialchars((string)($template['table_start_y'] ?? '50')) ?>mm;
+                right:<?= htmlspecialchars((string)($template['table_start_x'] ?? '10')) ?>mm;
+                width:170mm; z-index:1;">
 
         <table>
             <thead>
@@ -79,14 +98,14 @@
             </thead>
             <tbody>
             <?php
-            $rowHeight = $template['table_row_height'];
-            $maxRows   = $template['table_max_rows'];
+            $rowHeight = $template['table_row_height'] ?? '12';
+            $maxRows   = (int)($template['table_max_rows'] ?? 12);
 
-            for($i=0; $i<$maxRows; $i++):
+            for ($i = 0; $i < $maxRows; $i++):
                 $item = $items[$i] ?? null;
             ?>
-                <tr style="height:<?= $rowHeight ?>mm;">
-                    <td><?= $i+1 ?></td>
+                <tr style="height:<?= htmlspecialchars((string)$rowHeight) ?>mm;">
+                    <td><?= $i + 1 ?></td>
                     <td><?= htmlspecialchars($item['name'] ?? '') ?></td>
                     <td><?= htmlspecialchars($item['quantity'] ?? '') ?></td>
                     <td><?= htmlspecialchars($item['net_weight'] ?? '') ?></td>
@@ -100,28 +119,37 @@
     </div>
 
     <!-- QR -->
-    <img src="<?= $qrPath ?>"
+    <?php if (!empty($qrPath)): ?>
+    <img src="<?= htmlspecialchars($qrPath) ?>"
          style="position:absolute;
-                left:<?= $template['qr_x'] ?>mm;
-                top:<?= $template['qr_y'] ?>mm;
-                width:<?= $template['qr_width'] ?>mm;
-                height:<?= $template['qr_height'] ?>mm;">
+                left:<?= htmlspecialchars((string)($template['qr_x'] ?? '180')) ?>mm;
+                top:<?= htmlspecialchars((string)($template['qr_y'] ?? '250')) ?>mm;
+                width:<?= htmlspecialchars((string)($template['qr_width'] ?? '50')) ?>mm;
+                height:<?= htmlspecialchars((string)($template['qr_height'] ?? '50')) ?>mm;
+                z-index:1;">
+    <?php endif; ?>
 
     <!-- التوقيع -->
-    <img src="<?= $signaturePath ?>"
+    <?php if (!empty($signaturePath)): ?>
+    <img src="<?= htmlspecialchars($signaturePath) ?>"
          style="position:absolute;
-                left:<?= $template['signature_x'] ?>mm;
-                top:<?= $template['signature_y'] ?>mm;
-                width:<?= $template['signature_width'] ?>mm;
-                height:<?= $template['signature_height'] ?>mm;">
+                left:<?= htmlspecialchars((string)($template['signature_x'] ?? '100')) ?>mm;
+                top:<?= htmlspecialchars((string)($template['signature_y'] ?? '250')) ?>mm;
+                width:<?= htmlspecialchars((string)($template['signature_width'] ?? '50')) ?>mm;
+                height:<?= htmlspecialchars((string)($template['signature_height'] ?? '50')) ?>mm;
+                z-index:1;">
+    <?php endif; ?>
 
     <!-- الختم -->
-    <img src="<?= $stampPath ?>"
+    <?php if (!empty($stampPath)): ?>
+    <img src="<?= htmlspecialchars($stampPath) ?>"
          style="position:absolute;
-                left:<?= $template['stamp_x'] ?>mm;
-                top:<?= $template['stamp_y'] ?>mm;
-                width:<?= $template['stamp_width'] ?>mm;
-                height:<?= $template['stamp_height'] ?>mm;">
+                left:<?= htmlspecialchars((string)($template['stamp_x'] ?? '150')) ?>mm;
+                top:<?= htmlspecialchars((string)($template['stamp_y'] ?? '250')) ?>mm;
+                width:<?= htmlspecialchars((string)($template['stamp_width'] ?? '50')) ?>mm;
+                height:<?= htmlspecialchars((string)($template['stamp_height'] ?? '50')) ?>mm;
+                z-index:1;">
+    <?php endif; ?>
 
 </div>
 
