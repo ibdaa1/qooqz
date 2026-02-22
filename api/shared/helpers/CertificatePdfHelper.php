@@ -32,6 +32,13 @@ class CertificatePdfHelper
     /** Cached assets config */
     private static ?array $assetsConfig = null;
 
+    /** Cached Arabic font base64 CSS (keyed by font file mtime) */
+    private static string $arabicFontCssCache = '';
+    private static int    $arabicFontCssMtime = 0;
+
+    /** Minimum valid font file size in bytes (50 KB) */
+    private const MIN_FONT_SIZE = 51200;
+
     // ──────────────────────────────────────────────────────────────────────────
 
     /**
@@ -234,6 +241,17 @@ class CertificatePdfHelper
             return '';
         }
 
+        // For Arabic / RTL languages, inject the Amiri font as a base64 @font-face rule.
+        // Amiri has full Arabic OpenType shaping tables (init/medi/fina/isol) that dompdf's
+        // Cpdf::doArabicShaping() requires for correct connected letter rendering.
+        if (in_array($lang, ['ar', 'ar-SA', 'ar-AE'], true)) {
+            $fontCss = self::arabicFontCss();
+            if ($fontCss !== '') {
+                // Inject before </head> so it is available to all elements
+                $html = str_replace('</head>', $fontCss . '</head>', $html);
+            }
+        }
+
         // Determine the vendor dir that contains the dompdf fonts
         $vendorDir = dirname($autoload);
         /** @var \Dompdf\Options $options */
@@ -258,15 +276,93 @@ class CertificatePdfHelper
             return '';
         }
 
-        $dir = dirname($outputPath);
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
+        $outDir = dirname($outputPath);
+        if (!is_dir($outDir)) {
+            @mkdir($outDir, 0755, true);
         }
 
         if (file_put_contents($outputPath, $pdfContent) === false) {
             return '';
         }
         return $outputPath;
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Return a CSS <style> block that embeds the Amiri Arabic font as a base64
+     * data URI @font-face rule.  The font file is downloaded from CDN on first
+     * use and cached in api/storage/fonts/ for subsequent calls.
+     *
+     * Returns '' if the font cannot be obtained (falls back to DejaVu Sans).
+     */
+    public static function arabicFontCss(): string
+    {
+        $fontPath = self::getArabicFontPath();
+        if ($fontPath === '') {
+            return '';
+        }
+        $mtime = (int)@filemtime($fontPath);
+        // Return the in-process cache if the font file hasn't changed
+        if (self::$arabicFontCssCache !== '' && self::$arabicFontCssMtime === $mtime) {
+            return self::$arabicFontCssCache;
+        }
+        $b64 = base64_encode(file_get_contents($fontPath));
+        $css = '<style>'
+            . '@font-face {'
+            . 'font-family:"Amiri";'
+            . 'font-style:normal;font-weight:400;'
+            . 'src:url("data:font/truetype;base64,' . $b64 . '") format("truetype");'
+            . '}'
+            . '</style>';
+        self::$arabicFontCssCache = $css;
+        self::$arabicFontCssMtime = $mtime;
+        return $css;
+    }
+
+    /**
+     * Return the local path to the cached Amiri-Regular.ttf, downloading it
+     * from CDN if it is not already present.  Returns '' on failure.
+     */
+    public static function getArabicFontPath(): string
+    {
+        $fontsDir = self::apiDir() . '/storage/fonts';
+        $fontPath = $fontsDir . '/Amiri-Regular.ttf';
+
+        // Use cache if the file looks valid
+        if (file_exists($fontPath) && filesize($fontPath) > self::MIN_FONT_SIZE) {
+            return $fontPath;
+        }
+
+        @mkdir($fontsDir, 0755, true);
+
+        // Try multiple CDN mirrors in order
+        $cdnUrls = [
+            'https://cdn.jsdelivr.net/npm/amiri-font@0.113.0/fonts/amiri-regular.ttf',
+            'https://fonts.gstatic.com/s/amiri/v27/J7aRnpd8CGxBHqUpvrIw74NL.ttf',
+            'https://github.com/aliftype/amiri/raw/main/Amiri-Regular.ttf',
+        ];
+
+        $ctx = stream_context_create(['http' => [
+            'timeout'       => 20,
+            'ignore_errors' => true,
+            'user_agent'    => 'Mozilla/5.0 (compatible; CertBot/1.0)',
+        ], 'ssl' => [
+            'verify_peer'      => true,
+            'verify_peer_name' => true,
+        ]]);
+
+        foreach ($cdnUrls as $url) {
+            $data = @file_get_contents($url, false, $ctx);
+            if ($data !== false && strlen($data) > self::MIN_FONT_SIZE) {
+                if (@file_put_contents($fontPath, $data) !== false) {
+                    return $fontPath;
+                }
+            }
+        }
+
+        error_log('[CertificatePdfHelper] Could not download Amiri font. Arabic PDF may render incorrectly.');
+        return '';
     }
 
     // ──────────────────────────────────────────────────────────────────────────

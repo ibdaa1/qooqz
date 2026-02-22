@@ -12,6 +12,8 @@ if (empty($L) && class_exists('CertificatePdfHelper', false)) {
 $fontFamily = htmlspecialchars($template['font_family'] ?? 'DejaVu Sans');
 $fontSize   = htmlspecialchars($template['font_size']   ?? '11');
 $lang       = $lang ?? 'ar';
+// Amiri is injected by CertificatePdfHelper::htmlToPdf() as a base64 @font-face.
+$cssFontFamily = '"Amiri", "' . $fontFamily . '", "DejaVu Sans", sans-serif';
 
 $bgSrc = '';
 if (!empty($template['background_image_data_uri'])) {
@@ -44,9 +46,10 @@ $lbl = function(string $key, string $fallback = '') use ($L): string {
 * { box-sizing: border-box; }
 body {
     margin: 0; padding: 0;
-    font-family: "<?= $fontFamily ?>", "DejaVu Sans", sans-serif;
+    font-family: <?= $cssFontFamily ?>;
     font-size: <?= $fontSize ?>pt;
     direction: rtl;
+    unicode-bidi: bidi-override;
 }
 .page {
     width: 210mm;

@@ -12,3 +12,7 @@
 # Sessions
 /storage/sessions/*
 !/storage/sessions/.gitkeep
+
+# Arabic font cache (downloaded at runtime from CDN)
+/storage/fonts/*.ttf
+/storage/fonts/*.otf
