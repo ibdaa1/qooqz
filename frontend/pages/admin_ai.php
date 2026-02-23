@@ -261,12 +261,12 @@ $sample_chunks = $health['sample_chunks'] ?? [];
     <!-- تبويبات -->
     <div class="tabs">
         <button class="tab active" onclick="showPanel('feed')">📤 تغذية البيانات</button>
-        <button class="tab" onclick="showPanel('kb')">📚 <?= L($L,'ai_tab_kb','قواعد المعرفة') ?></button>
-        <button class="tab" onclick="showPanel('docs')">📄 <?= L($L,'ai_tab_docs','مستندات') ?></button>
-        <button class="tab" onclick="showPanel('files')">📁 <?= L($L,'ai_tab_files','ملفات') ?></button>
-        <button class="tab" onclick="showPanel('feedback')">⭐ <?= L($L,'ai_tab_feedback','تقييمات') ?></button>
-        <button class="tab" onclick="showPanel('threads')">💬 <?= L($L,'ai_tab_threads','محادثات') ?></button>
-        <button class="tab" onclick="showPanel('chunks')">🔍 <?= L($L,'ai_tab_chunks','القطع') ?></button>
+        <button class="tab" onclick="showPanel('kb')"><?= L($L,'ai_tab_kb','قواعد المعرفة') ?></button>
+        <button class="tab" onclick="showPanel('docs')"><?= L($L,'ai_tab_docs','مستندات') ?></button>
+        <button class="tab" onclick="showPanel('files')"><?= L($L,'ai_tab_files','ملفات') ?></button>
+        <button class="tab" onclick="showPanel('feedback')"><?= L($L,'ai_tab_feedback','تقييمات') ?></button>
+        <button class="tab" onclick="showPanel('threads')"><?= L($L,'ai_tab_threads','محادثات') ?></button>
+        <button class="tab" onclick="showPanel('chunks')"><?= L($L,'ai_tab_chunks','القطع') ?></button>
     </div>
 
     <!-- 0. تغذية البيانات (الرئيسي) -->

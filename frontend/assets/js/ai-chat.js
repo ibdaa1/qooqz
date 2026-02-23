@@ -43,6 +43,7 @@ document.getElementById('chatForm').addEventListener('submit', function() {
 (function() {
     var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     var micBtn = document.getElementById('micBtn');
+    if (!micBtn) return;
     if (!SpeechRecognition) { micBtn.style.display = 'none'; return; }
 
     var recognition = new SpeechRecognition();
