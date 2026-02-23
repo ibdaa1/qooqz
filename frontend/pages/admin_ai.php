@@ -185,7 +185,7 @@ $sample_chunks = $health['sample_chunks'] ?? [];
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= L($L,'ai_admin_panel','لوحة إدارة AI Engine') ?></title>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/frontend/assets/css/ai-admin.css">
+    <link rel="stylesheet" href="../assets/css/ai-admin.css">
 </head>
 <body>
 
@@ -460,7 +460,7 @@ $sample_chunks = $health['sample_chunks'] ?? [];
 
 </div>
 
-<script src="/frontend/assets/js/ai-admin.js"></script>
+<script src="../assets/js/ai-admin.js"></script>
 
 </body>
 </html>

@@ -174,7 +174,7 @@ if (isset($_GET['new'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= L($L,'ai_chat_title','المساعد الذكي') ?> — AI Chat</title>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/frontend/assets/css/ai-chat.css">
+    <link rel="stylesheet" href="../assets/css/ai-chat.css">
 </head>
 <body>
 
@@ -329,7 +329,7 @@ if (isset($_GET['new'])) {
     </div>
 </div>
 
-<script src="/frontend/assets/js/ai-chat.js"></script>
+<script src="../assets/js/ai-chat.js"></script>
 
 </body>
 </html>
