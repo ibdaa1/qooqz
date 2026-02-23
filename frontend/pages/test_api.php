@@ -300,16 +300,19 @@ if (isset($_GET['new'])) {
         <form method="POST" enctype="multipart/form-data" class="form-row" id="chatForm">
             <input type="hidden" name="thread_id" value="<?= htmlspecialchars($thread_id) ?>">
             <input type="file" name="image" id="imageInput" accept="image/*" onchange="showFile('image')">
-            <input type="file" name="document_file" id="docInput" accept=".txt,.pdf,.doc,.docx,.csv" onchange="showFile('document')">
+            <input type="file" name="document_file" id="docInput" accept=".txt,.pdf,.doc,.docx,.csv,.xlsx" onchange="showFile('document')">
+
+            <!-- Side buttons (outside textarea) -->
+            <div class="side-btns">
+                <button type="button" class="side-btn" id="imgBtn" onclick="document.getElementById('imageInput').click()" title="<?= L($L,'ai_attach_img','إرفاق صورة') ?>">🖼️</button>
+                <button type="button" class="side-btn" id="docBtn" onclick="document.getElementById('docInput').click()" title="<?= L($L,'ai_attach_doc','إرفاق ملف') ?>">📎</button>
+                <button type="button" class="side-btn" id="micBtn" title="<?= L($L,'ai_voice','تسجيل صوتي') ?>">🎤</button>
+            </div>
 
             <div class="textarea-wrap">
                 <textarea name="question" id="qInput"
                     placeholder="<?= L($L,'ai_placeholder','اكتب سؤالك هنا...') ?>"
                     rows="1" required></textarea>
-                <div class="attach-btns">
-                    <button type="button" class="attach-btn" onclick="document.getElementById('imageInput').click()" title="<?= L($L,'ai_attach_img','إرفاق صورة') ?>">🖼️</button>
-                    <button type="button" class="attach-btn" onclick="document.getElementById('docInput').click()" title="<?= L($L,'ai_attach_doc','إرفاق ملف') ?>">📎</button>
-                </div>
             </div>
             <button type="submit" class="send-btn" id="sendBtn" title="<?= L($L,'ai_send','إرسال') ?>">
                 <span class="send-icon">➤</span>
@@ -319,6 +322,7 @@ if (isset($_GET['new'])) {
     </div>
 </div>
 
+<script>var AI_LANG='<?= $lang ?>';</script>
 <script src="../assets/js/ai-chat.js"></script>
 
 </body>

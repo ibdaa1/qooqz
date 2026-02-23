@@ -91,5 +91,8 @@
   "ai_send_feedback": "⭐ إرسال",
   "ai_feedback_title": "إرسال تقييم",
   "ai_feedback_list": "التقييمات",
-  "ai_words": "كلمات"
+  "ai_words": "كلمات",
+  "ai_voice": "تسجيل صوتي",
+  "ai_voice_stop": "إيقاف التسجيل",
+  "ai_feed_title": "تغذية البيانات"
 }

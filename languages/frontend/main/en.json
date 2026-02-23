@@ -91,5 +91,8 @@
   "ai_send_feedback": "⭐ Submit",
   "ai_feedback_title": "Submit Feedback",
   "ai_feedback_list": "Feedback List",
-  "ai_words": "words"
+  "ai_words": "words",
+  "ai_voice": "Voice input",
+  "ai_voice_stop": "Stop recording",
+  "ai_feed_title": "Data Feed"
 }

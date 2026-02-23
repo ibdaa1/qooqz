@@ -103,7 +103,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_c
     $flash = ($r && ($r['status'] ?? '') === 'ok') ? "✅ " . L($L,'ai_add_chunk','تم الإضافة') : "❌ " . ($r['detail'] ?? 'خطأ');
 }
 
-// رفع ملف
+// رفع ملف وإضافته تلقائياً لقاعدة المعرفة (Excel/PDF/DOCX/CSV/صورة)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'upload_to_kb') {
+    $kb_id = $_POST['kb_id_for_file'] ?? '';
+    if (!empty($_FILES['kb_file']['tmp_name']) && !empty($kb_id)) {
+        // الخطوة 1: رفع الملف لاستخراج النص
+        $ch = curl_init($API_BASE . '/api/v1/files/upload');
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => [
+                'file' => new CURLFile(
+                    $_FILES['kb_file']['tmp_name'],
+                    $_FILES['kb_file']['type'],
+                    $_FILES['kb_file']['name']
+                ),
+            ],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 120,
+        ]);
+        $file_resp = json_decode(curl_exec($ch), true);
+        curl_close($ch);
+
+        if ($file_resp && ($file_resp['status'] ?? '') === 'ok') {
+            $extracted = $file_resp['extracted_text'] ?? '';
+            $fname     = $file_resp['filename'] ?? $_FILES['kb_file']['name'];
+            if (!empty($extracted)) {
+                // الخطوة 2: إضافة المحتوى المستخرج كمستند مقطع في قاعدة المعرفة
+                $ch2 = curl_init($API_BASE . "/api/v1/knowledge-bases/{$kb_id}/documents");
+                curl_setopt_array($ch2, [
+                    CURLOPT_POST           => true,
+                    CURLOPT_POSTFIELDS     => json_encode([
+                        'title'    => $fname,
+                        'content'  => $extracted,
+                        'language' => $_POST['kb_file_lang'] ?? 'ar',
+                    ]),
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT        => 60,
+                    CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+                ]);
+                $doc_resp = json_decode(curl_exec($ch2), true);
+                curl_close($ch2);
+                $flash = ($doc_resp && ($doc_resp['status'] ?? '') === 'ok')
+                    ? "✅ تم رفع '{$fname}' وإضافته — " . ($doc_resp['chunks_created'] ?? 0) . " قطعة"
+                    : "⚠️ رُفع الملف لكن فشل التقطيع: " . ($doc_resp['detail'] ?? 'خطأ');
+            } else {
+                $flash = "✅ رُفع الملف '{$fname}' (لم يُستخرج نص منه)";
+            }
+        } else {
+            $flash = "❌ فشل رفع الملف: " . ($file_resp['detail'] ?? 'خطأ في الاتصال');
+        }
+    } else {
+        $flash = "❌ الرجاء اختيار ملف وقاعدة معرفة";
+    }
+}
+
+
+// رفع ملف (للتخزين فقط)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'upload_file') {
     if (!empty($_FILES['file_upload']['tmp_name'])) {
         $ch = curl_init($API_BASE . '/api/v1/files/upload');
@@ -205,16 +260,65 @@ $sample_chunks = $health['sample_chunks'] ?? [];
 
     <!-- تبويبات -->
     <div class="tabs">
-        <button class="tab active" onclick="showPanel('kb')"><?= L($L,'ai_tab_kb','📚 قواعد المعرفة') ?></button>
-        <button class="tab" onclick="showPanel('docs')"><?= L($L,'ai_tab_docs','📄 مستندات + قطع') ?></button>
-        <button class="tab" onclick="showPanel('files')"><?= L($L,'ai_tab_files','📁 ملفات') ?></button>
-        <button class="tab" onclick="showPanel('feedback')"><?= L($L,'ai_tab_feedback','⭐ تقييمات') ?></button>
-        <button class="tab" onclick="showPanel('threads')"><?= L($L,'ai_tab_threads','💬 محادثات') ?></button>
-        <button class="tab" onclick="showPanel('chunks')"><?= L($L,'ai_tab_chunks','🔍 القطع النصية') ?></button>
+        <button class="tab active" onclick="showPanel('feed')">📤 تغذية البيانات</button>
+        <button class="tab" onclick="showPanel('kb')">📚 <?= L($L,'ai_tab_kb','قواعد المعرفة') ?></button>
+        <button class="tab" onclick="showPanel('docs')">📄 <?= L($L,'ai_tab_docs','مستندات') ?></button>
+        <button class="tab" onclick="showPanel('files')">📁 <?= L($L,'ai_tab_files','ملفات') ?></button>
+        <button class="tab" onclick="showPanel('feedback')">⭐ <?= L($L,'ai_tab_feedback','تقييمات') ?></button>
+        <button class="tab" onclick="showPanel('threads')">💬 <?= L($L,'ai_tab_threads','محادثات') ?></button>
+        <button class="tab" onclick="showPanel('chunks')">🔍 <?= L($L,'ai_tab_chunks','القطع') ?></button>
+    </div>
+
+    <!-- 0. تغذية البيانات (الرئيسي) -->
+    <div class="panel active" id="panel-feed">
+        <div class="row-2">
+            <div class="card">
+                <h3>📤 رفع ملف وإضافته تلقائياً لقاعدة المعرفة</h3>
+                <p style="font-size:.82rem;color:var(--text2);margin-bottom:14px">يدعم: Excel (.xlsx/.xls)، PDF، Word (.docx)، CSV، TXT، صور (PNG/JPG)</p>
+                <form method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="upload_to_kb">
+                    <div class="form-group">
+                        <label><?= L($L,'ai_knowledge_bases','قاعدة المعرفة') ?> *</label>
+                        <select name="kb_id_for_file" required>
+                            <option value=""><?= L($L,'ai_kb_select','اختر...') ?></option>
+                            <?php foreach ($kbs as $kb): ?>
+                                <option value="<?= htmlspecialchars($kb['id']) ?>"><?= htmlspecialchars($kb['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><?= L($L,'ai_language','اللغة') ?></label>
+                        <select name="kb_file_lang">
+                            <option value="ar"><?= L($L,'ai_lang_ar','عربي') ?></option>
+                            <option value="en"><?= L($L,'ai_lang_en','English') ?></option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>الملف *</label>
+                        <div class="file-input-wrap">
+                            <input type="file" name="kb_file" accept=".xlsx,.xls,.pdf,.doc,.docx,.csv,.txt,.jpg,.jpeg,.png,.gif" required style="display:block">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">📤 رفع وإضافة للمعرفة</button>
+                </form>
+            </div>
+            <div class="card">
+                <h3>💡 كيف يعمل</h3>
+                <div style="font-size:.85rem;color:var(--text2);line-height:2">
+                    <p>1️⃣ ارفع ملف Excel أو PDF أو Word أو CSV</p>
+                    <p>2️⃣ يستخرج النظام النصوص تلقائياً</p>
+                    <p>3️⃣ يُقطّع المحتوى ويضيفه لقاعدة المعرفة</p>
+                    <p>4️⃣ يصبح متاحاً للبحث فوراً في المحادثات</p>
+                    <hr style="border-color:var(--brd);margin:10px 0">
+                    <p>🖼️ <strong>الصور:</strong> يتعرف النظام على محتوى الصورة ويقرأ ما فيها</p>
+                    <p>📊 <strong>Excel:</strong> يقرأ كل الأوراق والبيانات</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- 1. قواعد المعرفة -->
-    <div class="panel active" id="panel-kb">
+    <div class="panel" id="panel-kb">
         <div class="row-2">
             <div class="card">
                 <h3>➕ <?= L($L,'ai_create_kb','إنشاء قاعدة معرفة جديدة') ?></h3>
