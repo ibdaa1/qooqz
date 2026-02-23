@@ -9,3 +9,5 @@ scikit-learn
 numpy
 aiofiles
 a2wsgi
+PyPDF2
+pdfminer.six

@@ -214,9 +214,9 @@ if (isset($_GET['new'])) {
             <h2><?= L($L,'ai_welcome_title','مرحباً بك في المساعد الذكي') ?></h2>
             <p><?= L($L,'ai_welcome_desc','اطرح أي سؤال وسأبحث في قاعدة المعرفة للعثور على أفضل إجابة.') ?></p>
             <div class="suggestions">
-                <button class="sug-btn" onclick="ask(<?= json_encode($lang==='en' ? 'What is Artificial Intelligence?' : 'ما هو الذكاء الاصطناعي؟') ?>)"><?= L($L,'ai_suggest_ai','🧠 ما هو الذكاء الاصطناعي؟') ?></button>
-                <button class="sug-btn" onclick="ask(<?= json_encode($lang==='en' ? 'ML vs DL difference' : 'ما الفرق بين Machine Learning و Deep Learning؟') ?>)"><?= L($L,'ai_suggest_ml','⚡ ML vs DL') ?></button>
-                <button class="sug-btn" onclick="ask(<?= json_encode($lang==='en' ? 'What is HTTP?' : 'ما هو HTTP؟') ?>)"><?= L($L,'ai_suggest_http','🌐 ما هو HTTP؟') ?></button>
+                <button class="sug-btn" onclick='ask(<?= json_encode($lang==='en' ? 'What is Artificial Intelligence?' : 'ما هو الذكاء الاصطناعي؟') ?>)'><?= L($L,'ai_suggest_ai','🧠 ما هو الذكاء الاصطناعي؟') ?></button>
+                <button class="sug-btn" onclick='ask(<?= json_encode($lang==='en' ? 'ML vs DL difference' : 'ما الفرق بين Machine Learning و Deep Learning؟') ?>)'><?= L($L,'ai_suggest_ml','⚡ ML vs DL') ?></button>
+                <button class="sug-btn" onclick='ask(<?= json_encode($lang==='en' ? 'What is HTTP?' : 'ما هو HTTP؟') ?>)'><?= L($L,'ai_suggest_http','🌐 ما هو HTTP؟') ?></button>
             </div>
         </div>
         <?php else: ?>

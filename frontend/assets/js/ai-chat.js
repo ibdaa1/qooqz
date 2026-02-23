@@ -72,9 +72,14 @@ document.getElementById('chatForm').addEventListener('submit', function() {
         isRecording = false;
         micBtn.classList.remove('recording');
     };
-    recognition.onerror = function() {
+    recognition.onerror = function(event) {
         isRecording = false;
         micBtn.classList.remove('recording');
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            alert(typeof AI_LANG !== 'undefined' && AI_LANG === 'en'
+                ? '🎤 Microphone permission denied. Please allow microphone access in your browser settings.'
+                : '🎤 تم رفض إذن الميكروفون. يرجى السماح بالوصول إلى الميكروفون من إعدادات المتصفح.');
+        }
     };
 
     micBtn.addEventListener('click', function() {
