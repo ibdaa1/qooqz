@@ -312,7 +312,16 @@ def build_smart_answer(question, top_chunks, file_context=None):
             parts.append(content)
 
     if not parts:
-        return "عذراً، لم أجد معلومات كافية في قاعدة المعرفة أو الملف المرفق للإجابة على سؤالك."
+        if file_context and file_context.get("text"):
+            ft = file_context["text"]
+            if "📷" in ft or "صورة" in ft or "image" in ft.lower():
+                return (
+                    f"📎 استلمت الملف المرفق: {file_context.get('filename','')}\n\n"
+                    f"{ft}\n\n"
+                    "💡 لقراءة النصوص داخل الصور بدقة، يحتاج النظام إلى تثبيت أداة OCR (pytesseract)."
+                )
+            return f"📎 استلمت الملف المرفق.\n\nمعلومات الملف:\n{ft}"
+        return "عذراً، لم أجد معلومات كافية في قاعدة المعرفة للإجابة على سؤالك. يمكنك إعادة صياغة السؤال."
 
     if len(parts) == 1:
         return parts[0]
@@ -386,6 +395,30 @@ def process_chat_request(question: str, thread_id: Optional[str], file_context: 
     """منطق الدردشة المشترك"""
     start_time = time.time()
     question = question.strip() if question else ""
+
+    # استخراج محتوى الملف المضمّن في السؤال (من PHP two-step upload)
+    if file_context is None and "[محتوى الملف المرفق" in question:
+        try:
+            marker = "[محتوى الملف المرفق"
+            m_start = question.index(marker)
+            clean_question = question[:m_start].strip()
+            block = question[m_start:]
+            # استخراج اسم الملف
+            fname = "ملف"
+            if "'" in block:
+                try:
+                    fname = block[block.index("'") + 1 : block.index("':\n")]
+                except Exception:
+                    pass
+            # استخراج المحتوى
+            content = ""
+            if "':\n" in block:
+                content = block[block.index("':\n") + 3:].rstrip("]").strip()
+            file_context = {"filename": fname, "text": content, "type": "uploaded"}
+            question = clean_question or question
+        except Exception:
+            pass
+
     if not question and not file_context:
         raise HTTPException(status_code=400, detail="السؤال أو الملف مطلوب")
 
@@ -420,11 +453,11 @@ def process_chat_request(question: str, thread_id: Optional[str], file_context: 
 
     # 4. Save & Return
     latency_ms = int((time.time() - start_time) * 1000)
-    
+    asst_msg_id = str(uuid.uuid4())  # define early to avoid NameError if save fails
+
     # Save messages...
     try:
         user_msg_id = str(uuid.uuid4())
-        asst_msg_id = str(uuid.uuid4())
         
         # User message
         content_to_save = question
@@ -442,8 +475,8 @@ def process_chat_request(question: str, thread_id: Optional[str], file_context: 
             (asst_msg_id, thread_id, 'assistant', answer, 'local-rag-v1', len(answer.split()), latency_ms, 'ar')
         )
         
-        # Link file if exists
-        if file_context:
+        # Link file if exists (only when file_id is available)
+        if file_context and file_context.get('file_id'):
              execute_query("INSERT INTO ai_message_files (message_id, file_id) VALUES (%s, %s)", (user_msg_id, file_context['file_id']))
              
     except Exception as e:

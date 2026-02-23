@@ -54,59 +54,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($question)) {
     $has_file = (!empty($_FILES['image']['tmp_name']) && $_FILES['image']['error'] === 0);
     $has_doc  = (!empty($_FILES['document_file']['tmp_name']) && $_FILES['document_file']['error'] === 0);
 
-    if ($has_file) {
-        $post_data = [
-            'question' => $question,
-            'image'    => new CURLFile(
-                $_FILES['image']['tmp_name'],
-                $_FILES['image']['type'],
-                $_FILES['image']['name']
-            ),
-        ];
-        if (!empty($thread_id)) $post_data['thread_id'] = $thread_id;
+    // ====== خطوة 1: رفع الملف واستخراج النص (يعمل مع الصور والمستندات) ======
+    $file_context_text = '';
+    $file_name_display = '';
+    if ($has_file || $has_doc) {
+        $fkey = $has_file ? $_FILES['image'] : $_FILES['document_file'];
+        if ($has_file) $uploaded_image = $fkey['name'];
+        $file_name_display = $fkey['name'];
 
-        curl_setopt_array($ch, [
-            CURLOPT_URL            => $API_BASE . '/api/v1/chat/with-image',
+        $uch = curl_init($API_BASE . '/api/v1/files/upload');
+        curl_setopt_array($uch, [
             CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $post_data,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 60,
-            CURLOPT_HTTPHEADER     => ['Accept: application/json'],
-        ]);
-        $uploaded_image = $_FILES['image']['name'];
-    } else {
-        $post_data = ['question' => $question];
-        if (!empty($thread_id)) $post_data['thread_id'] = $thread_id;
-
-        curl_setopt_array($ch, [
-            CURLOPT_URL            => $API_BASE . '/api/v1/chat',
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $post_data,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 30,
-            CURLOPT_HTTPHEADER     => ['Accept: application/json'],
-        ]);
-    }
-
-    // رفع مستند منفصل
-    if ($has_doc) {
-        $dch = curl_init();
-        curl_setopt_array($dch, [
-            CURLOPT_URL            => $API_BASE . '/api/v1/files/upload',
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => [
-                'file' => new CURLFile(
-                    $_FILES['document_file']['tmp_name'],
-                    $_FILES['document_file']['type'],
-                    $_FILES['document_file']['name']
-                ),
-            ],
+            CURLOPT_POSTFIELDS     => ['file' => new CURLFile($fkey['tmp_name'], $fkey['type'], $fkey['name'])],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 60,
         ]);
-        curl_exec($dch);
-        curl_close($dch);
+        $up_resp = json_decode(curl_exec($uch), true);
+        curl_close($uch);
+        if ($up_resp && !empty($up_resp['extracted_text'])) {
+            $file_context_text = $up_resp['extracted_text'];
+        }
     }
+
+    // ====== خطوة 2: بناء السؤال مع محتوى الملف ======
+    $full_q = $question;
+    if ($file_context_text) {
+        $full_q .= "\n\n[محتوى الملف المرفق '" . $file_name_display . "':\n" . mb_substr($file_context_text, 0, 3000) . ']';
+    } elseif ($file_name_display) {
+        $full_q .= "\n\n[الملف المرفق: " . $file_name_display . ']';
+    }
+
+    // ====== خطوة 3: الدردشة مع السياق الكامل ======
+    $post_data = ['question' => $full_q];
+    if (!empty($thread_id)) $post_data['thread_id'] = $thread_id;
+
+    curl_setopt_array($ch, [
+        CURLOPT_URL            => $API_BASE . '/api/v1/chat',
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $post_data,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 60,
+        CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+    ]);
 
     $result    = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
