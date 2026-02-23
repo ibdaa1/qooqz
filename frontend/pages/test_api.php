@@ -5,14 +5,23 @@
  */
 declare(strict_types=1);
 
-// تحميل Bootstrap الفرونت اند (يعالج اللغة، الجلسة، API Client)
-$bootstrapPath = dirname(__DIR__) . '/bootstrap.php';
-if (file_exists($bootstrapPath)) {
-    require_once $bootstrapPath;
+// بدء الجلسة بشكل مستقل (بدون bootstrap حتى لا تتوقف الصفحة بسبب ملفات core مفقودة)
+if (session_status() === PHP_SESSION_NONE) {
+    $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+             || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    session_start([
+        'cookie_httponly' => true,
+        'cookie_secure'   => $isSecure,
+        'cookie_samesite' => 'Lax',
+    ]);
 }
 
-// جلب اللغة والاتجاه من Bootstrap أو الافتراضي
-$lang      = $GLOBALS['FRONT_CONTAINER']['lang'] ?? ($_SESSION['lang'] ?? 'ar');
+// تحديد اللغة: URL → Session → المستخدم المحفوظ → افتراضي
+$_allowedLangs = ['ar', 'en', 'fr', 'de', 'tr', 'fa', 'ur'];
+$_rawLang = $_GET['lang'] ?? $_SESSION['lang'] ?? ($_SESSION['current_user']['preferred_language'] ?? 'ar');
+$lang = in_array($_rawLang, $_allowedLangs, true) ? $_rawLang : 'ar';
+$_SESSION['lang'] = $lang;
+
 $rtlLangs  = ['ar', 'fa', 'ur', 'he', 'ps', 'sd', 'ku'];
 $direction = in_array(substr($lang, 0, 2), $rtlLangs, true) ? 'rtl' : 'ltr';
 

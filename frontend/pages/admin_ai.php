@@ -6,20 +6,42 @@
  */
 declare(strict_types=1);
 
-// تحميل Bootstrap الأدمن (يعالج الجلسة، الصلاحيات، اللغة، الثيم)
+// بدء الجلسة بشكل مستقل قبل أي bootstrap
+if (session_status() === PHP_SESSION_NONE) {
+    $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+             || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    session_start([
+        'cookie_httponly' => true,
+        'cookie_secure'   => $isSecure,
+        'cookie_samesite' => 'Lax',
+    ]);
+}
+
+// تحميل Bootstrap الأدمن (اختياري — لا نوقف الصفحة إذا فشل)
 $adminBootstrap = dirname(__DIR__, 2) . '/api/bootstrap_admin_ui.php';
 if (file_exists($adminBootstrap)) {
-    require_once $adminBootstrap;
+    try {
+        require_once $adminBootstrap;
+    } catch (Throwable $_e) {
+        // الصفحة تعمل بقيم افتراضية إذا فشل bootstrap
+    }
 }
 
 // جلب بيانات الأدمن UI
 /** @var array $ADMIN_UI */
 $ADMIN_UI  = $GLOBALS['ADMIN_UI'] ?? [];
-$lang      = $ADMIN_UI['lang'] ?? 'ar';
-$direction = $ADMIN_UI['direction'] ?? 'rtl';
+
+// تحديد اللغة: URL → ADMIN_UI → Session → افتراضي
+$_allowedLangs = ['ar', 'en', 'fr', 'de', 'tr', 'fa', 'ur'];
+$_rawLang = $_GET['lang'] ?? ($ADMIN_UI['lang'] ?? ($_SESSION['lang'] ?? 'ar'));
+$lang = in_array($_rawLang, $_allowedLangs, true) ? $_rawLang : 'ar';
+$_SESSION['lang'] = $lang;
+
+$rtlLangs  = ['ar', 'fa', 'ur', 'he', 'ps', 'sd', 'ku'];
+$direction = $ADMIN_UI['direction'] ?? (in_array(substr($lang, 0, 2), $rtlLangs, true) ? 'rtl' : 'ltr');
 $theme     = $ADMIN_UI['theme'] ?? [];
 $user      = $ADMIN_UI['user'] ?? [];
-$csrfToken = $ADMIN_UI['csrf_token'] ?? '';
+$csrfToken = $ADMIN_UI['csrf_token'] ?? (bin2hex(random_bytes(16)));
 
 // ملف اللغة
 $langFile = dirname(__DIR__, 2) . '/languages/frontend/main/' . $lang . '.json';
