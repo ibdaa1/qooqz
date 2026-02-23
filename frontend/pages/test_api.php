@@ -24,7 +24,7 @@ function L(array $t, string $k, string $fb = ''): string {
 }
 
 // ===== إعدادات API (نفس طريقة index.php الأصلية) =====
-$API_BASE = "https://hcsfcs.top/ai-engine";
+$API_BASE = "http://127.0.0.1:8888";
 
 // ===== حالة الصحة =====
 $api_ok = false;
@@ -33,8 +33,6 @@ $ch_h = curl_init($API_BASE . "/api/v1/health");
 curl_setopt_array($ch_h, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_TIMEOUT        => 3,
-    CURLOPT_SSL_VERIFYPEER => false,
-    CURLOPT_SSL_VERIFYHOST => 0,
 ]);
 $h_raw = curl_exec($ch_h);
 curl_close($ch_h);
@@ -73,8 +71,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($question)) {
             CURLOPT_POSTFIELDS     => $post_data,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 60,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => 0,
             CURLOPT_HTTPHEADER     => ['Accept: application/json'],
         ]);
         $uploaded_image = $_FILES['image']['name'];
@@ -88,8 +84,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($question)) {
             CURLOPT_POSTFIELDS     => $post_data,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 30,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => 0,
             CURLOPT_HTTPHEADER     => ['Accept: application/json'],
         ]);
     }
@@ -109,8 +103,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($question)) {
             ],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 60,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => 0,
         ]);
         curl_exec($dch);
         curl_close($dch);
@@ -143,8 +135,6 @@ if (!empty($thread_id)) {
     curl_setopt_array($hch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 10,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_SSL_VERIFYHOST => 0,
     ]);
     $hraw = curl_exec($hch);
     curl_close($hch);

@@ -24,7 +24,7 @@ function L(array $t, string $k, string $fb = ''): string {
 }
 
 // ===== إعدادات API (نفس طريقة index.php الأصلية) =====
-$API_BASE = "https://hcsfcs.top/ai-engine";
+$API_BASE = "http://127.0.0.1:8888";
 
 // دالة مساعدة: طلب curl مشترك
 function api_get(string $url): ?array {
@@ -32,8 +32,6 @@ function api_get(string $url): ?array {
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 5,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_SSL_VERIFYHOST => 0,
         CURLOPT_HTTPHEADER     => ['Accept: application/json'],
     ]);
     $raw = curl_exec($ch);
@@ -56,8 +54,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_k
         ]),
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 10,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_SSL_VERIFYHOST => 0,
         CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
     ]);
     $r = json_decode(curl_exec($ch), true);
@@ -78,8 +74,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_d
         ]),
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 30,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_SSL_VERIFYHOST => 0,
         CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
     ]);
     $r = json_decode(curl_exec($ch), true);
@@ -102,8 +96,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_c
         ]),
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 10,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_SSL_VERIFYHOST => 0,
         CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
     ]);
     $r = json_decode(curl_exec($ch), true);
@@ -126,8 +118,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'uploa
             ],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 60,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => 0,
         ]);
         $r = json_decode(curl_exec($ch), true);
         curl_close($ch);
@@ -151,8 +141,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_f
         ]),
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 10,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_SSL_VERIFYHOST => 0,
         CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
     ]);
     $r = json_decode(curl_exec($ch), true);
