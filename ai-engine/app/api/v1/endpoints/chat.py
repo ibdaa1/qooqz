@@ -349,8 +349,8 @@ async def chat_with_image(
         try:
             content = await image.read()
             
-            # معالجة الملف واستخراج النص
-            file_result = extract_text_from_file(None, "", content)
+            # معالجة الملف واستخراج النص (تمرير اسم الملف لاستخراج الامتداد بشكل صحيح)
+            file_result = extract_text_from_file(image.filename, image.content_type, content)
             
             # حفظ الملف
             os.makedirs(UPLOAD_DIR, exist_ok=True)
