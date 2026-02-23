@@ -1,9 +1,534 @@
 <?php
 /**
- * 🛠️ لوحة إدارة قاعدة المعرفة
- * إضافة/عرض/حذف البيانات في كل الجداول
+ * frontend/pages/admin_ai.php
+ * لوحة إدارة AI Engine — نفس طريقة الاتصال الأصلية + دعم اللغات
  */
 session_start();
+
+// ===== اللغة =====
+$_allowed = ['ar', 'en'];
+$lang = in_array($_GET['lang'] ?? '', $_allowed, true)
+    ? $_GET['lang']
+    : ($_SESSION['lang'] ?? 'ar');
+$_SESSION['lang'] = $lang;
+$dir = in_array($lang, ['ar', 'fa', 'ur', 'he'], true) ? 'rtl' : 'ltr';
+
+$_lf = dirname(__DIR__, 2) . '/languages/frontend/main/' . $lang . '.json';
+if (!file_exists($_lf)) {
+    $_lf = dirname(__DIR__, 2) . '/languages/frontend/main/ar.json';
+}
+$L = file_exists($_lf) ? (json_decode(file_get_contents($_lf), true) ?? []) : [];
+
+function L(array $t, string $k, string $fb = ''): string {
+    return htmlspecialchars($t[$k] ?? $fb, ENT_QUOTES, 'UTF-8');
+}
+
+// ===== إعدادات API (نفس طريقة index.php الأصلية) =====
+$API_BASE = "https://hcsfcs.top/ai-engine";
+
+// دالة مساعدة: طلب curl مشترك
+function api_get(string $url): ?array {
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 5,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => 0,
+        CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+    ]);
+    $raw = curl_exec($ch);
+    curl_close($ch);
+    return $raw ? json_decode($raw, true) : null;
+}
+
+// ====== معالجة الأفعال ======
+$flash = '';
+
+// إضافة قاعدة معرفة
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_kb') {
+    $ch = curl_init($API_BASE . '/api/v1/knowledge-bases');
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode([
+            'name'        => $_POST['kb_name'] ?? '',
+            'description' => $_POST['kb_desc'] ?? '',
+            'is_public'   => isset($_POST['kb_public']),
+        ]),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 10,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => 0,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+    ]);
+    $r = json_decode(curl_exec($ch), true);
+    curl_close($ch);
+    $flash = ($r && ($r['status'] ?? '') === 'ok') ? "✅ " . L($L,'ai_create_kb','تم الإنشاء') : "❌ " . ($r['detail'] ?? 'خطأ');
+}
+
+// إضافة مستند
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_doc') {
+    $kb_id = $_POST['doc_kb_id'] ?? '';
+    $ch = curl_init($API_BASE . "/api/v1/knowledge-bases/{$kb_id}/documents");
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode([
+            'title'    => $_POST['doc_title'] ?? '',
+            'content'  => $_POST['doc_content'] ?? '',
+            'language' => $_POST['doc_lang'] ?? 'ar',
+        ]),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => 0,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+    ]);
+    $r = json_decode(curl_exec($ch), true);
+    curl_close($ch);
+    $flash = ($r && ($r['status'] ?? '') === 'ok')
+        ? "✅ " . L($L,'ai_add_doc','تم الإضافة') . " — " . ($r['chunks_created'] ?? 0) . " chunks"
+        : "❌ " . ($r['detail'] ?? 'خطأ');
+}
+
+// إضافة قطعة مباشرة
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_chunk') {
+    $ch = curl_init($API_BASE . "/api/v1/chunks/add");
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode([
+            'id'          => 'chunk-' . substr(uniqid(), -8) . '-uuid',
+            'document_id' => $_POST['chunk_doc_id'] ?: 'doc-001-uuid',
+            'content'     => $_POST['chunk_content'] ?? '',
+            'language'    => $_POST['chunk_lang'] ?? 'ar',
+        ]),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 10,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => 0,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+    ]);
+    $r = json_decode(curl_exec($ch), true);
+    curl_close($ch);
+    $flash = ($r && ($r['status'] ?? '') === 'ok') ? "✅ " . L($L,'ai_add_chunk','تم الإضافة') : "❌ " . ($r['detail'] ?? 'خطأ');
+}
+
+// رفع ملف
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'upload_file') {
+    if (!empty($_FILES['file_upload']['tmp_name'])) {
+        $ch = curl_init($API_BASE . '/api/v1/files/upload');
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => [
+                'file' => new CURLFile(
+                    $_FILES['file_upload']['tmp_name'],
+                    $_FILES['file_upload']['type'],
+                    $_FILES['file_upload']['name']
+                ),
+            ],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 60,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => 0,
+        ]);
+        $r = json_decode(curl_exec($ch), true);
+        curl_close($ch);
+        $flash = ($r && ($r['status'] ?? '') === 'ok')
+            ? "✅ " . L($L,'ai_upload','رفع') . ": " . htmlspecialchars($r['filename'] ?? '')
+            : "❌ " . L($L,'ai_upload_error','فشل الرفع');
+    } else {
+        $flash = "❌ " . L($L,'ai_choose_file','اختر ملف');
+    }
+}
+
+// إرسال تقييم
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_feedback') {
+    $ch = curl_init($API_BASE . '/api/v1/feedback');
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode([
+            'message_id' => $_POST['fb_message_id'] ?? '',
+            'rating'     => (int)($_POST['fb_rating'] ?? 5),
+            'comment'    => $_POST['fb_comment'] ?? '',
+        ]),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 10,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => 0,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+    ]);
+    $r = json_decode(curl_exec($ch), true);
+    curl_close($ch);
+    $flash = ($r && ($r['status'] ?? '') === 'ok') ? "✅ " . L($L,'ai_send_feedback','شكراً!') : "❌ خطأ";
+}
+
+// ====== جلب البيانات (كلها عبر curl) ======
+$kbs_resp    = api_get($API_BASE . '/api/v1/knowledge-bases');
+$kbs         = ($kbs_resp && isset($kbs_resp['knowledge_bases'])) ? $kbs_resp['knowledge_bases'] : [];
+
+$files_resp  = api_get($API_BASE . '/api/v1/files');
+$files_list  = ($files_resp && isset($files_resp['files'])) ? $files_resp['files'] : [];
+
+$fb_resp     = api_get($API_BASE . '/api/v1/feedback');
+$feedbacks   = ($fb_resp && isset($fb_resp['feedbacks'])) ? $fb_resp['feedbacks'] : [];
+$avg_rating  = $fb_resp['average_rating'] ?? 0;
+
+$thr_resp    = api_get($API_BASE . '/api/v1/threads?limit=10');
+$threads     = ($thr_resp && isset($thr_resp['threads'])) ? $thr_resp['threads'] : [];
+
+$health      = api_get($API_BASE . '/api/v1/health');
+$chunks_count= $health['total_chunks_found'] ?? 0;
+$sample_chunks = $health['sample_chunks'] ?? [];
+?>
+<!DOCTYPE html>
+<html lang="<?= htmlspecialchars($lang) ?>" dir="<?= $dir ?>">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= L($L,'ai_admin_panel','لوحة إدارة AI Engine') ?></title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{
+            --bg:#090b10;--bg2:#0f1218;--card:#151921;--card2:#1a1f2b;
+            --brd:#252a36;--brd2:#363d4e;
+            --text:#e4e8f1;--text2:#8892a6;--text3:#5d6577;
+            --accent:#7c6aff;--accent2:#6555e0;
+            --green:#2dd4a0;--red:#ff5c6a;--orange:#ffa94d;--blue:#5eaeff;
+            --radius:12px;
+        }
+        body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+        .topbar{background:var(--card);border-bottom:1px solid var(--brd);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+        .topbar h1{font-size:1.2rem;display:flex;align-items:center;gap:8px}
+        .topbar-right{display:flex;gap:8px;align-items:center}
+        .topbar-right a,.topbar-right button{color:var(--text2);text-decoration:none;padding:5px 12px;border:1px solid var(--brd);border-radius:8px;font-size:.78rem;transition:all .2s;background:transparent;cursor:pointer;font-family:inherit}
+        .topbar-right a:hover,.topbar-right button:hover{color:var(--accent);border-color:var(--accent)}
+        .lang-active{background:var(--accent) !important;color:#fff !important;border-color:var(--accent) !important}
+        .container{max-width:1100px;margin:0 auto;padding:20px}
+        .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px}
+        .stat{background:var(--card);border:1px solid var(--brd);border-radius:var(--radius);padding:16px;text-align:center}
+        .stat .num{font-size:1.6rem;font-weight:700;color:var(--accent)}
+        .stat .label{font-size:.78rem;color:var(--text2);margin-top:4px}
+        .tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
+        .tab{padding:8px 18px;border-radius:8px;cursor:pointer;font-size:.85rem;background:var(--card);border:1px solid var(--brd);color:var(--text2);transition:all .2s;font-family:inherit}
+        .tab.active,.tab:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+        .panel{display:none}
+        .panel.active{display:block}
+        .card{background:var(--card);border:1px solid var(--brd);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+        .card h3{font-size:1rem;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+        .form-group{margin-bottom:12px}
+        .form-group label{display:block;font-size:.82rem;color:var(--text2);margin-bottom:4px}
+        input[type="text"],input[type="number"],textarea,select{width:100%;background:var(--bg2);border:1px solid var(--brd);border-radius:8px;padding:10px 14px;color:var(--text);font-size:.9rem;font-family:inherit;outline:none;transition:border-color .2s}
+        input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+        textarea{min-height:100px;resize:vertical}
+        .checkbox-row{display:flex;align-items:center;gap:8px;font-size:.85rem}
+        .checkbox-row input[type="checkbox"]{width:16px;height:16px}
+        .btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:8px;border:none;cursor:pointer;font-size:.88rem;font-weight:600;font-family:inherit;transition:all .2s}
+        .btn-primary{background:linear-gradient(135deg,#7c6aff,#5a45e0);color:#fff}
+        .btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(124,106,255,.3)}
+        .btn-green{background:var(--green);color:#000}
+        .btn-sm{padding:6px 12px;font-size:.78rem;border-radius:6px}
+        table{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:10px}
+        th,td{padding:10px 12px;text-align:inherit;border-bottom:1px solid var(--brd)}
+        th{background:rgba(255,255,255,.03);color:var(--text2);font-size:.75rem;font-weight:600}
+        tr:hover td{background:rgba(255,255,255,.02)}
+        .id-cell{font-family:monospace;font-size:.72rem;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .content-cell{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .flash{padding:12px 18px;border-radius:8px;margin-bottom:16px;font-size:.88rem;animation:fadeIn .3s ease}
+        .flash.ok{background:rgba(45,212,160,.1);border:1px solid rgba(45,212,160,.2);color:var(--green)}
+        .flash.err{background:rgba(255,92,106,.1);border:1px solid rgba(255,92,106,.2);color:var(--red)}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+        .stars{color:var(--orange);font-size:1.1rem;letter-spacing:2px}
+        .file-input-wrap input[type="file"]{width:100%;padding:10px;background:var(--bg2);border:1px dashed var(--brd2);border-radius:8px;color:var(--text);font-family:inherit;cursor:pointer}
+        .row-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        @media(max-width:640px){.row-2{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+        ::-webkit-scrollbar{width:5px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:var(--brd);border-radius:10px}
+    </style>
+</head>
+<body>
+
+<div class="topbar">
+    <h1>🛠️ <?= L($L,'ai_admin_panel','لوحة إدارة AI Engine') ?></h1>
+    <div class="topbar-right">
+        <a href="test_api.php?lang=<?= htmlspecialchars($lang) ?>"><?= L($L,'ai_chat_link','💬 الدردشة') ?></a>
+        <a href="?" ><?= L($L,'ai_refresh','🔄 تحديث') ?></a>
+        <a href="?lang=ar" class="<?= $lang==='ar' ? 'lang-active' : '' ?>">ع</a>
+        <a href="?lang=en" class="<?= $lang==='en' ? 'lang-active' : '' ?>">EN</a>
+    </div>
+</div>
+
+<div class="container">
+
+    <?php if ($flash): ?>
+        <div class="flash <?= str_contains($flash, '❌') ? 'err' : 'ok' ?>"><?= $flash ?></div>
+    <?php endif; ?>
+
+    <!-- إحصائيات -->
+    <div class="stats">
+        <div class="stat"><div class="num"><?= count($kbs) ?></div><div class="label"><?= L($L,'ai_stats_kbs','قواعد معرفة') ?></div></div>
+        <div class="stat"><div class="num"><?= $chunks_count ?></div><div class="label"><?= L($L,'ai_stats_chunks','قطع نصية') ?></div></div>
+        <div class="stat"><div class="num"><?= count($files_list) ?></div><div class="label"><?= L($L,'ai_stats_files','ملفات') ?></div></div>
+        <div class="stat"><div class="num"><?= count($threads) ?></div><div class="label"><?= L($L,'ai_stats_threads','محادثات') ?></div></div>
+        <div class="stat"><div class="num"><?= count($feedbacks) ?></div><div class="label"><?= L($L,'ai_tab_feedback','تقييمات') ?></div></div>
+        <div class="stat"><div class="num"><?= $avg_rating ?></div><div class="label">⭐ <?= L($L,'ai_avg_rating','متوسط التقييم') ?></div></div>
+    </div>
+
+    <!-- تبويبات -->
+    <div class="tabs">
+        <button class="tab active" onclick="showPanel('kb')"><?= L($L,'ai_tab_kb','📚 قواعد المعرفة') ?></button>
+        <button class="tab" onclick="showPanel('docs')"><?= L($L,'ai_tab_docs','📄 مستندات + قطع') ?></button>
+        <button class="tab" onclick="showPanel('files')"><?= L($L,'ai_tab_files','📁 ملفات') ?></button>
+        <button class="tab" onclick="showPanel('feedback')"><?= L($L,'ai_tab_feedback','⭐ تقييمات') ?></button>
+        <button class="tab" onclick="showPanel('threads')"><?= L($L,'ai_tab_threads','💬 محادثات') ?></button>
+        <button class="tab" onclick="showPanel('chunks')"><?= L($L,'ai_tab_chunks','🔍 القطع النصية') ?></button>
+    </div>
+
+    <!-- 1. قواعد المعرفة -->
+    <div class="panel active" id="panel-kb">
+        <div class="row-2">
+            <div class="card">
+                <h3>➕ <?= L($L,'ai_create_kb','إنشاء قاعدة معرفة جديدة') ?></h3>
+                <form method="POST">
+                    <input type="hidden" name="action" value="add_kb">
+                    <div class="form-group">
+                        <label><?= L($L,'ai_kb_name','اسم القاعدة *') ?></label>
+                        <input type="text" name="kb_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label><?= L($L,'ai_description','الوصف') ?></label>
+                        <input type="text" name="kb_desc">
+                    </div>
+                    <div class="form-group">
+                        <div class="checkbox-row">
+                            <input type="checkbox" name="kb_public" id="kb_public" checked>
+                            <label for="kb_public"><?= L($L,'ai_kb_public','عامة') ?></label>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><?= L($L,'ai_create_btn','➕ إنشاء') ?></button>
+                </form>
+            </div>
+            <div class="card">
+                <h3>📋 <?= L($L,'ai_existing_kbs','القواعد الموجودة') ?></h3>
+                <?php if (empty($kbs)): ?>
+                    <p style="color:var(--text3)"><?= L($L,'ai_no_kbs','لا توجد قواعد بعد') ?></p>
+                <?php else: ?>
+                    <table>
+                        <tr><th>ID</th><th><?= L($L,'ai_name','الاسم') ?></th><th><?= L($L,'ai_description','الوصف') ?></th><th><?= L($L,'ai_public','عامة') ?></th></tr>
+                        <?php foreach ($kbs as $kb): ?>
+                            <tr>
+                                <td class="id-cell"><?= htmlspecialchars($kb['id'] ?? '') ?></td>
+                                <td><strong><?= htmlspecialchars($kb['name'] ?? '') ?></strong></td>
+                                <td class="content-cell"><?= htmlspecialchars($kb['description'] ?? '-') ?></td>
+                                <td><?= ($kb['is_public'] ?? 0) ? '✅' : '❌' ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </table>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. مستندات + قطع -->
+    <div class="panel" id="panel-docs">
+        <div class="row-2">
+            <div class="card">
+                <h3>📄 <?= L($L,'ai_add_doc','إضافة مستند') ?></h3>
+                <form method="POST">
+                    <input type="hidden" name="action" value="add_doc">
+                    <div class="form-group">
+                        <label><?= L($L,'ai_knowledge_bases','قاعدة المعرفة') ?> *</label>
+                        <select name="doc_kb_id" required>
+                            <option value=""><?= L($L,'ai_kb_select','اختر...') ?></option>
+                            <?php foreach ($kbs as $kb): ?>
+                                <option value="<?= htmlspecialchars($kb['id']) ?>"><?= htmlspecialchars($kb['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><?= L($L,'ai_doc_title','عنوان المستند') ?></label>
+                        <input type="text" name="doc_title">
+                    </div>
+                    <div class="form-group">
+                        <label><?= L($L,'ai_language','اللغة') ?></label>
+                        <select name="doc_lang">
+                            <option value="ar"><?= L($L,'ai_lang_ar','عربي') ?></option>
+                            <option value="en"><?= L($L,'ai_lang_en','English') ?></option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><?= L($L,'ai_content','المحتوى') ?> *</label>
+                        <textarea name="doc_content" rows="8" required placeholder="سؤال: ما هو Python؟&#10;جواب: Python هي لغة برمجة عالية المستوى..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><?= L($L,'ai_add_and_chunk','📄 إضافة وتقطيع') ?></button>
+                </form>
+            </div>
+            <div class="card">
+                <h3>✏️ <?= L($L,'ai_add_chunk','إضافة قطعة نصية مباشرة') ?></h3>
+                <form method="POST">
+                    <input type="hidden" name="action" value="add_chunk">
+                    <div class="form-group">
+                        <label><?= L($L,'ai_doc_id','معرف المستند') ?></label>
+                        <input type="text" name="chunk_doc_id" value="doc-001-uuid">
+                    </div>
+                    <div class="form-group">
+                        <label><?= L($L,'ai_language','اللغة') ?></label>
+                        <select name="chunk_lang">
+                            <option value="ar"><?= L($L,'ai_lang_ar','عربي') ?></option>
+                            <option value="en"><?= L($L,'ai_lang_en','English') ?></option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><?= L($L,'ai_content','المحتوى') ?> *</label>
+                        <textarea name="chunk_content" rows="5" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-green"><?= L($L,'ai_add_chunk_btn','✏️ إضافة قطعة') ?></button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. ملفات -->
+    <div class="panel" id="panel-files">
+        <div class="row-2">
+            <div class="card">
+                <h3>📁 <?= L($L,'ai_upload_file','رفع ملف') ?></h3>
+                <form method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="upload_file">
+                    <div class="form-group">
+                        <label><?= L($L,'ai_choose_file','اختر ملف (TXT, PDF, صورة)') ?></label>
+                        <div class="file-input-wrap">
+                            <input type="file" name="file_upload" accept=".txt,.pdf,.doc,.docx,.csv,.jpg,.jpeg,.png,.gif" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><?= L($L,'ai_upload','📤 رفع') ?></button>
+                </form>
+            </div>
+            <div class="card">
+                <h3>📋 <?= L($L,'ai_uploaded_files','الملفات المرفوعة') ?></h3>
+                <?php if (empty($files_list)): ?>
+                    <p style="color:var(--text3)"><?= L($L,'ai_no_files','لا توجد ملفات') ?></p>
+                <?php else: ?>
+                    <table>
+                        <tr><th><?= L($L,'ai_name','الاسم') ?></th><th><?= L($L,'ai_type','النوع') ?></th><th><?= L($L,'ai_size','الحجم') ?></th><th><?= L($L,'ai_date','التاريخ') ?></th></tr>
+                        <?php foreach ($files_list as $f): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($f['filename'] ?? '') ?></td>
+                                <td><?= htmlspecialchars($f['mime_type'] ?? '') ?></td>
+                                <td><?= number_format(($f['file_size'] ?? 0) / 1024, 1) ?> KB</td>
+                                <td style="font-size:.72rem"><?= htmlspecialchars($f['created_at'] ?? '') ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </table>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. تقييمات -->
+    <div class="panel" id="panel-feedback">
+        <div class="row-2">
+            <div class="card">
+                <h3>⭐ <?= L($L,'ai_feedback_title','إرسال تقييم') ?></h3>
+                <form method="POST">
+                    <input type="hidden" name="action" value="add_feedback">
+                    <div class="form-group">
+                        <label><?= L($L,'ai_message_id','معرف الرسالة *') ?></label>
+                        <input type="text" name="fb_message_id" required>
+                    </div>
+                    <div class="form-group">
+                        <label><?= L($L,'ai_rating','التقييم * (1-5)') ?></label>
+                        <select name="fb_rating" required>
+                            <option value="5">⭐⭐⭐⭐⭐</option>
+                            <option value="4">⭐⭐⭐⭐</option>
+                            <option value="3">⭐⭐⭐</option>
+                            <option value="2">⭐⭐</option>
+                            <option value="1">⭐</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><?= L($L,'ai_comment','تعليق') ?></label>
+                        <input type="text" name="fb_comment">
+                    </div>
+                    <button type="submit" class="btn btn-primary"><?= L($L,'ai_send_feedback','⭐ إرسال') ?></button>
+                </form>
+            </div>
+            <div class="card">
+                <h3>📊 <?= L($L,'ai_feedback_list','التقييمات') ?> (<?= L($L,'ai_avg_rating','متوسط') ?>: <?= $avg_rating ?> ⭐)</h3>
+                <?php if (empty($feedbacks)): ?>
+                    <p style="color:var(--text3)"><?= L($L,'ai_no_feedback','لا توجد تقييمات') ?></p>
+                <?php else: ?>
+                    <table>
+                        <tr><th><?= L($L,'ai_message_id','الرسالة') ?></th><th><?= L($L,'ai_rating','التقييم') ?></th><th><?= L($L,'ai_comment','التعليق') ?></th><th><?= L($L,'ai_date','التاريخ') ?></th></tr>
+                        <?php foreach ($feedbacks as $fb): ?>
+                            <tr>
+                                <td class="id-cell"><?= htmlspecialchars($fb['message_id'] ?? '') ?></td>
+                                <td><span class="stars"><?= str_repeat('⭐', (int)($fb['rating'] ?? 0)) ?></span></td>
+                                <td><?= htmlspecialchars($fb['comment'] ?? '-') ?></td>
+                                <td style="font-size:.72rem"><?= htmlspecialchars($fb['created_at'] ?? '') ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </table>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. محادثات -->
+    <div class="panel" id="panel-threads">
+        <div class="card">
+            <h3>💬 <?= L($L,'ai_last_threads','آخر المحادثات') ?></h3>
+            <?php if (empty($threads)): ?>
+                <p style="color:var(--text3)"><?= L($L,'ai_no_threads','لا توجد محادثات') ?></p>
+            <?php else: ?>
+                <table>
+                    <tr><th>ID</th><th><?= L($L,'ai_title','العنوان') ?></th><th><?= L($L,'ai_date','التاريخ') ?></th></tr>
+                    <?php foreach ($threads as $t): ?>
+                        <tr>
+                            <td class="id-cell"><?= htmlspecialchars($t['id'] ?? '') ?></td>
+                            <td><strong><?= htmlspecialchars($t['title'] ?? '-') ?></strong></td>
+                            <td style="font-size:.72rem"><?= htmlspecialchars($t['created_at'] ?? '') ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </table>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- 6. القطع النصية -->
+    <div class="panel" id="panel-chunks">
+        <div class="card">
+            <h3>🔍 <?= L($L,'ai_tab_chunks','القطع النصية') ?> (<?= $chunks_count ?>)</h3>
+            <?php if (empty($sample_chunks)): ?>
+                <p style="color:var(--text3)"><?= L($L,'ai_no_chunks','لا توجد قطع') ?></p>
+            <?php else: ?>
+                <table>
+                    <tr><th>ID</th><th><?= L($L,'ai_content','المحتوى') ?></th><th><?= L($L,'ai_language','اللغة') ?></th><th><?= L($L,'ai_words','كلمات') ?></th></tr>
+                    <?php foreach ($sample_chunks as $ch): ?>
+                        <tr>
+                            <td class="id-cell"><?= htmlspecialchars($ch['id'] ?? '') ?></td>
+                            <td class="content-cell"><?= htmlspecialchars(mb_substr($ch['content'] ?? '', 0, 100)) ?></td>
+                            <td><?= htmlspecialchars($ch['language'] ?? 'ar') ?></td>
+                            <td><?= htmlspecialchars((string)($ch['token_count'] ?? 0)) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </table>
+            <?php endif; ?>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function showPanel(name) {
+    document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+    document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+    document.getElementById('panel-' + name).classList.add('active');
+    event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>
 
 $API_BASE = "http://127.0.0.1:8888";
 $ctx = stream_context_create(['http' => ['timeout' => 5]]);
