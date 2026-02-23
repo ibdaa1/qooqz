@@ -214,28 +214,47 @@ def _process_pdf_file(file_bytes: bytes, result: dict) -> dict:
 
 
 def _extract_pdf_raw(data: bytes) -> str:
-    """استخراج نص خام من PDF بدون مكتبات"""
+    """استخراج نص خام من PDF بدون مكتبات - يدعم UTF-16BE للعربية"""
     text_parts = []
-
-    # البحث عن streams نصية
     content = data.decode("latin-1", errors="ignore")
 
-    # استخراج نصوص بين أقواس
-    for match in re.finditer(r'\(([^)]{3,500})\)', content):
-        t = match.group(1)
-        # تحقق أنه نص مقروء
-        if any(ord(c) > 127 for c in t):  # يحتوي أحرف غير ASCII (عربي مثلاً)
-            text_parts.append(t)
-        elif t.strip() and all(c.isprintable() or c in '\n\r\t ' for c in t):
-            text_parts.append(t)
+    # --- المسار 1: نصوص hex مُشفَّرة كـ UTF-16BE (الشائع في ملفات PDF العربية) ---
+    # مثال: <FEFF0645064506310628064E> = "مساحة" بـ UTF-16BE
+    arabic_found = []
+    for hex_match in re.finditer(r'<([0-9A-Fa-f]{4,})>', content):
+        hex_str = hex_match.group(1)
+        if len(hex_str) % 4 != 0:
+            continue
+        try:
+            raw = bytes.fromhex(hex_str)
+            # BOM للـ UTF-16BE
+            if raw[:2] in (b'\xfe\xff', b'\xff\xfe'):
+                decoded = raw.decode("utf-16", errors="ignore").strip()
+            else:
+                decoded = raw.decode("utf-16-be", errors="ignore").strip()
+            if decoded and len(decoded) >= 2:
+                arabic_found.append(decoded)
+        except Exception:
+            continue
+    if arabic_found:
+        text_parts.extend(arabic_found[:300])
 
-    # البحث عن BT...ET blocks
-    for match in re.finditer(r'BT\s*(.*?)\s*ET', content, re.DOTALL):
-        block = match.group(1)
-        for text_match in re.finditer(r'\(([^)]+)\)', block):
-            text_parts.append(text_match.group(1))
+    # --- المسار 2: نصوص ASCII داخل أقواس في BT...ET blocks ---
+    for bt_match in re.finditer(r'BT\s*(.*?)\s*ET', content, re.DOTALL):
+        block = bt_match.group(1)
+        for t_match in re.finditer(r'\(([^)]{2,300})\)', block):
+            t = t_match.group(1)
+            if t.strip() and all(c.isprintable() or c in '\n\r\t ' for c in t):
+                text_parts.append(t)
 
-    return "\n".join(text_parts[:100])
+    # --- المسار 3: نصوص ASCII خارج الـ blocks ---
+    if not arabic_found:
+        for match in re.finditer(r'\(([^)]{3,500})\)', content):
+            t = match.group(1)
+            if t.strip() and all(c.isprintable() or c in '\n\r\t ' for c in t):
+                text_parts.append(t)
+
+    return "\n".join(text_parts[:200])
 
 
 def _process_docx_file(file_bytes: bytes, result: dict) -> dict:
