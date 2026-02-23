@@ -1,310 +1,564 @@
 <?php
 /**
- * frontend/pages/test_api.php
- * صفحة اختبار نظام الذكاء الاصطناعي - تدعم جميع اللغات
+ * 🤖 المساعد الذكي - نسخة الإنتاج
+ * واجهة دردشة كاملة مع دعم الصور والملفات
  */
-declare(strict_types=1);
+session_start();
 
-// بدء الجلسة بشكل مستقل (بدون bootstrap حتى لا تتوقف الصفحة بسبب ملفات core مفقودة)
-if (session_status() === PHP_SESSION_NONE) {
-    $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-             || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
-    session_start([
-        'cookie_httponly' => true,
-        'cookie_secure'   => $isSecure,
-        'cookie_samesite' => 'Lax',
-    ]);
+$API_BASE = "http://127.0.0.1:8888";
+
+// ====== حالة الصحة (سريع) ======
+$api_ok = false;
+$health_data = null;
+$ctx = stream_context_create(['http' => ['timeout' => 3]]);
+$health_raw = @file_get_contents($API_BASE . "/api/v1/health", false, $ctx);
+if ($health_raw) {
+    $health_data = json_decode($health_raw, true);
+    $api_ok = ($health_data && ($health_data['status'] ?? '') === 'ok');
 }
 
-// تحديد اللغة: URL → Session → المستخدم المحفوظ → افتراضي
-$_allowedLangs = ['ar', 'en', 'fr', 'de', 'tr', 'fa', 'ur'];
-$_rawLang = $_GET['lang'] ?? $_SESSION['lang'] ?? ($_SESSION['current_user']['preferred_language'] ?? 'ar');
-$lang = in_array($_rawLang, $_allowedLangs, true) ? $_rawLang : 'ar';
-$_SESSION['lang'] = $lang;
+// ====== معالجة الإرسال ======
+$response_data = null;
+$error_msg = null;
+$question = trim($_POST['question'] ?? '');
+$thread_id = $_POST['thread_id'] ?? ($_SESSION['thread_id'] ?? '');
+$uploaded_image = null;
 
-$rtlLangs  = ['ar', 'fa', 'ur', 'he', 'ps', 'sd', 'ku'];
-$direction = in_array(substr($lang, 0, 2), $rtlLangs, true) ? 'rtl' : 'ltr';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($question)) {
+    $ch = curl_init();
 
-// جلب ترجمات الذكاء الاصطناعي من ملفات اللغة
-$langFile = dirname(__DIR__, 2) . '/languages/frontend/main/' . $lang . '.json';
-if (!file_exists($langFile)) {
-    $langFile = dirname(__DIR__, 2) . '/languages/frontend/main/ar.json';
+    $has_file = (!empty($_FILES['image']['tmp_name']) && $_FILES['image']['error'] === 0);
+    $has_doc  = (!empty($_FILES['document_file']['tmp_name']) && $_FILES['document_file']['error'] === 0);
+
+    if ($has_file) {
+        // دردشة مع صورة
+        $post_data = [
+            'question' => $question,
+            'image'    => new CURLFile(
+                $_FILES['image']['tmp_name'],
+                $_FILES['image']['type'],
+                $_FILES['image']['name']
+            ),
+        ];
+        if (!empty($thread_id)) $post_data['thread_id'] = $thread_id;
+
+        curl_setopt_array($ch, [
+            CURLOPT_URL            => $API_BASE . '/api/v1/chat/with-image',
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $post_data,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 60,
+            CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+        ]);
+        $uploaded_image = $_FILES['image']['name'];
+    } else {
+        // دردشة عادية
+        $post_data = ['question' => $question];
+        if (!empty($thread_id)) $post_data['thread_id'] = $thread_id;
+
+        curl_setopt_array($ch, [
+            CURLOPT_URL            => $API_BASE . '/api/v1/chat',
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $post_data,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+        ]);
+    }
+
+    // رفع مستند منفصل
+    if ($has_doc) {
+        $dch = curl_init();
+        curl_setopt_array($dch, [
+            CURLOPT_URL            => $API_BASE . '/api/v1/files/upload',
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => [
+                'file' => new CURLFile(
+                    $_FILES['document_file']['tmp_name'],
+                    $_FILES['document_file']['type'],
+                    $_FILES['document_file']['name']
+                ),
+            ],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 60,
+        ]);
+        curl_exec($dch);
+        curl_close($dch);
+    }
+
+    $result    = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_err  = curl_error($ch);
+    curl_close($ch);
+
+    if ($curl_err) {
+        $error_msg = "خطأ في الاتصال: " . $curl_err;
+    } elseif ($http_code !== 200) {
+        $error_msg = "خطأ HTTP: " . $http_code;
+        $decoded = json_decode($result, true);
+        if ($decoded && isset($decoded['detail'])) $error_msg .= " — " . $decoded['detail'];
+    } else {
+        $response_data = json_decode($result, true);
+        if ($response_data && isset($response_data['thread_id'])) {
+            $thread_id = $response_data['thread_id'];
+            $_SESSION['thread_id'] = $thread_id;
+        }
+    }
 }
-$t = file_exists($langFile) ? (json_decode(file_get_contents($langFile), true) ?? []) : [];
 
-// دالة ترجمة مبسّطة
-function t(array $translations, string $key, string $fallback = ''): string {
-    return htmlspecialchars($translations[$key] ?? $fallback, ENT_QUOTES, 'UTF-8');
+// جلب تاريخ المحادثة
+$history = [];
+if (!empty($thread_id)) {
+    $hraw = @file_get_contents($API_BASE . "/api/v1/threads/" . urlencode($thread_id), false, $ctx);
+    if ($hraw) {
+        $hdata = json_decode($hraw, true);
+        if ($hdata && isset($hdata['messages'])) {
+            $history = $hdata['messages'];
+            // اقصِ آخر رسالتين لأنهما الحالية (سيتم عرضها أدناه)
+            if ($_SERVER['REQUEST_METHOD'] === 'POST' && count($history) >= 2) {
+                array_pop($history);
+                array_pop($history);
+            }
+        }
+    }
 }
 
-// جلب رابط AI API من الإعدادات
-$aiApiBase = defined('AI_API_BASE_URL') ? AI_API_BASE_URL : '/ai-engine/api/v1';
+// محادثة جديدة
+if (isset($_GET['new'])) {
+    unset($_SESSION['thread_id']);
+    $thread_id = '';
+    header("Location: test_api.php");
+    exit;
+}
 ?>
 <!DOCTYPE html>
-<html lang="<?= htmlspecialchars($lang, ENT_QUOTES, 'UTF-8') ?>" dir="<?= $direction ?>">
+<html lang="ar" dir="rtl">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?= t($t, 'ai_test_title', 'AI Test') ?> — QOOQZ</title>
-    <link rel="stylesheet" href="/assets/css/main.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>المساعد الذكي — AI Chat</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        *,*::before,*::after{box-sizing:border-box}
-        body{margin:0;font-family:system-ui,sans-serif;background:#f5f7fb;color:#1a1a2e}
-        [dir=rtl]{text-align:right}
-        .ai-wrap{max-width:860px;margin:40px auto;padding:0 16px}
-        .ai-card{background:#fff;border-radius:12px;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden}
-        .ai-header{background:linear-gradient(135deg,#4361ee,#3a0ca3);color:#fff;padding:20px 24px;display:flex;align-items:center;gap:12px}
-        .ai-header h1{margin:0;font-size:1.3rem;font-weight:700}
-        .ai-header .badge{background:rgba(255,255,255,.2);border-radius:20px;padding:3px 10px;font-size:.75rem}
-        .ai-messages{height:420px;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px;background:#fafbfc}
-        .msg{max-width:75%;padding:12px 16px;border-radius:12px;font-size:.93rem;line-height:1.6;word-break:break-word;white-space:pre-wrap}
-        .msg.user{background:#4361ee;color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
-        [dir=rtl] .msg.user{align-self:flex-start;border-bottom-right-radius:12px;border-bottom-left-radius:4px}
-        .msg.bot{background:#fff;border:1px solid #e2e8f0;align-self:flex-start;border-bottom-left-radius:4px}
-        [dir=rtl] .msg.bot{align-self:flex-end;border-bottom-left-radius:12px;border-bottom-right-radius:4px}
-        .msg.thinking{opacity:.6;font-style:italic}
-        .msg-meta{font-size:.72rem;opacity:.6;margin-top:4px}
-        .msg-file-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.15);border-radius:6px;padding:3px 8px;font-size:.78rem;margin-bottom:6px}
-        .ai-form{border-top:1px solid #e2e8f0;padding:16px 20px;display:flex;gap:10px;align-items:flex-end;background:#fff}
-        .ai-input{flex:1;resize:none;border:1px solid #d1d5db;border-radius:8px;padding:10px 14px;font-size:.93rem;font-family:inherit;min-height:44px;max-height:120px;outline:none;transition:border-color .2s}
-        .ai-input:focus{border-color:#4361ee}
-        .btn-send{background:#4361ee;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:.93rem;cursor:pointer;transition:background .2s;white-space:nowrap}
-        .btn-send:hover{background:#3a0ca3}
-        .btn-send:disabled{opacity:.5;cursor:not-allowed}
-        .btn-attach{background:#f1f5f9;border:1px solid #d1d5db;border-radius:8px;padding:10px 14px;cursor:pointer;font-size:1.1rem;transition:background .2s}
-        .btn-attach:hover{background:#e2e8f0}
-        .file-preview{padding:8px 20px;background:#eff6ff;border-top:1px solid #bfdbfe;font-size:.82rem;color:#1e40af;display:flex;align-items:center;gap:8px}
-        .file-preview .remove{cursor:pointer;color:#ef4444;font-weight:bold;margin-inline-start:auto}
-        .sources-block{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-top:8px;font-size:.8rem}
-        .sources-block summary{cursor:pointer;font-weight:600;color:#4361ee}
-        .source-item{border-top:1px solid #e2e8f0;padding:6px 0;color:#64748b}
-        #file-input{display:none}
-        .lang-switcher{display:flex;gap:8px;margin-bottom:16px;justify-content:flex-end}
-        [dir=rtl] .lang-switcher{justify-content:flex-start}
-        .lang-btn{padding:5px 14px;border-radius:20px;border:1px solid #d1d5db;background:#fff;cursor:pointer;font-size:.82rem}
-        .lang-btn.active{background:#4361ee;color:#fff;border-color:#4361ee}
-        .thread-bar{padding:10px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:.82rem;color:#64748b;display:flex;align-items:center;gap:8px}
-        .btn-new-thread{background:none;border:1px solid #d1d5db;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:.8rem;color:#4361ee}
-        .btn-new-thread:hover{background:#eff6ff}
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{
+            --bg:#090b10;--bg2:#0f1218;--card:#151921;--card2:#1a1f2b;
+            --brd:#252a36;--brd2:#363d4e;
+            --text:#e4e8f1;--text2:#8892a6;--text3:#5d6577;
+            --accent:#7c6aff;--accent2:#6555e0;--accent-g:linear-gradient(135deg,#7c6aff,#5a45e0);
+            --green:#2dd4a0;--green-bg:rgba(45,212,160,.08);--green-brd:rgba(45,212,160,.2);
+            --red:#ff5c6a;--red-bg:rgba(255,92,106,.08);
+            --orange:#ffa94d;--blue:#5eaeff;
+            --radius:14px;--radius-sm:10px;
+            --shadow:0 4px 24px rgba(0,0,0,.35);
+            --shadow2:0 8px 40px rgba(0,0,0,.5);
+        }
+        html{height:100%}
+        body{
+            font-family:'Tajawal','Segoe UI',sans-serif;
+            background:var(--bg);color:var(--text);
+            height:100%;display:flex;flex-direction:column;
+            -webkit-font-smoothing:antialiased;
+        }
+
+        /* ===== HEADER ===== */
+        .header{
+            background:linear-gradient(180deg,var(--card) 0%,var(--bg2) 100%);
+            border-bottom:1px solid var(--brd);
+            padding:12px 24px;display:flex;align-items:center;justify-content:space-between;
+            position:sticky;top:0;z-index:100;
+            backdrop-filter:blur(12px);
+        }
+        .header-right{display:flex;align-items:center;gap:14px}
+        .logo{font-size:1.25rem;font-weight:700;display:flex;align-items:center;gap:8px}
+        .logo svg{width:28px;height:28px}
+        .version{
+            background:var(--accent);color:#fff;padding:2px 9px;border-radius:20px;
+            font-size:.65rem;font-weight:700;letter-spacing:.5px;
+        }
+        .status-dot{
+            width:9px;height:9px;border-radius:50%;display:inline-block;
+            box-shadow:0 0 6px currentColor;
+        }
+        .status-dot.on{background:var(--green);color:var(--green)}
+        .status-dot.off{background:var(--red);color:var(--red)}
+        .status-label{font-size:.78rem;color:var(--text2);display:flex;align-items:center;gap:5px}
+        .header-left{display:flex;align-items:center;gap:10px}
+        .btn-sm{
+            background:var(--card2);border:1px solid var(--brd);color:var(--text2);
+            padding:6px 14px;border-radius:8px;font-size:.78rem;cursor:pointer;
+            text-decoration:none;display:inline-flex;align-items:center;gap:5px;
+            transition:all .2s;font-family:inherit;
+        }
+        .btn-sm:hover{border-color:var(--accent);color:var(--accent);background:rgba(124,106,255,.06)}
+
+        /* ===== CHAT AREA ===== */
+        .chat-wrap{flex:1;overflow-y:auto;padding:20px 0;scroll-behavior:smooth}
+        .chat-inner{max-width:800px;margin:0 auto;padding:0 20px;display:flex;flex-direction:column;gap:6px}
+
+        /* message row */
+        .msg{display:flex;gap:10px;max-width:88%;animation:fadeUp .35s ease}
+        .msg.user{align-self:flex-end;flex-direction:row-reverse}
+        .msg.bot{align-self:flex-start}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+        .avatar{
+            width:36px;height:36px;border-radius:50%;display:flex;align-items:center;
+            justify-content:center;font-size:1rem;flex-shrink:0;
+        }
+        .msg.user .avatar{background:var(--accent);color:#fff}
+        .msg.bot .avatar{background:var(--green);color:#000;font-size:1.1rem}
+
+        .bubble{
+            padding:12px 16px;border-radius:var(--radius);line-height:1.75;
+            font-size:.92rem;white-space:pre-wrap;word-break:break-word;
+        }
+        .msg.user .bubble{
+            background:var(--accent2);color:#fff;border-bottom-right-radius:4px;
+        }
+        .msg.bot .bubble{
+            background:var(--card2);border:1px solid var(--brd);border-bottom-left-radius:4px;
+        }
+
+        /* sources panel */
+        .sources-panel{
+            margin-top:8px;padding:10px 14px;border-radius:var(--radius-sm);
+            background:rgba(124,106,255,.05);border:1px solid rgba(124,106,255,.12);
+        }
+        .sources-title{color:var(--accent);font-weight:700;font-size:.8rem;margin-bottom:6px}
+        .src-item{
+            font-size:.78rem;color:var(--text2);padding:4px 0;
+            border-bottom:1px solid rgba(255,255,255,.03);
+        }
+        .src-item:last-child{border:0}
+        .score{
+            display:inline-block;background:var(--accent);color:#fff;padding:1px 7px;
+            border-radius:20px;font-size:.65rem;font-weight:700;margin-right:4px;
+        }
+
+        /* meta chips */
+        .meta-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+        .chip{
+            background:rgba(255,255,255,.04);border:1px solid var(--brd);
+            padding:2px 9px;border-radius:20px;font-size:.68rem;color:var(--text3);
+            display:inline-flex;align-items:center;gap:3px;
+        }
+        .chip .emoji{font-size:.72rem}
+        .thread-info{font-size:.72rem;color:var(--orange);margin-top:4px}
+
+        /* welcome */
+        .welcome{text-align:center;padding:60px 20px}
+        .welcome-icon{font-size:3.2rem;margin-bottom:12px;animation:float 3s ease-in-out infinite}
+        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+        .welcome h2{font-size:1.3rem;margin-bottom:8px;font-weight:700}
+        .welcome p{color:var(--text2);max-width:460px;margin:0 auto 20px;line-height:1.7;font-size:.9rem}
+        .suggestions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+        .sug-btn{
+            background:var(--card2);border:1px solid var(--brd);color:var(--text);
+            padding:8px 18px;border-radius:24px;cursor:pointer;
+            font-size:.82rem;transition:all .2s;font-family:inherit;
+        }
+        .sug-btn:hover{border-color:var(--accent);background:rgba(124,106,255,.08);transform:translateY(-1px)}
+
+        /* error */
+        .error-box{
+            background:var(--red-bg);border:1px solid rgba(255,92,106,.2);color:var(--red);
+            padding:12px 16px;border-radius:var(--radius-sm);font-size:.88rem;text-align:center;
+            max-width:600px;margin:10px auto;
+        }
+
+        /* ===== INPUT BAR ===== */
+        .input-bar{
+            background:var(--card);border-top:1px solid var(--brd);padding:14px 20px;
+        }
+        .input-inner{max-width:800px;margin:0 auto}
+
+        /* attachment preview */
+        .attach-row{
+            display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center;
+        }
+        .attach-tag{
+            display:none;align-items:center;gap:4px;
+            background:rgba(124,106,255,.1);border:1px solid rgba(124,106,255,.18);
+            padding:4px 10px;border-radius:20px;font-size:.75rem;color:var(--accent);
+        }
+        .attach-tag.show{display:inline-flex}
+        .attach-tag .remove{cursor:pointer;margin-right:4px;opacity:.6}
+        .attach-tag .remove:hover{opacity:1}
+
+        .form-row{display:flex;gap:10px;align-items:flex-end}
+        .textarea-wrap{flex:1;position:relative}
+        .textarea-wrap textarea{
+            width:100%;background:var(--bg2);border:2px solid var(--brd);border-radius:var(--radius);
+            padding:13px 16px 13px 44px;color:var(--text);font-size:.95rem;font-family:inherit;
+            resize:none;outline:none;transition:border-color .3s;min-height:48px;max-height:140px;
+        }
+        .textarea-wrap textarea:focus{border-color:var(--accent)}
+        .textarea-wrap textarea::placeholder{color:var(--text3)}
+
+        /* attachment buttons inside textarea */
+        .attach-btns{
+            position:absolute;bottom:11px;left:10px;display:flex;gap:4px;
+        }
+        .attach-btn{
+            width:32px;height:32px;border-radius:8px;border:none;
+            background:var(--card2);color:var(--text3);cursor:pointer;
+            display:flex;align-items:center;justify-content:center;font-size:.9rem;
+            transition:all .2s;
+        }
+        .attach-btn:hover{background:var(--accent);color:#fff}
+        input[type="file"]{display:none}
+
+        .send-btn{
+            background:var(--accent-g);border:none;width:48px;height:48px;border-radius:var(--radius);
+            cursor:pointer;display:flex;align-items:center;justify-content:center;
+            color:#fff;font-size:1.2rem;transition:transform .15s,box-shadow .15s;flex-shrink:0;
+        }
+        .send-btn:hover{transform:scale(1.06);box-shadow:0 4px 18px rgba(124,106,255,.35)}
+        .send-btn:active{transform:scale(.95)}
+        .send-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+
+        /* spinner */
+        .spinner{display:none;width:20px;height:20px;border:2px solid rgba(255,255,255,.2);
+            border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .sending .spinner{display:block}
+        .sending .send-icon{display:none}
+
+        /* health strip */
+        .health-strip{
+            background:var(--card);border-bottom:1px solid var(--brd);
+            padding:6px 20px;font-size:.72rem;color:var(--text3);
+            display:flex;align-items:center;justify-content:center;gap:16px;
+        }
+        .health-strip .hs-item{display:flex;align-items:center;gap:4px}
+
+        /* ===== RESPONSIVE ===== */
+        @media(max-width:640px){
+            .header{padding:10px 14px}
+            .logo{font-size:1.05rem}
+            .chat-inner{padding:0 12px}
+            .msg{max-width:95%}
+            .input-bar{padding:10px 12px}
+            .welcome h2{font-size:1.1rem}
+            .suggestions{gap:6px}
+            .sug-btn{padding:6px 12px;font-size:.78rem}
+        }
+
+        /* scrollbar */
+        ::-webkit-scrollbar{width:5px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:var(--brd);border-radius:10px}
+        ::-webkit-scrollbar-thumb:hover{background:var(--brd2)}
     </style>
 </head>
 <body>
 
-<?php
-// تضمين الهيدر إن وُجد (اختياري)
-$headerFile = dirname(__DIR__) . '/partials/header.php';
-if (file_exists($headerFile) && isset($GLOBALS['PUBLIC_UI'])) {
-    // تجنّب إعادة طباعة DOCTYPE إذا أُدرج الهيدر
-}
-?>
-
-<div class="ai-wrap">
-
-    <!-- Language Switcher -->
-    <div class="lang-switcher">
-        <a href="?lang=ar" class="lang-btn <?= $lang === 'ar' ? 'active' : '' ?>">العربية</a>
-        <a href="?lang=en" class="lang-btn <?= $lang === 'en' ? 'active' : '' ?>">English</a>
+<!-- HEADER -->
+<div class="header">
+    <div class="header-right">
+        <div class="logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg>
+            المساعد الذكي
+            <span class="version">v1.0</span>
+        </div>
+        <span class="status-label">
+            <span class="status-dot <?= $api_ok ? 'on' : 'off' ?>"></span>
+            <?= $api_ok ? 'متصل' : 'غير متصل' ?>
+        </span>
     </div>
+    <div class="header-left">
+        <?php if (!empty($thread_id)): ?>
+            <span style="font-size:.7rem;color:var(--text3);direction:ltr">
+                <?= substr($thread_id, 0, 8) ?>...
+            </span>
+        <?php endif; ?>
+        <a href="?new=1" class="btn-sm">✦ محادثة جديدة</a>
+        <a href="http://hcsfcs.top:8888/docs" target="_blank" class="btn-sm">API ↗</a>
+    </div>
+</div>
 
-    <div class="ai-card">
+<!-- HEALTH STRIP -->
+<?php if ($api_ok && $health_data): ?>
+<div class="health-strip">
+    <span class="hs-item">✅ API يعمل</span>
+    <?php if (!empty($health_data['database_connection'])): ?>
+        <span class="hs-item">🗄️ DB متصل</span>
+    <?php endif; ?>
+    <?php if (isset($health_data['total_chunks_found'])): ?>
+        <span class="hs-item">📦 <?= $health_data['total_chunks_found'] ?> سجل</span>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
 
-        <!-- Header -->
-        <div class="ai-header">
-            <span style="font-size:1.6rem">🤖</span>
-            <div>
-                <h1><?= t($t, 'ai_chat_title', 'AI Assistant') ?></h1>
-                <div class="badge">QOOQZ RAG</div>
+<!-- CHAT AREA -->
+<div class="chat-wrap" id="chatWrap">
+    <div class="chat-inner" id="chatInner">
+
+        <?php if (empty($history) && empty($question)): ?>
+        <!-- WELCOME -->
+        <div class="welcome">
+            <div class="welcome-icon">🤖</div>
+            <h2>مرحباً بك في المساعد الذكي</h2>
+            <p>اطرح أي سؤال وسأبحث في قاعدة المعرفة للعثور على أفضل إجابة. يمكنك أيضاً إرفاق صور وملفات.</p>
+            <div class="suggestions">
+                <button class="sug-btn" onclick="ask('ما هو الذكاء الاصطناعي؟')">🧠 ما هو الذكاء الاصطناعي؟</button>
+                <button class="sug-btn" onclick="ask('ما الفرق بين Machine Learning و Deep Learning؟')">⚡ ML vs DL</button>
+                <button class="sug-btn" onclick="ask('ما هو HTTP؟')">🌐 ما هو HTTP؟</button>
             </div>
         </div>
+        <?php else: ?>
 
-        <!-- Thread Bar -->
-        <div class="thread-bar">
-            <span id="thread-label"><?= t($t, 'ai_threads', 'Conversations') ?>: —</span>
-            <button class="btn-new-thread" onclick="startNewThread()">
-                + <?= t($t, 'ai_new_thread', 'New Chat') ?>
-            </button>
+            <!-- HISTORY -->
+            <?php foreach ($history as $msg): ?>
+                <?php $role = $msg['role'] ?? 'user'; ?>
+                <div class="msg <?= $role ?>">
+                    <div class="avatar"><?= $role === 'user' ? '👤' : '🤖' ?></div>
+                    <div class="bubble"><?= nl2br(htmlspecialchars($msg['content'] ?? '')) ?></div>
+                </div>
+            <?php endforeach; ?>
+
+            <!-- CURRENT QUESTION -->
+            <?php if (!empty($question)): ?>
+                <div class="msg user">
+                    <div class="avatar">👤</div>
+                    <div>
+                        <div class="bubble"><?= nl2br(htmlspecialchars($question)) ?></div>
+                        <?php if ($uploaded_image): ?>
+                            <div style="margin-top:4px;font-size:.72rem;color:var(--text3)">📎 <?= htmlspecialchars($uploaded_image) ?></div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <!-- ERROR -->
+            <?php if ($error_msg): ?>
+                <div class="error-box">❌ <?= htmlspecialchars($error_msg) ?></div>
+            <?php endif; ?>
+
+            <!-- AI ANSWER -->
+            <?php if ($response_data && isset($response_data['answer'])): ?>
+                <div class="msg bot">
+                    <div class="avatar">🤖</div>
+                    <div style="min-width:0">
+                        <div class="bubble"><?= nl2br(htmlspecialchars($response_data['answer'])) ?></div>
+
+                        <?php if (!empty($response_data['sources'])): ?>
+                            <div class="sources-panel">
+                                <div class="sources-title">📚 المصادر</div>
+                                <?php foreach ($response_data['sources'] as $i => $src): ?>
+                                    <div class="src-item">
+                                        <?= $i + 1 ?>. <?= htmlspecialchars(mb_substr($src['content_preview'] ?? '', 0, 120)) ?>
+                                        <?php if (isset($src['score'])): ?>
+                                            <span class="score"><?= round(($src['score'] ?? 0) * 100) ?>%</span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+
+                        <?php $m = $response_data['metadata'] ?? []; ?>
+                        <div class="meta-row">
+                            <span class="chip"><span class="emoji">⚡</span><?= $m['latency_ms'] ?? 0 ?>ms</span>
+                            <span class="chip"><span class="emoji">📝</span><?= $m['input_tokens'] ?? 0 ?> دخول</span>
+                            <span class="chip"><span class="emoji">📤</span><?= $m['output_tokens'] ?? 0 ?> خروج</span>
+                            <span class="chip"><span class="emoji">📊</span><?= $m['sources_found'] ?? 0 ?> مصادر</span>
+                            <span class="chip"><span class="emoji">🧠</span><?= $m['model'] ?? 'local' ?></span>
+                            <?php if (!empty($m['has_memory'])): ?>
+                                <span class="chip"><span class="emoji">💾</span>ذاكرة</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- INPUT BAR -->
+<div class="input-bar">
+    <div class="input-inner">
+        <div class="attach-row">
+            <span class="attach-tag" id="imgTag">
+                <span class="remove" onclick="clearFile('image')">&times;</span>
+                🖼️ <span id="imgName"></span>
+            </span>
+            <span class="attach-tag" id="docTag">
+                <span class="remove" onclick="clearFile('document')">&times;</span>
+                📄 <span id="docName"></span>
+            </span>
         </div>
+        <form method="POST" enctype="multipart/form-data" class="form-row" id="chatForm">
+            <input type="hidden" name="thread_id" value="<?= htmlspecialchars($thread_id) ?>">
+            <input type="file" name="image" id="imageInput" accept="image/*" onchange="showFile('image')">
+            <input type="file" name="document_file" id="docInput" accept=".txt,.pdf,.doc,.docx,.csv" onchange="showFile('document')">
 
-        <!-- Messages -->
-        <div class="ai-messages" id="messages"></div>
-
-        <!-- File Preview -->
-        <div class="file-preview" id="file-preview" style="display:none">
-            <span>📎</span>
-            <span id="file-name"></span>
-            <span class="remove" onclick="removeFile()">✕</span>
-        </div>
-
-        <!-- Form -->
-        <form class="ai-form" id="chat-form" onsubmit="sendMessage(event)">
-            <label for="file-input" class="btn-attach" title="<?= t($t, 'ai_attach_file', 'Attach file') ?>">📎</label>
-            <input type="file" id="file-input" accept="image/*,.pdf,.txt,.docx,.csv,.md"
-                   onchange="onFileSelect(this)">
-            <textarea class="ai-input" id="question" rows="1"
-                      placeholder="<?= t($t, 'ai_placeholder', 'Type your question...') ?>"
-                      onkeydown="handleKey(event)"></textarea>
-            <button type="submit" class="btn-send" id="send-btn">
-                <?= t($t, 'ai_send', 'Send') ?>
+            <div class="textarea-wrap">
+                <textarea name="question" id="qInput" placeholder="اكتب سؤالك هنا..." rows="1" required></textarea>
+                <div class="attach-btns">
+                    <button type="button" class="attach-btn" onclick="document.getElementById('imageInput').click()" title="إرفاق صورة">🖼️</button>
+                    <button type="button" class="attach-btn" onclick="document.getElementById('docInput').click()" title="إرفاق ملف">📎</button>
+                </div>
+            </div>
+            <button type="submit" class="send-btn" id="sendBtn" title="إرسال">
+                <span class="send-icon">➤</span>
+                <span class="spinner"></span>
             </button>
         </form>
-
     </div>
 </div>
 
 <script>
-const AI_BASE = <?= json_encode($aiApiBase) ?>;
-const LANG    = <?= json_encode($lang) ?>;
-const DIR     = <?= json_encode($direction) ?>;
-const L       = {
-    thinking  : <?= json_encode($t['ai_thinking'] ?? 'Thinking...') ?>,
-    error     : <?= json_encode($t['ai_error']    ?? 'Error') ?>,
-    sources   : <?= json_encode($t['ai_sources']  ?? 'Sources') ?>,
-    latency   : <?= json_encode($t['ai_latency']  ?? 'Latency') ?>,
-    ms        : <?= json_encode($t['ai_ms']        ?? 'ms') ?>,
-    attached  : <?= json_encode($t['ai_file_attached'] ?? 'Attached') ?>,
-};
+// التمرير للأسفل
+const wrap = document.getElementById('chatWrap');
+wrap.scrollTop = wrap.scrollHeight;
 
-let threadId  = null;
-let attachedFile = null;
-
-function startNewThread() {
-    threadId = null;
-    attachedFile = null;
-    removeFile();
-    document.getElementById('messages').innerHTML = '';
-    document.getElementById('thread-label').textContent = <?= json_encode(($t['ai_threads'] ?? 'Conversations') . ': —') ?>;
-}
-
-function onFileSelect(input) {
-    if (input.files && input.files[0]) {
-        attachedFile = input.files[0];
-        document.getElementById('file-name').textContent = attachedFile.name;
-        document.getElementById('file-preview').style.display = 'flex';
-    }
-}
-
-function removeFile() {
-    attachedFile = null;
-    document.getElementById('file-input').value = '';
-    document.getElementById('file-preview').style.display = 'none';
-}
-
-function handleKey(e) {
+// إرسال بـ Enter
+document.getElementById('qInput').addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        document.getElementById('chat-form').dispatchEvent(new Event('submit'));
+        if (this.value.trim()) document.getElementById('chatForm').submit();
     }
-}
+});
 
-function appendMessage(role, text, meta) {
-    const box = document.getElementById('messages');
-    const div = document.createElement('div');
-    div.className = 'msg ' + (role === 'user' ? 'user' : 'bot');
-
-    if (meta && meta.filename) {
-        const badge = document.createElement('div');
-        badge.className = 'msg-file-badge';
-        badge.textContent = '📎 ' + meta.filename;
-        div.appendChild(badge);
-    }
-
-    const textNode = document.createElement('div');
-    textNode.textContent = text;
-    div.appendChild(textNode);
-
-    if (meta && meta.latency_ms !== undefined) {
-        const m = document.createElement('div');
-        m.className = 'msg-meta';
-        m.textContent = L.latency + ': ' + meta.latency_ms + ' ' + L.ms;
-        div.appendChild(m);
-    }
-
-    if (meta && meta.sources && meta.sources.length > 0) {
-        const det = document.createElement('details');
-        det.className = 'sources-block';
-        const sum = document.createElement('summary');
-        sum.textContent = L.sources + ' (' + meta.sources.length + ')';
-        det.appendChild(sum);
-        meta.sources.forEach(function(s) {
-            const si = document.createElement('div');
-            si.className = 'source-item';
-            si.textContent = (s.score ? '[' + (s.score * 100).toFixed(0) + '%] ' : '') + s.content;
-            det.appendChild(si);
-        });
-        div.appendChild(det);
-    }
-
-    box.appendChild(div);
-    box.scrollTop = box.scrollHeight;
-    return div;
-}
-
-async function sendMessage(e) {
-    e.preventDefault();
-    const input = document.getElementById('question');
-    const question = input.value.trim();
-    if (!question && !attachedFile) return;
-
-    input.value = '';
-    input.style.height = '';
-
-    const sendBtn = document.getElementById('send-btn');
-    sendBtn.disabled = true;
-
-    // رسالة المستخدم
-    const pendingFile = attachedFile;
-    appendMessage('user', question, pendingFile ? {filename: pendingFile.name} : null);
-    removeFile();
-
-    // رسالة "جارٍ التفكير"
-    const thinkDiv = appendMessage('bot', L.thinking, null);
-    thinkDiv.classList.add('thinking');
-
-    try {
-        const fd = new FormData();
-        fd.append('question', question || ' ');
-        if (threadId) fd.append('thread_id', threadId);
-
-        let endpoint = AI_BASE + '/chat';
-
-        if (pendingFile) {
-            fd.append('image', pendingFile);
-            endpoint = AI_BASE + '/chat/with-image';
-        }
-
-        const resp = await fetch(endpoint, {method: 'POST', body: fd});
-
-        thinkDiv.remove();
-
-        if (!resp.ok) {
-            const errText = await resp.text();
-            appendMessage('bot', L.error + ' (HTTP ' + resp.status + '): ' + errText);
-        } else {
-            const data = await resp.json();
-            if (data.thread_id) {
-                threadId = data.thread_id;
-                document.getElementById('thread-label').textContent =
-                    <?= json_encode($t['ai_threads'] ?? 'Conversations') ?> + ': ' + threadId.slice(0,8) + '…';
-            }
-            appendMessage('bot', data.answer || '', {
-                latency_ms : data.metadata?.latency_ms,
-                sources    : data.sources || [],
-            });
-        }
-    } catch (err) {
-        thinkDiv.remove();
-        appendMessage('bot', L.error + ': ' + err.message);
-    }
-
-    sendBtn.disabled = false;
-    input.focus();
-}
-
-// Auto-resize textarea
-document.getElementById('question').addEventListener('input', function() {
+// تكبير textarea  تلقائياً
+const ta = document.getElementById('qInput');
+ta.addEventListener('input', function() {
     this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    this.style.height = Math.min(this.scrollHeight, 140) + 'px';
+});
+ta.focus();
+
+// أزرار اقتراحات
+function ask(q) {
+    document.getElementById('qInput').value = q;
+    document.getElementById('chatForm').submit();
+}
+
+// عرض اسم الملف المرفق
+function showFile(type) {
+    const input = type === 'image' ? document.getElementById('imageInput') : document.getElementById('docInput');
+    const tag   = type === 'image' ? document.getElementById('imgTag') : document.getElementById('docTag');
+    const name  = type === 'image' ? document.getElementById('imgName') : document.getElementById('docName');
+    if (input.files.length) {
+        name.textContent = input.files[0].name;
+        tag.classList.add('show');
+    }
+}
+function clearFile(type) {
+    const input = type === 'image' ? document.getElementById('imageInput') : document.getElementById('docInput');
+    const tag   = type === 'image' ? document.getElementById('imgTag') : document.getElementById('docTag');
+    input.value = '';
+    tag.classList.remove('show');
+}
+
+// حالة الإرسال
+document.getElementById('chatForm').addEventListener('submit', function() {
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = true;
+    btn.parentElement.classList.add('sending');
 });
 </script>
+
 </body>
 </html>
