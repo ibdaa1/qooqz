@@ -1,0 +1,801 @@
+/* ============================================================
+   assets/css/public.css
+   QOOQZ — Global Public Interface  (mobile-first, RTL-ready)
+   ============================================================ */
+
+/* -------------------------------------------------------
+   0. Import base design tokens
+   ----------------------------------------------------- */
+@import "./variables.css";
+
+/* -------------------------------------------------------
+   1. CSS Custom properties — overridable by JS/theme API
+   ----------------------------------------------------- */
+:root {
+  --pub-primary:       var(--color-primary, #2d8cf0);
+  --pub-secondary:     var(--color-secondary, #6c757d);
+  --pub-accent:        var(--color-accent, #f39c12);
+  --pub-bg:            #ffffff;
+  --pub-surface:       #f8f9fb;
+  --pub-text:          #222831;
+  --pub-muted:         #6c757d;
+  --pub-border:        #e6e9ee;
+  --pub-radius:        10px;
+  --pub-radius-sm:     6px;
+  --pub-shadow:        0 2px 12px rgba(33,37,41,0.08);
+  --pub-shadow-hover:  0 6px 24px rgba(33,37,41,0.14);
+  --pub-header-h:      60px;
+  --pub-transition:    0.2s ease;
+}
+
+/* -------------------------------------------------------
+   2. Reset & base
+   ----------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Cairo", "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--pub-text);
+  background: var(--pub-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+img, video, svg { max-width: 100%; height: auto; display: block; }
+
+a { color: var(--pub-primary); text-decoration: none; transition: color var(--pub-transition); }
+a:hover { color: var(--pub-accent); }
+
+ul, ol { margin: 0; padding: 0; list-style: none; }
+
+/* -------------------------------------------------------
+   3. Utility container
+   ----------------------------------------------------- */
+.pub-container {
+  width: 100%;
+  max-width: 1180px;
+  margin-inline: auto;
+  padding-inline: 16px;
+}
+
+/* -------------------------------------------------------
+   4. Header
+   ----------------------------------------------------- */
+.pub-header {
+  background: var(--pub-primary);
+  color: #fff;
+  height: var(--pub-header-h);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.pub-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  gap: 12px;
+}
+
+/* Logo */
+.pub-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: #fff;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.pub-logo:hover { color: rgba(255,255,255,0.85); }
+
+.pub-logo-icon {
+  width: 36px;
+  height: 36px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+/* Desktop Nav */
+.pub-nav {
+  display: none;
+  gap: 4px;
+  align-items: center;
+}
+.pub-nav a {
+  color: rgba(255,255,255,0.9);
+  padding: 6px 12px;
+  border-radius: var(--pub-radius-sm);
+  font-size: 0.92rem;
+  font-weight: 500;
+  transition: background var(--pub-transition), color var(--pub-transition);
+}
+.pub-nav a:hover,
+.pub-nav a.active {
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+}
+
+/* Header actions */
+.pub-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pub-lang-btn {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background var(--pub-transition);
+  text-decoration: none;
+}
+.pub-lang-btn:hover { background: rgba(255,255,255,0.25); color: #fff; }
+
+.pub-login-btn {
+  background: #fff;
+  color: var(--pub-primary);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: opacity var(--pub-transition);
+}
+.pub-login-btn:hover { opacity: 0.9; color: var(--pub-primary); }
+
+/* Hamburger toggle */
+.pub-hamburger {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: background var(--pub-transition);
+}
+.pub-hamburger:hover { background: rgba(255,255,255,0.15); }
+.pub-hamburger span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: #fff;
+  border-radius: 2px;
+  transition: transform 0.25s ease, opacity 0.2s ease;
+}
+
+/* Mobile drawer */
+.pub-mobile-nav {
+  display: none;
+  position: fixed;
+  inset: var(--pub-header-h) 0 0 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 99;
+  backdrop-filter: blur(4px);
+}
+.pub-mobile-nav.open { display: block; }
+.pub-mobile-nav-inner {
+  background: var(--pub-primary);
+  max-width: 280px;
+  height: 100%;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 4px 0 20px rgba(0,0,0,0.25);
+  overflow-y: auto;
+}
+[dir="rtl"] .pub-mobile-nav-inner { margin-inline-start: auto; }
+[dir="ltr"] .pub-mobile-nav-inner { margin-inline-end: auto; }
+
+.pub-mobile-nav-inner a {
+  display: block;
+  color: rgba(255,255,255,0.92);
+  padding: 11px 14px;
+  border-radius: var(--pub-radius-sm);
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: background var(--pub-transition);
+}
+.pub-mobile-nav-inner a:hover,
+.pub-mobile-nav-inner a.active { background: rgba(255,255,255,0.2); color: #fff; }
+
+/* -------------------------------------------------------
+   5. Hero / Banner
+   ----------------------------------------------------- */
+.pub-hero {
+  background: linear-gradient(135deg, var(--pub-primary) 0%, var(--pub-accent) 100%);
+  color: #fff;
+  padding: 52px 16px 48px;
+  text-align: center;
+}
+.pub-hero h1 {
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  font-weight: 800;
+  margin: 0 0 12px;
+  line-height: 1.2;
+}
+.pub-hero p {
+  font-size: clamp(0.95rem, 2vw, 1.15rem);
+  opacity: 0.9;
+  max-width: 560px;
+  margin: 0 auto 24px;
+}
+.pub-hero-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* -------------------------------------------------------
+   6. Search bar
+   ----------------------------------------------------- */
+.pub-search-bar {
+  background: var(--pub-surface);
+  border-bottom: 1px solid var(--pub-border);
+  padding: 12px 0;
+}
+.pub-search-form {
+  display: flex;
+  gap: 8px;
+  max-width: 600px;
+  margin-inline: auto;
+}
+.pub-search-input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--pub-border);
+  border-radius: var(--pub-radius);
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color var(--pub-transition), box-shadow var(--pub-transition);
+  background: #fff;
+}
+.pub-search-input:focus {
+  border-color: var(--pub-primary);
+  box-shadow: 0 0 0 3px rgba(45,140,240,0.12);
+}
+.pub-search-btn {
+  padding: 10px 20px;
+  background: var(--pub-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--pub-radius);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--pub-transition);
+  white-space: nowrap;
+}
+.pub-search-btn:hover { opacity: 0.88; }
+
+/* -------------------------------------------------------
+   7. Section headings
+   ----------------------------------------------------- */
+.pub-section { padding: 36px 0; }
+.pub-section + .pub-section { border-top: 1px solid var(--pub-border); }
+
+.pub-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pub-section-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--pub-text);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pub-section-title::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 1.2em;
+  background: var(--pub-primary);
+  border-radius: 2px;
+}
+.pub-section-link {
+  font-size: 0.88rem;
+  color: var(--pub-primary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.pub-section-link:hover { text-decoration: underline; }
+
+/* -------------------------------------------------------
+   8. Grids
+   ----------------------------------------------------- */
+.pub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.pub-grid-md {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.pub-grid-lg {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+@media (min-width: 768px) {
+  .pub-grid    { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 18px; }
+  .pub-grid-md { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
+  .pub-grid-lg { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 22px; }
+}
+
+/* -------------------------------------------------------
+   9. Product Card
+   ----------------------------------------------------- */
+.pub-product-card {
+  background: var(--pub-bg);
+  border: 1px solid var(--pub-border);
+  border-radius: var(--pub-radius);
+  overflow: hidden;
+  transition: box-shadow var(--pub-transition), transform var(--pub-transition);
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+}
+.pub-product-card:hover {
+  box-shadow: var(--pub-shadow-hover);
+  transform: translateY(-3px);
+}
+.pub-product-card-img {
+  width: 100%;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+  background: var(--pub-surface);
+}
+.pub-product-card-img-placeholder {
+  width: 100%;
+  aspect-ratio: 4/3;
+  background: var(--pub-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  color: var(--pub-border);
+}
+.pub-product-card-body {
+  padding: 12px 14px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pub-product-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--pub-text);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pub-product-price {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--pub-primary);
+  margin-top: auto;
+  padding-top: 6px;
+}
+.pub-product-badge {
+  display: inline-block;
+  background: var(--pub-accent);
+  color: #fff;
+  font-size: 0.7rem;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+/* -------------------------------------------------------
+   10. Job Card
+   ----------------------------------------------------- */
+.pub-job-card {
+  background: var(--pub-bg);
+  border: 1px solid var(--pub-border);
+  border-radius: var(--pub-radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: box-shadow var(--pub-transition);
+}
+.pub-job-card:hover { box-shadow: var(--pub-shadow-hover); }
+
+.pub-job-title {
+  font-size: 0.97rem;
+  font-weight: 700;
+  color: var(--pub-text);
+  margin: 0;
+  line-height: 1.3;
+}
+.pub-job-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--pub-muted);
+}
+.pub-job-meta span {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.pub-job-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.pub-tag {
+  background: rgba(45,140,240,0.08);
+  color: var(--pub-primary);
+  border: 1px solid rgba(45,140,240,0.18);
+  font-size: 0.75rem;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+.pub-tag--urgent { background: rgba(231,76,60,0.08); color: #e74c3c; border-color: rgba(231,76,60,0.2); }
+.pub-tag--remote { background: rgba(46,204,113,0.08); color: #27ae60; border-color: rgba(46,204,113,0.2); }
+.pub-tag--featured { background: rgba(243,156,18,0.08); color: #f39c12; border-color: rgba(243,156,18,0.2); }
+
+/* -------------------------------------------------------
+   11. Entity / Tenant Card
+   ----------------------------------------------------- */
+.pub-entity-card {
+  background: var(--pub-bg);
+  border: 1px solid var(--pub-border);
+  border-radius: var(--pub-radius);
+  padding: 18px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  transition: box-shadow var(--pub-transition);
+}
+.pub-entity-card:hover { box-shadow: var(--pub-shadow-hover); }
+
+.pub-entity-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--pub-surface);
+  flex-shrink: 0;
+  border: 2px solid var(--pub-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  color: var(--pub-muted);
+  overflow: hidden;
+}
+.pub-entity-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.pub-entity-info { flex: 1; min-width: 0; }
+.pub-entity-name {
+  font-size: 0.97rem;
+  font-weight: 700;
+  color: var(--pub-text);
+  margin: 0 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pub-entity-desc {
+  font-size: 0.82rem;
+  color: var(--pub-muted);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pub-entity-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  color: #27ae60;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* -------------------------------------------------------
+   12. Buttons
+   ----------------------------------------------------- */
+.pub-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 20px;
+  border-radius: var(--pub-radius-sm);
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity var(--pub-transition), transform var(--pub-transition);
+  white-space: nowrap;
+}
+.pub-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+.pub-btn:active { transform: translateY(0); }
+
+.pub-btn--primary { background: var(--pub-primary); color: #fff; }
+.pub-btn--outline {
+  background: transparent;
+  color: #fff;
+  border: 2px solid rgba(255,255,255,0.6);
+}
+.pub-btn--outline:hover { background: rgba(255,255,255,0.12); opacity: 1; }
+.pub-btn--ghost {
+  background: transparent;
+  color: var(--pub-primary);
+  border: 1px solid var(--pub-primary);
+}
+.pub-btn--sm { padding: 5px 12px; font-size: 0.82rem; }
+
+/* -------------------------------------------------------
+   13. Pagination
+   ----------------------------------------------------- */
+.pub-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 24px 0 8px;
+  flex-wrap: wrap;
+}
+.pub-page-btn {
+  min-width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--pub-border);
+  border-radius: var(--pub-radius-sm);
+  background: #fff;
+  color: var(--pub-text);
+  font-size: 0.88rem;
+  text-decoration: none;
+  transition: all var(--pub-transition);
+  padding: 0 10px;
+}
+.pub-page-btn:hover,
+.pub-page-btn.active {
+  background: var(--pub-primary);
+  border-color: var(--pub-primary);
+  color: #fff;
+}
+.pub-page-btn.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* -------------------------------------------------------
+   14. Filters / Tabs
+   ----------------------------------------------------- */
+.pub-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--pub-border);
+  padding-bottom: 0;
+}
+.pub-tab {
+  padding: 8px 16px;
+  border-radius: var(--pub-radius-sm) var(--pub-radius-sm) 0 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--pub-muted);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  transition: color var(--pub-transition);
+}
+.pub-tab:hover { color: var(--pub-primary); }
+.pub-tab.active {
+  color: var(--pub-primary);
+  border-bottom-color: var(--pub-primary);
+  font-weight: 700;
+}
+
+/* -------------------------------------------------------
+   15. Empty state
+   ----------------------------------------------------- */
+.pub-empty {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--pub-muted);
+}
+.pub-empty-icon { font-size: 3rem; margin-bottom: 12px; }
+.pub-empty-msg { font-size: 0.95rem; }
+
+/* -------------------------------------------------------
+   16. Loading skeleton
+   ----------------------------------------------------- */
+.pub-skeleton {
+  background: linear-gradient(90deg, var(--pub-surface) 25%, #e9ecef 50%, var(--pub-surface) 75%);
+  background-size: 200% 100%;
+  animation: pub-shimmer 1.5s infinite;
+  border-radius: var(--pub-radius-sm);
+}
+@keyframes pub-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* -------------------------------------------------------
+   17. Footer
+   ----------------------------------------------------- */
+.pub-footer {
+  background: #1e2a38;
+  color: rgba(255,255,255,0.8);
+  padding: 40px 0 0;
+  margin-top: 48px;
+}
+.pub-footer-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 28px;
+}
+@media (min-width: 600px) {
+  .pub-footer-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 900px) {
+  .pub-footer-grid { grid-template-columns: 2fr 1fr 1fr 1fr; }
+}
+
+.pub-footer-brand-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 8px;
+}
+.pub-footer-brand-desc {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin: 0;
+}
+.pub-footer-col-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 14px;
+}
+.pub-footer-col a {
+  display: block;
+  color: rgba(255,255,255,0.65);
+  font-size: 0.88rem;
+  padding: 4px 0;
+  transition: color var(--pub-transition);
+}
+.pub-footer-col a:hover { color: #fff; }
+
+.pub-footer-bottom {
+  border-top: 1px solid rgba(255,255,255,0.1);
+  margin-top: 32px;
+  padding: 14px 0;
+  text-align: center;
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.45);
+}
+
+/* -------------------------------------------------------
+   18. Responsive — Desktop nav show/hide
+   ----------------------------------------------------- */
+@media (min-width: 768px) {
+  .pub-nav { display: flex; }
+  .pub-hamburger { display: none; }
+}
+
+/* -------------------------------------------------------
+   19. Page-specific: product list page filters
+   ----------------------------------------------------- */
+.pub-filter-bar {
+  background: var(--pub-surface);
+  border: 1px solid var(--pub-border);
+  border-radius: var(--pub-radius);
+  padding: 14px 16px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.pub-filter-select {
+  padding: 7px 12px;
+  border: 1px solid var(--pub-border);
+  border-radius: var(--pub-radius-sm);
+  font-size: 0.88rem;
+  background: #fff;
+  color: var(--pub-text);
+  outline: none;
+  cursor: pointer;
+}
+.pub-filter-select:focus { border-color: var(--pub-primary); }
+
+/* -------------------------------------------------------
+   20. Stats row (homepage)
+   ----------------------------------------------------- */
+.pub-stats-row {
+  display: flex;
+  gap: 1px;
+  background: var(--pub-border);
+  border-radius: var(--pub-radius);
+  overflow: hidden;
+  margin: 32px 0;
+}
+.pub-stat-item {
+  flex: 1;
+  background: var(--pub-bg);
+  padding: 20px 12px;
+  text-align: center;
+  min-width: 0;
+}
+.pub-stat-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--pub-primary);
+  display: block;
+}
+.pub-stat-label {
+  font-size: 0.8rem;
+  color: var(--pub-muted);
+}
+
+/* -------------------------------------------------------
+   21. RTL adjustments
+   ----------------------------------------------------- */
+[dir="rtl"] .pub-section-title::before { margin-inline-end: 0; margin-inline-start: 4px; }
+[dir="rtl"] .pub-mobile-nav-inner { border-inline-end: none; border-inline-start: 1px solid rgba(255,255,255,0.1); }
+
+/* -------------------------------------------------------
+   22. Print / accessibility helpers
+   ----------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
