@@ -94,5 +94,8 @@
   "ai_words": "words",
   "ai_voice": "Voice input",
   "ai_voice_stop": "Stop recording",
-  "ai_feed_title": "Data Feed"
+  "ai_feed_title": "Data Feed",
+  "ai_camera": "Scan document with camera",
+  "ai_ocr_title": "Extracted text",
+  "ai_chars": "chars"
 }

@@ -94,5 +94,8 @@
   "ai_words": "كلمات",
   "ai_voice": "تسجيل صوتي",
   "ai_voice_stop": "إيقاف التسجيل",
-  "ai_feed_title": "تغذية البيانات"
+  "ai_feed_title": "تغذية البيانات",
+  "ai_camera": "مسح مستند بالكاميرا",
+  "ai_ocr_title": "النص المستخرج",
+  "ai_chars": "حرف"
 }

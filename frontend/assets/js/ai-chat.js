@@ -21,10 +21,14 @@ function ask(q) {
 }
 
 function showFile(type) {
-    const input = type === 'image' ? document.getElementById('imageInput') : document.getElementById('docInput');
-    const tag   = type === 'image' ? document.getElementById('imgTag')    : document.getElementById('docTag');
-    const name  = type === 'image' ? document.getElementById('imgName')   : document.getElementById('docName');
-    if (input.files.length) { name.textContent = input.files[0].name; tag.classList.add('show'); }
+    var input = type === 'image' ? document.getElementById('imageInput') : document.getElementById('docInput');
+    var tag   = type === 'image' ? document.getElementById('imgTag')    : document.getElementById('docTag');
+    var name  = type === 'image' ? document.getElementById('imgName')   : document.getElementById('docName');
+    if (input.files.length) {
+        name.textContent = input.files[0].name;
+        tag.classList.add('show');
+        if (type === 'image') _runOcr(input.files[0]);
+    }
 }
 function clearFile(type) {
     const input = type === 'image' ? document.getElementById('imageInput') : document.getElementById('docInput');
@@ -38,6 +42,73 @@ document.getElementById('chatForm').addEventListener('submit', function() {
     btn.disabled = true;
     btn.parentElement.classList.add('sending');
 });
+
+// ===== Camera button — opens device camera directly on mobile =====
+(function() {
+    var camBtn = document.getElementById('cameraBtn');
+    if (!camBtn) return;
+    camBtn.addEventListener('click', function() {
+        var inp = document.getElementById('imageInput');
+        if (!inp) return;
+        inp.setAttribute('capture', 'environment');
+        inp.click();
+        inp.addEventListener('change', function removeCap() {
+            inp.removeAttribute('capture');
+            inp.removeEventListener('change', removeCap);
+        });
+    });
+})();
+
+// ===== Client-side OCR via Tesseract.js (loaded lazily) =====
+function _loadTesseract(cb) {
+    if (typeof Tesseract !== 'undefined') { cb(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload = cb;
+    s.onerror = function() { console.warn('Tesseract.js failed to load'); };
+    document.head.appendChild(s);
+}
+
+function _runOcr(file) {
+    var preview  = document.getElementById('ocrPreview');
+    var statusEl = document.getElementById('ocrStatus');
+    var textEl   = document.getElementById('ocrExtracted');
+    var ocrInput = document.getElementById('ocrTextInput');
+    if (ocrInput) ocrInput.value = '';
+    if (!preview || !file) return;
+    var isEn = (typeof AI_LANG !== 'undefined' && AI_LANG === 'en');
+    preview.style.display = 'block';
+    if (statusEl) statusEl.textContent = isEn ? '⏳ Reading image…' : '⏳ جارٍ قراءة الصورة…';
+    if (textEl)   textEl.textContent   = '';
+
+    _loadTesseract(function() {
+        if (typeof Tesseract === 'undefined') {
+            if (statusEl) statusEl.textContent = '⚠️ OCR library failed to load';
+            return;
+        }
+        var lang = isEn ? 'eng' : 'ara+eng';
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            Tesseract.recognize(e.target.result, lang, {
+                logger: function(m) {
+                    if (m.status === 'recognizing text' && statusEl) {
+                        statusEl.textContent = (isEn ? '⏳ ' : '⏳ ') + Math.round((m.progress || 0) * 100) + '%';
+                    }
+                }
+            }).then(function(result) {
+                var text = (result.data.text || '').trim();
+                if (ocrInput) ocrInput.value = text;
+                if (statusEl) statusEl.textContent = text
+                    ? (isEn ? '✅ Text extracted (' + text.length + ' chars)' : '✅ تم استخراج النص (' + text.length + ' حرف)')
+                    : (isEn ? 'ℹ️ No text found' : 'ℹ️ لم يُعثر على نص في الصورة');
+                if (textEl && text) textEl.textContent = text.length > 400 ? text.substring(0, 400) + '…' : text;
+            }).catch(function() {
+                if (statusEl) statusEl.textContent = isEn ? '⚠️ OCR failed' : '⚠️ فشل استخراج النص';
+            });
+        };
+        reader.readAsDataURL(file);
+    });
+}
 
 // ===== Voice Recognition (Web Speech API) =====
 (function() {

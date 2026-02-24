@@ -47,6 +47,7 @@ $error_msg     = null;
 $question      = trim($_POST['question'] ?? '');
 $thread_id     = $_POST['thread_id'] ?? ($_SESSION['thread_id'] ?? '');
 $uploaded_image = null;
+$file_context_text = '';  // always defined (used in rendering too)
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($question)) {
     $ch = curl_init();
@@ -55,7 +56,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($question)) {
     $has_doc  = (!empty($_FILES['document_file']['tmp_name']) && $_FILES['document_file']['error'] === 0);
 
     // ====== خطوة 1: رفع الملف واستخراج النص (يعمل مع الصور والمستندات) ======
-    $file_context_text = '';
     $file_name_display = '';
     $upload_failed = false;
     if ($has_file || $has_doc) {
@@ -81,6 +81,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($question)) {
         } else {
             $upload_failed = true;
         }
+    }
+
+    // Fallback to client-side OCR text (Tesseract.js) if server extracted nothing
+    $client_ocr = trim($_POST['ocr_text'] ?? '');
+    if (!$file_context_text && $client_ocr) {
+        $file_context_text = $client_ocr;
     }
 
     // ====== خطوة 2: بناء السؤال مع محتوى الملف ======
@@ -252,6 +258,12 @@ if (isset($_GET['new'])) {
                             <?php if (!empty($upload_failed)): ?>
                             <div style="color:#e53e3e;font-size:.72rem;margin-top:4px">⚠️ فشل رفع الملف للخادم — سيتم البحث بدون محتواه</div>
                             <?php endif; ?>
+                            <?php if (!empty($file_context_text)): ?>
+                            <details class="ocr-block">
+                                <summary>📝 <?= L($L,'ai_ocr_title','النص المستخرج') ?> (<?= mb_strlen($file_context_text) ?> <?= L($L,'ai_chars','حرف') ?>)</summary>
+                                <pre class="ocr-block-text"><?= htmlspecialchars(mb_substr($file_context_text, 0, 800)) ?></pre>
+                            </details>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -312,15 +324,21 @@ if (isset($_GET['new'])) {
                 <span class="remove" onclick="clearFile('document')">&times;</span>
                 📄 <span id="docName"></span>
             </span>
+            <div id="ocrPreview" class="ocr-preview" style="display:none">
+                <div id="ocrStatus" class="ocr-status"></div>
+                <pre id="ocrExtracted" class="ocr-extracted"></pre>
+            </div>
         </div>
         <form method="POST" enctype="multipart/form-data" class="form-row" id="chatForm">
             <input type="hidden" name="thread_id" value="<?= htmlspecialchars($thread_id) ?>">
             <input type="file" name="image" id="imageInput" accept="image/*" onchange="showFile('image')">
             <input type="file" name="document_file" id="docInput" accept=".txt,.pdf,.doc,.docx,.csv,.xlsx" onchange="showFile('document')">
+            <input type="hidden" name="ocr_text" id="ocrTextInput">
 
             <!-- Side buttons (outside textarea) -->
             <div class="side-btns">
                 <button type="button" class="side-btn" id="imgBtn" onclick="document.getElementById('imageInput').click()" title="<?= L($L,'ai_attach_img','إرفاق صورة') ?>">🖼️</button>
+                <button type="button" class="side-btn" id="cameraBtn" title="<?= L($L,'ai_camera','مسح مستند بالكاميرا') ?>">📷</button>
                 <button type="button" class="side-btn" id="docBtn" onclick="document.getElementById('docInput').click()" title="<?= L($L,'ai_attach_doc','إرفاق ملف') ?>">📎</button>
                 <button type="button" class="side-btn" id="micBtn" title="<?= L($L,'ai_voice','تسجيل صوتي') ?>">🎤</button>
             </div>
