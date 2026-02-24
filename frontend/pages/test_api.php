@@ -52,8 +52,14 @@ $file_context_text = '';  // always defined (used in rendering too)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($question)) {
     $ch = curl_init();
 
-    $has_file = (!empty($_FILES['image']['tmp_name']) && $_FILES['image']['error'] === 0);
-    $has_doc  = (!empty($_FILES['document_file']['tmp_name']) && $_FILES['document_file']['error'] === 0);
+    $has_file   = (!empty($_FILES['image']['tmp_name'])        && $_FILES['image']['error']        === 0);
+    $has_camera = (!empty($_FILES['camera_image']['tmp_name']) && $_FILES['camera_image']['error'] === 0);
+    $has_doc    = (!empty($_FILES['document_file']['tmp_name']) && $_FILES['document_file']['error'] === 0);
+    // Treat camera capture as an image upload
+    if ($has_camera && !$has_file) {
+        $_FILES['image'] = $_FILES['camera_image'];
+        $has_file = true;
+    }
 
     // ====== خطوة 1: رفع الملف واستخراج النص (يعمل مع الصور والمستندات) ======
     $file_name_display = '';
@@ -331,8 +337,9 @@ if (isset($_GET['new'])) {
         </div>
         <form method="POST" enctype="multipart/form-data" class="form-row" id="chatForm">
             <input type="hidden" name="thread_id" value="<?= htmlspecialchars($thread_id) ?>">
-            <input type="file" name="image" id="imageInput" accept="image/*" onchange="showFile('image')">
-            <input type="file" name="document_file" id="docInput" accept=".txt,.pdf,.doc,.docx,.csv,.xlsx" onchange="showFile('document')">
+            <input type="file" name="image"         id="imageInput"  accept="image/*"                                     style="display:none" onchange="showFile('image')">
+            <input type="file" name="camera_image"  id="cameraInput" accept="image/*" capture="environment"               style="display:none" onchange="showCameraFile()">
+            <input type="file" name="document_file" id="docInput"    accept=".txt,.pdf,.doc,.docx,.csv,.xlsx"              style="display:none" onchange="showFile('document')">
             <input type="hidden" name="ocr_text" id="ocrTextInput">
 
             <!-- Side buttons (outside textarea) -->

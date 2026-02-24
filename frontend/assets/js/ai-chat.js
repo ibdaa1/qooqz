@@ -31,10 +31,19 @@ function showFile(type) {
     }
 }
 function clearFile(type) {
-    const input = type === 'image' ? document.getElementById('imageInput') : document.getElementById('docInput');
-    const tag   = type === 'image' ? document.getElementById('imgTag')    : document.getElementById('docTag');
-    input.value = '';
+    const input  = type === 'image' ? document.getElementById('imageInput')  : document.getElementById('docInput');
+    const camInp = type === 'image' ? document.getElementById('cameraInput') : null;
+    const tag    = type === 'image' ? document.getElementById('imgTag')       : document.getElementById('docTag');
+    if (input)  input.value  = '';
+    if (camInp) camInp.value = '';
     tag.classList.remove('show');
+    // Also hide OCR preview when clearing image
+    if (type === 'image') {
+        var prev = document.getElementById('ocrPreview');
+        if (prev) prev.style.display = 'none';
+        var ocrIn = document.getElementById('ocrTextInput');
+        if (ocrIn) ocrIn.value = '';
+    }
 }
 
 document.getElementById('chatForm').addEventListener('submit', function() {
@@ -43,21 +52,25 @@ document.getElementById('chatForm').addEventListener('submit', function() {
     btn.parentElement.classList.add('sending');
 });
 
-// ===== Camera button — opens device camera directly on mobile =====
+// ===== Camera button — dedicated input with static capture="environment" =====
 (function() {
     var camBtn = document.getElementById('cameraBtn');
     if (!camBtn) return;
     camBtn.addEventListener('click', function() {
-        var inp = document.getElementById('imageInput');
-        if (!inp) return;
-        inp.setAttribute('capture', 'environment');
-        inp.click();
-        inp.addEventListener('change', function removeCap() {
-            inp.removeAttribute('capture');
-            inp.removeEventListener('change', removeCap);
-        });
+        var inp = document.getElementById('cameraInput');
+        if (inp) inp.click();
     });
 })();
+
+function showCameraFile() {
+    var input = document.getElementById('cameraInput');
+    var tag   = document.getElementById('imgTag');
+    var name  = document.getElementById('imgName');
+    if (!input || !input.files.length) return;
+    name.textContent = input.files[0].name;
+    tag.classList.add('show');
+    _runOcr(input.files[0]);
+}
 
 // ===== Client-side OCR via Tesseract.js (loaded lazily) =====
 function _loadTesseract(cb) {
