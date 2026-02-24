@@ -1,0 +1,150 @@
+{
+  "lang": "en",
+  "dir": "ltr",
+  "name": "English",
+
+  "nav": {
+    "home": "Home",
+    "products": "Products",
+    "categories": "Categories",
+    "jobs": "Jobs",
+    "entities": "Entities",
+    "tenants": "Tenants",
+    "login": "Login",
+    "register": "Register",
+    "account": "My Account",
+    "logout": "Logout",
+    "menu_open": "Open menu",
+    "menu_close": "Close menu"
+  },
+
+  "hero": {
+    "title": "QOOQZ Global Platform",
+    "subtitle": "Discover products, jobs, entities and tenants — all in one place",
+    "browse_products": "Browse Products",
+    "explore_jobs": "Explore Jobs"
+  },
+
+  "search": {
+    "placeholder": "Search products, jobs, entities...",
+    "button": "Search"
+  },
+
+  "stats": {
+    "products": "Products",
+    "jobs": "Jobs",
+    "entities": "Entities",
+    "tenants": "Tenants"
+  },
+
+  "sections": {
+    "featured_products": "🛍️ Featured Products",
+    "latest_jobs": "💼 Latest Jobs",
+    "entities": "🏢 Entities",
+    "tenants": "👥 Tenants",
+    "categories": "📂 Categories",
+    "view_all": "View all →"
+  },
+
+  "products": {
+    "page_title": "Products",
+    "featured": "Featured",
+    "search_placeholder": "Search products...",
+    "sort_newest": "Newest",
+    "sort_price_asc": "Price: Low to High",
+    "sort_price_desc": "Price: High to Low",
+    "filter": "Filter",
+    "clear": "Clear",
+    "empty": "No products available at the moment",
+    "product_count": "product(s)",
+    "view_product": "View Product"
+  },
+
+  "categories": {
+    "page_title": "Categories",
+    "search_placeholder": "Search categories...",
+    "filter": "Filter",
+    "clear": "Clear",
+    "empty": "No categories available at the moment",
+    "category_count": "category/categories",
+    "subcategories": "Subcategories",
+    "browse": "Browse",
+    "all_categories": "All Categories",
+    "parent_only": "Parent Only",
+    "featured_only": "Featured Only",
+    "products_count": "product(s)"
+  },
+
+  "jobs": {
+    "page_title": "Jobs",
+    "search_placeholder": "Search jobs...",
+    "type_all": "All Types",
+    "type_full_time": "Full Time",
+    "type_part_time": "Part Time",
+    "type_contract": "Contract",
+    "type_freelance": "Freelance",
+    "type_internship": "Internship",
+    "remote": "Remote",
+    "featured": "Featured",
+    "urgent": "Urgent",
+    "filter": "Search",
+    "clear": "Clear",
+    "empty": "No jobs available at the moment",
+    "job_count": "job(s)",
+    "apply": "Apply Now",
+    "deadline": "Deadline"
+  },
+
+  "entities": {
+    "page_title": "Entities",
+    "search_placeholder": "Search entities...",
+    "type_all": "All Types",
+    "type_company": "Company",
+    "type_store": "Store",
+    "type_restaurant": "Restaurant",
+    "type_medical": "Medical",
+    "type_training": "Training",
+    "verified": "Verified",
+    "filter": "Search",
+    "clear": "Clear",
+    "empty": "No entities available at the moment",
+    "entity_count": "entity/entities"
+  },
+
+  "tenants": {
+    "page_title": "Tenants",
+    "search_placeholder": "Search tenants...",
+    "active": "Active",
+    "inactive": "Inactive",
+    "filter": "Search",
+    "clear": "Clear",
+    "empty": "No tenants available at the moment",
+    "tenant_count": "tenant(s)"
+  },
+
+  "pagination": {
+    "prev": "Prev",
+    "next": "Next"
+  },
+
+  "footer": {
+    "tagline": "A complete global platform for products, jobs, entities, and tenants.",
+    "quick_links": "Quick Links",
+    "support": "Support",
+    "account": "Account",
+    "about": "About Us",
+    "contact": "Contact",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "rights": "All rights reserved",
+    "back_to_top": "Back to top"
+  },
+
+  "common": {
+    "home": "Home",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "no_image": "No image",
+    "currency": "SAR"
+  }
+}

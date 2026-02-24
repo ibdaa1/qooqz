@@ -1,0 +1,137 @@
+{
+    "lang": "id",
+    "dir": "ltr",
+    "name": "Bahasa Indonesia",
+    "nav": {
+        "home": "Beranda",
+        "products": "Produk",
+        "categories": "Kategori",
+        "jobs": "Pekerjaan",
+        "entities": "Entitas",
+        "tenants": "Penyewa",
+        "login": "Masuk",
+        "register": "Daftar",
+        "account": "Masuk",
+        "logout": "Keluar",
+        "menu_open": "Menu",
+        "menu_close": "Close"
+    },
+    "hero": {
+        "title": "Platform Global QOOQZ",
+        "subtitle": "Temukan produk, pekerjaan, entitas, dan penyewa",
+        "browse_products": "Jelajahi Produk",
+        "explore_jobs": "Jelajahi Pekerjaan"
+    },
+    "search": {
+        "placeholder": "Cari ...",
+        "button": "Cari"
+    },
+    "stats": {
+        "products": "Produk",
+        "jobs": "Pekerjaan",
+        "entities": "Entitas",
+        "tenants": "Penyewa"
+    },
+    "sections": {
+        "featured_products": "🛍️ Produk",
+        "latest_jobs": "💼 Pekerjaan",
+        "entities": "🏢 Entitas",
+        "tenants": "👥 Penyewa",
+        "categories": "📂 Kategori",
+        "view_all": "→"
+    },
+    "products": {
+        "page_title": "Produk",
+        "featured": "★",
+        "search_placeholder": "Cari ...",
+        "sort_newest": "Newest",
+        "sort_price_asc": "Price ↑",
+        "sort_price_desc": "Price ↓",
+        "filter": "Cari",
+        "clear": "×",
+        "empty": "—",
+        "product_count": "Produk",
+        "view_product": "→"
+    },
+    "categories": {
+        "page_title": "Kategori",
+        "search_placeholder": "Cari ...",
+        "filter": "Cari",
+        "clear": "×",
+        "empty": "—",
+        "category_count": "Kategori",
+        "subcategories": "Kategori",
+        "browse": "→",
+        "all_categories": "Kategori",
+        "parent_only": "Parent",
+        "featured_only": "Featured",
+        "products_count": "Produk"
+    },
+    "jobs": {
+        "page_title": "Pekerjaan",
+        "search_placeholder": "Cari ...",
+        "type_all": "All",
+        "type_full_time": "Full",
+        "type_part_time": "Part",
+        "type_contract": "Contract",
+        "type_freelance": "Free",
+        "type_internship": "Intern",
+        "remote": "Remote",
+        "featured": "★",
+        "urgent": "!",
+        "filter": "Cari",
+        "clear": "×",
+        "empty": "—",
+        "job_count": "Pekerjaan",
+        "apply": "→",
+        "deadline": "⏰"
+    },
+    "entities": {
+        "page_title": "Entitas",
+        "search_placeholder": "Cari ...",
+        "type_all": "All",
+        "type_company": "Co.",
+        "type_store": "Store",
+        "type_restaurant": "Rest.",
+        "type_medical": "Med.",
+        "type_training": "Train.",
+        "verified": "✅",
+        "filter": "Cari",
+        "clear": "×",
+        "empty": "—",
+        "entity_count": "Entitas"
+    },
+    "tenants": {
+        "page_title": "Penyewa",
+        "search_placeholder": "Cari ...",
+        "active": "●",
+        "inactive": "○",
+        "filter": "Cari",
+        "clear": "×",
+        "empty": "—",
+        "tenant_count": "Penyewa"
+    },
+    "pagination": {
+        "prev": "Sebelumnya",
+        "next": "Berikutnya"
+    },
+    "footer": {
+        "tagline": "Temukan produk, pekerjaan, entitas, dan penyewa",
+        "quick_links": "Beranda",
+        "support": "Support",
+        "account": "Masuk",
+        "about": "ℹ",
+        "contact": "✉",
+        "privacy": "🔒",
+        "terms": "📄",
+        "rights": "Hak cipta dilindungi",
+        "back_to_top": "↑"
+    },
+    "common": {
+        "home": "Beranda",
+        "loading": "...",
+        "error": "!",
+        "no_image": "🖼",
+        "currency": "SAR"
+    }
+}

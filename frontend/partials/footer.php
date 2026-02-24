@@ -4,11 +4,13 @@
  */
 $_year     = date('Y');
 $_ctx      = $GLOBALS['PUB_CONTEXT'] ?? [];
-$_lang     = $_ctx['lang'] ?? 'ar';
 $_appName  = $GLOBALS['PUB_APP_NAME'] ?? 'QOOQZ';
 $_basePath = rtrim($GLOBALS['PUB_BASE_PATH'] ?? '/frontend/public', '/');
 if (!function_exists('e')) {
     function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES|ENT_SUBSTITUTE, 'UTF-8'); }
+}
+if (!function_exists('t')) {
+    function t(string $key, array $r = []): string { return $key; }
 }
 ?>
 
@@ -22,51 +24,47 @@ if (!function_exists('e')) {
             <!-- Brand column -->
             <div class="pub-footer-col">
                 <p class="pub-footer-brand-name">🌐 <?= e($_appName) ?></p>
-                <p class="pub-footer-brand-desc">
-                    <?= $_lang === 'ar'
-                        ? 'منصة عالمية متكاملة لعرض المنتجات والوظائف والكيانات والمستأجرين.'
-                        : 'A complete global platform for products, jobs, entities, and tenants.' ?>
-                </p>
+                <p class="pub-footer-brand-desc"><?= e(t('footer.tagline')) ?></p>
             </div>
 
             <!-- Quick links -->
             <div class="pub-footer-col">
-                <p class="pub-footer-col-title"><?= $_lang === 'ar' ? 'روابط سريعة' : 'Quick Links' ?></p>
-                <a href="<?= e($_basePath . '/index.php') ?>"><?= $_lang === 'ar' ? 'الرئيسية' : 'Home' ?></a>
-                <a href="<?= e($_basePath . '/products.php') ?>"><?= $_lang === 'ar' ? 'المنتجات' : 'Products' ?></a>
-                <a href="<?= e($_basePath . '/jobs.php') ?>"><?= $_lang === 'ar' ? 'الوظائف' : 'Jobs' ?></a>
-                <a href="<?= e($_basePath . '/entities.php') ?>"><?= $_lang === 'ar' ? 'الكيانات' : 'Entities' ?></a>
-                <a href="<?= e($_basePath . '/tenants.php') ?>"><?= $_lang === 'ar' ? 'المستأجرون' : 'Tenants' ?></a>
+                <p class="pub-footer-col-title"><?= e(t('footer.quick_links')) ?></p>
+                <a href="<?= e($_basePath . '/index.php') ?>"><?= e(t('nav.home')) ?></a>
+                <a href="<?= e($_basePath . '/products.php') ?>"><?= e(t('nav.products')) ?></a>
+                <a href="<?= e($_basePath . '/categories.php') ?>"><?= e(t('nav.categories')) ?></a>
+                <a href="<?= e($_basePath . '/jobs.php') ?>"><?= e(t('nav.jobs')) ?></a>
+                <a href="<?= e($_basePath . '/entities.php') ?>"><?= e(t('nav.entities')) ?></a>
+                <a href="<?= e($_basePath . '/tenants.php') ?>"><?= e(t('nav.tenants')) ?></a>
             </div>
 
             <!-- Support -->
             <div class="pub-footer-col">
-                <p class="pub-footer-col-title"><?= $_lang === 'ar' ? 'الدعم' : 'Support' ?></p>
-                <a href="#"><?= $_lang === 'ar' ? 'من نحن' : 'About Us' ?></a>
-                <a href="#"><?= $_lang === 'ar' ? 'تواصل معنا' : 'Contact' ?></a>
-                <a href="#"><?= $_lang === 'ar' ? 'سياسة الخصوصية' : 'Privacy Policy' ?></a>
-                <a href="#"><?= $_lang === 'ar' ? 'الشروط والأحكام' : 'Terms of Service' ?></a>
+                <p class="pub-footer-col-title"><?= e(t('footer.support')) ?></p>
+                <a href="#"><?= e(t('footer.about')) ?></a>
+                <a href="#"><?= e(t('footer.contact')) ?></a>
+                <a href="#"><?= e(t('footer.privacy')) ?></a>
+                <a href="#"><?= e(t('footer.terms')) ?></a>
             </div>
 
             <!-- Auth -->
             <div class="pub-footer-col">
-                <p class="pub-footer-col-title"><?= $_lang === 'ar' ? 'الحساب' : 'Account' ?></p>
-                <a href="/frontend/login.html"><?= $_lang === 'ar' ? 'تسجيل الدخول' : 'Login' ?></a>
-                <a href="/frontend/register.html"><?= $_lang === 'ar' ? 'إنشاء حساب' : 'Register' ?></a>
+                <p class="pub-footer-col-title"><?= e(t('footer.account')) ?></p>
+                <a href="/frontend/login.html"><?= e(t('nav.login')) ?></a>
+                <a href="/frontend/register.html"><?= e(t('nav.register')) ?></a>
             </div>
 
         </div>
     </div>
 
     <div class="pub-footer-bottom">
-        © <?= $_year ?> <?= e($_appName) ?> —
-        <?= $_lang === 'ar' ? 'جميع الحقوق محفوظة' : 'All rights reserved' ?>
+        © <?= $_year ?> <?= e($_appName) ?> — <?= e(t('footer.rights')) ?>
     </div>
 </footer>
 
 <!-- Back-to-top button -->
-<?php $_btt_side = $_lang === 'ar' ? 'left' : 'right'; ?>
-<button id="pubBackToTop" title="<?= $_lang === 'ar' ? 'العودة للأعلى' : 'Back to top' ?>"
+<?php $_btt_side = ($_ctx['dir'] ?? 'rtl') === 'rtl' ? 'left' : 'right'; ?>
+<button id="pubBackToTop" title="<?= e(t('footer.back_to_top')) ?>"
         style="display:none;position:fixed;bottom:20px;<?= e($_btt_side) ?>:20px;
                z-index:200;width:40px;height:40px;background:var(--pub-primary);color:#fff;
                border:none;border-radius:50%;font-size:1.2rem;cursor:pointer;align-items:center;

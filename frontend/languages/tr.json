@@ -1,0 +1,137 @@
+{
+    "lang": "tr",
+    "dir": "ltr",
+    "name": "Türkçe",
+    "nav": {
+        "home": "Anasayfa",
+        "products": "Ürünler",
+        "categories": "Kategoriler",
+        "jobs": "İşler",
+        "entities": "Kuruluşlar",
+        "tenants": "Kiracılar",
+        "login": "Giriş",
+        "register": "Kayıt",
+        "account": "Giriş",
+        "logout": "Çıkış",
+        "menu_open": "Menu",
+        "menu_close": "Close"
+    },
+    "hero": {
+        "title": "QOOQZ Küresel Platform",
+        "subtitle": "Ürünleri, işleri, kuruluşları ve kiracıları keşfedin",
+        "browse_products": "Ürünleri Gözat",
+        "explore_jobs": "İşleri Keşfet"
+    },
+    "search": {
+        "placeholder": "Arama ...",
+        "button": "Arama"
+    },
+    "stats": {
+        "products": "Ürünler",
+        "jobs": "İşler",
+        "entities": "Kuruluşlar",
+        "tenants": "Kiracılar"
+    },
+    "sections": {
+        "featured_products": "🛍️ Ürünler",
+        "latest_jobs": "💼 İşler",
+        "entities": "🏢 Kuruluşlar",
+        "tenants": "👥 Kiracılar",
+        "categories": "📂 Kategoriler",
+        "view_all": "→"
+    },
+    "products": {
+        "page_title": "Ürünler",
+        "featured": "★",
+        "search_placeholder": "Arama ...",
+        "sort_newest": "Newest",
+        "sort_price_asc": "Price ↑",
+        "sort_price_desc": "Price ↓",
+        "filter": "Arama",
+        "clear": "×",
+        "empty": "—",
+        "product_count": "Ürünler",
+        "view_product": "→"
+    },
+    "categories": {
+        "page_title": "Kategoriler",
+        "search_placeholder": "Arama ...",
+        "filter": "Arama",
+        "clear": "×",
+        "empty": "—",
+        "category_count": "Kategoriler",
+        "subcategories": "Kategoriler",
+        "browse": "→",
+        "all_categories": "Kategoriler",
+        "parent_only": "Parent",
+        "featured_only": "Featured",
+        "products_count": "Ürünler"
+    },
+    "jobs": {
+        "page_title": "İşler",
+        "search_placeholder": "Arama ...",
+        "type_all": "All",
+        "type_full_time": "Full",
+        "type_part_time": "Part",
+        "type_contract": "Contract",
+        "type_freelance": "Free",
+        "type_internship": "Intern",
+        "remote": "Remote",
+        "featured": "★",
+        "urgent": "!",
+        "filter": "Arama",
+        "clear": "×",
+        "empty": "—",
+        "job_count": "İşler",
+        "apply": "→",
+        "deadline": "⏰"
+    },
+    "entities": {
+        "page_title": "Kuruluşlar",
+        "search_placeholder": "Arama ...",
+        "type_all": "All",
+        "type_company": "Co.",
+        "type_store": "Store",
+        "type_restaurant": "Rest.",
+        "type_medical": "Med.",
+        "type_training": "Train.",
+        "verified": "✅",
+        "filter": "Arama",
+        "clear": "×",
+        "empty": "—",
+        "entity_count": "Kuruluşlar"
+    },
+    "tenants": {
+        "page_title": "Kiracılar",
+        "search_placeholder": "Arama ...",
+        "active": "●",
+        "inactive": "○",
+        "filter": "Arama",
+        "clear": "×",
+        "empty": "—",
+        "tenant_count": "Kiracılar"
+    },
+    "pagination": {
+        "prev": "Önceki",
+        "next": "Sonraki"
+    },
+    "footer": {
+        "tagline": "Ürünleri, işleri, kuruluşları ve kiracıları keşfedin",
+        "quick_links": "Anasayfa",
+        "support": "Support",
+        "account": "Giriş",
+        "about": "ℹ",
+        "contact": "✉",
+        "privacy": "🔒",
+        "terms": "📄",
+        "rights": "Tüm hakları saklıdır",
+        "back_to_top": "↑"
+    },
+    "common": {
+        "home": "Anasayfa",
+        "loading": "...",
+        "error": "!",
+        "no_image": "🖼",
+        "currency": "SAR"
+    }
+}

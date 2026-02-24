@@ -799,3 +799,96 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* -------------------------------------------------------
+   23. Category Cards
+   ----------------------------------------------------- */
+.pub-grid-cat {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+}
+@media (min-width: 600px) { .pub-grid-cat { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 18px; } }
+@media (min-width: 900px) { .pub-grid-cat { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; } }
+
+.pub-cat-card {
+  background: var(--pub-bg);
+  border: 1px solid var(--pub-border);
+  border-radius: var(--pub-radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow var(--pub-transition), transform var(--pub-transition);
+  cursor: pointer;
+}
+.pub-cat-card:hover {
+  box-shadow: var(--pub-shadow-hover);
+  transform: translateY(-3px);
+}
+.pub-cat-card--featured { border-color: var(--pub-primary); box-shadow: 0 0 0 2px rgba(45,140,240,0.15); }
+
+.pub-cat-img-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4/3;
+  background: var(--pub-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.pub-cat-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.pub-img-placeholder {
+  font-size: 2.6rem;
+  color: var(--pub-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+.pub-cat-badge {
+  position: absolute;
+  top: 8px;
+  inset-inline-start: 8px;
+  background: var(--pub-accent);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+}
+.pub-cat-body {
+  padding: 12px 14px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.pub-cat-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--pub-text);
+  margin: 0;
+  line-height: 1.3;
+}
+.pub-cat-desc {
+  font-size: 0.78rem;
+  color: var(--pub-muted);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pub-cat-count {
+  font-size: 0.76rem;
+  color: var(--pub-primary);
+  font-weight: 600;
+  margin-top: auto;
+}

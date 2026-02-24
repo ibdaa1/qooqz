@@ -1,0 +1,137 @@
+{
+    "lang": "es",
+    "dir": "ltr",
+    "name": "Español",
+    "nav": {
+        "home": "Inicio",
+        "products": "Productos",
+        "categories": "Categorías",
+        "jobs": "Empleos",
+        "entities": "Entidades",
+        "tenants": "Inquilinos",
+        "login": "Iniciar sesión",
+        "register": "Registrarse",
+        "account": "Iniciar sesión",
+        "logout": "Cerrar sesión",
+        "menu_open": "Menu",
+        "menu_close": "Close"
+    },
+    "hero": {
+        "title": "Plataforma global QOOQZ",
+        "subtitle": "Descubre productos, empleos, entidades e inquilinos",
+        "browse_products": "Ver productos",
+        "explore_jobs": "Explorar empleos"
+    },
+    "search": {
+        "placeholder": "Búsqueda ...",
+        "button": "Búsqueda"
+    },
+    "stats": {
+        "products": "Productos",
+        "jobs": "Empleos",
+        "entities": "Entidades",
+        "tenants": "Inquilinos"
+    },
+    "sections": {
+        "featured_products": "🛍️ Productos",
+        "latest_jobs": "💼 Empleos",
+        "entities": "🏢 Entidades",
+        "tenants": "👥 Inquilinos",
+        "categories": "📂 Categorías",
+        "view_all": "→"
+    },
+    "products": {
+        "page_title": "Productos",
+        "featured": "★",
+        "search_placeholder": "Búsqueda ...",
+        "sort_newest": "Newest",
+        "sort_price_asc": "Price ↑",
+        "sort_price_desc": "Price ↓",
+        "filter": "Búsqueda",
+        "clear": "×",
+        "empty": "—",
+        "product_count": "Productos",
+        "view_product": "→"
+    },
+    "categories": {
+        "page_title": "Categorías",
+        "search_placeholder": "Búsqueda ...",
+        "filter": "Búsqueda",
+        "clear": "×",
+        "empty": "—",
+        "category_count": "Categorías",
+        "subcategories": "Categorías",
+        "browse": "→",
+        "all_categories": "Categorías",
+        "parent_only": "Parent",
+        "featured_only": "Featured",
+        "products_count": "Productos"
+    },
+    "jobs": {
+        "page_title": "Empleos",
+        "search_placeholder": "Búsqueda ...",
+        "type_all": "All",
+        "type_full_time": "Full",
+        "type_part_time": "Part",
+        "type_contract": "Contract",
+        "type_freelance": "Free",
+        "type_internship": "Intern",
+        "remote": "Remote",
+        "featured": "★",
+        "urgent": "!",
+        "filter": "Búsqueda",
+        "clear": "×",
+        "empty": "—",
+        "job_count": "Empleos",
+        "apply": "→",
+        "deadline": "⏰"
+    },
+    "entities": {
+        "page_title": "Entidades",
+        "search_placeholder": "Búsqueda ...",
+        "type_all": "All",
+        "type_company": "Co.",
+        "type_store": "Store",
+        "type_restaurant": "Rest.",
+        "type_medical": "Med.",
+        "type_training": "Train.",
+        "verified": "✅",
+        "filter": "Búsqueda",
+        "clear": "×",
+        "empty": "—",
+        "entity_count": "Entidades"
+    },
+    "tenants": {
+        "page_title": "Inquilinos",
+        "search_placeholder": "Búsqueda ...",
+        "active": "●",
+        "inactive": "○",
+        "filter": "Búsqueda",
+        "clear": "×",
+        "empty": "—",
+        "tenant_count": "Inquilinos"
+    },
+    "pagination": {
+        "prev": "Anterior",
+        "next": "Siguiente"
+    },
+    "footer": {
+        "tagline": "Descubre productos, empleos, entidades e inquilinos",
+        "quick_links": "Inicio",
+        "support": "Support",
+        "account": "Iniciar sesión",
+        "about": "ℹ",
+        "contact": "✉",
+        "privacy": "🔒",
+        "terms": "📄",
+        "rights": "Todos los derechos reservados",
+        "back_to_top": "↑"
+    },
+    "common": {
+        "home": "Inicio",
+        "loading": "...",
+        "error": "!",
+        "no_image": "🖼",
+        "currency": "SAR"
+    }
+}

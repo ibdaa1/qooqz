@@ -1,0 +1,137 @@
+{
+    "lang": "it",
+    "dir": "ltr",
+    "name": "Italiano",
+    "nav": {
+        "home": "Home",
+        "products": "Prodotti",
+        "categories": "Categorie",
+        "jobs": "Lavori",
+        "entities": "Entità",
+        "tenants": "Inquilini",
+        "login": "Accedi",
+        "register": "Registrati",
+        "account": "Accedi",
+        "logout": "Esci",
+        "menu_open": "Menu",
+        "menu_close": "Close"
+    },
+    "hero": {
+        "title": "Piattaforma globale QOOQZ",
+        "subtitle": "Scopri prodotti, lavori, entità e inquilini",
+        "browse_products": "Sfoglia prodotti",
+        "explore_jobs": "Esplora lavori"
+    },
+    "search": {
+        "placeholder": "Ricerca ...",
+        "button": "Ricerca"
+    },
+    "stats": {
+        "products": "Prodotti",
+        "jobs": "Lavori",
+        "entities": "Entità",
+        "tenants": "Inquilini"
+    },
+    "sections": {
+        "featured_products": "🛍️ Prodotti",
+        "latest_jobs": "💼 Lavori",
+        "entities": "🏢 Entità",
+        "tenants": "👥 Inquilini",
+        "categories": "📂 Categorie",
+        "view_all": "→"
+    },
+    "products": {
+        "page_title": "Prodotti",
+        "featured": "★",
+        "search_placeholder": "Ricerca ...",
+        "sort_newest": "Newest",
+        "sort_price_asc": "Price ↑",
+        "sort_price_desc": "Price ↓",
+        "filter": "Ricerca",
+        "clear": "×",
+        "empty": "—",
+        "product_count": "Prodotti",
+        "view_product": "→"
+    },
+    "categories": {
+        "page_title": "Categorie",
+        "search_placeholder": "Ricerca ...",
+        "filter": "Ricerca",
+        "clear": "×",
+        "empty": "—",
+        "category_count": "Categorie",
+        "subcategories": "Categorie",
+        "browse": "→",
+        "all_categories": "Categorie",
+        "parent_only": "Parent",
+        "featured_only": "Featured",
+        "products_count": "Prodotti"
+    },
+    "jobs": {
+        "page_title": "Lavori",
+        "search_placeholder": "Ricerca ...",
+        "type_all": "All",
+        "type_full_time": "Full",
+        "type_part_time": "Part",
+        "type_contract": "Contract",
+        "type_freelance": "Free",
+        "type_internship": "Intern",
+        "remote": "Remote",
+        "featured": "★",
+        "urgent": "!",
+        "filter": "Ricerca",
+        "clear": "×",
+        "empty": "—",
+        "job_count": "Lavori",
+        "apply": "→",
+        "deadline": "⏰"
+    },
+    "entities": {
+        "page_title": "Entità",
+        "search_placeholder": "Ricerca ...",
+        "type_all": "All",
+        "type_company": "Co.",
+        "type_store": "Store",
+        "type_restaurant": "Rest.",
+        "type_medical": "Med.",
+        "type_training": "Train.",
+        "verified": "✅",
+        "filter": "Ricerca",
+        "clear": "×",
+        "empty": "—",
+        "entity_count": "Entità"
+    },
+    "tenants": {
+        "page_title": "Inquilini",
+        "search_placeholder": "Ricerca ...",
+        "active": "●",
+        "inactive": "○",
+        "filter": "Ricerca",
+        "clear": "×",
+        "empty": "—",
+        "tenant_count": "Inquilini"
+    },
+    "pagination": {
+        "prev": "Precedente",
+        "next": "Successivo"
+    },
+    "footer": {
+        "tagline": "Scopri prodotti, lavori, entità e inquilini",
+        "quick_links": "Home",
+        "support": "Support",
+        "account": "Accedi",
+        "about": "ℹ",
+        "contact": "✉",
+        "privacy": "🔒",
+        "terms": "📄",
+        "rights": "Tutti i diritti riservati",
+        "back_to_top": "↑"
+    },
+    "common": {
+        "home": "Home",
+        "loading": "...",
+        "error": "!",
+        "no_image": "🖼",
+        "currency": "SAR"
+    }
+}

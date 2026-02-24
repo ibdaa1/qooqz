@@ -5,8 +5,9 @@ declare(strict_types=1);
  *
  * Public context bootstrap for QOOQZ frontend pages.
  * - Loads theme colors/settings from API
- * - Handles language detection (ar/en/...)
- * - Provides helper functions for public pages
+ * - Auto-detects language from HTTP_ACCEPT_LANGUAGE (no visible language button)
+ * - Loads translations from frontend/languages/{code}.json
+ * - Supports all world languages; RTL auto-detected from translation file
  * - No auth required (guest-friendly)
  */
 
@@ -39,19 +40,130 @@ if (php_sapi_name() !== 'cli' && session_status() === PHP_SESSION_NONE) {
 }
 
 /* -------------------------------------------------------
- * 3. Language & direction
+ * 3. Auto-detect language (no visible language button)
+ *    Priority: URL param → session → browser Accept-Language → app default
  * ----------------------------------------------------- */
-$_RTL_LANGS = ['ar', 'fa', 'ur', 'he'];
+if (!function_exists('pub_detect_lang')) {
+    /**
+     * Detect best language code from HTTP_ACCEPT_LANGUAGE.
+     * Returns the 2-letter language code if a translation file exists.
+     */
+    function pub_detect_lang(string $default = 'ar'): string {
+        $langDir = FRONTEND_BASE . '/languages';
+        $avail   = [];
 
-$lang = $_GET['lang']
-     ?? $_SESSION['pub_lang']
-     ?? ($appConfig['default_lang'] ?? 'ar');
+        // Collect available language codes from frontend/languages/*.json
+        foreach (glob($langDir . '/*.json') ?: [] as $f) {
+            $code = basename($f, '.json');
+            if (preg_match('/^[a-z]{2,5}$/', $code)) {
+                $avail[$code] = true;
+            }
+        }
 
-// Sanitise: only allow [a-z]{2,5}
-$lang = preg_match('/^[a-z]{2,5}$/', $lang) ? $lang : 'ar';
-$_SESSION['pub_lang'] = $lang;
+        if (empty($avail)) {
+            return $default;
+        }
 
-$dir = in_array($lang, $_RTL_LANGS, true) ? 'rtl' : 'ltr';
+        $header = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '';
+        if (!$header) {
+            return isset($avail[$default]) ? $default : array_key_first($avail);
+        }
+
+        // Parse quality-weighted list, e.g. "ar,en-US;q=0.9,en;q=0.8,fr;q=0.7"
+        $candidates = [];
+        foreach (explode(',', $header) as $part) {
+            $part = trim($part);
+            if (preg_match('/^([a-zA-Z\-]+)(?:;q=([0-9.]+))?$/', $part, $m)) {
+                $q    = isset($m[2]) ? (float)$m[2] : 1.0;
+                $code = strtolower(substr($m[1], 0, 2));
+                $candidates[$code] = max($candidates[$code] ?? 0, $q);
+            }
+        }
+        // Sort by quality descending
+        arsort($candidates);
+
+        foreach (array_keys($candidates) as $code) {
+            if (isset($avail[$code])) {
+                return $code;
+            }
+        }
+        return isset($avail[$default]) ? $default : array_key_first($avail);
+    }
+}
+
+/* -------------------------------------------------------
+ * 4. Resolve active language
+ * ----------------------------------------------------- */
+// URL ?lang=xx overrides (useful for testing), then session, then browser
+if (isset($_GET['lang']) && preg_match('/^[a-z]{2,5}$/', $_GET['lang'])) {
+    $lang = $_GET['lang'];
+    $_SESSION['pub_lang'] = $lang;
+} elseif (!empty($_SESSION['pub_lang'])) {
+    $lang = $_SESSION['pub_lang'];
+} else {
+    $lang = pub_detect_lang($appConfig['default_lang'] ?? 'ar');
+    $_SESSION['pub_lang'] = $lang;
+}
+
+// Fallback to 'ar' if no translation file exists
+$langFile = FRONTEND_BASE . '/languages/' . $lang . '.json';
+if (!is_readable($langFile)) {
+    $lang     = $appConfig['default_lang'] ?? 'ar';
+    $langFile = FRONTEND_BASE . '/languages/' . $lang . '.json';
+}
+
+/* -------------------------------------------------------
+ * 5. Load translations
+ * ----------------------------------------------------- */
+if (!function_exists('pub_load_translations')) {
+    /**
+     * Load translation file and return array.
+     * Falls back to English then empty array.
+     */
+    function pub_load_translations(string $langCode): array {
+        $base = FRONTEND_BASE . '/languages/';
+        $f    = $base . $langCode . '.json';
+        if (!is_readable($f)) {
+            $f = $base . 'en.json';
+        }
+        if (!is_readable($f)) {
+            return [];
+        }
+        $data = json_decode(file_get_contents($f), true);
+        return is_array($data) ? $data : [];
+    }
+}
+
+if (!function_exists('t')) {
+    /**
+     * Translate a dot-separated key, e.g. t('nav.home') or t('hero.title').
+     * Falls back to the key itself.
+     */
+    function t(string $key, array $replace = []): string {
+        $strings = $GLOBALS['PUB_STRINGS'] ?? [];
+        $parts   = explode('.', $key, 2);
+        $group   = $parts[0] ?? '';
+        $sub     = $parts[1] ?? '';
+
+        $val = $sub !== ''
+            ? ($strings[$group][$sub] ?? $key)
+            : ($strings[$group] ?? $key);
+
+        if (!is_string($val)) {
+            $val = $key;
+        }
+
+        // Simple placeholder replacement {key} => value
+        foreach ($replace as $k => $v) {
+            $val = str_replace('{' . $k . '}', (string)$v, $val);
+        }
+        return $val;
+    }
+}
+
+$_translations = pub_load_translations($lang);
+$dir = $_translations['dir'] ?? (in_array($lang, ['ar','fa','ur','he']) ? 'rtl' : 'ltr');
+$GLOBALS['PUB_STRINGS'] = $_translations;
 
 /* -------------------------------------------------------
  * 4. API base URL (used for server-side fetch)
@@ -169,7 +281,74 @@ if (!function_exists('pub_paginate')) {
 }
 
 /* -------------------------------------------------------
- * 9. Compose the shared context globals
+ * 9. Image URL helper
+ *    Resolves uploaded image URLs for products, categories,
+ *    entities, brands, etc.
+ *    image_types reference:
+ *      category / product / product_thumb / entity_logo /
+ *      entity_cover / banner / gallery / brand / avatar …
+ * ----------------------------------------------------- */
+if (!function_exists('pub_img')) {
+    /**
+     * Build an absolute-path image URL for items stored in /uploads.
+     *
+     * @param string|null $path   Raw path from DB (may be absolute URL, relative path or null)
+     * @param string      $type   image_types.code  e.g. 'product_thumb', 'category', 'entity_logo'
+     * @param string      $fallback Emoji / text shown when no image available
+     */
+    function pub_img(?string $path, string $type = 'product', string $fallback = ''): string {
+        if (empty($path)) {
+            return $fallback;
+        }
+
+        // Already a full URL → return as-is
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, '//')) {
+            return $path;
+        }
+
+        // Strip leading slashes for normalisation
+        $clean = ltrim($path, '/');
+
+        // If it already starts with uploads/ → prepend /
+        if (str_starts_with($clean, 'uploads/')) {
+            return '/' . $clean;
+        }
+
+        // Otherwise build under /uploads/images/
+        return '/uploads/images/' . $clean;
+    }
+}
+
+/* -------------------------------------------------------
+ * 10. Image HTML tag helper
+ * ----------------------------------------------------- */
+if (!function_exists('pub_img_tag')) {
+    /**
+     * Render an <img> tag or a placeholder div.
+     *
+     * @param string|null $path
+     * @param string      $alt
+     * @param string      $type  image_types.code
+     * @param string      $cssClass
+     * @param string      $placeholderIcon  Emoji used as placeholder
+     */
+    function pub_img_tag(?string $path, string $alt = '', string $type = 'product',
+                          string $cssClass = '', string $placeholderIcon = '🖼️'): string {
+        $url = empty($path) ? '' : pub_img($path, $type);
+        if ($url) {
+            return '<img data-src="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '"'
+                 . ' alt="' . htmlspecialchars($alt, ENT_QUOTES, 'UTF-8') . '"'
+                 . ' loading="lazy"'
+                 . ($cssClass ? ' class="' . htmlspecialchars($cssClass, ENT_QUOTES, 'UTF-8') . '"' : '')
+                 . ' onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">'
+                 . '<span class="pub-img-placeholder" style="display:none;" aria-hidden="true">' . $placeholderIcon . '</span>';
+        }
+        return '<span class="pub-img-placeholder" aria-hidden="true">' . $placeholderIcon . '</span>';
+    }
+}
+
+/* -------------------------------------------------------
+ * 11. Compose the shared context globals
  * ----------------------------------------------------- */
 $tenantId = (int)($_GET['tenant_id'] ?? $_SESSION['pub_tenant_id'] ?? 1);
 $_SESSION['pub_tenant_id'] = $tenantId;
