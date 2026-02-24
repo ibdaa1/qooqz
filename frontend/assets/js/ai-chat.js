@@ -92,3 +92,37 @@ document.getElementById('chatForm').addEventListener('submit', function() {
         }
     });
 })();
+
+// ===== Markdown + Mermaid rendering =====
+(function() {
+    if (typeof marked === 'undefined') return;
+    marked.setOptions({ breaks: true, gfm: true });
+
+    document.querySelectorAll('.md-bubble').forEach(function(el) {
+        var raw = '';
+        try { raw = JSON.parse(el.getAttribute('data-md') || '""'); } catch(e) { raw = el.getAttribute('data-md') || ''; }
+        if (!raw) return;
+        el.innerHTML = marked.parse(raw);
+        el.classList.add('md-content');
+        // Replace mermaid code blocks with .mermaid divs for chart rendering
+        el.querySelectorAll('pre code').forEach(function(code) {
+            var cls = code.className || '';
+            if (cls.indexOf('language-mermaid') !== -1 || cls.indexOf('mermaid') !== -1) {
+                var div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = code.textContent;
+                var pre = code.closest('pre');
+                if (pre) pre.replaceWith(div);
+            }
+        });
+    });
+
+    // Init mermaid if any .mermaid divs exist
+    if (typeof mermaid !== 'undefined' && document.querySelector('.mermaid')) {
+        mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
+        mermaid.run({ querySelector: '.mermaid' });
+    }
+
+    // Re-scroll to bottom after rendering
+    wrap.scrollTop = wrap.scrollHeight;
+})();

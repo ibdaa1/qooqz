@@ -214,7 +214,11 @@ if (isset($_GET['new'])) {
                 <?php $role = $msg['role'] ?? 'user'; ?>
                 <div class="msg <?= htmlspecialchars($role) ?>">
                     <div class="avatar"><?= $role === 'user' ? '👤' : '🤖' ?></div>
+                    <?php if ($role === 'user'): ?>
                     <div class="bubble"><?= nl2br(htmlspecialchars($msg['content'] ?? '')) ?></div>
+                    <?php else: ?>
+                    <div class="bubble md-bubble" data-md="<?= htmlspecialchars(json_encode($msg['content'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"></div>
+                    <?php endif; ?>
                 </div>
             <?php endforeach; ?>
 
@@ -238,14 +242,14 @@ if (isset($_GET['new'])) {
                 <div class="msg bot">
                     <div class="avatar">🤖</div>
                     <div style="min-width:0">
-                        <div class="bubble"><?= nl2br(htmlspecialchars($response_data['answer'])) ?></div>
+                        <div class="bubble md-bubble" data-md="<?= htmlspecialchars(json_encode($response_data['answer'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"></div>
 
                         <?php if (!empty($response_data['sources'])): ?>
                             <div class="sources-panel">
                                 <div class="sources-title">📚 <?= L($L,'ai_sources','المصادر') ?></div>
                                 <?php foreach ($response_data['sources'] as $i => $src): ?>
                                     <div class="src-item">
-                                        <?= $i+1 ?>. <?= htmlspecialchars(mb_substr($src['content_preview'] ?? '', 0, 120)) ?>
+                                        <?= $i+1 ?>. <?= htmlspecialchars(mb_substr($src['content'] ?? $src['content_preview'] ?? '', 0, 120)) ?>
                                         <?php if (isset($src['score'])): ?>
                                             <span class="score"><?= round(($src['score'] ?? 0) * 100) ?>%</span>
                                         <?php endif; ?>
@@ -312,6 +316,8 @@ if (isset($_GET['new'])) {
 </div>
 
 <script>var AI_LANG='<?= $lang ?>';</script>
+<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" crossorigin="anonymous"></script>
 <script src="../assets/js/ai-chat.js"></script>
 
 </body>

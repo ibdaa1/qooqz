@@ -275,11 +275,12 @@ def find_direct_answer(query, chunks, context_text=""):
     return best_answer
 
 
-def build_smart_answer(question, top_chunks, file_context=None):
-    """بناء إجابة ذكية من القطع وسياق الملفات"""
+def build_smart_answer(question, top_chunks, file_context=None, memory_context=""):
+    """بناء إجابة ذكية من القطع وسياق الملفات والذاكرة"""
     
-    # 1. إجابة مباشرة
-    direct = find_direct_answer(question, top_chunks, str(file_context or ""))
+    # 1. إجابة مباشرة (تشمل الذاكرة والملف)
+    all_extra = " ".join(filter(None, [memory_context, str(file_context or "")]))
+    direct = find_direct_answer(question, top_chunks, all_extra)
     if direct:
         return direct
 
@@ -312,6 +313,11 @@ def build_smart_answer(question, top_chunks, file_context=None):
             parts.append(content)
 
     if not parts:
+        # 4. الذاكرة — إذا كان السؤال يتعلق بمحادثة سابقة
+        if memory_context:
+            mem_score = score_chunk(question, memory_context)
+            if mem_score > 0.1:
+                return f"بناءً على محادثتنا السابقة:\n\n{memory_context[:600]}"
         if file_context and file_context.get("text"):
             ft = file_context["text"]
             if "📷" in ft or "صورة" in ft or "image" in ft.lower():
@@ -430,6 +436,23 @@ def process_chat_request(question: str, thread_id: Optional[str], file_context: 
             execute_query("INSERT INTO ai_threads (id, title, metadata) VALUES (%s, %s, %s)", (thread_id, question[:80], '{}'))
             is_new_thread = True
         except: pass
+
+    # 2. Load thread memory (for continuing conversations)
+    memory_context = ""
+    if thread_id and not is_new_thread:
+        try:
+            mem_rows = execute_query(
+                "SELECT key_facts FROM ai_thread_memory WHERE thread_id = %s",
+                (thread_id,)
+            ) or []
+            if mem_rows:
+                key_facts = json.loads(mem_rows[0].get("key_facts") or "[]")
+                if key_facts:
+                    memory_context = "سياق المحادثة:\n" + "\n".join([
+                        f"س: {f['q']}\nج: {f['a'][:150]}" for f in key_facts[-5:]
+                    ])
+        except Exception as me:
+            print(f"Memory load error: {me}")
     
     # 2. Search
     keywords = extract_keywords(question)
@@ -448,8 +471,8 @@ def process_chat_request(question: str, thread_id: Optional[str], file_context: 
     raw_chunks.sort(key=lambda x: x.get("_score", 0), reverse=True)
     top_chunks = raw_chunks[:10]
 
-    # 3. Build Answer (with file context)
-    answer = build_smart_answer(question, top_chunks, file_context)
+    # 3. Build Answer (with file context and memory)
+    answer = build_smart_answer(question, top_chunks, file_context, memory_context)
 
     # 4. Save & Return
     latency_ms = int((time.time() - start_time) * 1000)
@@ -482,15 +505,45 @@ def process_chat_request(question: str, thread_id: Optional[str], file_context: 
     except Exception as e:
         print(f"Save error: {e}")
 
+    # 5. Update thread memory (store Q&A for future context)
+    try:
+        mem_rows = execute_query(
+            "SELECT key_facts FROM ai_thread_memory WHERE thread_id = %s",
+            (thread_id,)
+        ) or []
+        key_facts = []
+        if mem_rows:
+            try:
+                key_facts = json.loads(mem_rows[0].get("key_facts") or "[]")
+            except Exception:
+                pass
+        key_facts.append({"q": question[:200], "a": answer[:300]})
+        key_facts = key_facts[-10:]  # keep last 10 turns
+        kf_json = json.dumps(key_facts, ensure_ascii=False)
+        summary = f"آخر سؤال: {question[:100]}"
+        execute_query(
+            "INSERT INTO ai_thread_memory (thread_id, summary, key_facts) VALUES (%s, %s, %s) "
+            "ON DUPLICATE KEY UPDATE summary=%s, key_facts=%s, last_updated=NOW()",
+            (thread_id, summary, kf_json, summary, kf_json)
+        )
+    except Exception as me:
+        print(f"Memory save error: {me}")
+
+    sources_used = [c for c in top_chunks if c.get("_score", 0) > 0]
     return {
         "status": "ok",
         "thread_id": thread_id,
         "message_id": asst_msg_id,
         "answer": answer,
-        "sources": [{"chunk_id": c["id"], "content": c["content"][:100], "score": c["_score"]} for c in top_chunks[:3] if c["_score"] > 0],
+        "sources": [{"chunk_id": c["id"], "content": c["content"][:100], "score": c["_score"]} for c in sources_used[:3]],
         "metadata": {
             "latency_ms": latency_ms,
+            "input_tokens": len(question.split()),
+            "output_tokens": len(answer.split()),
+            "sources_found": len(sources_used),
+            "model": "local-rag-v1",
             "has_file": bool(file_context),
-            "file_info": file_context['filename'] if file_context else None
+            "has_memory": bool(memory_context),
+            "file_info": file_context.get('filename') if file_context else None,
         }
     }
