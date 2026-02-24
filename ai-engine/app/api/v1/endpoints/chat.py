@@ -18,6 +18,9 @@ router = APIRouter()
 
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "uploads")
 
+# امتدادات ملفات الصور المدعومة
+IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "bmp", "webp", "tiff", "tif", "svg"}
+
 # ===== كلمات التوقف العربية (موسّعة) =====
 STOP_WORDS = {
     "في", "من", "على", "إلى", "الى", "عن", "مع", "هذا", "هذه", "ذلك", "تلك",
@@ -277,14 +280,53 @@ def find_direct_answer(query, chunks, context_text=""):
 
 def build_smart_answer(question, top_chunks, file_context=None, memory_context=""):
     """بناء إجابة ذكية من القطع وسياق الملفات والذاكرة"""
-    
+
+    # كلمات تشير إلى أن المستخدم يسأل عن الملف/الصورة مباشرة
+    _q = question.lower()
+    DESCRIBE_WORDS = {"فسر", "وصف", "اوصف", "حلل", "اقرا", "اقرأ", "ماذا", "وش", "describe",
+                      "analyze", "read", "tell", "اخبرني", "خبرني", "ما", "show"}
+    is_file_query = file_context and any(w in _q for w in DESCRIBE_WORDS)
+
+    # ===== استجابة مخصصة للصور (يعيد دائماً info الصورة + توضيح OCR) =====
+    if file_context and file_context.get("type") == "image":
+        ft   = file_context.get("text", "")
+        fname = file_context.get("filename", "")
+        if ft and "📷" in ft:
+            # has metadata
+            return (
+                f"📎 **الصورة المرفقة:** {fname}\n\n"
+                f"{ft}\n\n"
+                "---\n"
+                "⚠️ **ملاحظة:** لقراءة النصوص المكتوبة داخل الصورة بدقة يحتاج النظام إلى أداة OCR "
+                "(pytesseract + Tesseract). يمكن تثبيتها بالأمر:\n"
+                "```\npip install Pillow pytesseract\n```\n"
+                "💡 إذا كان سؤالك عن موضوع معين مرتبط بالصورة، اكتب السؤال نصياً وسأبحث في قاعدة المعرفة."
+            )
+        else:
+            return (
+                f"📎 **تم استلام الصورة:** {fname}\n\n"
+                "⚠️ لم يتمكن النظام من استخراج النص منها (OCR غير مثبت).\n\n"
+                "💡 اكتب سؤالك نصياً وسأبحث في قاعدة المعرفة عن المعلومات المتعلقة بالصورة."
+            )
+
+    # ===== ملف مرفق (غير صورة) بدون نص =====
+    if file_context and file_context.get("type") == "attached" and not file_context.get("text"):
+        fname = file_context.get("filename", "")
+        return (
+            f"📎 **تم استلام الملف:** {fname}\n\n"
+            "⚠️ لم يتمكن النظام من استخراج النص منه. تأكد من:\n"
+            "- أن الملف يحتوي على نص قابل للنسخ (وليس صور ممسوحة)\n"
+            "- أن المكتبات المطلوبة مثبتة: `pip install PyPDF2 pdfminer.six`\n\n"
+            "💡 اكتب سؤالك نصياً للبحث في قاعدة المعرفة."
+        )
+
     # 1. إجابة مباشرة (تشمل الذاكرة والملف)
     all_extra = " ".join(filter(None, [memory_context, str(file_context or "")]))
     direct = find_direct_answer(question, top_chunks, all_extra)
     if direct:
         return direct
 
-    # 2. تجميع من الملفات المرفقة (الأولوية لها)
+    # 2. تجميع من الملفات المرفقة (الأولوية لها عند الأسئلة عن الملف)
     parts = []
     
     if file_context and file_context.get("text"):
@@ -301,6 +343,10 @@ def build_smart_answer(question, top_chunks, file_context=None, memory_context="
                  parts.append(f"من الملف المرفق:\n...{best_file_chunk}...")
              else:
                  parts.append(f"ملخص الملف المرفق:\n{file_text[:300]}...")
+
+        # إذا كان السؤال عن الملف مباشرة، لا تُضف نتائج KB غير ذات صلة
+        if is_file_query:
+            return parts[0] if parts else "لم يتمكن النظام من استخراج محتوى الملف."
 
     # 3. تجميع من قاعدة المعرفة
     relevant = [c for c in top_chunks if c.get("_score", 0) > 0.05]
@@ -320,12 +366,6 @@ def build_smart_answer(question, top_chunks, file_context=None, memory_context="
                 return f"بناءً على محادثتنا السابقة:\n\n{memory_context[:600]}"
         if file_context and file_context.get("text"):
             ft = file_context["text"]
-            if "📷" in ft or "صورة" in ft or "image" in ft.lower():
-                return (
-                    f"📎 استلمت الملف المرفق: {file_context.get('filename','')}\n\n"
-                    f"{ft}\n\n"
-                    "💡 لقراءة النصوص داخل الصور بدقة، يحتاج النظام إلى تثبيت أداة OCR (pytesseract)."
-                )
             return f"📎 استلمت الملف المرفق.\n\nمعلومات الملف:\n{ft}"
         return "عذراً، لم أجد معلومات كافية في قاعدة المعرفة للإجابة على سؤالك. يمكنك إعادة صياغة السؤال."
 
@@ -333,7 +373,7 @@ def build_smart_answer(question, top_chunks, file_context=None, memory_context="
         return parts[0]
     else:
         combined = "\n\n".join(parts)
-        return f"بناءً على المعلومات المتاحة:\n\n{combined}"
+        return f"بناءً على المعلومات المتاحة في قاعدة المعرفة:\n\n{combined}"
 
 
 @router.post("/chat")
@@ -420,7 +460,25 @@ def process_chat_request(question: str, thread_id: Optional[str], file_context: 
             content = ""
             if "':\n" in block:
                 content = block[block.index("':\n") + 3:].rstrip("]").strip()
-            file_context = {"filename": fname, "text": content, "type": "uploaded"}
+            # تحديد نوع الملف
+            ftype = "uploaded"
+            if fname.lower().split(".")[-1] in IMAGE_EXTENSIONS:
+                ftype = "image"
+            file_context = {"filename": fname, "text": content, "type": ftype}
+            question = clean_question or question
+        except Exception:
+            pass
+
+    # كذلك: marker مختصر "[الملف المرفق: ...]" — يُستخدم عندما لا يُستخرج نص من الملف
+    if file_context is None and "[الملف المرفق:" in question:
+        try:
+            marker = "[الملف المرفق:"
+            m_start = question.index(marker)
+            clean_question = question[:m_start].strip()
+            block = question[m_start + len(marker):]
+            fname = block.rstrip("]").strip()
+            ftype = "image" if fname.lower().split(".")[-1] in IMAGE_EXTENSIONS else "attached"
+            file_context = {"filename": fname, "text": "", "type": ftype}
             question = clean_question or question
         except Exception:
             pass

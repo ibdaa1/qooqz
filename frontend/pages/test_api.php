@@ -57,6 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($question)) {
     // ====== خطوة 1: رفع الملف واستخراج النص (يعمل مع الصور والمستندات) ======
     $file_context_text = '';
     $file_name_display = '';
+    $upload_failed = false;
     if ($has_file || $has_doc) {
         $fkey = $has_file ? $_FILES['image'] : $_FILES['document_file'];
         if ($has_file) $uploaded_image = $fkey['name'];
@@ -69,10 +70,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($question)) {
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 60,
         ]);
-        $up_resp = json_decode(curl_exec($uch), true);
+        $up_raw  = curl_exec($uch);
+        $up_code = curl_getinfo($uch, CURLINFO_HTTP_CODE);
         curl_close($uch);
-        if ($up_resp && !empty($up_resp['extracted_text'])) {
-            $file_context_text = $up_resp['extracted_text'];
+        if ($up_code === 200) {
+            $up_resp = json_decode($up_raw, true);
+            if ($up_resp && !empty($up_resp['extracted_text'])) {
+                $file_context_text = $up_resp['extracted_text'];
+            }
+        } else {
+            $upload_failed = true;
         }
     }
 
@@ -228,7 +235,23 @@ if (isset($_GET['new'])) {
                     <div>
                         <div class="bubble"><?= nl2br(htmlspecialchars($question)) ?></div>
                         <?php if ($uploaded_image): ?>
-                            <div style="margin-top:4px;font-size:.72rem;color:var(--text3)">📎 <?= htmlspecialchars($uploaded_image) ?></div>
+                            <div style="margin-top:6px;font-size:.72rem;color:var(--text3)">📎 <?= htmlspecialchars($uploaded_image) ?></div>
+                            <?php
+                            // Show inline preview for images uploaded in this request (max 5MB)
+                            $imgExt = strtolower(pathinfo($uploaded_image, PATHINFO_EXTENSION));
+                            $imgExts = ['jpg','jpeg','png','gif','bmp','webp'];
+                            $imgSize = $_FILES['image']['size'] ?? 0;
+                            if (in_array($imgExt, $imgExts) && !empty($_FILES['image']['tmp_name']) && $imgSize <= 5 * 1024 * 1024):
+                                $imgB64 = base64_encode(file_get_contents($_FILES['image']['tmp_name']));
+                                $mime   = mime_content_type($_FILES['image']['tmp_name']) ?: 'image/png';
+                            ?>
+                            <img src="data:<?= htmlspecialchars($mime) ?>;base64,<?= $imgB64 ?>"
+                                 alt="<?= htmlspecialchars($uploaded_image) ?>"
+                                 style="max-width:220px;max-height:160px;border-radius:8px;margin-top:6px;display:block">
+                            <?php endif; ?>
+                            <?php if (!empty($upload_failed)): ?>
+                            <div style="color:#e53e3e;font-size:.72rem;margin-top:4px">⚠️ فشل رفع الملف للخادم — سيتم البحث بدون محتواه</div>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>

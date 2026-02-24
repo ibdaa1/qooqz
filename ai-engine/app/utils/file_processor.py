@@ -160,6 +160,19 @@ def _process_csv_file(file_bytes: bytes, result: dict) -> dict:
 def _process_pdf_file(file_bytes: bytes, result: dict) -> dict:
     """معالجة ملف PDF - استخراج نص بدون مكتبات خارجية"""
 
+    # Belt-and-suspenders: ensure ~/.local site-packages are visible.
+    # pip install --user puts packages there but Passenger uses a separate venv.
+    # Adding the path here means the fix applies on every call without needing
+    # passenger_wsgi.py to reload first.
+    try:
+        import sys as _sys, os as _os
+        _pv = f"{_sys.version_info.major}.{_sys.version_info.minor}"
+        _us = _os.path.expanduser(f"~/.local/lib/python{_pv}/site-packages")
+        if _os.path.isdir(_us) and _us not in _sys.path:
+            _sys.path.insert(0, _us)
+    except Exception:
+        pass
+
     # محاولة 1: PyPDF2 (إذا متوفر)
     try:
         import PyPDF2
@@ -376,17 +389,21 @@ def _process_image_file(file_bytes: bytes, ext: str, file_path: str, result: dic
 
     # محاولة 3: بدون أي مكتبة - معلومات أساسية من الـ header
     info = _get_image_info(file_bytes, ext)
+    fmt = ext.upper().lstrip(".")
+    size_kb = len(file_bytes) / 1024
+    dims = f"{info['width']}×{info['height']} بكسل" if info.get("width") else "غير معروفة"
     description = (
-        f"📷 صورة ({ext})\n"
-        f"الحجم: {len(file_bytes) / 1024:.1f} KB\n"
+        f"📷 صورة ({fmt})\n"
+        f"الأبعاد: {dims}\n"
+        f"الحجم: {size_kb:.1f} KB\n\n"
+        f"ℹ️ الملف هو صورة. لاستخراج أي نص مكتوب بداخلها يحتاج النظام إلى أداة OCR:\n"
+        f"  pip install Pillow pytesseract\n"
+        f"  وتثبيت Tesseract على الخادم.\n\n"
+        f"💡 إذا كان سؤالك عن محتوى الصورة من قاعدة المعرفة، سيتم البحث عنه تلقائياً."
     )
-    if info.get("width"):
-        description += f"الأبعاد: {info['width']}×{info['height']}\n"
-
-    description += "\n⚠️ لتحليل أعمق، ثبّت: pip install Pillow pytesseract"
-
     result["text"] = description
     result["method"] = "basic_info"
+    result["metadata"].update({"format": fmt, "file_size_kb": round(size_kb, 1), **info})
     result["success"] = True
     return result
 
