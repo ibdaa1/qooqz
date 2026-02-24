@@ -173,7 +173,25 @@ def _process_pdf_file(file_bytes: bytes, result: dict) -> dict:
     except Exception:
         pass
 
-    # محاولة 1: PyPDF2 (إذا متوفر)
+    # محاولة 1: pdfminer.six — الأفضل للعربية (يدعم CMap / Unicode mappings)
+    # boxes_flow=None: يُعطّل كشف الأعمدة ويستخرج النص بترتيب PDF الأصلي (أفضل للعربية RTL)
+    # all_texts=True: يشمل جميع عناصر النص بما فيها الرؤوس والتذييلات
+    try:
+        from pdfminer.high_level import extract_text as pdfminer_extract
+        from pdfminer.layout import LAParams
+        laparams = LAParams(boxes_flow=None, word_margin=0.1, char_margin=2.0, all_texts=True)
+        text = pdfminer_extract(io.BytesIO(file_bytes), laparams=laparams)
+        if text and len(text.strip()) > 10:
+            result["text"] = text.strip()
+            result["method"] = "pdfminer"
+            result["success"] = True
+            return result
+    except ImportError:
+        pass
+    except Exception:
+        pass
+
+    # محاولة 2: PyPDF2 (احتياطي)
     try:
         import PyPDF2
         reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
@@ -188,20 +206,6 @@ def _process_pdf_file(file_bytes: bytes, result: dict) -> dict:
             result["method"] = "pypdf2"
             result["metadata"]["page_count"] = len(reader.pages)
             result["metadata"]["pages_with_text"] = len(pages_text)
-            result["success"] = True
-            return result
-    except ImportError:
-        pass
-    except Exception:
-        pass
-
-    # محاولة 2: pdfminer (إذا متوفر)
-    try:
-        from pdfminer.high_level import extract_text as pdfminer_extract
-        text = pdfminer_extract(io.BytesIO(file_bytes))
-        if text and text.strip():
-            result["text"] = text.strip()
-            result["method"] = "pdfminer"
             result["success"] = True
             return result
     except ImportError:

@@ -52,11 +52,35 @@ document.getElementById('chatForm').addEventListener('submit', function() {
     btn.parentElement.classList.add('sending');
 });
 
+// ===== Attachment dropdown toggle =====
+(function() {
+    var btn = document.getElementById('attachToggle');
+    var dd  = document.getElementById('attachDropdown');
+    if (!btn || !dd) return;
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        dd.classList.toggle('show');
+        btn.classList.toggle('open');
+    });
+    document.addEventListener('click', function() {
+        dd.classList.remove('show');
+        btn.classList.remove('open');
+    });
+})();
+
+function closeAttachMenu() {
+    var dd  = document.getElementById('attachDropdown');
+    var btn = document.getElementById('attachToggle');
+    if (dd)  dd.classList.remove('show');
+    if (btn) btn.classList.remove('open');
+}
+
 // ===== Camera button — dedicated input with static capture="environment" =====
 (function() {
     var camBtn = document.getElementById('cameraBtn');
     if (!camBtn) return;
     camBtn.addEventListener('click', function() {
+        closeAttachMenu();
         var inp = document.getElementById('cameraInput');
         if (inp) inp.click();
     });
@@ -172,6 +196,7 @@ function _runOcr(file) {
         if (isRecording) {
             recognition.stop();
         } else {
+            closeAttachMenu();
             recognition.start();
         }
     });

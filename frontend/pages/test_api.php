@@ -342,12 +342,15 @@ if (isset($_GET['new'])) {
             <input type="file" name="document_file" id="docInput"    accept=".txt,.pdf,.doc,.docx,.csv,.xlsx"              style="display:none" onchange="showFile('document')">
             <input type="hidden" name="ocr_text" id="ocrTextInput">
 
-            <!-- Side buttons (outside textarea) -->
-            <div class="side-btns">
-                <button type="button" class="side-btn" id="imgBtn" onclick="document.getElementById('imageInput').click()" title="<?= L($L,'ai_attach_img','إرفاق صورة') ?>">🖼️</button>
-                <button type="button" class="side-btn" id="cameraBtn" title="<?= L($L,'ai_camera','مسح مستند بالكاميرا') ?>">📷</button>
-                <button type="button" class="side-btn" id="docBtn" onclick="document.getElementById('docInput').click()" title="<?= L($L,'ai_attach_doc','إرفاق ملف') ?>">📎</button>
-                <button type="button" class="side-btn" id="micBtn" title="<?= L($L,'ai_voice','تسجيل صوتي') ?>">🎤</button>
+            <!-- Attachment dropdown (single button → dropdown menu) -->
+            <div class="attach-menu">
+                <button type="button" class="attach-toggle" id="attachToggle" title="<?= L($L,'ai_attach_doc','إرفاق أو تسجيل') ?>">📎</button>
+                <div class="attach-dropdown" id="attachDropdown">
+                    <button type="button" class="adrop-item" onclick="document.getElementById('imageInput').click();closeAttachMenu()">🖼️ <?= L($L,'ai_attach_img','صورة') ?></button>
+                    <button type="button" class="adrop-item" id="cameraBtn">📷 <?= L($L,'ai_camera','كاميرا') ?></button>
+                    <button type="button" class="adrop-item" onclick="document.getElementById('docInput').click();closeAttachMenu()">📄 <?= L($L,'ai_attach_doc','ملف') ?></button>
+                    <button type="button" class="adrop-item" id="micBtn">🎤 <?= L($L,'ai_voice','صوت') ?></button>
+                </div>
             </div>
 
             <div class="textarea-wrap">
