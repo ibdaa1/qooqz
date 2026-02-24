@@ -160,7 +160,38 @@ def _process_csv_file(file_bytes: bytes, result: dict) -> dict:
 def _process_pdf_file(file_bytes: bytes, result: dict) -> dict:
     """معالجة ملف PDF - استخراج نص بدون مكتبات خارجية"""
 
-    # محاولة 1: PyPDF2 (إذا متوفر)
+    # Belt-and-suspenders: ensure ~/.local site-packages are visible.
+    # pip install --user puts packages there but Passenger uses a separate venv.
+    # Adding the path here means the fix applies on every call without needing
+    # passenger_wsgi.py to reload first.
+    try:
+        import sys as _sys, os as _os
+        _pv = f"{_sys.version_info.major}.{_sys.version_info.minor}"
+        _us = _os.path.expanduser(f"~/.local/lib/python{_pv}/site-packages")
+        if _os.path.isdir(_us) and _us not in _sys.path:
+            _sys.path.insert(0, _us)
+    except Exception:
+        pass
+
+    # محاولة 1: pdfminer.six — الأفضل للعربية (يدعم CMap / Unicode mappings)
+    # boxes_flow=None: يُعطّل كشف الأعمدة ويستخرج النص بترتيب PDF الأصلي (أفضل للعربية RTL)
+    # all_texts=True: يشمل جميع عناصر النص بما فيها الرؤوس والتذييلات
+    try:
+        from pdfminer.high_level import extract_text as pdfminer_extract
+        from pdfminer.layout import LAParams
+        laparams = LAParams(boxes_flow=None, word_margin=0.1, char_margin=2.0, all_texts=True)
+        text = pdfminer_extract(io.BytesIO(file_bytes), laparams=laparams)
+        if text and len(text.strip()) > 10:
+            result["text"] = text.strip()
+            result["method"] = "pdfminer"
+            result["success"] = True
+            return result
+    except ImportError:
+        pass
+    except Exception:
+        pass
+
+    # محاولة 2: PyPDF2 (احتياطي)
     try:
         import PyPDF2
         reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
@@ -175,20 +206,6 @@ def _process_pdf_file(file_bytes: bytes, result: dict) -> dict:
             result["method"] = "pypdf2"
             result["metadata"]["page_count"] = len(reader.pages)
             result["metadata"]["pages_with_text"] = len(pages_text)
-            result["success"] = True
-            return result
-    except ImportError:
-        pass
-    except Exception:
-        pass
-
-    # محاولة 2: pdfminer (إذا متوفر)
-    try:
-        from pdfminer.high_level import extract_text as pdfminer_extract
-        text = pdfminer_extract(io.BytesIO(file_bytes))
-        if text and text.strip():
-            result["text"] = text.strip()
-            result["method"] = "pdfminer"
             result["success"] = True
             return result
     except ImportError:
@@ -214,28 +231,47 @@ def _process_pdf_file(file_bytes: bytes, result: dict) -> dict:
 
 
 def _extract_pdf_raw(data: bytes) -> str:
-    """استخراج نص خام من PDF بدون مكتبات"""
+    """استخراج نص خام من PDF بدون مكتبات - يدعم UTF-16BE للعربية"""
     text_parts = []
-
-    # البحث عن streams نصية
     content = data.decode("latin-1", errors="ignore")
 
-    # استخراج نصوص بين أقواس
-    for match in re.finditer(r'\(([^)]{3,500})\)', content):
-        t = match.group(1)
-        # تحقق أنه نص مقروء
-        if any(ord(c) > 127 for c in t):  # يحتوي أحرف غير ASCII (عربي مثلاً)
-            text_parts.append(t)
-        elif t.strip() and all(c.isprintable() or c in '\n\r\t ' for c in t):
-            text_parts.append(t)
+    # --- المسار 1: نصوص hex مُشفَّرة كـ UTF-16BE (الشائع في ملفات PDF العربية) ---
+    # مثال: <FEFF0645064506310628064E> = "مساحة" بـ UTF-16BE
+    arabic_found = []
+    for hex_match in re.finditer(r'<([0-9A-Fa-f]{4,})>', content):
+        hex_str = hex_match.group(1)
+        if len(hex_str) % 4 != 0:
+            continue
+        try:
+            raw = bytes.fromhex(hex_str)
+            # BOM للـ UTF-16BE
+            if raw[:2] in (b'\xfe\xff', b'\xff\xfe'):
+                decoded = raw.decode("utf-16", errors="ignore").strip()
+            else:
+                decoded = raw.decode("utf-16-be", errors="ignore").strip()
+            if decoded and len(decoded) >= 2:
+                arabic_found.append(decoded)
+        except Exception:
+            continue
+    if arabic_found:
+        text_parts.extend(arabic_found[:300])
 
-    # البحث عن BT...ET blocks
-    for match in re.finditer(r'BT\s*(.*?)\s*ET', content, re.DOTALL):
-        block = match.group(1)
-        for text_match in re.finditer(r'\(([^)]+)\)', block):
-            text_parts.append(text_match.group(1))
+    # --- المسار 2: نصوص ASCII داخل أقواس في BT...ET blocks ---
+    for bt_match in re.finditer(r'BT\s*(.*?)\s*ET', content, re.DOTALL):
+        block = bt_match.group(1)
+        for t_match in re.finditer(r'\(([^)]{2,300})\)', block):
+            t = t_match.group(1)
+            if t.strip() and all(c.isprintable() or c in '\n\r\t ' for c in t):
+                text_parts.append(t)
 
-    return "\n".join(text_parts[:100])
+    # --- المسار 3: نصوص ASCII خارج الـ blocks ---
+    if not arabic_found:
+        for match in re.finditer(r'\(([^)]{3,500})\)', content):
+            t = match.group(1)
+            if t.strip() and all(c.isprintable() or c in '\n\r\t ' for c in t):
+                text_parts.append(t)
+
+    return "\n".join(text_parts[:200])
 
 
 def _process_docx_file(file_bytes: bytes, result: dict) -> dict:
@@ -357,17 +393,21 @@ def _process_image_file(file_bytes: bytes, ext: str, file_path: str, result: dic
 
     # محاولة 3: بدون أي مكتبة - معلومات أساسية من الـ header
     info = _get_image_info(file_bytes, ext)
+    fmt = ext.upper().lstrip(".")
+    size_kb = len(file_bytes) / 1024
+    dims = f"{info['width']}×{info['height']} بكسل" if info.get("width") else "غير معروفة"
     description = (
-        f"📷 صورة ({ext})\n"
-        f"الحجم: {len(file_bytes) / 1024:.1f} KB\n"
+        f"📷 صورة ({fmt})\n"
+        f"الأبعاد: {dims}\n"
+        f"الحجم: {size_kb:.1f} KB\n\n"
+        f"ℹ️ الملف هو صورة. لاستخراج أي نص مكتوب بداخلها يحتاج النظام إلى أداة OCR:\n"
+        f"  pip install Pillow pytesseract\n"
+        f"  وتثبيت Tesseract على الخادم.\n\n"
+        f"💡 إذا كان سؤالك عن محتوى الصورة من قاعدة المعرفة، سيتم البحث عنه تلقائياً."
     )
-    if info.get("width"):
-        description += f"الأبعاد: {info['width']}×{info['height']}\n"
-
-    description += "\n⚠️ لتحليل أعمق، ثبّت: pip install Pillow pytesseract"
-
     result["text"] = description
     result["method"] = "basic_info"
+    result["metadata"].update({"format": fmt, "file_size_kb": round(size_kb, 1), **info})
     result["success"] = True
     return result
 

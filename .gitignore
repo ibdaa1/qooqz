@@ -1,0 +1,17 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Logs (keep the files, ignore their content changes tracked only via explicit add)
+# We DO commit logs intentionally (uvicorn.log, fastapi.log) - no rule here
+
+# OS files
+.DS_Store
+Thumbs.db
+*.pyc

@@ -60,6 +60,7 @@ async def upload_file(
             "file_size": len(content),
             "mime_type": file.content_type,
             "text_extracted": bool(extracted_text),
+            "extracted_text": extracted_text,
             "preview": extracted_text[:100] if extracted_text else ""
         }
     except Exception as e:

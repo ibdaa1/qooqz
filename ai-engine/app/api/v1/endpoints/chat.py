@@ -18,6 +18,9 @@ router = APIRouter()
 
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "uploads")
 
+# امتدادات ملفات الصور المدعومة
+IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "bmp", "webp", "tiff", "tif", "svg"}
+
 # ===== كلمات التوقف العربية (موسّعة) =====
 STOP_WORDS = {
     "في", "من", "على", "إلى", "الى", "عن", "مع", "هذا", "هذه", "ذلك", "تلك",
@@ -275,15 +278,55 @@ def find_direct_answer(query, chunks, context_text=""):
     return best_answer
 
 
-def build_smart_answer(question, top_chunks, file_context=None):
-    """بناء إجابة ذكية من القطع وسياق الملفات"""
-    
-    # 1. إجابة مباشرة
-    direct = find_direct_answer(question, top_chunks, str(file_context or ""))
+def build_smart_answer(question, top_chunks, file_context=None, memory_context=""):
+    """بناء إجابة ذكية من القطع وسياق الملفات والذاكرة"""
+
+    # كلمات تشير إلى أن المستخدم يسأل عن الملف/الصورة مباشرة
+    _q = question.lower()
+    DESCRIBE_WORDS = {"فسر", "وصف", "اوصف", "حلل", "اقرا", "اقرأ", "ماذا", "وش", "describe",
+                      "analyze", "read", "tell", "اخبرني", "خبرني", "ما", "show"}
+    is_file_query = file_context and any(w in _q for w in DESCRIBE_WORDS)
+
+    # ===== استجابة مخصصة للصور (يعيد دائماً info الصورة + توضيح OCR) =====
+    if file_context and file_context.get("type") == "image":
+        ft   = file_context.get("text", "")
+        fname = file_context.get("filename", "")
+        if ft and "📷" in ft:
+            # has metadata
+            return (
+                f"📎 **الصورة المرفقة:** {fname}\n\n"
+                f"{ft}\n\n"
+                "---\n"
+                "⚠️ **ملاحظة:** لقراءة النصوص المكتوبة داخل الصورة بدقة يحتاج النظام إلى أداة OCR "
+                "(pytesseract + Tesseract). يمكن تثبيتها بالأمر:\n"
+                "```\npip install Pillow pytesseract\n```\n"
+                "💡 إذا كان سؤالك عن موضوع معين مرتبط بالصورة، اكتب السؤال نصياً وسأبحث في قاعدة المعرفة."
+            )
+        else:
+            return (
+                f"📎 **تم استلام الصورة:** {fname}\n\n"
+                "⚠️ لم يتمكن النظام من استخراج النص منها (OCR غير مثبت).\n\n"
+                "💡 اكتب سؤالك نصياً وسأبحث في قاعدة المعرفة عن المعلومات المتعلقة بالصورة."
+            )
+
+    # ===== ملف مرفق (غير صورة) بدون نص =====
+    if file_context and file_context.get("type") == "attached" and not file_context.get("text"):
+        fname = file_context.get("filename", "")
+        return (
+            f"📎 **تم استلام الملف:** {fname}\n\n"
+            "⚠️ لم يتمكن النظام من استخراج النص منه. تأكد من:\n"
+            "- أن الملف يحتوي على نص قابل للنسخ (وليس صور ممسوحة)\n"
+            "- أن المكتبات المطلوبة مثبتة: `pip install PyPDF2 pdfminer.six`\n\n"
+            "💡 اكتب سؤالك نصياً للبحث في قاعدة المعرفة."
+        )
+
+    # 1. إجابة مباشرة (تشمل الذاكرة والملف)
+    all_extra = " ".join(filter(None, [memory_context, str(file_context or "")]))
+    direct = find_direct_answer(question, top_chunks, all_extra)
     if direct:
         return direct
 
-    # 2. تجميع من الملفات المرفقة (الأولوية لها)
+    # 2. تجميع من الملفات المرفقة (الأولوية لها عند الأسئلة عن الملف)
     parts = []
     
     if file_context and file_context.get("text"):
@@ -301,6 +344,10 @@ def build_smart_answer(question, top_chunks, file_context=None):
              else:
                  parts.append(f"ملخص الملف المرفق:\n{file_text[:300]}...")
 
+        # إذا كان السؤال عن الملف مباشرة، لا تُضف نتائج KB غير ذات صلة
+        if is_file_query:
+            return parts[0] if parts else "لم يتمكن النظام من استخراج محتوى الملف."
+
     # 3. تجميع من قاعدة المعرفة
     relevant = [c for c in top_chunks if c.get("_score", 0) > 0.05]
     for c in relevant[:3]:
@@ -312,13 +359,21 @@ def build_smart_answer(question, top_chunks, file_context=None):
             parts.append(content)
 
     if not parts:
-        return "عذراً، لم أجد معلومات كافية في قاعدة المعرفة أو الملف المرفق للإجابة على سؤالك."
+        # 4. الذاكرة — إذا كان السؤال يتعلق بمحادثة سابقة
+        if memory_context:
+            mem_score = score_chunk(question, memory_context)
+            if mem_score > 0.1:
+                return f"بناءً على محادثتنا السابقة:\n\n{memory_context[:600]}"
+        if file_context and file_context.get("text"):
+            ft = file_context["text"]
+            return f"📎 استلمت الملف المرفق.\n\nمعلومات الملف:\n{ft}"
+        return "عذراً، لم أجد معلومات كافية في قاعدة المعرفة للإجابة على سؤالك. يمكنك إعادة صياغة السؤال."
 
     if len(parts) == 1:
         return parts[0]
     else:
         combined = "\n\n".join(parts)
-        return f"بناءً على المعلومات المتاحة:\n\n{combined}"
+        return f"بناءً على المعلومات المتاحة في قاعدة المعرفة:\n\n{combined}"
 
 
 @router.post("/chat")
@@ -349,8 +404,8 @@ async def chat_with_image(
         try:
             content = await image.read()
             
-            # معالجة الملف واستخراج النص
-            file_result = extract_text_from_file(None, "", content)
+            # معالجة الملف واستخراج النص (تمرير اسم الملف لاستخراج الامتداد بشكل صحيح)
+            file_result = extract_text_from_file(image.filename, image.content_type, content)
             
             # حفظ الملف
             os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -386,6 +441,48 @@ def process_chat_request(question: str, thread_id: Optional[str], file_context: 
     """منطق الدردشة المشترك"""
     start_time = time.time()
     question = question.strip() if question else ""
+
+    # استخراج محتوى الملف المضمّن في السؤال (من PHP two-step upload)
+    if file_context is None and "[محتوى الملف المرفق" in question:
+        try:
+            marker = "[محتوى الملف المرفق"
+            m_start = question.index(marker)
+            clean_question = question[:m_start].strip()
+            block = question[m_start:]
+            # استخراج اسم الملف
+            fname = "ملف"
+            if "'" in block:
+                try:
+                    fname = block[block.index("'") + 1 : block.index("':\n")]
+                except Exception:
+                    pass
+            # استخراج المحتوى
+            content = ""
+            if "':\n" in block:
+                content = block[block.index("':\n") + 3:].rstrip("]").strip()
+            # تحديد نوع الملف
+            ftype = "uploaded"
+            if fname.lower().split(".")[-1] in IMAGE_EXTENSIONS:
+                ftype = "image"
+            file_context = {"filename": fname, "text": content, "type": ftype}
+            question = clean_question or question
+        except Exception:
+            pass
+
+    # كذلك: marker مختصر "[الملف المرفق: ...]" — يُستخدم عندما لا يُستخرج نص من الملف
+    if file_context is None and "[الملف المرفق:" in question:
+        try:
+            marker = "[الملف المرفق:"
+            m_start = question.index(marker)
+            clean_question = question[:m_start].strip()
+            block = question[m_start + len(marker):]
+            fname = block.rstrip("]").strip()
+            ftype = "image" if fname.lower().split(".")[-1] in IMAGE_EXTENSIONS else "attached"
+            file_context = {"filename": fname, "text": "", "type": ftype}
+            question = clean_question or question
+        except Exception:
+            pass
+
     if not question and not file_context:
         raise HTTPException(status_code=400, detail="السؤال أو الملف مطلوب")
 
@@ -397,6 +494,23 @@ def process_chat_request(question: str, thread_id: Optional[str], file_context: 
             execute_query("INSERT INTO ai_threads (id, title, metadata) VALUES (%s, %s, %s)", (thread_id, question[:80], '{}'))
             is_new_thread = True
         except: pass
+
+    # 2. Load thread memory (for continuing conversations)
+    memory_context = ""
+    if thread_id and not is_new_thread:
+        try:
+            mem_rows = execute_query(
+                "SELECT key_facts FROM ai_thread_memory WHERE thread_id = %s",
+                (thread_id,)
+            ) or []
+            if mem_rows:
+                key_facts = json.loads(mem_rows[0].get("key_facts") or "[]")
+                if key_facts:
+                    memory_context = "سياق المحادثة:\n" + "\n".join([
+                        f"س: {f['q']}\nج: {f['a'][:150]}" for f in key_facts[-5:]
+                    ])
+        except Exception as me:
+            print(f"Memory load error: {me}")
     
     # 2. Search
     keywords = extract_keywords(question)
@@ -415,16 +529,16 @@ def process_chat_request(question: str, thread_id: Optional[str], file_context: 
     raw_chunks.sort(key=lambda x: x.get("_score", 0), reverse=True)
     top_chunks = raw_chunks[:10]
 
-    # 3. Build Answer (with file context)
-    answer = build_smart_answer(question, top_chunks, file_context)
+    # 3. Build Answer (with file context and memory)
+    answer = build_smart_answer(question, top_chunks, file_context, memory_context)
 
     # 4. Save & Return
     latency_ms = int((time.time() - start_time) * 1000)
-    
+    asst_msg_id = str(uuid.uuid4())  # define early to avoid NameError if save fails
+
     # Save messages...
     try:
         user_msg_id = str(uuid.uuid4())
-        asst_msg_id = str(uuid.uuid4())
         
         # User message
         content_to_save = question
@@ -442,22 +556,52 @@ def process_chat_request(question: str, thread_id: Optional[str], file_context: 
             (asst_msg_id, thread_id, 'assistant', answer, 'local-rag-v1', len(answer.split()), latency_ms, 'ar')
         )
         
-        # Link file if exists
-        if file_context:
+        # Link file if exists (only when file_id is available)
+        if file_context and file_context.get('file_id'):
              execute_query("INSERT INTO ai_message_files (message_id, file_id) VALUES (%s, %s)", (user_msg_id, file_context['file_id']))
              
     except Exception as e:
         print(f"Save error: {e}")
 
+    # 5. Update thread memory (store Q&A for future context)
+    try:
+        mem_rows = execute_query(
+            "SELECT key_facts FROM ai_thread_memory WHERE thread_id = %s",
+            (thread_id,)
+        ) or []
+        key_facts = []
+        if mem_rows:
+            try:
+                key_facts = json.loads(mem_rows[0].get("key_facts") or "[]")
+            except Exception:
+                pass
+        key_facts.append({"q": question[:200], "a": answer[:300]})
+        key_facts = key_facts[-10:]  # keep last 10 turns
+        kf_json = json.dumps(key_facts, ensure_ascii=False)
+        summary = f"آخر سؤال: {question[:100]}"
+        execute_query(
+            "INSERT INTO ai_thread_memory (thread_id, summary, key_facts) VALUES (%s, %s, %s) "
+            "ON DUPLICATE KEY UPDATE summary=%s, key_facts=%s, last_updated=NOW()",
+            (thread_id, summary, kf_json, summary, kf_json)
+        )
+    except Exception as me:
+        print(f"Memory save error: {me}")
+
+    sources_used = [c for c in top_chunks if c.get("_score", 0) > 0]
     return {
         "status": "ok",
         "thread_id": thread_id,
         "message_id": asst_msg_id,
         "answer": answer,
-        "sources": [{"chunk_id": c["id"], "content": c["content"][:100], "score": c["_score"]} for c in top_chunks[:3] if c["_score"] > 0],
+        "sources": [{"chunk_id": c["id"], "content": c["content"][:100], "score": c["_score"]} for c in sources_used[:3]],
         "metadata": {
             "latency_ms": latency_ms,
+            "input_tokens": len(question.split()),
+            "output_tokens": len(answer.split()),
+            "sources_found": len(sources_used),
+            "model": "local-rag-v1",
             "has_file": bool(file_context),
-            "file_info": file_context['filename'] if file_context else None
+            "has_memory": bool(memory_context),
+            "file_info": file_context.get('filename') if file_context else None,
         }
     }

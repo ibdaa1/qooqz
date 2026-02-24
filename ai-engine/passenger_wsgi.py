@@ -14,6 +14,13 @@ project_home = "/home/hcsfcsto/public_html/ai-engine"
 if project_home not in sys.path:
     sys.path.insert(0, project_home)
 
+# إضافة حزم المستخدم (~/.local) حتى تظهر للـ Passenger
+# pip install --user يضع الحزم هنا، لكن Passenger يستخدم venv منفصل
+_py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
+_user_site = os.path.expanduser(f"~/.local/lib/python{_py_ver}/site-packages")
+if os.path.isdir(_user_site) and _user_site not in sys.path:
+    sys.path.insert(1, _user_site)
+
 # ===========================================
 # 2. تحميل متغيرات البيئة
 # ===========================================

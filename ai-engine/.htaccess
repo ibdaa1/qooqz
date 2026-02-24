@@ -1,0 +1,33 @@
+# ai-engine/.htaccess
+# Routes all /ai-engine/ requests to the FastAPI server (uvicorn on port 8888)
+# via Passenger WSGI (primary) or mod_proxy reverse-proxy (fallback).
+
+# -----------------------------------------------------------------------
+# Option 1 – Passenger WSGI (cPanel Python App)
+# -----------------------------------------------------------------------
+<IfModule mod_passenger.c>
+  PassengerEnabled On
+  PassengerAppType wsgi
+  PassengerStartupFile passenger_wsgi.py
+</IfModule>
+
+# -----------------------------------------------------------------------
+# Option 2 – mod_proxy reverse-proxy to uvicorn on 127.0.0.1:8888
+# (used when Passenger is not active for this path)
+# -----------------------------------------------------------------------
+<IfModule !mod_passenger.c>
+  <IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Pass all requests through to the uvicorn server.
+    # NOTE: The URL path seen by uvicorn does NOT include the /ai-engine
+    #       prefix because .htaccess rules run after Apache strips the
+    #       directory prefix.  So /ai-engine/api/v1/threads becomes
+    #       /api/v1/threads as seen by uvicorn. ✓
+    RewriteRule ^(.*)$ http://127.0.0.1:8888/$1 [P,L]
+
+    <IfModule mod_proxy.c>
+      ProxyPassReverse / http://127.0.0.1:8888/
+    </IfModule>
+  </IfModule>
+</IfModule>
