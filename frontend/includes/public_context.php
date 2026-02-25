@@ -209,40 +209,109 @@ if (!function_exists('pub_fetch')) {
 }
 
 /* -------------------------------------------------------
- * 6. Theme / color settings (from DB via API)
+ * 6. Theme / color settings — loaded directly from DB via PDO
+ *    Map: color_settings.setting_key → CSS variable
  * ----------------------------------------------------- */
 if (!function_exists('pub_load_theme')) {
     function pub_load_theme(int $tenantId = 1): array {
+        // Defaults (fallback when DB is unreachable)
         $defaults = [
-            'primary'    => '#2d8cf0',
-            'secondary'  => '#6c757d',
-            'accent'     => '#f39c12',
-            'background' => '#ffffff',
-            'surface'    => '#f8f9fb',
-            'text'       => '#222831',
+            'primary'    => '#FF0000',
+            'secondary'  => '#10B981',
+            'accent'     => '#F59E0B',
+            'background' => '#0d0d0d',
+            'surface'    => '#1a1a2e',
+            'text'       => '#FFFFFF',
+            'text_muted' => '#B0B0B0',
+            'border'     => '#333333',
+            'header_bg'  => '#FF0000',
+            'footer_bg'  => '#1a1a2e',
         ];
 
-        // Try to get from session cache (TTL: 5 min)
+        // Session cache (TTL: 5 min)
         $cacheKey = 'pub_theme_' . $tenantId;
         if (!empty($_SESSION[$cacheKey]) && !empty($_SESSION[$cacheKey . '_ts'])
             && (time() - $_SESSION[$cacheKey . '_ts']) < 300) {
             return $_SESSION[$cacheKey];
         }
 
-        // Fetch from API
-        $url  = pub_api_url('color_settings/active') . '?tenant_id=' . $tenantId;
-        $resp = pub_fetch($url);
+        // Try direct PDO connection (same DB as API)
+        $dbConf = null;
+        $dbFile = FRONTEND_BASE . '/../api/shared/config/db.php';
+        if (is_readable($dbFile)) {
+            $dbConf = require $dbFile;
+        }
 
+        if ($dbConf && is_array($dbConf)) {
+            try {
+                $dsn = sprintf(
+                    'mysql:host=%s;port=%d;dbname=%s;charset=%s',
+                    $dbConf['host'] ?? 'localhost',
+                    (int)($dbConf['port'] ?? 3306),
+                    $dbConf['name'],
+                    $dbConf['charset'] ?? 'utf8mb4'
+                );
+                $pdo = new PDO($dsn, $dbConf['user'], $dbConf['pass'], [
+                    PDO::ATTR_TIMEOUT => 3,
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                ]);
+
+                // Load color_settings for this tenant
+                $st = $pdo->prepare(
+                    'SELECT setting_key, color_value FROM color_settings
+                      WHERE tenant_id = ? AND is_active = 1 ORDER BY id'
+                );
+                $st->execute([$tenantId]);
+                $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+
+                if ($rows) {
+                    $colors = $defaults;
+                    // Mapping from DB key → theme key
+                    $map = [
+                        'primary_color'        => 'primary',
+                        'secondary_color'      => 'secondary',
+                        'accent_color'         => 'accent',
+                        'background_main'      => 'background',
+                        'background_secondary' => 'surface',
+                        'text_primary'         => 'text',
+                        'text_secondary'       => 'text_muted',
+                        'border_color'         => 'border',
+                        'header_bg_color'      => 'header_bg',
+                        'footer_bg_color'      => 'footer_bg',
+                    ];
+                    foreach ($rows as $row) {
+                        $k   = $row['setting_key'] ?? '';
+                        $v   = $row['color_value'] ?? '';
+                        if (!$v) continue;
+                        $mapped = $map[$k] ?? null;
+                        if ($mapped) {
+                            $colors[$mapped] = $v;
+                        }
+                    }
+                    // header_bg defaults to primary if not explicitly set from DB
+                    if (empty($colors['header_bg']) || $colors['header_bg'] === $defaults['header_bg']) {
+                        $colors['header_bg'] = $colors['primary'];
+                    }
+                    $_SESSION[$cacheKey]         = $colors;
+                    $_SESSION[$cacheKey . '_ts'] = time();
+                    return $colors;
+                }
+            } catch (Throwable $_) {
+                // Silently fall through to default
+            }
+        }
+
+        // Fallback: try HTTP call to color_settings API
+        $url  = pub_api_url('color_settings/active') . '?tenant_id=' . $tenantId;
+        $resp = pub_fetch($url, 3);
         if (!empty($resp['data']) && is_array($resp['data'])) {
             $colors = $defaults;
             foreach ($resp['data'] as $item) {
-                $key = strtolower($item['key'] ?? '');
-                $val = $item['value'] ?? '';
-                if ($key && $val) {
-                    $colors[$key] = $val;
-                }
+                $k = strtolower($item['setting_key'] ?? $item['key'] ?? '');
+                $v = $item['color_value'] ?? $item['value'] ?? '';
+                if ($k && $v) { $colors[$k] = $v; }
             }
-            $_SESSION[$cacheKey]        = $colors;
+            $_SESSION[$cacheKey]         = $colors;
             $_SESSION[$cacheKey . '_ts'] = time();
             return $colors;
         }
@@ -292,9 +361,16 @@ if (!function_exists('pub_img')) {
     /**
      * Build an absolute-path image URL for items stored in /uploads.
      *
-     * @param string|null $path   Raw path from DB (may be absolute URL, relative path or null)
-     * @param string      $type   image_types.code  e.g. 'product_thumb', 'category', 'entity_logo'
-     * @param string      $fallback Emoji / text shown when no image available
+     * Handles all path formats from the DB:
+     *   /admin/uploads/images/general/2026/02/02/img_xxx.webp  → as-is (absolute)
+     *   /uploads/images/img_xxx.webp                           → as-is
+     *   uploads/images/img_xxx.webp                            → /uploads/images/img_xxx.webp
+     *   img_xxx.webp                                           → /uploads/images/img_xxx.webp
+     *   https://cdn.example.com/x.jpg                          → passthrough
+     *
+     * @param string|null $path   Raw path from DB
+     * @param string      $type   image_types.code  (category / product / entity_logo …)
+     * @param string      $fallback Returned when no image available
      */
     function pub_img(?string $path, string $type = 'product', string $fallback = ''): string {
         if (empty($path)) {
@@ -306,15 +382,21 @@ if (!function_exists('pub_img')) {
             return $path;
         }
 
-        // Strip leading slashes for normalisation
-        $clean = ltrim($path, '/');
+        // Absolute path starting with / → return as-is (covers /admin/uploads/... and /uploads/...)
+        if (str_starts_with($path, '/')) {
+            return $path;
+        }
 
-        // If it already starts with uploads/ → prepend /
+        // Relative path already starting with uploads/
+        $clean = ltrim($path, '/');
         if (str_starts_with($clean, 'uploads/')) {
             return '/' . $clean;
         }
+        if (str_starts_with($clean, 'admin/uploads/')) {
+            return '/' . $clean;
+        }
 
-        // Otherwise build under /uploads/images/
+        // Bare filename — place under /uploads/images/
         return '/uploads/images/' . $clean;
     }
 }

@@ -33,6 +33,7 @@ $_navItems = [
     t('nav.jobs')       => $_basePath . '/jobs.php',
     t('nav.entities')   => $_basePath . '/entities.php',
     t('nav.tenants')    => $_basePath . '/tenants.php',
+    '🛒 ' . ($lang === 'ar' ? 'السلة' : 'Cart') => $_basePath . '/cart.php',
 ];
 
 // Font: Cairo for Arabic/RTL, Inter for LTR
@@ -45,7 +46,7 @@ $_fontUrl = $dir === 'rtl'
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="<?= e($theme['primary'] ?? '#2d8cf0') ?>">
+    <meta name="theme-color" content="<?= e($theme['primary'] ?? '#FF0000') ?>">
 
     <title><?= e($_pageTitle) ?></title>
     <?php if ($_pageDesc): ?><meta name="description" content="<?= e($_pageDesc) ?>"><?php endif; ?>
@@ -59,8 +60,25 @@ $_fontUrl = $dir === 'rtl'
     <link rel="stylesheet" href="/frontend/assets/css/main.css">
     <link rel="stylesheet" href="/frontend/assets/css/public.css">
 
-    <!-- Theme data for JS (JSON, injected server-side) -->
+    <!-- Theme: inject CSS variables from DB color_settings -->
     <?php if (!empty($theme)): ?>
+    <style>
+    :root {
+        --pub-primary:    <?= e($theme['primary']    ?? '#FF0000') ?>;
+        --pub-secondary:  <?= e($theme['secondary']  ?? '#10B981') ?>;
+        --pub-accent:     <?= e($theme['accent']     ?? '#F59E0B') ?>;
+        --pub-bg:         <?= e($theme['background'] ?? '#0d0d0d') ?>;
+        --pub-surface:    <?= e($theme['surface']    ?? '#1a1a2e') ?>;
+        --pub-text:       <?= e($theme['text']       ?? '#FFFFFF') ?>;
+        --pub-muted:      <?= e($theme['text_muted'] ?? '#B0B0B0') ?>;
+        --pub-border:     <?= e($theme['border']     ?? '#333333') ?>;
+        --pub-header-bg:  <?= e($theme['header_bg']  ?? $theme['primary'] ?? '#FF0000') ?>;
+        --pub-footer-bg:  <?= e($theme['footer_bg']  ?? '#1a1a2e') ?>;
+    }
+    .pub-header  { background: var(--pub-header-bg) !important; }
+    .pub-footer  { background: var(--pub-footer-bg) !important; }
+    .pub-hero    { background: linear-gradient(135deg, var(--pub-header-bg) 0%, var(--pub-accent) 100%) !important; }
+    </style>
     <script type="application/json" id="pubThemeData"><?= json_encode($theme, JSON_HEX_TAG | JSON_UNESCAPED_UNICODE) ?></script>
     <?php endif; ?>
 </head>

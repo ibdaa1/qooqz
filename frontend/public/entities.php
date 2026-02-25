@@ -100,7 +100,7 @@ include dirname(__DIR__) . '/partials/header.php';
     <?php if (!empty($entities)): ?>
     <div class="pub-grid-md">
         <?php foreach ($entities as $ent): ?>
-        <a href="/frontend/public/entities.php?id=<?= (int)($ent['id'] ?? 0) ?>"
+        <a href="/frontend/public/entity.php?id=<?= (int)($ent['id'] ?? 0) ?>"
            class="pub-entity-card" style="text-decoration:none;">
             <div class="pub-entity-avatar">
                 <?php if (!empty($ent['logo_url'])): ?>

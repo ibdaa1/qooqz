@@ -244,6 +244,118 @@ if ($first === 'jobs') {
 }
 
 /* -------------------------------------------------------
+ * Route: Entity detail — full vendor profile
+ * GET /api/public/entity/{id}         — full entity profile
+ * GET /api/public/entity/{id}/products — entity products
+ * ----------------------------------------------------- */
+if ($first === 'entity') {
+    $entityId = isset($segments[1]) && ctype_digit((string)$segments[1]) ? (int)$segments[1] : (int)($_GET['id'] ?? 0);
+    $sub      = strtolower($segments[2] ?? '');
+
+    if (!$entityId) {
+        ResponseFormatter::notFound('Entity ID required');
+        exit;
+    }
+
+    // Sub-route: entity products
+    if ($sub === 'products') {
+        $where  = 'WHERE p.is_active = 1 AND p.entity_id = ?';
+        $params = [$entityId];
+        if (!empty($_GET['category_id'])) { $where .= ' AND p.category_id = ?'; $params[] = (int)$_GET['category_id']; }
+        $total = $pdoCount("SELECT COUNT(*) FROM products p $where", $params);
+        $rows  = $pdoList(
+            "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.price, p.sku, p.slug,
+                    p.is_featured, p.image_url
+               FROM products p
+          LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
+              $where ORDER BY p.is_featured DESC, p.id DESC LIMIT ? OFFSET ?",
+            array_merge([$lang], $params, [$per, $offset])
+        );
+        ResponseFormatter::success(['ok'=>true,'data'=>$rows,'meta'=>[
+            'total'=>$total,'page'=>$page,'per_page'=>$per,
+            'total_pages'=>$per > 0 ? (int)ceil($total/$per) : 1
+        ]]);
+        exit;
+    }
+
+    // Full entity profile
+    $entity = $pdoOne(
+        "SELECT e.id, e.store_name, e.slug, e.description, e.vendor_type, e.store_type,
+                e.is_verified, e.logo_url, e.cover_url, e.phone, e.email, e.website,
+                e.facebook, e.twitter, e.instagram, e.whatsapp, e.snapchat,
+                e.status, e.tenant_id, e.created_at,
+                et.name AS type_name, et.icon AS type_icon
+           FROM entities e
+      LEFT JOIN entity_types et ON et.id = e.entity_type_id
+          WHERE e.id = ? AND e.status = 'active' LIMIT 1",
+        [$entityId]
+    );
+
+    if (!$entity) {
+        ResponseFormatter::notFound('Entity not found');
+        exit;
+    }
+
+    // Translation override (store_name / description)
+    $translation = $pdoOne(
+        "SELECT store_name, description FROM entity_translations
+          WHERE entity_id = ? AND language_code = ? LIMIT 1",
+        [$entityId, $lang]
+    );
+    if ($translation) {
+        if (!empty($translation['store_name'])) $entity['store_name'] = $translation['store_name'];
+        if (!empty($translation['description'])) $entity['description'] = $translation['description'];
+    }
+
+    // Working hours
+    $workingHours = $pdoList(
+        "SELECT day_of_week, open_time, close_time, is_closed
+           FROM entities_working_hours
+          WHERE entity_id = ? ORDER BY FIELD(day_of_week,'sunday','monday','tuesday','wednesday','thursday','friday','saturday')",
+        [$entityId]
+    );
+
+    // Addresses (with coordinates)
+    $addresses = $pdoList(
+        "SELECT id, label, address_line1, address_line2, city_id, country_id,
+                latitude, longitude, is_primary
+           FROM addresses
+          WHERE owner_type = 'entity' AND owner_id = ? ORDER BY is_primary DESC, id ASC LIMIT 5",
+        [$entityId]
+    );
+
+    // Payment methods
+    $paymentMethods = $pdoList(
+        "SELECT pm.id, pm.name, pm.code, pm.icon, epm.is_active
+           FROM entity_payment_methods epm
+      LEFT JOIN payment_methods pm ON pm.id = epm.payment_method_id
+          WHERE epm.entity_id = ? AND epm.is_active = 1",
+        [$entityId]
+    );
+
+    // Attributes
+    $attributes = $pdoList(
+        "SELECT ea.attribute_name, eav.value
+           FROM entities_attributes ea
+      LEFT JOIN entities_attribute_values eav ON eav.attribute_id = ea.id AND eav.entity_id = ?
+          WHERE ea.entity_type_id IS NULL OR ea.entity_type_id = (SELECT entity_type_id FROM entities WHERE id = ?)
+          LIMIT 20",
+        [$entityId, $entityId]
+    );
+
+    ResponseFormatter::success([
+        'ok'      => true,
+        'data'    => array_merge($entity, [
+            'working_hours'   => $workingHours,
+            'addresses'       => $addresses,
+            'payment_methods' => $paymentMethods,
+            'attributes'      => $attributes,
+        ]),
+    ]);
+    exit;
+}
+
+/* -------------------------------------------------------
  * Route: Entities (public listing)
  * GET /api/public/entities[/{id}]
  * ----------------------------------------------------- */
