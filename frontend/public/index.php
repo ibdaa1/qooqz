@@ -27,28 +27,28 @@ $qs   = 'lang=' . urlencode($lang) . '&per=8&page=1&tenant_id=' . $tenantId;
 
 // Products
 $r = pub_fetch($base . 'public/products?' . $qs);
-$featuredProducts = $r['data'] ?? [];
-$totalProducts    = (int)($r['meta']['total'] ?? count($featuredProducts));
+$featuredProducts = $r['data']['data'] ?? ($r['data']['items'] ?? []);
+$totalProducts    = (int)($r['data']['meta']['total'] ?? count($featuredProducts));
 
 // Categories
 $rc = pub_fetch($base . 'public/categories?lang=' . urlencode($lang) . '&per=8&tenant_id=' . $tenantId . '&featured=1');
-$featuredCategories = $rc['data'] ?? [];
-$totalCategories    = (int)($rc['meta']['total'] ?? count($featuredCategories));
+$featuredCategories = $rc['data']['data'] ?? ($rc['data']['items'] ?? []);
+$totalCategories    = (int)($rc['data']['meta']['total'] ?? count($featuredCategories));
 
 // Jobs
 $rj = pub_fetch($base . 'public/jobs?lang=' . urlencode($lang) . '&per=6&is_featured=1');
-$latestJobs   = $rj['data'] ?? [];
-$totalJobs    = (int)($rj['meta']['total'] ?? count($latestJobs));
+$latestJobs   = $rj['data']['data'] ?? ($rj['data']['items'] ?? []);
+$totalJobs    = (int)($rj['data']['meta']['total'] ?? count($latestJobs));
 
 // Entities
 $re = pub_fetch($base . 'public/entities?' . $qs . '&per=6');
-$featuredEntities = $re['data'] ?? [];
-$totalEntities    = (int)($re['meta']['total'] ?? count($featuredEntities));
+$featuredEntities = $re['data']['data'] ?? ($re['data']['items'] ?? []);
+$totalEntities    = (int)($re['data']['meta']['total'] ?? count($featuredEntities));
 
 // Tenants
 $rt = pub_fetch($base . 'public/tenants?' . $qs . '&per=6');
-$featuredTenants = $rt['data'] ?? [];
-$totalTenants    = (int)($rt['meta']['total'] ?? count($featuredTenants));
+$featuredTenants = $rt['data']['data'] ?? ($rt['data']['items'] ?? []);
+$totalTenants    = (int)($rt['data']['meta']['total'] ?? count($featuredTenants));
 
 include dirname(__DIR__) . '/partials/header.php';
 ?>

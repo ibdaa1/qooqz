@@ -120,9 +120,14 @@ if ($first === 'products') {
 
     $total = $pdoCount("SELECT COUNT(*) FROM products p $where", $params);
     $rows  = $pdoList(
-        "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.price, p.sku, p.slug, p.is_featured, p.tenant_id
+        "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.sku, p.slug, p.is_featured, p.tenant_id,
+                pp.price, pp.currency_code,
+                i.url AS image_url, i.thumb_url AS image_thumb_url
            FROM products p
       LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
+      LEFT JOIN product_pricing pp ON pp.product_id = p.id AND pp.variant_id IS NULL AND pp.is_active = 1
+      LEFT JOIN images i ON i.owner_id = p.id AND i.is_main = 1
+             AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product_thumb' LIMIT 1)
          $where ORDER BY p.id DESC LIMIT ? OFFSET ?",
         array_merge($params, [$per, $offset])
     );
@@ -264,10 +269,14 @@ if ($first === 'entity') {
         if (!empty($_GET['category_id'])) { $where .= ' AND p.category_id = ?'; $params[] = (int)$_GET['category_id']; }
         $total = $pdoCount("SELECT COUNT(*) FROM products p $where", $params);
         $rows  = $pdoList(
-            "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.price, p.sku, p.slug,
-                    p.is_featured, p.image_url
+            "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.sku, p.slug,
+                    p.is_featured, pp.price, pp.currency_code,
+                    i.url AS image_url, i.thumb_url AS image_thumb_url
                FROM products p
           LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
+          LEFT JOIN product_pricing pp ON pp.product_id = p.id AND pp.variant_id IS NULL AND pp.is_active = 1
+          LEFT JOIN images i ON i.owner_id = p.id AND i.is_main = 1
+                 AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product_thumb' LIMIT 1)
               $where ORDER BY p.is_featured DESC, p.id DESC LIMIT ? OFFSET ?",
             array_merge([$lang], $params, [$per, $offset])
         );
@@ -278,15 +287,20 @@ if ($first === 'entity') {
         exit;
     }
 
-    // Full entity profile
+    // Full entity profile — images fetched from images table (entity_logo / entity_cover)
     $entity = $pdoOne(
-        "SELECT e.id, e.store_name, e.slug, e.description, e.vendor_type, e.store_type,
-                e.is_verified, e.logo_url, e.cover_url, e.phone, e.email, e.website,
-                e.facebook, e.twitter, e.instagram, e.whatsapp, e.snapchat,
+        "SELECT e.id, e.store_name, e.slug, e.vendor_type, e.store_type,
+                e.is_verified, e.phone, e.mobile, e.email, e.website_url AS website,
                 e.status, e.tenant_id, e.created_at,
-                et.name AS type_name, et.icon AS type_icon
+                et.name AS type_name, et.icon AS type_icon,
+                logo_i.url AS logo_url, logo_i.thumb_url AS logo_thumb_url,
+                cover_i.url AS cover_url
            FROM entities e
       LEFT JOIN entity_types et ON et.id = e.entity_type_id
+      LEFT JOIN images logo_i ON logo_i.owner_id = e.id AND logo_i.is_main = 1
+             AND logo_i.image_type_id = (SELECT id FROM image_types WHERE code = 'entity_logo' LIMIT 1)
+      LEFT JOIN images cover_i ON cover_i.owner_id = e.id AND cover_i.is_main = 1
+             AND cover_i.image_type_id = (SELECT id FROM image_types WHERE code = 'entity_cover' LIMIT 1)
           WHERE e.id = ? AND e.status = 'active' LIMIT 1",
         [$entityId]
     );
@@ -377,8 +391,12 @@ if ($first === 'entities') {
 
     $total = $pdoCount("SELECT COUNT(*) FROM entities e $where", $params);
     $rows  = $pdoList(
-        "SELECT e.id, e.store_name, e.slug, e.vendor_type, e.is_verified, e.logo_url, e.tenant_id
-           FROM entities e $where ORDER BY e.is_verified DESC, e.id DESC LIMIT ? OFFSET ?",
+        "SELECT e.id, e.store_name, e.slug, e.vendor_type, e.is_verified, e.tenant_id,
+                i.url AS logo_url, i.thumb_url AS logo_thumb_url
+           FROM entities e
+      LEFT JOIN images i ON i.owner_id = e.id AND i.is_main = 1
+             AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'entity_logo' LIMIT 1)
+          $where ORDER BY e.is_verified DESC, e.id DESC LIMIT ? OFFSET ?",
         array_merge($params, [$per, $offset])
     );
 

@@ -53,7 +53,7 @@ if (empty($entityPMs)) {
     $entityPMs = $gpmResp['data']['items'] ?? $gpmResp['items'] ?? $gpmResp['data'] ?? [];
 }
 
-// Demo fallback (payment methods that show as options if entity has none configured)
+// No payment methods configured for this entity — show empty list
 if (empty($entityPMs)) {
     $entityPMs = [];
 }

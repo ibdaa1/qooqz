@@ -21,19 +21,19 @@ $limit  = 18;
 $search = trim($_GET['q'] ?? '');
 $vType  = trim($_GET['vendor_type'] ?? '');
 
-/* Fetch from real API */
+/* Fetch from public entities endpoint */
 $qs = http_build_query(array_filter([
     'lang'        => $lang,
     'page'        => $page,
-    'per'         => $limit,
-    'tenant_id'   => $tenantId ?: null,
+    'limit'       => $limit,
+    'tenant_id'   => $tenantId,
     'vendor_type' => $vType ?: null,
 ]));
 $resp     = pub_fetch(pub_api_url('public/entities') . '?' . $qs);
-$entities = $resp['data'] ?? [];
-$meta     = $resp['meta'] ?? [];
+$entities = $resp['data']['data'] ?? ($resp['data']['items'] ?? []);
+$meta     = $resp['data']['meta']  ?? [];
 $total    = (int)($meta['total'] ?? count($entities));
-$totalPg  = (int)($meta['total_pages'] ?? (int)ceil($total / $limit));
+$totalPg  = (int)($meta['total_pages'] ?? (($limit > 0 && $total > 0) ? (int)ceil($total / $limit) : 1));
 
 $vendorTypes = [
     ''           => t('entities.type_all'),
@@ -53,11 +53,11 @@ include dirname(__DIR__) . '/partials/header.php';
     <nav style="font-size:0.84rem;color:var(--pub-muted);margin-bottom:20px;" aria-label="breadcrumb">
         <a href="/frontend/public/index.php"><?= e(t('common.home')) ?></a>
         <span style="margin:0 6px;">›</span>
-        <span><?= e(t('entities.page_title')) ?></span>
+        <span><?= e(t('nav.entities')) ?></span>
     </nav>
 
     <div class="pub-section-head" style="margin-bottom:16px;">
-        <h1 style="font-size:1.4rem;margin:0;">🏢 <?= e(t('entities.page_title')) ?></h1>
+        <h1 style="font-size:1.4rem;margin:0;">🏢 <?= e(t('nav.entities')) ?></h1>
         <span style="font-size:0.85rem;color:var(--pub-muted);">
             <?= number_format($total) ?> <?= e(t('entities.entity_count')) ?>
         </span>
@@ -86,16 +86,18 @@ include dirname(__DIR__) . '/partials/header.php';
         <a href="/frontend/public/entity.php?id=<?= (int)($ent['id'] ?? 0) ?>"
            class="pub-entity-card" style="text-decoration:none;">
             <div class="pub-entity-avatar">
-                <?php if (!empty($ent['logo_url'])): ?>
-                    <img data-src="<?= e(pub_img($ent['logo_url'], 'entity_logo')) ?>"
+                <?php $logoSrc = pub_img($ent['logo_url'] ?? null, 'entity_logo'); ?>
+                <?php if ($logoSrc): ?>
+                    <img src="<?= e($logoSrc) ?>"
                          alt="<?= e($ent['store_name'] ?? '') ?>" loading="lazy"
-                         onerror="this.style.display='none'">
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                    <span style="display:none;align-items:center;justify-content:center;">🏢</span>
                 <?php else: ?>
                     🏢
                 <?php endif; ?>
             </div>
             <div class="pub-entity-info">
-                <p class="pub-entity-name"><?= e($ent['store_name'] ?? '') ?></p>
+                <p class="pub-entity-name"><?= e($ent['store_name'] ?? $ent['name'] ?? '') ?></p>
                 <?php if (!empty($ent['vendor_type'])): ?>
                     <p class="pub-entity-desc"><?= e($vendorTypes[$ent['vendor_type']] ?? $ent['vendor_type']) ?></p>
                 <?php endif; ?>

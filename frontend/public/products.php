@@ -23,22 +23,22 @@ $brandId = (int)($_GET['brand_id'] ?? 0);
 $catId   = (int)($_GET['category_id'] ?? 0);
 $sort    = in_array($_GET['sort'] ?? '', ['price_asc','price_desc','newest'], true) ? $_GET['sort'] : 'newest';
 
-/* Fetch from real API */
+/* Fetch */
 $qs = http_build_query(array_filter([
     'lang'        => $lang,
     'page'        => $page,
-    'per'         => $limit,
-    'tenant_id'   => $tenantId ?: null,
+    'limit'       => $limit,
+    'tenant_id'   => $tenantId,
     'brand_id'    => $brandId ?: null,
     'category_id' => $catId ?: null,
     'search'      => $search ?: null,
 ]));
 
 $resp     = pub_fetch(pub_api_url('public/products') . '?' . $qs);
-$products = $resp['data'] ?? [];
-$meta     = $resp['meta'] ?? [];
+$products = $resp['data']['data'] ?? ($resp['data']['items'] ?? []);
+$meta     = $resp['data']['meta']  ?? [];
 $total    = (int)($meta['total'] ?? count($products));
-$totalPg  = (int)($meta['total_pages'] ?? (int)ceil($total / $limit));
+$totalPg  = (int)($meta['total_pages'] ?? (($limit > 0 && $total > 0) ? (int)ceil($total / $limit) : 1));
 
 include dirname(__DIR__) . '/partials/header.php';
 ?>
@@ -49,12 +49,12 @@ include dirname(__DIR__) . '/partials/header.php';
     <nav style="font-size:0.84rem;color:var(--pub-muted);margin-bottom:20px;" aria-label="breadcrumb">
         <a href="/frontend/public/index.php"><?= e(t('common.home')) ?></a>
         <span style="margin:0 6px;">›</span>
-        <span><?= e(t('products.page_title')) ?></span>
+        <span><?= e(t('nav.products')) ?></span>
     </nav>
 
     <!-- Page title -->
     <div class="pub-section-head" style="margin-bottom:16px;">
-        <h1 style="font-size:1.4rem;margin:0;">🛍️ <?= e(t('products.page_title')) ?></h1>
+        <h1 style="font-size:1.4rem;margin:0;">🛍️ <?= e(t('nav.products')) ?></h1>
         <span style="font-size:0.85rem;color:var(--pub-muted);">
             <?= number_format($total) ?> <?= e(t('products.product_count')) ?>
         </span>
@@ -85,8 +85,16 @@ include dirname(__DIR__) . '/partials/header.php';
         <?php foreach ($products as $p): ?>
         <a href="/frontend/public/products.php?id=<?= (int)($p['id'] ?? 0) ?>"
            class="pub-product-card" style="text-decoration:none;" aria-label="<?= e($p['name'] ?? '') ?>">
-            <div class="pub-product-card-img">
-                <?= pub_img_tag($p['image_url'] ?? $p['image_thumb_url'] ?? null, $p['name'] ?? '', 'product', 'pub-product-img', '🖼️') ?>
+            <div class="pub-cat-img-wrap" style="aspect-ratio:1;">
+                <?php $imgSrc = pub_img($p['image_thumb_url'] ?? $p['image_url'] ?? null, 'product_thumb'); ?>
+                <?php if ($imgSrc): ?>
+                    <img src="<?= e($imgSrc) ?>"
+                         alt="<?= e($p['name'] ?? '') ?>" class="pub-cat-img" loading="lazy"
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                    <span class="pub-img-placeholder" style="display:none;" aria-hidden="true">🖼️</span>
+                <?php else: ?>
+                    <span class="pub-img-placeholder" aria-hidden="true">🖼️</span>
+                <?php endif; ?>
             </div>
             <div class="pub-product-card-body">
                 <?php if (!empty($p['is_featured'])): ?>
@@ -99,7 +107,7 @@ include dirname(__DIR__) . '/partials/header.php';
                 <?php if (!empty($p['price'])): ?>
                     <p class="pub-product-price">
                         <?= number_format((float)$p['price'], 2) ?>
-                        <small><?= e($p['currency_code'] ?? $p['currency'] ?? 'SAR') ?></small>
+                        <small><?= e($p['currency_code'] ?? $p['currency'] ?? t('common.currency')) ?></small>
                     </p>
                 <?php endif; ?>
             </div>
@@ -109,7 +117,7 @@ include dirname(__DIR__) . '/partials/header.php';
 
     <!-- Pagination -->
     <?php if ($totalPg > 1): ?>
-    <nav class="pub-pagination" aria-label="pagination">
+    <nav class="pub-pagination" aria-label="Pagination">
         <?php
         $base_qs = http_build_query(array_filter(['q'=>$search,'sort'=>$sort,'brand_id'=>$brandId,'category_id'=>$catId]));
         $pg_url  = fn(int $pg) => '?' . ($base_qs ? $base_qs . '&' : '') . 'page=' . $pg;

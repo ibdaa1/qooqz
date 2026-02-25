@@ -20,18 +20,18 @@ $page   = max(1, (int)($_GET['page'] ?? 1));
 $limit  = 18;
 $search = trim($_GET['q'] ?? '');
 
-/* Fetch from real API */
+/* Fetch from public tenants endpoint */
 $qs = http_build_query(array_filter([
     'lang'   => $lang,
     'page'   => $page,
-    'per'    => $limit,
+    'limit'  => $limit,
     'search' => $search ?: null,
 ]));
 $resp    = pub_fetch(pub_api_url('public/tenants') . '?' . $qs);
-$tenants = $resp['data'] ?? [];
-$meta    = $resp['meta'] ?? [];
+$tenants = $resp['data']['data'] ?? ($resp['data']['items'] ?? []);
+$meta    = $resp['data']['meta']  ?? [];
 $total   = (int)($meta['total'] ?? count($tenants));
-$totalPg = (int)($meta['total_pages'] ?? (int)ceil($total / $limit));
+$totalPg = (int)($meta['total_pages'] ?? (($limit > 0 && $total > 0) ? (int)ceil($total / $limit) : 1));
 
 include dirname(__DIR__) . '/partials/header.php';
 ?>
@@ -42,19 +42,19 @@ include dirname(__DIR__) . '/partials/header.php';
     <nav style="font-size:0.84rem;color:var(--pub-muted);margin-bottom:20px;" aria-label="breadcrumb">
         <a href="/frontend/public/index.php"><?= e(t('common.home')) ?></a>
         <span style="margin:0 6px;">›</span>
-        <span><?= e(t('tenants.page_title')) ?></span>
+        <span><?= e(t('nav.tenants')) ?></span>
     </nav>
 
     <div class="pub-section-head" style="margin-bottom:16px;">
-        <h1 style="font-size:1.4rem;margin:0;">👥 <?= e(t('tenants.page_title')) ?></h1>
+        <h1 style="font-size:1.4rem;margin:0;">👥 <?= e(t('nav.tenants')) ?></h1>
         <span style="font-size:0.85rem;color:var(--pub-muted);">
             <?= number_format($total) ?> <?= e(t('tenants.tenant_count')) ?>
         </span>
     </div>
 
-    <!-- Search filter -->
+    <!-- Filter -->
     <form method="get" class="pub-filter-bar">
-        <input type="search" name="q" class="pub-search-input" style="max-width:280px;"
+        <input type="search" name="q" class="pub-search-input" style="max-width:300px;"
                placeholder="<?= e(t('tenants.search_placeholder')) ?>"
                value="<?= e($search) ?>">
         <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm"><?= e(t('tenants.filter')) ?></button>
@@ -73,18 +73,14 @@ include dirname(__DIR__) . '/partials/header.php';
             <div class="pub-entity-info">
                 <p class="pub-entity-name"><?= e($ten['store_name'] ?? $ten['name'] ?? '') ?></p>
                 <?php if (!empty($ten['domain'])): ?>
-                    <p class="pub-entity-desc">🌐 <?= e($ten['domain']) ?></p>
+                    <p class="pub-entity-desc"><?= e($ten['domain']) ?></p>
                 <?php endif; ?>
-                <div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap;">
-                    <?php if (!empty($ten['is_active'])): ?>
-                        <span class="pub-entity-verified">🟢 <?= e(t('tenants.active')) ?></span>
-                    <?php else: ?>
-                        <span style="font-size:0.75rem;color:var(--pub-muted);">⚪ <?= e(t('tenants.inactive')) ?></span>
-                    <?php endif; ?>
-                    <?php if (!empty($ten['plan_name'])): ?>
-                        <span class="pub-tag"><?= e($ten['plan_name']) ?></span>
-                    <?php endif; ?>
-                </div>
+                <?php if (isset($ten['plan_name']) && $ten['plan_name']): ?>
+                    <p class="pub-entity-desc"><?= e($ten['plan_name']) ?></p>
+                <?php endif; ?>
+                <span class="pub-entity-verified">
+                    <?= !empty($ten['is_active']) ? '🟢 ' . e(t('tenants.active')) : '🔴 ' . e(t('tenants.inactive')) ?>
+                </span>
             </div>
         </a>
         <?php endforeach; ?>

@@ -35,7 +35,7 @@ $GLOBALS['PUB_BASE_PATH'] = '/frontend/public';
  * ----------------------------------------------------- */
 $qs   = 'lang=' . urlencode($lang) . '&tenant_id=' . $tenantId;
 $resp = pub_fetch(pub_api_url('public/entity/' . $entityId) . '?' . $qs);
-$entity = $resp['data'] ?? [];
+$entity = $resp['data']['data'] ?? [];
 
 if (empty($entity)) {
     $GLOBALS['PUB_PAGE_TITLE'] = t('entity.not_found') . ' — QOOQZ';
@@ -54,8 +54,8 @@ $rp = pub_fetch(
     pub_api_url('public/entity/' . ($entity['id'] ?? $entityId) . '/products')
     . '?' . $qs . '&per=' . $productLimit . '&page=' . $productPage
 );
-$products    = $rp['data'] ?? [];
-$productMeta = $rp['meta'] ?? ['total' => count($products), 'total_pages' => 1];
+$products    = $rp['data']['data'] ?? ($rp['data']['items'] ?? []);
+$productMeta = $rp['data']['meta'] ?? ['total' => count($products), 'total_pages' => 1];
 
 $GLOBALS['PUB_PAGE_TITLE'] = e($entity['store_name'] ?? '') . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_DESC']  = e($entity['description'] ?? '');

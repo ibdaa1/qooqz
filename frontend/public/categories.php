@@ -40,10 +40,10 @@ $qs = http_build_query(array_filter([
 ]));
 
 $resp       = pub_fetch(pub_api_url('public/categories') . '?' . $qs);
-$categories = $resp['data'] ?? [];
-$meta       = $resp['meta'] ?? [];
+$categories = $resp['data']['data'] ?? ($resp['data']['items'] ?? []);
+$meta       = $resp['data']['meta'] ?? [];
 $total      = (int)($meta['total'] ?? count($categories));
-$totalPg    = (int)($meta['total_pages'] ?? (int)ceil($total / $limit));
+$totalPg    = (int)($meta['total_pages'] ?? (($limit > 0 && $total > 0) ? (int)ceil($total / $limit) : 1));
 
 include dirname(__DIR__) . '/partials/header.php';
 ?>

@@ -23,21 +23,21 @@ $jobType   = trim($_GET['employment_type'] ?? '');
 $isRemote  = isset($_GET['remote']) && $_GET['remote'] === '1' ? 1 : null;
 $isFeat    = isset($_GET['featured']) && $_GET['featured'] === '1' ? 1 : null;
 
-/* Fetch from real API */
+/* Fetch from public jobs endpoint */
 $qs = http_build_query(array_filter([
     'lang'            => $lang,
     'page'            => $page,
-    'per'             => $limit,
+    'limit'           => $limit,
     'search'          => $search ?: null,
     'employment_type' => $jobType ?: null,
     'is_remote'       => $isRemote,
     'is_featured'     => $isFeat,
 ]));
-$resp = pub_fetch(pub_api_url('public/jobs') . '?' . $qs);
-$jobs    = $resp['data'] ?? [];
-$meta    = $resp['meta'] ?? [];
+$resp    = pub_fetch(pub_api_url('public/jobs') . '?' . $qs);
+$jobs    = $resp['data']['data'] ?? ($resp['data']['items'] ?? []);
+$meta    = $resp['data']['meta']  ?? [];
 $total   = (int)($meta['total'] ?? count($jobs));
-$totalPg = (int)($meta['total_pages'] ?? (int)ceil($total / $limit));
+$totalPg = (int)($meta['total_pages'] ?? (($limit > 0 && $total > 0) ? (int)ceil($total / $limit) : 1));
 
 $empTypes = [
     ''            => t('jobs.type_all'),
@@ -57,11 +57,11 @@ include dirname(__DIR__) . '/partials/header.php';
     <nav style="font-size:0.84rem;color:var(--pub-muted);margin-bottom:20px;" aria-label="breadcrumb">
         <a href="/frontend/public/index.php"><?= e(t('common.home')) ?></a>
         <span style="margin:0 6px;">›</span>
-        <span><?= e(t('jobs.page_title')) ?></span>
+        <span><?= e(t('nav.jobs')) ?></span>
     </nav>
 
     <div class="pub-section-head" style="margin-bottom:16px;">
-        <h1 style="font-size:1.4rem;margin:0;">💼 <?= e(t('jobs.page_title')) ?></h1>
+        <h1 style="font-size:1.4rem;margin:0;">💼 <?= e(t('nav.jobs')) ?></h1>
         <span style="font-size:0.85rem;color:var(--pub-muted);">
             <?= number_format($total) ?> <?= e(t('jobs.job_count')) ?>
         </span>
@@ -109,7 +109,7 @@ include dirname(__DIR__) . '/partials/header.php';
                     <span>🕐 <?= e($empTypes[$j['employment_type']] ?? $j['employment_type']) ?></span>
                 <?php endif; ?>
                 <?php if (!empty($j['deadline'])): ?>
-                    <span>📅 <?= e(t('jobs.deadline')) ?>: <?= e($j['deadline']) ?></span>
+                    <span>📅 <?= e($j['deadline']) ?></span>
                 <?php endif; ?>
             </div>
             <div class="pub-job-tags">
