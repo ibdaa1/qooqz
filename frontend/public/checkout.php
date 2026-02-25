@@ -17,7 +17,7 @@ $user     = $ctx['user'] ?? null;
 
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
-$GLOBALS['PUB_PAGE_TITLE'] = ($lang === 'ar' ? 'إتمام الشراء' : 'Checkout') . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_TITLE'] = t('checkout.title') . ' — QOOQZ';
 
 $sessionId = session_id();
 $base      = pub_api_url('');
@@ -53,14 +53,9 @@ if (empty($entityPMs)) {
     $entityPMs = $gpmResp['data']['items'] ?? $gpmResp['items'] ?? $gpmResp['data'] ?? [];
 }
 
-// Demo fallback
+// Demo fallback (payment methods that show as options if entity has none configured)
 if (empty($entityPMs)) {
-    $entityPMs = [
-        ['id'=>1, 'code'=>'card',  'name'=>$lang==='ar'?'بطاقة ائتمان':'Credit Card',  'icon'=>'💳', 'is_active'=>1],
-        ['id'=>2, 'code'=>'mada',  'name'=>'Mada',                                       'icon'=>'💳', 'is_active'=>1],
-        ['id'=>3, 'code'=>'bank',  'name'=>$lang==='ar'?'تحويل بنكي':'Bank Transfer',   'icon'=>'🏦', 'is_active'=>1],
-        ['id'=>4, 'code'=>'cod',   'name'=>$lang==='ar'?'الدفع عند الاستلام':'Cash on Delivery','icon'=>'💵','is_active'=>1],
-    ];
+    $entityPMs = [];
 }
 
 /* -------------------------------------------------------
@@ -78,11 +73,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['payment_method_code'
     $address = htmlspecialchars(trim($_POST['delivery_address'] ?? ''), ENT_QUOTES, 'UTF-8');
 
     if (!$name || !$phone) {
-        $checkoutError = $lang === 'ar'
-            ? 'يرجى إدخال الاسم ورقم الهاتف.'
-            : 'Please enter your name and phone number.';
+        $checkoutError = t('checkout.error_fields_required');
     } elseif (!$cartId || $cartTotal <= 0) {
-        $checkoutError = $lang === 'ar' ? 'السلة فارغة.' : 'Cart is empty.';
+        $checkoutError = t('cart.empty');
     } else {
         // Create payment via API
         $payload = [
@@ -123,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['payment_method_code'
             $checkoutSuccess = true;
             $paymentId       = (int)($respData['data']['id'] ?? $respData['id'] ?? 0);
         } else {
-            $checkoutError = $respData['message'] ?? $respData['error'] ?? ($lang === 'ar' ? 'حدث خطأ، حاول مجدداً.' : 'An error occurred, please try again.');
+            $checkoutError = $respData['message'] ?? $respData['error'] ?? t('common.error');
         }
     }
 }
@@ -138,10 +131,10 @@ include dirname(__DIR__) . '/partials/header.php';
         <a href="/frontend/public/index.php"><?= e(t('common.home')) ?></a>
         <span style="margin:0 6px;">›</span>
         <a href="/frontend/public/cart.php?entity_id=<?= $entityId ?>">
-            🛒 <?= $lang === 'ar' ? 'سلة التسوق' : 'Cart' ?>
+            🛒 <?= e(t('cart.title')) ?>
         </a>
         <span style="margin:0 6px;">›</span>
-        <span>💳 <?= $lang === 'ar' ? 'إتمام الشراء' : 'Checkout' ?></span>
+        <span>💳 <?= e(t('checkout.title')) ?></span>
     </nav>
 
     <?php if ($checkoutSuccess): ?>
@@ -149,21 +142,19 @@ include dirname(__DIR__) . '/partials/header.php';
     <div style="text-align:center;padding:60px 20px;">
         <div style="font-size:4rem;margin-bottom:16px;">✅</div>
         <h1 style="font-size:1.6rem;margin:0 0 10px;color:var(--pub-text);">
-            <?= $lang === 'ar' ? 'تم تقديم طلبك بنجاح!' : 'Order Placed Successfully!' ?>
+            <?= e(t('checkout.success_title')) ?>
         </h1>
         <p style="color:var(--pub-muted);margin:0 0 24px;">
-            <?= $lang === 'ar'
-                ? 'شكراً لك. سيتم التواصل معك قريباً لتأكيد الطلب.'
-                : 'Thank you! We will contact you shortly to confirm your order.' ?>
+            <?= e(t('checkout.success_msg')) ?>
         </p>
         <?php if ($paymentId): ?>
             <p style="font-size:0.85rem;color:var(--pub-muted);">
-                <?= $lang === 'ar' ? 'رقم الطلب:' : 'Order #' ?> <strong>#<?= $paymentId ?></strong>
+                <?= e(t('checkout.order_number')) ?> <strong>#<?= $paymentId ?></strong>
             </p>
         <?php endif; ?>
         <div style="display:flex;gap:12px;justify-content:center;margin-top:20px;flex-wrap:wrap;">
             <a href="/frontend/public/index.php" class="pub-btn pub-btn--primary">
-                🏠 <?= $lang === 'ar' ? 'الصفحة الرئيسية' : 'Home' ?>
+                🏠 <?= e(t('common.home')) ?>
             </a>
             <a href="/frontend/public/products.php" class="pub-btn pub-btn--ghost">
                 🛍️ <?= e(t('hero.browse_products')) ?>
@@ -173,7 +164,7 @@ include dirname(__DIR__) . '/partials/header.php';
 
     <?php else: ?>
     <!-- Checkout form + summary -->
-    <h1 style="font-size:1.4rem;margin:0 0 24px;">💳 <?= $lang === 'ar' ? 'إتمام الشراء' : 'Checkout' ?></h1>
+    <h1 style="font-size:1.4rem;margin:0 0 24px;">💳 <?= e(t('checkout.title')) ?></h1>
 
     <?php if ($checkoutError): ?>
     <div style="background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);color:#e74c3c;
@@ -188,47 +179,46 @@ include dirname(__DIR__) . '/partials/header.php';
             <!-- Customer info -->
             <div class="pub-checkout-card">
                 <h2 class="pub-checkout-card-title">
-                    👤 <?= $lang === 'ar' ? 'بيانات العميل' : 'Customer Info' ?>
+                    👤 <?= e(t('checkout.customer_info')) ?>
                 </h2>
                 <div class="pub-form-grid">
                     <div class="pub-form-field">
                         <label class="pub-form-label">
-                            <?= $lang === 'ar' ? 'الاسم الكامل' : 'Full Name' ?> *
+                            <?= e(t('checkout.name')) ?> *
                         </label>
                         <input type="text" name="customer_name" class="pub-form-input" required
                                value="<?= e($user['username'] ?? '') ?>"
-                               placeholder="<?= $lang === 'ar' ? 'أدخل اسمك الكامل' : 'Enter your full name' ?>">
+                               placeholder="<?= e(t('checkout.name')) ?>">
                     </div>
                     <div class="pub-form-field">
                         <label class="pub-form-label">
-                            📞 <?= $lang === 'ar' ? 'رقم الهاتف' : 'Phone Number' ?> *
+                            📞 <?= e(t('checkout.phone')) ?> *
                         </label>
                         <input type="tel" name="customer_phone" class="pub-form-input" required
-                               placeholder="<?= $lang === 'ar' ? '+966XXXXXXXXX' : '+1XXXXXXXXXX' ?>">
+                               placeholder="">
                     </div>
                     <div class="pub-form-field" style="grid-column:1/-1;">
                         <label class="pub-form-label">
-                            📍 <?= $lang === 'ar' ? 'عنوان التوصيل' : 'Delivery Address' ?>
+                            📍 <?= e(t('checkout.address')) ?>
                         </label>
                         <textarea name="delivery_address" class="pub-form-input" rows="3"
-                                  placeholder="<?= $lang === 'ar' ? 'أدخل العنوان بالتفصيل' : 'Enter delivery address' ?>"
+                                  placeholder="<?= e(t('checkout.address')) ?>"
                                   style="resize:vertical;"></textarea>
                     </div>
                     <div class="pub-form-field" style="grid-column:1/-1;">
                         <label class="pub-form-label">
-                            📝 <?= $lang === 'ar' ? 'ملاحظات الطلب' : 'Order Notes' ?>
+                            📝 <?= e(t('checkout.notes')) ?>
                         </label>
                         <textarea name="order_notes" class="pub-form-input" rows="2"
-                                  placeholder="<?= $lang === 'ar' ? 'أي ملاحظات خاصة...' : 'Any special instructions...' ?>"
+                                  placeholder="<?= e(t('checkout.notes')) ?>"
                                   style="resize:vertical;"></textarea>
                     </div>
                 </div>
             </div>
 
-            <!-- Payment method selection -->
             <div class="pub-checkout-card" style="margin-top:16px;">
                 <h2 class="pub-checkout-card-title">
-                    💳 <?= $lang === 'ar' ? 'طريقة الدفع' : 'Payment Method' ?>
+                    💳 <?= e(t('checkout.payment')) ?>
                 </h2>
                 <div class="pub-pm-grid">
                     <?php foreach ($entityPMs as $idx => $pm): ?>
@@ -253,7 +243,7 @@ include dirname(__DIR__) . '/partials/header.php';
         <!-- Right: Order summary -->
         <div class="pub-checkout-summary">
             <div class="pub-cart-summary-inner">
-                <h2 class="pub-cart-summary-title">📋 <?= $lang === 'ar' ? 'ملخص الطلب' : 'Order Summary' ?></h2>
+                <h2 class="pub-cart-summary-title">📋 <?= e(t('cart.order_summary')) ?></h2>
 
                 <?php if (!empty($cartItems)): ?>
                 <div style="margin-bottom:14px;display:grid;gap:8px;max-height:260px;overflow-y:auto;">
@@ -273,25 +263,25 @@ include dirname(__DIR__) . '/partials/header.php';
                 <?php endif; ?>
 
                 <div class="pub-summary-row">
-                    <span><?= $lang === 'ar' ? 'المجموع الفرعي' : 'Subtotal' ?></span>
+                    <span><?= e(t('cart.subtotal')) ?></span>
                     <strong><?= number_format($cartTotal, 2) ?> <?= e(t('common.currency')) ?></strong>
                 </div>
                 <div class="pub-summary-row" style="color:var(--pub-muted);font-size:0.84rem;">
-                    <span><?= $lang === 'ar' ? 'التوصيل' : 'Shipping' ?></span>
-                    <span><?= $lang === 'ar' ? 'يُحدد لاحقاً' : 'TBD' ?></span>
+                    <span><?= e(t('cart.shipping')) ?></span>
+                    <span>—</span>
                 </div>
                 <div class="pub-summary-row pub-summary-total">
-                    <span><?= $lang === 'ar' ? 'الإجمالي' : 'Total' ?></span>
+                    <span><?= e(t('cart.total')) ?></span>
                     <strong><?= number_format($cartTotal, 2) ?> <?= e(t('common.currency')) ?></strong>
                 </div>
 
                 <button type="submit" class="pub-btn pub-btn--primary"
                         style="width:100%;margin-top:16px;font-size:1rem;padding:13px;display:block;">
-                    ✅ <?= $lang === 'ar' ? 'تأكيد الطلب' : 'Place Order' ?>
+                    ✅ <?= e(t('checkout.place_order')) ?>
                 </button>
 
                 <p style="font-size:0.75rem;text-align:center;color:var(--pub-muted);margin-top:12px;">
-                    🔒 <?= $lang === 'ar' ? 'معاملاتك آمنة ومشفرة' : 'Your transaction is secure and encrypted' ?>
+                    🔒 <?= e(t('checkout.secure_transaction')) ?>
                 </p>
             </div>
         </div>

@@ -31,53 +31,18 @@ $GLOBALS['PUB_APP_NAME']  = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH'] = '/frontend/public';
 
 /* -------------------------------------------------------
- * Fetch entity data
+ * Fetch entity data from real API
  * ----------------------------------------------------- */
-$base = pub_api_url('');
 $qs   = 'lang=' . urlencode($lang) . '&tenant_id=' . $tenantId;
-
-$resp   = pub_fetch($base . 'public/entity/' . $entityId . '?' . $qs);
+$resp = pub_fetch(pub_api_url('public/entity/' . $entityId) . '?' . $qs);
 $entity = $resp['data'] ?? [];
 
 if (empty($entity)) {
-    // Fallback demo data
-    $entity = [
-        'id'          => $entityId ?: 1,
-        'store_name'  => $lang === 'ar' ? 'متجر QOOQZ النموذجي' : 'QOOQZ Demo Store',
-        'description' => $lang === 'ar'
-            ? 'متجر نموذجي يعرض جميع الميزات المتاحة في منصة QOOQZ.'
-            : 'A demo store showcasing all features available on the QOOQZ platform.',
-        'vendor_type' => 'store',
-        'is_verified' => 1,
-        'logo_url'    => '/admin/uploads/images/general/2026/02/15/img_17711734988059_25670503_thumb_300x300.webp',
-        'cover_url'   => null,
-        'phone'       => '+966500000000',
-        'email'       => 'demo@qooqz.com',
-        'website'     => 'https://qooqz.com',
-        'facebook'    => 'https://facebook.com/qooqz',
-        'instagram'   => 'https://instagram.com/qooqz',
-        'whatsapp'    => '+966500000000',
-        'working_hours' => [
-            ['day_of_week'=>'sunday',    'open_time'=>'09:00', 'close_time'=>'21:00', 'is_closed'=>0],
-            ['day_of_week'=>'monday',    'open_time'=>'09:00', 'close_time'=>'21:00', 'is_closed'=>0],
-            ['day_of_week'=>'tuesday',   'open_time'=>'09:00', 'close_time'=>'21:00', 'is_closed'=>0],
-            ['day_of_week'=>'wednesday', 'open_time'=>'09:00', 'close_time'=>'21:00', 'is_closed'=>0],
-            ['day_of_week'=>'thursday',  'open_time'=>'09:00', 'close_time'=>'21:00', 'is_closed'=>0],
-            ['day_of_week'=>'friday',    'open_time'=>'14:00', 'close_time'=>'22:00', 'is_closed'=>0],
-            ['day_of_week'=>'saturday',  'open_time'=>'09:00', 'close_time'=>'21:00', 'is_closed'=>0],
-        ],
-        'addresses' => [
-            ['label'=>$lang==='ar'?'المقر الرئيسي':'Headquarters',
-             'address_line1'=>$lang==='ar'?'شارع الملك فهد، الرياض':'King Fahd Road, Riyadh',
-             'latitude'=>'24.7136','longitude'=>'46.6753','is_primary'=>1],
-        ],
-        'payment_methods' => [
-            ['name'=>$lang==='ar'?'بطاقة ائتمان':'Credit Card', 'code'=>'card', 'icon'=>'💳'],
-            ['name'=>$lang==='ar'?'تحويل بنكي':'Bank Transfer', 'code'=>'bank', 'icon'=>'🏦'],
-            ['name'=>'Mada', 'code'=>'mada', 'icon'=>'💳'],
-        ],
-        'attributes' => [],
-    ];
+    $GLOBALS['PUB_PAGE_TITLE'] = t('entity.not_found') . ' — QOOQZ';
+    include dirname(__DIR__) . '/partials/header.php';
+    echo '<div class="pub-container" style="padding:60px 0;text-align:center;"><p>' . e(t('entity.not_found')) . '</p></div>';
+    include dirname(__DIR__) . '/partials/footer.php';
+    exit;
 }
 
 /* -------------------------------------------------------
@@ -85,25 +50,27 @@ if (empty($entity)) {
  * ----------------------------------------------------- */
 $productPage  = max(1, (int)($_GET['page'] ?? 1));
 $productLimit = 12;
-$rp = pub_fetch($base . 'public/entity/' . ($entity['id'] ?? $entityId) . '/products?' . $qs
-    . '&limit=' . $productLimit . '&page=' . $productPage);
-$products   = $rp['data'] ?? [];
-$productMeta= $rp['meta'] ?? ['total'=>count($products), 'total_pages'=>1];
+$rp = pub_fetch(
+    pub_api_url('public/entity/' . ($entity['id'] ?? $entityId) . '/products')
+    . '?' . $qs . '&per=' . $productLimit . '&page=' . $productPage
+);
+$products    = $rp['data'] ?? [];
+$productMeta = $rp['meta'] ?? ['total' => count($products), 'total_pages' => 1];
 
 $GLOBALS['PUB_PAGE_TITLE'] = e($entity['store_name'] ?? '') . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_DESC']  = e($entity['description'] ?? '');
 
 /* -------------------------------------------------------
- * Day names translation
+ * Day names from translation file
  * ----------------------------------------------------- */
 $dayNames = [
-    'sunday'    => $lang === 'ar' ? 'الأحد'    : 'Sunday',
-    'monday'    => $lang === 'ar' ? 'الاثنين'  : 'Monday',
-    'tuesday'   => $lang === 'ar' ? 'الثلاثاء' : 'Tuesday',
-    'wednesday' => $lang === 'ar' ? 'الأربعاء' : 'Wednesday',
-    'thursday'  => $lang === 'ar' ? 'الخميس'  : 'Thursday',
-    'friday'    => $lang === 'ar' ? 'الجمعة'   : 'Friday',
-    'saturday'  => $lang === 'ar' ? 'السبت'    : 'Saturday',
+    'sunday'    => t('entity.day_sunday'),
+    'monday'    => t('entity.day_monday'),
+    'tuesday'   => t('entity.day_tuesday'),
+    'wednesday' => t('entity.day_wednesday'),
+    'thursday'  => t('entity.day_thursday'),
+    'friday'    => t('entity.day_friday'),
+    'saturday'  => t('entity.day_saturday'),
 ];
 
 include dirname(__DIR__) . '/partials/header.php';
@@ -178,13 +145,16 @@ include dirname(__DIR__) . '/partials/header.php';
 
             <!-- Social links -->
             <div class="pub-entity-social">
-                <?php foreach([
-                    'whatsapp'  => ['https://wa.me/' . ltrim($entity['whatsapp'] ?? '', '+'), '💬 WhatsApp'],
+                <?php
+                $waNum = ltrim($entity['whatsapp'] ?? '', '+');
+                $socials = [
+                    'whatsapp'  => [$waNum ? 'https://wa.me/' . $waNum : '', '💬 WhatsApp'],
                     'facebook'  => [$entity['facebook']  ?? '', '📘 Facebook'],
                     'instagram' => [$entity['instagram'] ?? '', '📷 Instagram'],
                     'twitter'   => [$entity['twitter']   ?? '', '🐦 Twitter'],
                     'snapchat'  => [$entity['snapchat']  ?? '', '👻 Snapchat'],
-                ] as $net => [$url, $label]):
+                ];
+                foreach ($socials as $net => [$url, $label]):
                     if (empty($entity[$net])) continue;
                 ?>
                     <a href="<?= e($url) ?>"
@@ -200,19 +170,19 @@ include dirname(__DIR__) . '/partials/header.php';
     <div class="pub-tabs" style="margin-top:24px;" role="tablist">
         <button class="pub-tab active" data-tab="products" role="tab"
                 aria-selected="true" aria-controls="tabProducts">
-            🛍️ <?= e(t('nav.products')) ?>
+            🛍️ <?= e(t('entity.products_tab')) ?>
         </button>
         <button class="pub-tab" data-tab="info" role="tab"
                 aria-selected="false" aria-controls="tabInfo">
-            ℹ️ <?= $lang === 'ar' ? 'معلومات' : 'Info' ?>
+            ℹ️ <?= e(t('entity.info_tab')) ?>
         </button>
         <button class="pub-tab" data-tab="hours" role="tab"
                 aria-selected="false" aria-controls="tabHours">
-            🕐 <?= $lang === 'ar' ? 'أوقات العمل' : 'Working Hours' ?>
+            🕐 <?= e(t('entity.hours_tab')) ?>
         </button>
         <button class="pub-tab" data-tab="map" role="tab"
                 aria-selected="false" aria-controls="tabMap">
-            🗺️ <?= $lang === 'ar' ? 'الموقع' : 'Location' ?>
+            🗺️ <?= e(t('entity.location_tab')) ?>
         </button>
     </div>
 
@@ -266,7 +236,7 @@ include dirname(__DIR__) . '/partials/header.php';
         <?php else: ?>
         <div class="pub-empty" style="margin-top:40px;">
             <div class="pub-empty-icon">🛍️</div>
-            <p class="pub-empty-msg"><?= $lang === 'ar' ? 'لا توجد منتجات حالياً' : 'No products available yet' ?></p>
+            <p class="pub-empty-msg"><?= e(t('entity.no_products')) ?></p>
         </div>
         <?php endif; ?>
     </div>
@@ -278,7 +248,7 @@ include dirname(__DIR__) . '/partials/header.php';
             <!-- Attributes -->
             <?php if (!empty($entity['attributes'])): ?>
             <div class="pub-info-card">
-                <h3 class="pub-info-card-title"><?= $lang === 'ar' ? '📋 المعلومات' : '📋 Details' ?></h3>
+                <h3 class="pub-info-card-title"><?= e(t('entity.details')) ?></h3>
                 <div class="pub-attr-grid">
                     <?php foreach ($entity['attributes'] as $attr): ?>
                         <?php if (empty($attr['value'])) continue; ?>
@@ -294,7 +264,7 @@ include dirname(__DIR__) . '/partials/header.php';
             <!-- Payment Methods -->
             <?php if (!empty($entity['payment_methods'])): ?>
             <div class="pub-info-card">
-                <h3 class="pub-info-card-title">💳 <?= $lang === 'ar' ? 'طرق الدفع' : 'Payment Methods' ?></h3>
+                <h3 class="pub-info-card-title"><?= e(t('entity.payment_methods')) ?></h3>
                 <div style="display:flex;gap:10px;flex-wrap:wrap;padding:12px 16px;">
                     <?php foreach ($entity['payment_methods'] as $pm): ?>
                         <span class="pub-tag" style="font-size:0.85rem;padding:6px 14px;">
@@ -311,14 +281,14 @@ include dirname(__DIR__) . '/partials/header.php';
     <div class="pub-tab-panel" id="tabHours" style="display:none;">
         <?php if (!empty($entity['working_hours'])): ?>
         <div class="pub-info-card" style="margin-top:20px;">
-            <h3 class="pub-info-card-title">🕐 <?= $lang === 'ar' ? 'أوقات العمل' : 'Working Hours' ?></h3>
+            <h3 class="pub-info-card-title">🕐 <?= e(t('entity.hours_tab')) ?></h3>
             <div class="pub-hours-table">
                 <?php foreach ($entity['working_hours'] as $h): ?>
                 <div class="pub-hours-row <?= !empty($h['is_closed']) ? 'pub-hours-row--closed' : '' ?>">
                     <span class="pub-hours-day"><?= e($dayNames[$h['day_of_week']] ?? $h['day_of_week']) ?></span>
                     <span class="pub-hours-time">
                         <?php if (!empty($h['is_closed'])): ?>
-                            <span style="color:var(--pub-muted);"><?= $lang === 'ar' ? 'مغلق' : 'Closed' ?></span>
+                            <span style="color:var(--pub-muted);"><?= e(t('entity.closed')) ?></span>
                         <?php else: ?>
                             <?= e($h['open_time'] ?? '') ?> — <?= e($h['close_time'] ?? '') ?>
                         <?php endif; ?>
@@ -337,11 +307,9 @@ include dirname(__DIR__) . '/partials/header.php';
             <?php foreach ($entity['addresses'] as $addr): ?>
             <div class="pub-info-card">
                 <h3 class="pub-info-card-title">
-                    📍 <?= e($addr['label'] ?? ($lang === 'ar' ? 'العنوان' : 'Address')) ?>
+                    📍 <?= e($addr['label'] ?? '') ?>
                     <?php if (!empty($addr['is_primary'])): ?>
-                        <span style="font-size:0.75rem;background:var(--pub-primary);color:#fff;padding:2px 8px;border-radius:20px;margin-inline-start:6px;">
-                            <?= $lang === 'ar' ? 'رئيسي' : 'Primary' ?>
-                        </span>
+                        <span style="font-size:0.75rem;background:var(--pub-primary);color:#fff;padding:2px 8px;border-radius:20px;margin-inline-start:6px;">★</span>
                     <?php endif; ?>
                 </h3>
                 <p style="padding:8px 16px;color:var(--pub-text);margin:0;">
@@ -349,11 +317,10 @@ include dirname(__DIR__) . '/partials/header.php';
                     <?php if (!empty($addr['address_line2'])): ?>, <?= e($addr['address_line2']) ?><?php endif; ?>
                 </p>
                 <?php if (!empty($addr['latitude']) && !empty($addr['longitude'])): ?>
-                <!-- Map embed via OpenStreetMap (no API key needed) -->
                 <div style="padding:0 16px 16px;">
                     <a href="https://www.openstreetmap.org/?mlat=<?= e($addr['latitude']) ?>&mlon=<?= e($addr['longitude']) ?>#map=16/<?= e($addr['latitude']) ?>/<?= e($addr['longitude']) ?>"
                        target="_blank" rel="noopener" class="pub-btn pub-btn--ghost pub-btn--sm" style="display:inline-flex;gap:6px;align-items:center;">
-                        🗺️ <?= $lang === 'ar' ? 'عرض على الخريطة' : 'View on Map' ?>
+                        🗺️ <?= e(t('entity.view_on_map')) ?>
                     </a>
                     <a href="https://maps.google.com/?q=<?= e($addr['latitude']) ?>,<?= e($addr['longitude']) ?>"
                        target="_blank" rel="noopener" class="pub-btn pub-btn--ghost pub-btn--sm" style="display:inline-flex;gap:6px;align-items:center;margin-inline-start:8px;">
@@ -367,7 +334,7 @@ include dirname(__DIR__) . '/partials/header.php';
         <?php else: ?>
         <div class="pub-empty" style="margin-top:40px;">
             <div class="pub-empty-icon">📍</div>
-            <p class="pub-empty-msg"><?= $lang === 'ar' ? 'لا توجد عناوين مسجلة' : 'No addresses registered' ?></p>
+            <p class="pub-empty-msg"><?= e(t('entity.no_addresses')) ?></p>
         </div>
         <?php endif; ?>
     </div>

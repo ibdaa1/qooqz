@@ -20,94 +20,35 @@ $GLOBALS['PUB_PAGE_TITLE'] = t('hero.title') . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_DESC']  = t('hero.subtitle');
 
 /* -------------------------------------------------------
- * Fetch data sections
+ * Fetch data sections from real API
  * ----------------------------------------------------- */
 $base = pub_api_url('');
-$qs   = 'lang=' . urlencode($lang) . '&limit=8&page=1&tenant_id=' . $tenantId;
-
-$featuredProducts  = [];
-$featuredCategories= [];
-$latestJobs        = [];
-$featuredEntities  = [];
-$featuredTenants   = [];
+$qs   = 'lang=' . urlencode($lang) . '&per=8&page=1&tenant_id=' . $tenantId;
 
 // Products
 $r = pub_fetch($base . 'public/products?' . $qs);
-$featuredProducts = $r['data']['items'] ?? ($r['data']['data'] ?? []);
-$featuredProducts = array_slice($featuredProducts, 0, 8);
+$featuredProducts = $r['data'] ?? [];
+$totalProducts    = (int)($r['meta']['total'] ?? count($featuredProducts));
 
 // Categories
-$rc = pub_fetch($base . 'public/categories?lang=' . urlencode($lang) . '&limit=8&tenant_id=' . $tenantId . '&featured=1');
-$featuredCategories = $rc['data']['items'] ?? ($rc['data']['data'] ?? []);
-$featuredCategories = array_slice($featuredCategories, 0, 8);
+$rc = pub_fetch($base . 'public/categories?lang=' . urlencode($lang) . '&per=8&tenant_id=' . $tenantId . '&featured=1');
+$featuredCategories = $rc['data'] ?? [];
+$totalCategories    = (int)($rc['meta']['total'] ?? count($featuredCategories));
 
 // Jobs
-$rj = pub_fetch($base . 'public/jobs?lang=' . urlencode($lang) . '&limit=6&featured=1');
-$latestJobs = $rj['data']['items'] ?? ($rj['data']['data'] ?? []);
-$latestJobs = array_slice($latestJobs, 0, 6);
+$rj = pub_fetch($base . 'public/jobs?lang=' . urlencode($lang) . '&per=6&is_featured=1');
+$latestJobs   = $rj['data'] ?? [];
+$totalJobs    = (int)($rj['meta']['total'] ?? count($latestJobs));
 
 // Entities
-$re = pub_fetch($base . 'public/entities?' . $qs . '&limit=6');
-$featuredEntities = $re['data']['items'] ?? ($re['data']['data'] ?? []);
-$featuredEntities = array_slice($featuredEntities, 0, 6);
+$re = pub_fetch($base . 'public/entities?' . $qs . '&per=6');
+$featuredEntities = $re['data'] ?? [];
+$totalEntities    = (int)($re['meta']['total'] ?? count($featuredEntities));
 
 // Tenants
-$rt = pub_fetch($base . 'public/tenants?' . $qs . '&limit=6');
-$featuredTenants = $rt['data']['items'] ?? ($rt['data']['data'] ?? []);
-$featuredTenants = array_slice($featuredTenants, 0, 6);
-
-// Stats
-$totalProducts   = (int)($r['data']['meta']['total']  ?? count($featuredProducts));
-$totalCategories = (int)($rc['data']['meta']['total'] ?? count($featuredCategories));
-$totalJobs       = (int)($rj['data']['meta']['total'] ?? count($latestJobs));
-$totalEntities   = (int)($re['data']['meta']['total'] ?? count($featuredEntities));
-$totalTenants    = (int)($rt['data']['meta']['total'] ?? count($featuredTenants));
-
-/* -------------------------------------------------------
- * Demo fallback when API unavailable
- * ----------------------------------------------------- */
-if (empty($featuredProducts)) {
-    $featuredProducts = [
-        ['id'=>1, 'name'=>$lang==='ar'?'جوال سامسونج S24':'Samsung S24',       'price'=>3499, 'currency'=>'SAR', 'is_featured'=>1, 'image_url'=>'/uploads/images/img_697288dfab0213.18814948.jpg'],
-        ['id'=>2, 'name'=>$lang==='ar'?'لابتوب ديل XPS':'Dell XPS Laptop',    'price'=>6999, 'currency'=>'SAR', 'is_featured'=>1, 'image_url'=>null],
-        ['id'=>3, 'name'=>$lang==='ar'?'سماعة سوني WH':'Sony WH Headphones', 'price'=>899,  'currency'=>'SAR', 'is_featured'=>1, 'image_url'=>null],
-        ['id'=>4, 'name'=>$lang==='ar'?'كاميرا كانون':'Canon Camera',         'price'=>4200, 'currency'=>'SAR', 'is_featured'=>0, 'image_url'=>null],
-    ];
-}
-if (empty($featuredCategories)) {
-    $featuredCategories = [
-        ['id'=>1, 'name'=>$lang==='ar'?'الإلكترونيات':'Electronics', 'image_url'=>'/uploads/images/img_697288dfab0213.18814948.jpg', 'is_featured'=>1, 'product_count'=>125],
-        ['id'=>2, 'name'=>$lang==='ar'?'الملابس':'Clothing',          'image_url'=>'/uploads/images/img_69728365b9a6a4.90230041.png', 'is_featured'=>1, 'product_count'=>88],
-        ['id'=>3, 'name'=>$lang==='ar'?'المنزل':'Home & Garden',       'image_url'=>null, 'is_featured'=>0, 'product_count'=>42],
-        ['id'=>4, 'name'=>$lang==='ar'?'الرياضة':'Sports',             'image_url'=>null, 'is_featured'=>0, 'product_count'=>67],
-    ];
-}
-if (empty($latestJobs)) {
-    $latestJobs = [
-        ['id'=>1, 'title'=>$lang==='ar'?'مطور واجهة أمامية':'Frontend Developer', 'employment_type'=>'full_time', 'is_remote'=>1, 'is_featured'=>1, 'is_urgent'=>0, 'city_name'=>$lang==='ar'?'الرياض':'Riyadh'],
-        ['id'=>2, 'title'=>$lang==='ar'?'مدير تسويق رقمي':'Digital Marketing Mgr', 'employment_type'=>'full_time', 'is_remote'=>0, 'is_featured'=>0, 'is_urgent'=>1, 'city_name'=>$lang==='ar'?'جدة':'Jeddah'],
-        ['id'=>3, 'title'=>$lang==='ar'?'مبرمج PHP':'PHP Developer',              'employment_type'=>'contract',  'is_remote'=>1, 'is_featured'=>1, 'is_urgent'=>0, 'city_name'=>$lang==='ar'?'الدمام':'Dammam'],
-    ];
-}
-if (empty($featuredEntities)) {
-    $featuredEntities = [
-        ['id'=>1, 'store_name'=>$lang==='ar'?'شركة التقنية العالمية':'Global Tech Co.', 'is_verified'=>1, 'vendor_type'=>'company', 'logo_url'=>''],
-        ['id'=>2, 'store_name'=>$lang==='ar'?'متجر الأزياء الفاخرة':'Luxury Fashion',  'is_verified'=>0, 'vendor_type'=>'store',   'logo_url'=>''],
-        ['id'=>3, 'store_name'=>$lang==='ar'?'مركز التدريب المتقدم':'Training Center',  'is_verified'=>1, 'vendor_type'=>'training','logo_url'=>''],
-    ];
-}
-if (empty($featuredTenants)) {
-    $featuredTenants = [
-        ['id'=>1, 'store_name'=>$lang==='ar'?'تك هب':'TechHub',        'domain'=>'techhub.example.com', 'is_active'=>1],
-        ['id'=>2, 'store_name'=>$lang==='ar'?'متجر الموضة':'Fashion',   'domain'=>'fashion.example.com', 'is_active'=>1],
-    ];
-}
-
-$totalProducts   = $totalProducts   ?: count($featuredProducts);
-$totalCategories = $totalCategories ?: count($featuredCategories);
-$totalJobs       = $totalJobs       ?: count($latestJobs);
-$totalEntities   = $totalEntities   ?: count($featuredEntities);
-$totalTenants    = $totalTenants    ?: count($featuredTenants);
+$rt = pub_fetch($base . 'public/tenants?' . $qs . '&per=6');
+$featuredTenants = $rt['data'] ?? [];
+$totalTenants    = (int)($rt['meta']['total'] ?? count($featuredTenants));
 
 include dirname(__DIR__) . '/partials/header.php';
 ?>
@@ -300,7 +241,7 @@ include dirname(__DIR__) . '/partials/header.php';
         </div>
         <div class="pub-grid-md">
             <?php foreach ($featuredEntities as $ent): ?>
-            <a href="/frontend/public/entities.php?id=<?= (int)($ent['id'] ?? 0) ?>"
+            <a href="/frontend/public/entity.php?id=<?= (int)($ent['id'] ?? 0) ?>"
                class="pub-entity-card" style="text-decoration:none;">
                 <div class="pub-entity-avatar">
                     <?php if (!empty($ent['logo_url'])): ?>

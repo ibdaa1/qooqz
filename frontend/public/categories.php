@@ -40,44 +40,10 @@ $qs = http_build_query(array_filter([
 ]));
 
 $resp       = pub_fetch(pub_api_url('public/categories') . '?' . $qs);
-$categories = $resp['data']['items'] ?? ($resp['data']['data'] ?? []);
-$meta       = $resp['data']['meta']  ?? [];
+$categories = $resp['data'] ?? [];
+$meta       = $resp['meta'] ?? [];
 $total      = (int)($meta['total'] ?? count($categories));
-$totalPg    = (int)($meta['total_pages'] ?? ceil($total / $limit));
-
-/* -------------------------------------------------------
- * Demo fallback when API unavailable
- * ----------------------------------------------------- */
-if (empty($categories)) {
-    $categories = [
-        ['id'=>1, 'name'=>t('lang') === 'ar' ? 'الإلكترونيات' : 'Electronics',
-         'slug'=>'electronics', 'image_url'=>'/uploads/images/img_697288dfab0213.18814948.jpg',
-         'is_featured'=>1, 'parent_id'=>null, 'product_count'=>125,
-         'description'=>t('lang') === 'ar' ? 'أجهزة وإلكترونيات' : 'Devices & electronics'],
-        ['id'=>2, 'name'=>t('lang') === 'ar' ? 'الملابس' : 'Clothing',
-         'slug'=>'clothing', 'image_url'=>'/uploads/images/img_69728365b9a6a4.90230041.png',
-         'is_featured'=>1, 'parent_id'=>null, 'product_count'=>88,
-         'description'=>t('lang') === 'ar' ? 'ملابس وأزياء' : 'Fashion & apparel'],
-        ['id'=>3, 'name'=>t('lang') === 'ar' ? 'المنزل والحديقة' : 'Home & Garden',
-         'slug'=>'home-garden', 'image_url'=>null,
-         'is_featured'=>0, 'parent_id'=>null, 'product_count'=>42,
-         'description'=>t('lang') === 'ar' ? 'أثاث ومستلزمات المنزل' : 'Furniture & home essentials'],
-        ['id'=>4, 'name'=>t('lang') === 'ar' ? 'الرياضة' : 'Sports',
-         'slug'=>'sports', 'image_url'=>null,
-         'is_featured'=>0, 'parent_id'=>null, 'product_count'=>67,
-         'description'=>t('lang') === 'ar' ? 'معدات رياضية' : 'Sports equipment & gear'],
-        ['id'=>5, 'name'=>t('lang') === 'ar' ? 'الكتب' : 'Books',
-         'slug'=>'books', 'image_url'=>null,
-         'is_featured'=>1, 'parent_id'=>null, 'product_count'=>234,
-         'description'=>t('lang') === 'ar' ? 'كتب ومنشورات' : 'Books & publications'],
-        ['id'=>6, 'name'=>t('lang') === 'ar' ? 'الغذاء والمشروبات' : 'Food & Beverages',
-         'slug'=>'food-beverages', 'image_url'=>null,
-         'is_featured'=>0, 'parent_id'=>null, 'product_count'=>156,
-         'description'=>t('lang') === 'ar' ? 'مواد غذائية ومشروبات' : 'Groceries & drinks'],
-    ];
-    $total   = count($categories);
-    $totalPg = 1;
-}
+$totalPg    = (int)($meta['total_pages'] ?? (int)ceil($total / $limit));
 
 include dirname(__DIR__) . '/partials/header.php';
 ?>

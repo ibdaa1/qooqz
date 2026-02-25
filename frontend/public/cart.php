@@ -16,7 +16,7 @@ $user     = $ctx['user'] ?? null;
 
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
-$GLOBALS['PUB_PAGE_TITLE'] = ($lang === 'ar' ? 'سلة التسوق' : 'Shopping Cart') . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_TITLE'] = t('cart.title') . ' — QOOQZ';
 
 $sessionId = session_id();
 $base      = pub_api_url('');
@@ -67,14 +67,14 @@ include dirname(__DIR__) . '/partials/header.php';
     <nav style="font-size:0.84rem;color:var(--pub-muted);margin-bottom:20px;">
         <a href="/frontend/public/index.php"><?= e(t('common.home')) ?></a>
         <span style="margin:0 6px;">›</span>
-        <span>🛒 <?= $lang === 'ar' ? 'سلة التسوق' : 'Shopping Cart' ?></span>
+        <span>🛒 <?= e(t('cart.title')) ?></span>
     </nav>
 
     <h1 style="font-size:1.4rem;margin:0 0 24px;">
-        🛒 <?= $lang === 'ar' ? 'سلة التسوق' : 'Shopping Cart' ?>
+        🛒 <?= e(t('cart.title')) ?>
         <?php if ($cartCount > 0): ?>
             <span style="font-size:0.85rem;font-weight:400;color:var(--pub-muted);">
-                (<?= $cartCount ?> <?= $lang === 'ar' ? 'منتج' : 'item(s)' ?>)
+                (<?= $cartCount ?> <?= e(t('cart.items')) ?>)
             </span>
         <?php endif; ?>
     </h1>
@@ -87,7 +87,7 @@ include dirname(__DIR__) . '/partials/header.php';
             <?php foreach ($cartItems as $item): ?>
             <?php
                 $itemId   = (int)($item['id'] ?? 0);
-                $prodName = $item['product_name'] ?? $item['name'] ?? ($lang === 'ar' ? 'منتج' : 'Product');
+                $prodName = $item['product_name'] ?? $item['name'] ?? t('nav.products');
                 $varName  = $item['variant_name'] ?? '';
                 $price    = (float)($item['price'] ?? $item['unit_price'] ?? 0);
                 $qty      = (int)($item['quantity'] ?? 1);
@@ -134,7 +134,7 @@ include dirname(__DIR__) . '/partials/header.php';
                         = <?= number_format($price * $qty, 2) ?> <?= e(t('common.currency')) ?>
                     </p>
                     <button class="pub-remove-btn" onclick="removeItem(<?= $itemId ?>)"
-                            title="<?= $lang === 'ar' ? 'حذف' : 'Remove' ?>">✕</button>
+                     title="<?= e(t('cart.remove')) ?>">✕</button>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -144,27 +144,27 @@ include dirname(__DIR__) . '/partials/header.php';
         <div class="pub-cart-summary">
             <div class="pub-cart-summary-inner">
                 <h2 class="pub-cart-summary-title">
-                    📋 <?= $lang === 'ar' ? 'ملخص الطلب' : 'Order Summary' ?>
+                    📋 <?= e(t('cart.order_summary')) ?>
                 </h2>
                 <div class="pub-summary-row">
-                    <span><?= $lang === 'ar' ? 'المجموع الفرعي' : 'Subtotal' ?></span>
+                    <span><?= e(t('cart.subtotal')) ?></span>
                     <strong><?= number_format($cartTotal, 2) ?> <?= e(t('common.currency')) ?></strong>
                 </div>
                 <div class="pub-summary-row" style="color:var(--pub-muted);font-size:0.84rem;">
-                    <span><?= $lang === 'ar' ? 'التوصيل' : 'Shipping' ?></span>
-                    <span><?= $lang === 'ar' ? 'يُحدد عند الدفع' : 'Calculated at checkout' ?></span>
+                    <span><?= e(t('cart.shipping')) ?></span>
+                    <span>—</span>
                 </div>
                 <div class="pub-summary-row pub-summary-total">
-                    <span><?= $lang === 'ar' ? 'الإجمالي' : 'Total' ?></span>
+                    <span><?= e(t('cart.total')) ?></span>
                     <strong id="cartGrandTotal"><?= number_format($cartTotal, 2) ?> <?= e(t('common.currency')) ?></strong>
                 </div>
                 <a href="/frontend/public/checkout.php?cart_id=<?= $cartId ?>&entity_id=<?= $entityId ?>"
                    class="pub-btn pub-btn--primary" style="width:100%;text-align:center;margin-top:16px;display:block;font-size:1rem;padding:12px;">
-                    💳 <?= $lang === 'ar' ? 'إتمام الشراء' : 'Proceed to Checkout' ?>
+                    💳 <?= e(t('cart.checkout')) ?>
                 </a>
                 <a href="/frontend/public/products.php" class="pub-btn pub-btn--ghost pub-btn--sm"
                    style="width:100%;text-align:center;margin-top:10px;display:block;">
-                    ← <?= $lang === 'ar' ? 'مواصلة التسوق' : 'Continue Shopping' ?>
+                    ← <?= e(t('cart.continue_shopping')) ?>
                 </a>
             </div>
         </div>
@@ -175,7 +175,7 @@ include dirname(__DIR__) . '/partials/header.php';
     <div class="pub-empty" style="padding:60px 0;">
         <div class="pub-empty-icon">🛒</div>
         <p class="pub-empty-msg" style="font-size:1.1rem;margin-bottom:20px;">
-            <?= $lang === 'ar' ? 'سلة التسوق فارغة' : 'Your cart is empty' ?>
+            <?= e(t('cart.empty')) ?>
         </p>
         <a href="/frontend/public/products.php" class="pub-btn pub-btn--primary">
             🛍️ <?= e(t('hero.browse_products')) ?>
@@ -263,11 +263,12 @@ include dirname(__DIR__) . '/partials/header.php';
 </style>
 
 <script>
-var CART_LANG  = <?= json_encode($lang) ?>;
-var CART_ID    = <?= $cartId ?>;
-var ENTITY_ID  = <?= $entityId ?>;
-var TENANT_ID  = <?= $tenantId ?>;
-var SESSION_ID = <?= json_encode($sessionId) ?>;
+var CART_LANG    = <?= json_encode($lang) ?>;
+var CART_ID      = <?= $cartId ?>;
+var ENTITY_ID    = <?= $entityId ?>;
+var TENANT_ID    = <?= $tenantId ?>;
+var SESSION_ID   = <?= json_encode($sessionId) ?>;
+var REMOVE_CONFIRM = <?= json_encode(t('cart.remove') . '?') ?>;
 
 function changeQty(itemId, delta) {
     var input = document.getElementById('qty' + itemId);
@@ -288,7 +289,7 @@ function updateCartItem(itemId, qty) {
 }
 
 function removeItem(itemId) {
-    if(!confirm(CART_LANG==='ar'?'حذف هذا المنتج من السلة؟':'Remove this item from cart?')) return;
+    if(!confirm(REMOVE_CONFIRM)) return;
     fetch('/api/cart_items', {
         method:'DELETE',
         headers:{'Content-Type':'application/json'},

@@ -9,6 +9,7 @@
         "jobs": "Jobs",
         "entities": "Entities",
         "tenants": "Tenants",
+        "cart": "🛒 Cart",
         "login": "Login",
         "register": "Register",
         "account": "My Account",
@@ -157,16 +158,28 @@
         "place_order": "Place Order",
         "success_title": "Order Placed Successfully!",
         "success_msg": "Thank you! We will contact you shortly to confirm your order.",
-        "order_number": "Order #"
+        "order_number": "Order #",
+        "error_fields_required": "Please enter your name and phone number.",
+        "secure_transaction": "Your transaction is secure and encrypted"
     },
     "entity": {
         "products_tab": "Products",
         "info_tab": "Info",
         "hours_tab": "Working Hours",
         "location_tab": "Location",
+        "details": "📋 Details",
         "no_products": "No products available yet",
         "no_addresses": "No addresses registered",
-        "payment_methods": "Payment Methods",
-        "view_on_map": "View on Map"
+        "payment_methods": "💳 Payment Methods",
+        "view_on_map": "View on Map",
+        "not_found": "Entity not found",
+        "day_sunday": "Sunday",
+        "day_monday": "Monday",
+        "day_tuesday": "Tuesday",
+        "day_wednesday": "Wednesday",
+        "day_thursday": "Thursday",
+        "day_friday": "Friday",
+        "day_saturday": "Saturday",
+        "closed": "Closed"
     }
 }

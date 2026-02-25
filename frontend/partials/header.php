@@ -33,7 +33,7 @@ $_navItems = [
     t('nav.jobs')       => $_basePath . '/jobs.php',
     t('nav.entities')   => $_basePath . '/entities.php',
     t('nav.tenants')    => $_basePath . '/tenants.php',
-    '🛒 ' . ($lang === 'ar' ? 'السلة' : 'Cart') => $_basePath . '/cart.php',
+    t('nav.cart') => $_basePath . '/cart.php',
 ];
 
 // Font: Cairo for Arabic/RTL, Inter for LTR
