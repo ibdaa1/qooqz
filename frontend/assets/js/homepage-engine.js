@@ -324,9 +324,21 @@
 
   /* -------------------------------------------------------
    * loadSections — fetch all active sections and render
-   * Clears PHP fallback content and replaces with DB sections.
+   * Only renders from DB when PHP has NOT already rendered sections
+   * (PHP is the primary renderer; JS adds enhancement only when needed)
    * ----------------------------------------------------- */
   function loadSections(tenantId, lang) {
+    var container = document.getElementById('pub-homepage-sections');
+    if (!container) return;
+
+    // If PHP already rendered section content, skip JS replacement entirely.
+    // PHP sections have class "pub-section".
+    if (container.querySelector('.pub-section')) {
+      // PHP content is present — just enhance it (sliders etc.)
+      return;
+    }
+
+    // No PHP content: fetch and render from API as fallback
     var url = '/api/public/homepage_sections'
             + '?tenant_id=' + encodeURIComponent(tenantId)
             + '&lang='      + encodeURIComponent(lang);
@@ -339,10 +351,8 @@
 
         if (sections.length === 0) return; // keep PHP fallback
 
-        var container = document.getElementById('pub-homepage-sections');
-        if (!container) return;
-
-        // Clear PHP-rendered fallback before rendering from DB
+        // Only clear empty container — never clear PHP-rendered content
+        if (container.querySelector('.pub-section')) return;
         container.innerHTML = '';
 
         // Render sections sequentially to preserve sort_order

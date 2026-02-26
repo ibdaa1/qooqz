@@ -899,43 +899,104 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 }
 
 /* -------------------------------------------------------
-   24. Banner / Slider section
+   24. Banner / Slider section — real carousel
    ----------------------------------------------------- */
 .pub-banner-slider {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-@media (min-width: 768px) {
-  .pub-banner-slider { flex-direction: row; flex-wrap: wrap; }
-  .pub-banner-slide  { flex: 1 1 320px; }
-}
-.pub-banner-slide {
   position: relative;
-  border-radius: var(--pub-radius);
   overflow: hidden;
+  border-radius: var(--pub-radius);
   background: var(--pub-surface);
-  min-height: 160px;
-  display: flex;
-  flex-direction: column;
+  min-height: 180px;
 }
+/* All slides hidden by default; JS adds .active to visible one */
+.pub-banner-slide {
+  display: none;
+  position: relative;
+  width: 100%;
+  min-height: 180px;
+  background: var(--pub-surface);
+}
+.pub-banner-slide.active {
+  display: block;
+  animation: pubFadeIn 0.5s ease;
+}
+@keyframes pubFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* First slide visible before JS initialises (no-JS fallback) */
+.pub-banner-slide:first-child { display: block; }
+.pub-banner-slide.active ~ .pub-banner-slide:first-child { display: none; }
+
 .pub-banner-img {
   width: 100%;
   height: auto;
-  max-height: 360px;
+  max-height: 420px;
   object-fit: cover;
   display: block;
 }
 .pub-banner-caption {
-  padding: 16px;
+  padding: 16px 20px;
   background: rgba(0,0,0,0.45);
   color: #fff;
   position: absolute;
   bottom: 0;
-  inset-inline: 0;
+  left: 0;
+  right: 0;
 }
 .pub-banner-caption h3 { margin: 0 0 4px; font-size: 1.05rem; font-weight: 700; }
 .pub-banner-caption p  { margin: 0 0 10px; font-size: 0.88rem; opacity: 0.9; }
+
+/* Prev / Next arrow buttons (injected by JS) */
+.pub-slider-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.45);
+  border: none;
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  line-height: 1;
+}
+.pub-slider-btn:hover { background: rgba(0,0,0,0.7); }
+.pub-slider-btn--prev { left: 10px; }
+.pub-slider-btn--next { right: 10px; }
+[dir="rtl"] .pub-slider-btn--prev { left: auto; right: 10px; }
+[dir="rtl"] .pub-slider-btn--next { right: auto; left: 10px; }
+
+/* Dot indicators (injected by JS) */
+.pub-slider-dots {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  z-index: 10;
+}
+.pub-slider-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.5);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s, transform 0.2s;
+}
+.pub-slider-dot.active,
+.pub-slider-dot:hover {
+  background: #fff;
+  transform: scale(1.2);
+}
 
 /* -------------------------------------------------------
    25. Deal / Discount cards

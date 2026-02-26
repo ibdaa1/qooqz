@@ -17,7 +17,8 @@ if (!function_exists('t')) {
 <!-- =============================================
      FOOTER
 ============================================= -->
-<footer class="pub-footer" role="contentinfo">
+<footer class="pub-footer" role="contentinfo"
+        style="border-top:4px solid var(--pub-primary,#2d8cf0);">
     <div class="pub-container">
         <div class="pub-footer-grid">
 

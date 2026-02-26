@@ -133,6 +133,69 @@
   }
 
   /* -------------------------------------------------------
+   * 6a. Banner/Slider carousel auto-advance
+   * Finds .pub-banner-slider elements rendered by PHP,
+   * activates the first slide, and auto-advances.
+   * ----------------------------------------------------- */
+  function initSliders() {
+    var sliders = document.querySelectorAll('.pub-banner-slider');
+    sliders.forEach(function (slider) {
+      var slides = slider.querySelectorAll('.pub-banner-slide');
+      if (slides.length <= 1) return; // nothing to cycle
+
+      var current = 0;
+      var isRtl   = document.documentElement.dir === 'rtl';
+
+      /* Activate first slide */
+      slides.forEach(function (s) { s.classList.remove('active'); });
+      slides[0].classList.add('active');
+
+      /* Inject prev / next buttons */
+      var prevBtn = document.createElement('button');
+      prevBtn.className = 'pub-slider-btn pub-slider-btn--prev';
+      prevBtn.setAttribute('aria-label', 'Previous');
+      prevBtn.innerHTML = isRtl ? '&#8250;' : '&#8249;'; // › or ‹
+      slider.appendChild(prevBtn);
+
+      var nextBtn = document.createElement('button');
+      nextBtn.className = 'pub-slider-btn pub-slider-btn--next';
+      nextBtn.setAttribute('aria-label', 'Next');
+      nextBtn.innerHTML = isRtl ? '&#8249;' : '&#8250;'; // ‹ or ›
+      slider.appendChild(nextBtn);
+
+      /* Inject dot indicators */
+      var dotsWrap = document.createElement('div');
+      dotsWrap.className = 'pub-slider-dots';
+      slides.forEach(function (_, i) {
+        var dot = document.createElement('button');
+        dot.className = 'pub-slider-dot' + (i === 0 ? ' active' : '');
+        dot.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+        dot.addEventListener('click', function () { goTo(i); });
+        dotsWrap.appendChild(dot);
+      });
+      slider.appendChild(dotsWrap);
+
+      function goTo(idx) {
+        slides[current].classList.remove('active');
+        dotsWrap.children[current].classList.remove('active');
+        current = (idx + slides.length) % slides.length;
+        slides[current].classList.add('active');
+        dotsWrap.children[current].classList.add('active');
+      }
+
+      prevBtn.addEventListener('click', function () { goTo(current - 1); clearInterval(timer); timer = setInterval(advance, 5000); });
+      nextBtn.addEventListener('click', function () { goTo(current + 1); clearInterval(timer); timer = setInterval(advance, 5000); });
+
+      function advance() { goTo(current + 1); }
+      var timer = setInterval(advance, 5000);
+
+      /* Pause on hover */
+      slider.addEventListener('mouseenter', function () { clearInterval(timer); });
+      slider.addEventListener('mouseleave', function () { timer = setInterval(advance, 5000); });
+    });
+  }
+
+  /* -------------------------------------------------------
    * 6. Animate counters (stats row)
    * ----------------------------------------------------- */
   function animateCounters() {
@@ -201,6 +264,7 @@
     markActiveNav();
     lazyLoadImages();
     initSearch();
+    initSliders();
     animateCounters();
     initFilterSelects();
     initBackToTop();
