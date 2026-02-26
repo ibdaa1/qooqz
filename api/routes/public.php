@@ -75,17 +75,90 @@ if ($first === '' || $first === 'home') {
 }
 
 /* -------------------------------------------------------
- * Route: UI (theme / color settings)
+ * Route: UI (theme / color / font / design / button / card settings)
+ * GET /api/public/ui?tenant_id=X
+ * All settings needed by the frontend to render dynamic theme.
+ * color_settings columns: setting_key, color_value (NOT key/value)
  * ----------------------------------------------------- */
 if ($first === 'ui') {
-    $colors = [];
-    if ($pdo instanceof PDO && $tenantId) {
-        $colors = $pdoList(
-            'SELECT `key`, `value`, `category` FROM color_settings WHERE tenant_id = ? AND is_active = 1 ORDER BY id',
-            [$tenantId]
-        );
+    $tid = $tenantId ?? 1;
+    $colors  = $pdoList(
+        'SELECT setting_key AS `key`, color_value AS value, category FROM color_settings WHERE tenant_id = ? AND is_active = 1 ORDER BY sort_order, id',
+        [$tid]
+    );
+    $fonts   = $pdoList(
+        'SELECT setting_key, font_family, font_size, font_weight, line_height, category FROM font_settings WHERE tenant_id = ? AND is_active = 1 ORDER BY sort_order',
+        [$tid]
+    );
+    $designs = $pdoList(
+        'SELECT setting_key, setting_value, setting_type, category FROM design_settings WHERE tenant_id = ? AND is_active = 1 ORDER BY sort_order',
+        [$tid]
+    );
+    $buttons = $pdoList(
+        'SELECT slug, button_type, background_color, text_color, border_color, border_width, border_radius, padding, font_size, font_weight, hover_background_color, hover_text_color FROM button_styles WHERE tenant_id = ? AND is_active = 1 ORDER BY button_type',
+        [$tid]
+    );
+    $cards = $pdoList(
+        'SELECT slug, card_type, background_color, border_color, border_width, border_radius, shadow_style, padding FROM card_styles WHERE tenant_id = ? AND is_active = 1 ORDER BY card_type',
+        [$tid]
+    );
+
+    // Generate CSS string from all settings (mirrors AdminUiThemeLoader::generateCss)
+    // Values are escaped to prevent CSS injection (</style> breakout protection)
+    $esc = function(string $v): string { return str_replace('</style', '<\\/style', htmlspecialchars($v, ENT_QUOTES, 'UTF-8')); };
+    $css = ":root {\n";
+    foreach ($colors as $c) {
+        if (!empty($c['key']) && !empty($c['value'])) {
+            $css .= '  --' . preg_replace('/[^a-z0-9_\-]/', '-', strtolower((string)$c['key'])) . ': ' . $esc((string)$c['value']) . ";\n";
+        }
     }
-    ResponseFormatter::success(['ok' => true, 'ui' => $GLOBALS['PUBLIC_UI'] ?? [], 'colors' => $colors]);
+    foreach ($fonts as $f) {
+        if (!empty($f['setting_key'])) {
+            $sk = preg_replace('/[^a-z0-9_\-]/', '-', strtolower((string)$f['setting_key']));
+            if (!empty($f['font_family'])) $css .= '  --' . $sk . '-family: ' . $esc((string)$f['font_family']) . ";\n";
+            if (!empty($f['font_size']))   $css .= '  --' . $sk . '-size: '   . $esc((string)$f['font_size'])   . ";\n";
+            if (!empty($f['font_weight'])) $css .= '  --' . $sk . '-weight: ' . $esc((string)$f['font_weight']) . ";\n";
+        }
+    }
+    foreach ($designs as $d) {
+        if (!empty($d['setting_key']) && !empty($d['setting_value'])) {
+            $css .= '  --' . preg_replace('/[^a-z0-9_\-]/', '-', strtolower((string)$d['setting_key'])) . ': ' . $esc((string)$d['setting_value']) . ";\n";
+        }
+    }
+    $css .= "}\n";
+    foreach ($buttons as $b) {
+        if (empty($b['slug'])) continue;
+        $css .= '.btn-' . preg_replace('/[^a-z0-9_\-]/', '-', (string)$b['slug']) . " {\n";
+        if (!empty($b['background_color'])) $css .= '  background-color: ' . $esc((string)$b['background_color']) . ";\n";
+        if (!empty($b['text_color']))       $css .= '  color: '            . $esc((string)$b['text_color'])       . ";\n";
+        if (!empty($b['border_color']))     $css .= '  border: '           . (int)$b['border_width'] . 'px solid ' . $esc((string)$b['border_color']) . ";\n";
+        if (isset($b['border_radius']))     $css .= '  border-radius: '    . (int)$b['border_radius'] . "px;\n";
+        if (!empty($b['padding']))          $css .= '  padding: '          . $esc((string)$b['padding'])          . ";\n";
+        if (!empty($b['font_size']))        $css .= '  font-size: '        . $esc((string)$b['font_size'])        . ";\n";
+        if (!empty($b['font_weight']))      $css .= '  font-weight: '      . $esc((string)$b['font_weight'])      . ";\n";
+        $css .= "}\n";
+    }
+    foreach ($cards as $c) {
+        if (empty($c['slug'])) continue;
+        $css .= '.card-' . preg_replace('/[^a-z0-9_\-]/', '-', (string)$c['slug']) . " {\n";
+        if (!empty($c['background_color'])) $css .= '  background-color: ' . $esc((string)$c['background_color']) . ";\n";
+        if (!empty($c['border_color']))     $css .= '  border: '           . (int)$c['border_width'] . 'px solid ' . $esc((string)$c['border_color']) . ";\n";
+        if (isset($c['border_radius']))     $css .= '  border-radius: '    . (int)$c['border_radius'] . "px;\n";
+        if (!empty($c['shadow_style']))     $css .= '  box-shadow: '       . $esc((string)$c['shadow_style'])      . ";\n";
+        if (!empty($c['padding']))          $css .= '  padding: '          . $esc((string)$c['padding'])           . ";\n";
+        $css .= "}\n";
+    }
+
+    ResponseFormatter::success([
+        'ok'           => true,
+        'ui'           => $GLOBALS['PUBLIC_UI'] ?? [],
+        'colors'       => $colors,
+        'fonts'        => $fonts,
+        'design'       => $designs,
+        'buttons'      => $buttons,
+        'cards'        => $cards,
+        'generated_css'=> $css,
+    ]);
     exit;
 }
 
@@ -467,9 +540,9 @@ if ($first === 'tenants') {
     $where  = "WHERE t.status = 'active'";
     $params = [];
     if (!empty($_GET['search'])) {
-        $where .= ' AND (t.name LIKE ? OR t.store_name LIKE ? OR t.domain LIKE ?)';
+        $where .= ' AND (t.name LIKE ? OR t.domain LIKE ?)';
         $kw     = '%' . $_GET['search'] . '%';
-        $params = [$kw, $kw, $kw];
+        $params = [$kw, $kw];
     }
 
     $total = $pdoCount("SELECT COUNT(*) FROM tenants t $where", $params);
@@ -539,6 +612,51 @@ if ($first === 'homepage_sections') {
              ON hst.section_id = hs.id AND hst.language_code = ?
           WHERE hs.tenant_id = ? AND hs.is_active = 1
           ORDER BY hs.sort_order ASC, hs.id ASC",
+        [$lang, $tenantId]
+    );
+    ResponseFormatter::success(['ok' => true, 'data' => $rows]);
+    exit;
+}
+
+/* -------------------------------------------------------
+ * Route: Banners (public listing — active, date-ranged)
+ * GET /api/public/banners?tenant_id=X[&position=X]
+ * ----------------------------------------------------- */
+if ($first === 'banners') {
+    if (!$tenantId) { ResponseFormatter::success(['ok' => true, 'data' => []]); exit; }
+    $banWhere  = 'WHERE b.tenant_id = ? AND b.is_active = 1
+                    AND (b.start_date IS NULL OR b.start_date <= NOW())
+                    AND (b.end_date   IS NULL OR b.end_date   >= NOW())';
+    $banParams = [$tenantId];
+    if (!empty($_GET['position'])) { $banWhere .= ' AND b.position = ?'; $banParams[] = $_GET['position']; }
+    $rows = $pdoList(
+        "SELECT b.id, b.title, b.subtitle, b.image_url, b.mobile_image_url,
+                b.link_url, b.link_text, b.background_color, b.text_color, b.sort_order, b.position
+           FROM banners b $banWhere ORDER BY b.sort_order ASC, b.id ASC LIMIT 20",
+        $banParams
+    );
+    ResponseFormatter::success(['ok' => true, 'data' => $rows]);
+    exit;
+}
+
+/* -------------------------------------------------------
+ * Route: Discounts (public active discounts for tenant)
+ * GET /api/public/discounts?tenant_id=X&lang=Y
+ * ----------------------------------------------------- */
+if ($first === 'discounts') {
+    if (!$tenantId) { ResponseFormatter::success(['ok' => true, 'data' => []]); exit; }
+    $rows = $pdoList(
+        "SELECT d.id, d.code, d.type, d.auto_apply, d.currency_code,
+                d.starts_at, d.ends_at, d.max_redemptions, d.current_redemptions,
+                COALESCE(dt.name, d.code) AS title,
+                dt.description, dt.terms_and_conditions
+           FROM discounts d
+      LEFT JOIN discount_translations dt ON dt.discount_id = d.id AND dt.language_code = ?
+          WHERE d.entity_id IN (SELECT id FROM entities WHERE tenant_id = ?)
+            AND d.status = 'active'
+            AND (d.starts_at IS NULL OR d.starts_at <= NOW())
+            AND (d.ends_at   IS NULL OR d.ends_at   >= NOW())
+          ORDER BY d.id DESC LIMIT 20",
         [$lang, $tenantId]
     );
     ResponseFormatter::success(['ok' => true, 'data' => $rows]);

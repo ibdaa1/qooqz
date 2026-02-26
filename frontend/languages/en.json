@@ -181,5 +181,9 @@
         "day_friday": "Friday",
         "day_saturday": "Saturday",
         "closed": "Closed"
+    },
+    "deals": {
+        "title": "🔥 Hot Deals",
+        "expires": "Expires"
     }
 }

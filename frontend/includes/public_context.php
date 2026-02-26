@@ -210,7 +210,8 @@ if (!function_exists('pub_fetch')) {
 
 /* -------------------------------------------------------
  * 6. Theme / color settings — loaded directly from DB via PDO
- *    Map: color_settings.setting_key → CSS variable
+ *    Also loads: design_settings, font_settings, button_styles, card_styles
+ *    Generates complete CSS string stored in $theme['generated_css']
  * ----------------------------------------------------- */
 if (!function_exists('pub_load_theme')) {
     function pub_load_theme(int $tenantId = 1): array {
@@ -226,6 +227,11 @@ if (!function_exists('pub_load_theme')) {
             'border'     => '#333333',
             'header_bg'  => '#FF0000',
             'footer_bg'  => '#1a1a2e',
+            'generated_css' => '',
+            'fonts'      => [],
+            'design'     => [],
+            'buttons'    => [],
+            'cards'      => [],
         ];
 
         // Session cache (TTL: 5 min)
@@ -256,18 +262,42 @@ if (!function_exists('pub_load_theme')) {
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 ]);
 
-                // Load color_settings for this tenant
-                $st = $pdo->prepare(
-                    'SELECT setting_key, color_value FROM color_settings
-                      WHERE tenant_id = ? AND is_active = 1 ORDER BY id'
-                );
-                $st->execute([$tenantId]);
-                $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+                $colors  = [];
+                $fonts   = [];
+                $designs = [];
+                $buttons = [];
+                $cards   = [];
 
-                if ($rows) {
-                    $colors = $defaults;
-                    // Mapping from DB key → theme key
-                    $map = [
+                // color_settings: setting_key, color_value
+                $st = $pdo->prepare('SELECT setting_key, color_value FROM color_settings WHERE tenant_id = ? AND is_active = 1 ORDER BY sort_order, id');
+                $st->execute([$tenantId]);
+                $colorRows = $st->fetchAll(PDO::FETCH_ASSOC);
+
+                // font_settings: setting_key, font_family, font_size, font_weight, line_height
+                $st = $pdo->prepare('SELECT setting_key, font_family, font_size, font_weight, line_height FROM font_settings WHERE tenant_id = ? AND is_active = 1 ORDER BY sort_order');
+                $st->execute([$tenantId]);
+                $fonts = $st->fetchAll(PDO::FETCH_ASSOC);
+
+                // design_settings: setting_key, setting_value
+                $st = $pdo->prepare('SELECT setting_key, setting_value, setting_type FROM design_settings WHERE tenant_id = ? AND is_active = 1 ORDER BY sort_order');
+                $st->execute([$tenantId]);
+                $designs = $st->fetchAll(PDO::FETCH_ASSOC);
+
+                // button_styles
+                $st = $pdo->prepare('SELECT slug, button_type, background_color, text_color, border_color, border_width, border_radius, padding, font_size, font_weight, hover_background_color, hover_text_color FROM button_styles WHERE tenant_id = ? AND is_active = 1 ORDER BY button_type');
+                $st->execute([$tenantId]);
+                $buttons = $st->fetchAll(PDO::FETCH_ASSOC);
+
+                // card_styles
+                $st = $pdo->prepare('SELECT slug, card_type, background_color, border_color, border_width, border_radius, shadow_style, padding FROM card_styles WHERE tenant_id = ? AND is_active = 1 ORDER BY card_type');
+                $st->execute([$tenantId]);
+                $cards = $st->fetchAll(PDO::FETCH_ASSOC);
+
+                if ($colorRows || $fonts || $designs || $buttons || $cards) {
+                    $theme = $defaults;
+
+                    // Map color_settings keys to theme keys
+                    $colorMap = [
                         'primary_color'        => 'primary',
                         'secondary_color'      => 'secondary',
                         'accent_color'         => 'accent',
@@ -279,41 +309,108 @@ if (!function_exists('pub_load_theme')) {
                         'header_bg_color'      => 'header_bg',
                         'footer_bg_color'      => 'footer_bg',
                     ];
-                    foreach ($rows as $row) {
-                        $k   = $row['setting_key'] ?? '';
-                        $v   = $row['color_value'] ?? '';
+                    foreach ($colorRows as $row) {
+                        $k = $row['setting_key'] ?? '';
+                        $v = $row['color_value'] ?? '';
                         if (!$v) continue;
-                        $mapped = $map[$k] ?? null;
-                        if ($mapped) {
-                            $colors[$mapped] = $v;
+                        $mapped = $colorMap[$k] ?? null;
+                        if ($mapped) $theme[$mapped] = $v;
+                        $colors[$k] = $v;
+                    }
+                    // header_bg defaults to primary if not explicitly set
+                    if (empty($colors['header_bg_color'])) {
+                        $theme['header_bg'] = $theme['primary'];
+                    }
+
+                    $theme['fonts']   = $fonts;
+                    $theme['design']  = $designs;
+                    $theme['buttons'] = $buttons;
+                    $theme['cards']   = $cards;
+
+                    // Generate complete CSS string (mirrors AdminUiThemeLoader::generateCss)
+                    // Escape values to prevent CSS/HTML injection (</style> breakout)
+                    $cssEsc = function(string $v): string { return str_replace('</style', '<\\/style', htmlspecialchars($v, ENT_QUOTES, 'UTF-8')); };
+                    $css = ":root {\n";
+                    foreach ($colors as $k => $v) {
+                        $css .= '  --' . preg_replace('/[^a-z0-9_\-]/', '-', strtolower($k)) . ': ' . $cssEsc($v) . ";\n";
+                    }
+                    foreach ($fonts as $f) {
+                        if (empty($f['setting_key'])) continue;
+                        $sk = preg_replace('/[^a-z0-9_\-]/', '-', strtolower($f['setting_key']));
+                        if (!empty($f['font_family'])) $css .= '  --' . $sk . '-family: ' . $cssEsc((string)$f['font_family']) . ";\n";
+                        if (!empty($f['font_size']))   $css .= '  --' . $sk . '-size: '   . $cssEsc((string)$f['font_size'])   . ";\n";
+                        if (!empty($f['font_weight'])) $css .= '  --' . $sk . '-weight: ' . $cssEsc((string)$f['font_weight']) . ";\n";
+                    }
+                    foreach ($designs as $d) {
+                        if (empty($d['setting_key']) || empty($d['setting_value'])) continue;
+                        $css .= '  --' . preg_replace('/[^a-z0-9_\-]/', '-', strtolower($d['setting_key'])) . ': ' . $cssEsc((string)$d['setting_value']) . ";\n";
+                    }
+                    $css .= "}\n";
+                    foreach ($buttons as $b) {
+                        if (empty($b['slug'])) continue;
+                        $slugB = preg_replace('/[^a-z0-9_\-]/', '-', (string)$b['slug']);
+                        $css .= ".btn-{$slugB} {\n";
+                        if (!empty($b['background_color'])) $css .= '  background-color: ' . $cssEsc((string)$b['background_color']) . ";\n";
+                        if (!empty($b['text_color']))       $css .= '  color: '            . $cssEsc((string)$b['text_color'])       . ";\n";
+                        if (!empty($b['border_color']))     $css .= '  border: '           . (int)$b['border_width'] . 'px solid ' . $cssEsc((string)$b['border_color']) . ";\n";
+                        if (isset($b['border_radius']))     $css .= '  border-radius: '    . (int)$b['border_radius'] . "px;\n";
+                        if (!empty($b['padding']))          $css .= '  padding: '          . $cssEsc((string)$b['padding'])          . ";\n";
+                        if (!empty($b['font_size']))        $css .= '  font-size: '        . $cssEsc((string)$b['font_size'])        . ";\n";
+                        if (!empty($b['font_weight']))      $css .= '  font-weight: '      . $cssEsc((string)$b['font_weight'])      . ";\n";
+                        $css .= "}\n";
+                        if (!empty($b['hover_background_color'])) {
+                            $css .= ".btn-{$slugB}:hover {\n  background-color: " . $cssEsc((string)$b['hover_background_color']) . ";\n";
+                            if (!empty($b['hover_text_color'])) $css .= '  color: ' . $cssEsc((string)$b['hover_text_color']) . ";\n";
+                            $css .= "}\n";
                         }
                     }
-                    // header_bg defaults to primary if not explicitly set from DB
-                    if (empty($colors['header_bg']) || $colors['header_bg'] === $defaults['header_bg']) {
-                        $colors['header_bg'] = $colors['primary'];
+                    foreach ($cards as $c) {
+                        if (empty($c['slug'])) continue;
+                        $slugC = preg_replace('/[^a-z0-9_\-]/', '-', (string)$c['slug']);
+                        $css .= ".card-{$slugC} {\n";
+                        if (!empty($c['background_color'])) $css .= '  background-color: ' . $cssEsc((string)$c['background_color']) . ";\n";
+                        if (!empty($c['border_color']))     $css .= '  border: '           . (int)$c['border_width'] . 'px solid ' . $cssEsc((string)$c['border_color']) . ";\n";
+                        if (isset($c['border_radius']))     $css .= '  border-radius: '    . (int)$c['border_radius'] . "px;\n";
+                        if (!empty($c['shadow_style']))     $css .= '  box-shadow: '       . $cssEsc((string)$c['shadow_style'])     . ";\n";
+                        if (!empty($c['padding']))          $css .= '  padding: '          . $cssEsc((string)$c['padding'])          . ";\n";
+                        $css .= "}\n";
                     }
-                    $_SESSION[$cacheKey]         = $colors;
+                    $theme['generated_css'] = $css;
+
+                    $_SESSION[$cacheKey]         = $theme;
                     $_SESSION[$cacheKey . '_ts'] = time();
-                    return $colors;
+                    return $theme;
                 }
             } catch (Throwable $_) {
-                // Silently fall through to default
+                // Silently fall through to HTTP fallback
             }
         }
 
-        // Fallback: try HTTP call to color_settings API
-        $url  = pub_api_url('color_settings/active') . '?tenant_id=' . $tenantId;
+        // Fallback: try HTTP call to /api/public/ui
+        $url  = pub_api_url('public/ui') . '?tenant_id=' . $tenantId;
         $resp = pub_fetch($url, 3);
-        if (!empty($resp['data']) && is_array($resp['data'])) {
-            $colors = $defaults;
-            foreach ($resp['data'] as $item) {
-                $k = strtolower($item['setting_key'] ?? $item['key'] ?? '');
-                $v = $item['color_value'] ?? $item['value'] ?? '';
-                if ($k && $v) { $colors[$k] = $v; }
+        if (!empty($resp['data']['generated_css'])) {
+            $theme = $defaults;
+            $theme['generated_css'] = $resp['data']['generated_css'];
+            // Also apply color map from response
+            foreach ($resp['data']['colors'] ?? [] as $item) {
+                $k = $item['key'] ?? '';
+                $v = $item['value'] ?? '';
+                $colorMap = [
+                    'primary_color'   => 'primary',
+                    'secondary_color' => 'secondary',
+                    'accent_color'    => 'accent',
+                    'header_bg_color' => 'header_bg',
+                    'footer_bg_color' => 'footer_bg',
+                ];
+                if ($k && $v && isset($colorMap[$k])) $theme[$colorMap[$k]] = $v;
             }
-            $_SESSION[$cacheKey]         = $colors;
+            if (empty($theme['header_bg']) || $theme['header_bg'] === $defaults['header_bg']) {
+                $theme['header_bg'] = $theme['primary'];
+            }
+            $_SESSION[$cacheKey]         = $theme;
             $_SESSION[$cacheKey . '_ts'] = time();
-            return $colors;
+            return $theme;
         }
 
         return $defaults;

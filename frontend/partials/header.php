@@ -62,7 +62,7 @@ $_fontUrl = $dir === 'rtl'
 
     <!-- Theme: inject CSS variables from DB color_settings -->
     <?php if (!empty($theme)): ?>
-    <style>
+    <style id="pubThemeVars">
     :root {
         --pub-primary:    <?= e($theme['primary']    ?? '#FF0000') ?>;
         --pub-secondary:  <?= e($theme['secondary']  ?? '#10B981') ?>;
@@ -79,6 +79,9 @@ $_fontUrl = $dir === 'rtl'
     .pub-footer  { background: var(--pub-footer-bg) !important; }
     .pub-hero    { background: linear-gradient(135deg, var(--pub-header-bg) 0%, var(--pub-accent) 100%) !important; }
     </style>
+    <?php if (!empty($theme['generated_css'])): ?>
+    <style id="pubDynamicTheme"><?= $theme['generated_css'] ?></style>
+    <?php endif; ?>
     <script type="application/json" id="pubThemeData"><?= json_encode($theme, JSON_HEX_TAG | JSON_UNESCAPED_UNICODE) ?></script>
     <?php endif; ?>
 </head>

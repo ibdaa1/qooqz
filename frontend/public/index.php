@@ -3,7 +3,7 @@ declare(strict_types=1);
 /**
  * frontend/public/index.php
  * QOOQZ — Global Public Homepage
- * Displays: Categories · Products · Jobs · Entities · Tenants
+ * Renders homepage sections dynamically from homepage_sections table.
  */
 
 require_once dirname(__DIR__) . '/includes/public_context.php';
@@ -13,6 +13,7 @@ $lang     = $ctx['lang'];
 $dir      = $ctx['dir'];
 $theme    = $ctx['theme'];
 $tenantId = $ctx['tenant_id'];
+$apiBase  = pub_api_url('');
 
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
@@ -20,35 +21,45 @@ $GLOBALS['PUB_PAGE_TITLE'] = t('hero.title') . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_DESC']  = t('hero.subtitle');
 
 /* -------------------------------------------------------
- * Fetch data sections from real API
+ * Fetch homepage sections from DB
  * ----------------------------------------------------- */
-$base = pub_api_url('');
-$qs   = 'lang=' . urlencode($lang) . '&per=8&page=1&tenant_id=' . $tenantId;
+$sectionsResp = pub_fetch($apiBase . 'public/homepage_sections?tenant_id=' . $tenantId . '&lang=' . urlencode($lang));
+$sections     = $sectionsResp['data'] ?? [];
 
-// Products
-$r = pub_fetch($base . 'public/products?' . $qs);
-$featuredProducts = $r['data']['data'] ?? ($r['data']['items'] ?? []);
-$totalProducts    = (int)($r['data']['meta']['total'] ?? count($featuredProducts));
+/* -------------------------------------------------------
+ * Helper: load section data based on section_type
+ * data_source column in homepage_sections may contain a relative URL
+ * like /categories?per_page=6 — we call our own API instead.
+ * ----------------------------------------------------- */
+$baseQs = 'lang=' . urlencode($lang) . '&tenant_id=' . $tenantId;
+function pub_section_data(string $type, int $limit, string $lang, int $tenantId, string $apiBase): array {
+    $qs = 'lang=' . urlencode($lang) . '&tenant_id=' . $tenantId . '&per=' . $limit . '&page=1';
+    return match($type) {
+        'categories'        => pub_fetch($apiBase . 'public/categories?'         . $qs . '&featured=1')['data']['data'] ?? [],
+        'featured_products' => pub_fetch($apiBase . 'public/products?'           . $qs . '&is_featured=1')['data']['data'] ?? [],
+        'new_products'      => pub_fetch($apiBase . 'public/products?'           . $qs . '&is_new=1')['data']['data'] ?? [],
+        'slider','banners'  => pub_fetch($apiBase . 'public/banners?tenant_id='  . $tenantId)['data'] ?? [],
+        'deals'             => pub_fetch($apiBase . 'public/discounts?tenant_id='. $tenantId . '&lang=' . urlencode($lang))['data'] ?? [],
+        'brands'            => pub_fetch($apiBase . 'public/entities?'           . $qs . '&per=8')['data']['data'] ?? [],
+        'vendors'           => pub_fetch($apiBase . 'public/entities?'           . $qs . '&per=6')['data']['data'] ?? [],
+        default             => [],
+    };
+}
 
-// Categories
-$rc = pub_fetch($base . 'public/categories?lang=' . urlencode($lang) . '&per=8&tenant_id=' . $tenantId . '&featured=1');
-$featuredCategories = $rc['data']['data'] ?? ($rc['data']['items'] ?? []);
-$totalCategories    = (int)($rc['data']['meta']['total'] ?? count($featuredCategories));
+/* -------------------------------------------------------
+ * Pre-fetch stats (independent of sections)
+ * ----------------------------------------------------- */
+$rProd = pub_fetch($apiBase . 'public/products?lang=' . urlencode($lang) . '&per=1&page=1&tenant_id=' . $tenantId);
+$rCat  = pub_fetch($apiBase . 'public/categories?lang=' . urlencode($lang) . '&per=1&tenant_id=' . $tenantId);
+$rJob  = pub_fetch($apiBase . 'public/jobs?lang=' . urlencode($lang) . '&per=1');
+$rEnt  = pub_fetch($apiBase . 'public/entities?lang=' . urlencode($lang) . '&per=1&tenant_id=' . $tenantId);
+$rTen  = pub_fetch($apiBase . 'public/tenants?lang=' . urlencode($lang) . '&per=1');
 
-// Jobs
-$rj = pub_fetch($base . 'public/jobs?lang=' . urlencode($lang) . '&per=6&is_featured=1');
-$latestJobs   = $rj['data']['data'] ?? ($rj['data']['items'] ?? []);
-$totalJobs    = (int)($rj['data']['meta']['total'] ?? count($latestJobs));
-
-// Entities
-$re = pub_fetch($base . 'public/entities?' . $qs . '&per=6');
-$featuredEntities = $re['data']['data'] ?? ($re['data']['items'] ?? []);
-$totalEntities    = (int)($re['data']['meta']['total'] ?? count($featuredEntities));
-
-// Tenants
-$rt = pub_fetch($base . 'public/tenants?' . $qs . '&per=6');
-$featuredTenants = $rt['data']['data'] ?? ($rt['data']['items'] ?? []);
-$totalTenants    = (int)($rt['data']['meta']['total'] ?? count($featuredTenants));
+$totalProducts  = (int)($rProd['data']['meta']['total'] ?? 0);
+$totalCategories= (int)($rCat['data']['meta']['total']  ?? 0);
+$totalJobs      = (int)($rJob['data']['meta']['total']  ?? 0);
+$totalEntities  = (int)($rEnt['data']['meta']['total']  ?? 0);
+$totalTenants   = (int)($rTen['data']['meta']['total']  ?? 0);
 
 include dirname(__DIR__) . '/partials/header.php';
 ?>
@@ -91,31 +102,219 @@ include dirname(__DIR__) . '/partials/header.php';
 <div class="pub-container">
     <div class="pub-stats-row">
         <div class="pub-stat-item">
-            <span class="pub-stat-value" data-target="<?= (int)$totalProducts ?>"><?= number_format((int)$totalProducts) ?>+</span>
+            <span class="pub-stat-value"><?= number_format($totalProducts) ?>+</span>
             <span class="pub-stat-label"><?= e(t('stats.products')) ?></span>
         </div>
         <div class="pub-stat-item">
-            <span class="pub-stat-value" data-target="<?= (int)$totalCategories ?>"><?= number_format((int)$totalCategories) ?>+</span>
+            <span class="pub-stat-value"><?= number_format($totalCategories) ?>+</span>
             <span class="pub-stat-label"><?= e(t('nav.categories')) ?></span>
         </div>
         <div class="pub-stat-item">
-            <span class="pub-stat-value" data-target="<?= (int)$totalJobs ?>"><?= number_format((int)$totalJobs) ?>+</span>
+            <span class="pub-stat-value"><?= number_format($totalJobs) ?>+</span>
             <span class="pub-stat-label"><?= e(t('stats.jobs')) ?></span>
         </div>
         <div class="pub-stat-item">
-            <span class="pub-stat-value" data-target="<?= (int)$totalEntities ?>"><?= number_format((int)$totalEntities) ?>+</span>
+            <span class="pub-stat-value"><?= number_format($totalEntities) ?>+</span>
             <span class="pub-stat-label"><?= e(t('stats.entities')) ?></span>
         </div>
         <div class="pub-stat-item">
-            <span class="pub-stat-value" data-target="<?= (int)$totalTenants ?>"><?= number_format((int)$totalTenants) ?>+</span>
+            <span class="pub-stat-value"><?= number_format($totalTenants) ?>+</span>
             <span class="pub-stat-label"><?= e(t('stats.tenants')) ?></span>
         </div>
     </div>
 </div>
 
-<!-- =============================================
-     FEATURED CATEGORIES
-============================================= -->
+<?php if (!empty($sections)):
+    foreach ($sections as $sec):
+        $secType   = $sec['section_type'] ?? '';
+        $layout    = $sec['layout_type']  ?? 'grid';
+        $perRow    = max(1, (int)($sec['items_per_row'] ?? 4));
+        $secBg     = $sec['background_color'] ?? '';
+        $secText   = $sec['text_color'] ?? '';
+        $secPad    = $sec['padding'] ?? '36px 0';
+        $secTitle  = $sec['title']    ?? '';
+        $secSub    = $sec['subtitle'] ?? '';
+        $items     = pub_section_data($secType, $perRow * 2, $lang, $tenantId, $apiBase);
+
+        if (empty($items)) continue;
+
+        $sStyle = '';
+        if ($secBg)   $sStyle .= 'background:' . e($secBg)   . ';';
+        if ($secText) $sStyle .= 'color:'       . e($secText) . ';';
+        if ($secPad)  $sStyle .= 'padding:'     . e($secPad)  . ';';
+?>
+<!-- Section: <?= e($secType) ?> -->
+<section class="pub-section" style="<?= $sStyle ?>">
+    <div class="pub-container">
+        <?php if ($secTitle): ?>
+        <div class="pub-section-head">
+            <h2 class="pub-section-title"><?= e($secTitle) ?></h2>
+            <?php
+            $viewAllLink = match($secType) {
+                'categories'        => '/frontend/public/categories.php',
+                'featured_products',
+                'new_products',
+                'deals'             => '/frontend/public/products.php',
+                'brands','vendors'  => '/frontend/public/entities.php',
+                default             => '',
+            };
+            if ($viewAllLink): ?>
+            <a href="<?= e($viewAllLink) ?>" class="pub-section-link"><?= e(t('sections.view_all')) ?></a>
+            <?php endif; ?>
+        </div>
+        <?php if ($secSub): ?><p class="pub-section-sub"><?= e($secSub) ?></p><?php endif; ?>
+        <?php endif; ?>
+
+        <?php
+        /* ---- Slider / Banner section ---- */
+        if ($secType === 'slider' || $secType === 'banners'): ?>
+        <div class="pub-banner-slider">
+            <?php foreach ($items as $b): ?>
+            <div class="pub-banner-slide"<?php if (!empty($b['background_color'])): ?> style="background:<?= e($b['background_color']) ?>"<?php endif; ?>>
+                <?php if (!empty($b['image_url'])): ?>
+                <a href="<?= e($b['link_url'] ?? '#') ?>">
+                    <img src="<?= e(pub_img($b['image_url'])) ?>"
+                         alt="<?= e($b['title'] ?? '') ?>" class="pub-banner-img" loading="lazy">
+                </a>
+                <?php endif; ?>
+                <?php if (!empty($b['title'])): ?>
+                <div class="pub-banner-caption">
+                    <h3><?= e($b['title']) ?></h3>
+                    <?php if (!empty($b['subtitle'])): ?><p><?= e($b['subtitle']) ?></p><?php endif; ?>
+                    <?php if (!empty($b['link_url']) && !empty($b['link_text'])): ?>
+                    <a href="<?= e($b['link_url']) ?>" class="pub-btn pub-btn--primary pub-btn--sm"><?= e($b['link_text']) ?></a>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+        </div>
+
+        <?php /* ---- Deals / Discounts section ---- */
+        elseif ($secType === 'deals'): ?>
+        <div class="pub-grid-lg">
+            <?php foreach ($items as $deal): ?>
+            <div class="pub-deal-card">
+                <?php if (!empty($deal['code'])): ?>
+                    <span class="pub-deal-badge"><?= e($deal['code']) ?></span>
+                <?php endif; ?>
+                <p class="pub-deal-title"><?= e($deal['title'] ?? $deal['code'] ?? '') ?></p>
+                <?php if (!empty($deal['description'])): ?>
+                    <p class="pub-deal-desc"><?= e($deal['description']) ?></p>
+                <?php endif; ?>
+                <?php if (!empty($deal['ends_at'])): ?>
+                    <p class="pub-deal-expires">⏰ <?= e(t('deals.expires')) ?>: <?= e(substr($deal['ends_at'], 0, 10)) ?></p>
+                <?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+        </div>
+
+        <?php /* ---- Categories section ---- */
+        elseif ($secType === 'categories'): ?>
+        <div class="pub-grid-cat">
+            <?php foreach ($items as $cat): ?>
+            <a href="/frontend/public/products.php?category_id=<?= (int)($cat['id'] ?? 0) ?>"
+               class="pub-cat-card<?= !empty($cat['is_featured']) ? ' pub-cat-card--featured' : '' ?>"
+               style="text-decoration:none;">
+                <div class="pub-cat-img-wrap">
+                    <?php if (!empty($cat['image_url'])): ?>
+                        <img src="<?= e(pub_img($cat['image_url'], 'category')) ?>"
+                             alt="<?= e($cat['name'] ?? '') ?>" class="pub-cat-img" loading="lazy"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                        <span class="pub-img-placeholder" style="display:none;" aria-hidden="true">📂</span>
+                    <?php else: ?>
+                        <span class="pub-img-placeholder" aria-hidden="true">📂</span>
+                    <?php endif; ?>
+                </div>
+                <div class="pub-cat-body">
+                    <h3 class="pub-cat-name"><?= e($cat['name'] ?? '') ?></h3>
+                    <?php if (!empty($cat['product_count'])): ?>
+                        <span class="pub-cat-count"><?= (int)$cat['product_count'] ?> <?= e(t('categories.products_count')) ?></span>
+                    <?php endif; ?>
+                </div>
+            </a>
+            <?php endforeach; ?>
+        </div>
+
+        <?php /* ---- Products (featured / new) ---- */
+        elseif (in_array($secType, ['featured_products', 'new_products'], true)): ?>
+        <div class="pub-grid">
+            <?php foreach ($items as $p): ?>
+            <a href="/frontend/public/products.php?id=<?= (int)($p['id'] ?? 0) ?>"
+               class="pub-product-card" style="text-decoration:none;">
+                <div class="pub-cat-img-wrap" style="aspect-ratio:1;">
+                    <?php if (!empty($p['image_url'])): ?>
+                        <img src="<?= e(pub_img($p['image_url'], 'product')) ?>"
+                             alt="<?= e($p['name'] ?? '') ?>" class="pub-cat-img" loading="lazy"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                        <span class="pub-img-placeholder" style="display:none;" aria-hidden="true">🖼️</span>
+                    <?php else: ?>
+                        <span class="pub-img-placeholder" aria-hidden="true">🖼️</span>
+                    <?php endif; ?>
+                </div>
+                <div class="pub-product-card-body">
+                    <?php if (!empty($p['is_featured'])): ?>
+                        <span class="pub-product-badge"><?= e(t('products.featured')) ?></span>
+                    <?php endif; ?>
+                    <p class="pub-product-name"><?= e($p['name'] ?? '') ?></p>
+                    <?php if (!empty($p['price'])): ?>
+                        <p class="pub-product-price">
+                            <?= number_format((float)$p['price'], 2) ?>
+                            <?= e($p['currency_code'] ?? t('common.currency')) ?>
+                        </p>
+                    <?php endif; ?>
+                </div>
+            </a>
+            <?php endforeach; ?>
+        </div>
+
+        <?php /* ---- Brands / Vendors ---- */
+        elseif (in_array($secType, ['brands', 'vendors'], true)): ?>
+        <div class="pub-grid-md">
+            <?php foreach ($items as $ent): ?>
+            <a href="/frontend/public/entity.php?id=<?= (int)($ent['id'] ?? 0) ?>"
+               class="pub-entity-card" style="text-decoration:none;">
+                <div class="pub-entity-avatar">
+                    <?php if (!empty($ent['logo_url'])): ?>
+                        <img src="<?= e(pub_img($ent['logo_url'], 'entity_logo')) ?>"
+                             alt="<?= e($ent['store_name'] ?? '') ?>" loading="lazy"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                        <span style="display:none;">🏢</span>
+                    <?php else: ?>
+                        🏢
+                    <?php endif; ?>
+                </div>
+                <div class="pub-entity-info">
+                    <p class="pub-entity-name"><?= e($ent['store_name'] ?? $ent['name'] ?? '') ?></p>
+                    <?php if (!empty($ent['vendor_type'])): ?>
+                        <p class="pub-entity-desc"><?= e($ent['vendor_type']) ?></p>
+                    <?php endif; ?>
+                    <?php if (!empty($ent['is_verified'])): ?>
+                        <span class="pub-entity-verified">✅ <?= e(t('entities.verified')) ?></span>
+                    <?php endif; ?>
+                </div>
+            </a>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+    </div>
+</section>
+    <?php endforeach;
+else:
+    /* ---- Fallback: no homepage_sections in DB → render default static sections ---- */
+    $rp  = pub_fetch($apiBase . 'public/products?'  . $baseQs . '&per=8&is_featured=1');
+    $rc  = pub_fetch($apiBase . 'public/categories?' . $baseQs . '&per=8&featured=1');
+    $rj  = pub_fetch($apiBase . 'public/jobs?lang='  . urlencode($lang) . '&per=6&is_featured=1');
+    $re  = pub_fetch($apiBase . 'public/entities?'   . $baseQs . '&per=6');
+    $rt  = pub_fetch($apiBase . 'public/tenants?'    . $baseQs . '&per=6');
+
+    $featuredProducts  = $rp['data']['data'] ?? [];
+    $featuredCategories= $rc['data']['data'] ?? [];
+    $latestJobs        = $rj['data']['data'] ?? [];
+    $featuredEntities  = $re['data']['data'] ?? [];
+    $featuredTenants   = $rt['data']['data'] ?? [];
+?>
 <?php if (!empty($featuredCategories)): ?>
 <section class="pub-section">
     <div class="pub-container">
@@ -151,9 +350,6 @@ include dirname(__DIR__) . '/partials/header.php';
 </section>
 <?php endif; ?>
 
-<!-- =============================================
-     FEATURED PRODUCTS
-============================================= -->
 <?php if (!empty($featuredProducts)): ?>
 <section class="pub-section" style="background:var(--pub-surface);">
     <div class="pub-container">
@@ -183,7 +379,7 @@ include dirname(__DIR__) . '/partials/header.php';
                     <?php if (!empty($p['price'])): ?>
                         <p class="pub-product-price">
                             <?= number_format((float)$p['price'], 2) ?>
-                            <?= e($p['currency'] ?? t('common.currency')) ?>
+                            <?= e($p['currency_code'] ?? t('common.currency')) ?>
                         </p>
                     <?php endif; ?>
                 </div>
@@ -194,9 +390,6 @@ include dirname(__DIR__) . '/partials/header.php';
 </section>
 <?php endif; ?>
 
-<!-- =============================================
-     LATEST JOBS
-============================================= -->
 <?php if (!empty($latestJobs)): ?>
 <section class="pub-section">
     <div class="pub-container">
@@ -210,9 +403,6 @@ include dirname(__DIR__) . '/partials/header.php';
                class="pub-job-card" style="text-decoration:none;">
                 <h3 class="pub-job-title"><?= e($j['title'] ?? '') ?></h3>
                 <div class="pub-job-meta">
-                    <?php if (!empty($j['city_name'])): ?>
-                        <span>📍 <?= e($j['city_name']) ?></span>
-                    <?php endif; ?>
                     <?php if (!empty($j['employment_type'])): ?>
                         <span>🕐 <?= e(str_replace('_', ' ', $j['employment_type'])) ?></span>
                     <?php endif; ?>
@@ -229,9 +419,6 @@ include dirname(__DIR__) . '/partials/header.php';
 </section>
 <?php endif; ?>
 
-<!-- =============================================
-     ENTITIES
-============================================= -->
 <?php if (!empty($featuredEntities)): ?>
 <section class="pub-section" style="background:var(--pub-surface);">
     <div class="pub-container">
@@ -269,9 +456,6 @@ include dirname(__DIR__) . '/partials/header.php';
 </section>
 <?php endif; ?>
 
-<!-- =============================================
-     TENANTS
-============================================= -->
 <?php if (!empty($featuredTenants)): ?>
 <section class="pub-section">
     <div class="pub-container">
@@ -285,11 +469,11 @@ include dirname(__DIR__) . '/partials/header.php';
                class="pub-entity-card" style="text-decoration:none;">
                 <div class="pub-entity-avatar">🏪</div>
                 <div class="pub-entity-info">
-                    <p class="pub-entity-name"><?= e($ten['store_name'] ?? $ten['name'] ?? '') ?></p>
+                    <p class="pub-entity-name"><?= e($ten['name'] ?? '') ?></p>
                     <?php if (!empty($ten['domain'])): ?>
                         <p class="pub-entity-desc"><?= e($ten['domain']) ?></p>
                     <?php endif; ?>
-                    <?php if (!empty($ten['is_active'])): ?>
+                    <?php if (($ten['status'] ?? '') === 'active'): ?>
                         <span class="pub-entity-verified">🟢 <?= e(t('tenants.active')) ?></span>
                     <?php endif; ?>
                 </div>
@@ -299,5 +483,7 @@ include dirname(__DIR__) . '/partials/header.php';
     </div>
 </section>
 <?php endif; ?>
+
+<?php endif; /* end sections/fallback */ ?>
 
 <?php include dirname(__DIR__) . '/partials/footer.php'; ?>

@@ -892,3 +892,80 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   font-weight: 600;
   margin-top: auto;
 }
+
+/* -------------------------------------------------------
+   24. Banner / Slider section
+   ----------------------------------------------------- */
+.pub-banner-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+@media (min-width: 768px) {
+  .pub-banner-slider { flex-direction: row; flex-wrap: wrap; }
+  .pub-banner-slide  { flex: 1 1 320px; }
+}
+.pub-banner-slide {
+  position: relative;
+  border-radius: var(--pub-radius);
+  overflow: hidden;
+  background: var(--pub-surface);
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+}
+.pub-banner-img {
+  width: 100%;
+  height: auto;
+  max-height: 360px;
+  object-fit: cover;
+  display: block;
+}
+.pub-banner-caption {
+  padding: 16px;
+  background: rgba(0,0,0,0.45);
+  color: #fff;
+  position: absolute;
+  bottom: 0;
+  inset-inline: 0;
+}
+.pub-banner-caption h3 { margin: 0 0 4px; font-size: 1.05rem; font-weight: 700; }
+.pub-banner-caption p  { margin: 0 0 10px; font-size: 0.88rem; opacity: 0.9; }
+
+/* -------------------------------------------------------
+   25. Deal / Discount cards
+   ----------------------------------------------------- */
+.pub-deal-card {
+  background: var(--pub-bg);
+  border: 2px dashed var(--pub-primary);
+  border-radius: var(--pub-radius);
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: box-shadow var(--pub-transition);
+}
+.pub-deal-card:hover { box-shadow: var(--pub-shadow-hover); }
+.pub-deal-badge {
+  display: inline-block;
+  background: var(--pub-primary);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 3px 12px;
+  border-radius: 20px;
+  letter-spacing: 0.05em;
+  width: fit-content;
+}
+.pub-deal-title  { font-size: 1rem; font-weight: 700; color: var(--pub-text); margin: 0; }
+.pub-deal-desc   { font-size: 0.84rem; color: var(--pub-muted); margin: 0; }
+.pub-deal-expires { font-size: 0.8rem; color: var(--pub-muted); margin: 0; }
+
+/* -------------------------------------------------------
+   26. Section subtitle
+   ----------------------------------------------------- */
+.pub-section-sub {
+  font-size: 0.9rem;
+  color: var(--pub-muted);
+  margin: -12px 0 16px;
+}
