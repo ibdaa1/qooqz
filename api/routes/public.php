@@ -145,7 +145,7 @@ if ($first === 'products') {
       LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
       LEFT JOIN product_pricing pp ON pp.product_id = p.id AND pp.variant_id IS NULL AND pp.is_active = 1
       LEFT JOIN images i ON i.owner_id = p.id AND i.is_main = 1
-             AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product_thumb' LIMIT 1)
+             AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
          $where ORDER BY p.id DESC LIMIT ? OFFSET ?",
         array_merge([$lang], $whereParams, [$per, $offset])
     );
@@ -310,7 +310,7 @@ if ($first === 'entity') {
           LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
           LEFT JOIN product_pricing pp ON pp.product_id = p.id AND pp.variant_id IS NULL AND pp.is_active = 1
           LEFT JOIN images i ON i.owner_id = p.id AND i.is_main = 1
-                 AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product_thumb' LIMIT 1)
+                 AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
               $where ORDER BY p.is_featured DESC, p.id DESC LIMIT ? OFFSET ?",
             array_merge([$lang], $params, [$per, $offset])
         );
@@ -335,7 +335,7 @@ if ($first === 'entity') {
              AND logo_i.image_type_id = (SELECT id FROM image_types WHERE code = 'entity_logo' LIMIT 1)
       LEFT JOIN images cover_i ON cover_i.owner_id = e.id AND cover_i.is_main = 1
              AND cover_i.image_type_id = (SELECT id FROM image_types WHERE code = 'entity_cover' LIMIT 1)
-          WHERE e.id = ? AND e.status = 'active' LIMIT 1",
+          WHERE e.id = ? AND e.status = 'approved' LIMIT 1",
         [$entityId]
     );
 
@@ -411,13 +411,13 @@ if ($first === 'entities') {
     $id = $_GET['id'] ?? (isset($segments[1]) && ctype_digit((string)$segments[1]) ? (int)$segments[1] : null);
 
     if ($id) {
-        $row = $pdoOne("SELECT * FROM entities WHERE id = ? AND status = 'active' LIMIT 1", [$id]);
+        $row = $pdoOne("SELECT * FROM entities WHERE id = ? AND status = 'approved' LIMIT 1", [$id]);
         if ($row) ResponseFormatter::success(['ok' => true, 'entity' => $row]);
         else      ResponseFormatter::notFound('Entity not found');
         exit;
     }
 
-    $where  = "WHERE e.status = 'active'";
+    $where  = "WHERE e.status = 'approved'";
     $params = [];
     if ($tenantId)                          { $where .= ' AND e.tenant_id = ?';    $params[] = $tenantId; }
     if (!empty($_GET['vendor_type']))        { $where .= ' AND e.vendor_type = ?'; $params[] = $_GET['vendor_type']; }
@@ -451,13 +451,13 @@ if ($first === 'tenants') {
     $id = $_GET['id'] ?? (isset($segments[1]) && ctype_digit((string)$segments[1]) ? (int)$segments[1] : null);
 
     if ($id) {
-        $row = $pdoOne("SELECT id, name, store_name, domain, is_active, plan_id FROM tenants WHERE id = ? AND is_active = 1 LIMIT 1", [$id]);
+        $row = $pdoOne("SELECT id, name, store_name, domain, status, plan_id FROM tenants WHERE id = ? AND status = 'active' LIMIT 1", [$id]);
         if ($row) ResponseFormatter::success(['ok' => true, 'tenant' => $row]);
         else      ResponseFormatter::notFound('Tenant not found');
         exit;
     }
 
-    $where  = 'WHERE t.is_active = 1';
+    $where  = "WHERE t.status = 'active'";
     $params = [];
     if (!empty($_GET['search'])) {
         $where .= ' AND (t.name LIKE ? OR t.store_name LIKE ? OR t.domain LIKE ?)';
@@ -467,7 +467,7 @@ if ($first === 'tenants') {
 
     $total = $pdoCount("SELECT COUNT(*) FROM tenants t $where", $params);
     $rows  = $pdoList(
-        "SELECT t.id, t.name, t.store_name, t.domain, t.is_active,
+        "SELECT t.id, t.name, t.store_name, t.domain, t.status,
                 sp.plan_name
            FROM tenants t
       LEFT JOIN subscription_plans sp ON sp.id = (
