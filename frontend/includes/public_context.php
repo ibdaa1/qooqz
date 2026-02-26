@@ -221,16 +221,16 @@ if (!function_exists('pub_load_theme')) {
     function pub_load_theme(int $tenantId = 1): array {
         // Defaults (fallback when DB is unreachable)
         $defaults = [
-            'primary'    => '#FF0000',
+            'primary'    => '#03874e',
             'secondary'  => '#10B981',
             'accent'     => '#F59E0B',
             'background' => '#0d0d0d',
-            'surface'    => '#1a1a2e',
+            'surface'    => '#4f4f4f',
             'text'       => '#FFFFFF',
             'text_muted' => '#B0B0B0',
             'border'     => '#333333',
-            'header_bg'  => '#FF0000',
-            'footer_bg'  => '#1a1a2e',
+            'header_bg'  => '#03874e',
+            'footer_bg'  => '#1e2a38',
             'generated_css' => '',
             'fonts'      => [],
             'design'     => [],
@@ -238,12 +238,8 @@ if (!function_exists('pub_load_theme')) {
             'cards'      => [],
         ];
 
-        // Session cache (TTL: 5 min)
-        $cacheKey = 'pub_theme_' . $tenantId;
-        if (!empty($_SESSION[$cacheKey]) && !empty($_SESSION[$cacheKey . '_ts'])
-            && (time() - $_SESSION[$cacheKey . '_ts']) < 300) {
-            return $_SESSION[$cacheKey];
-        }
+        // Session cache is checked after theme_id lookup (inside PDO block below)
+        // to ensure cache key includes theme_id and stale entries are not returned.
 
         // Try direct PDO connection (same DB as API)
         $dbConf = null;
@@ -272,46 +268,85 @@ if (!function_exists('pub_load_theme')) {
                 $buttons = [];
                 $cards   = [];
 
+                // Look up active theme_id (mirrors AdminUiThemeLoader::getActiveThemeId)
+                $thSt = $pdo->prepare('SELECT id FROM themes WHERE tenant_id = ? AND is_active = 1 LIMIT 1');
+                $thSt->execute([$tenantId]);
+                $thRow = $thSt->fetch(PDO::FETCH_ASSOC);
+                if (!$thRow) {
+                    $thSt = $pdo->prepare('SELECT id FROM themes WHERE tenant_id = ? AND is_default = 1 LIMIT 1');
+                    $thSt->execute([$tenantId]);
+                    $thRow = $thSt->fetch(PDO::FETCH_ASSOC);
+                }
+                $themeDbId  = $thRow ? (int)$thRow['id'] : null;
+                $thIdCond   = $themeDbId ? ' AND theme_id = ?' : '';
+                $thP = static function(array $base) use ($themeDbId): array {
+                    return $themeDbId ? array_merge($base, [$themeDbId]) : $base;
+                };
+
+                // Include theme_id in session cache key so stale caches auto-bust
+                $cacheKey = 'pub_theme_' . $tenantId . '_' . ($themeDbId ?? '0');
+
+                // Session cache check (TTL: 5 min) placed here so key includes theme_id
+                if (!empty($_SESSION[$cacheKey]) && !empty($_SESSION[$cacheKey . '_ts'])
+                    && (time() - $_SESSION[$cacheKey . '_ts']) < 300) {
+                    return $_SESSION[$cacheKey];
+                }
+
                 // color_settings: setting_key, color_value
-                $st = $pdo->prepare('SELECT setting_key, color_value FROM color_settings WHERE tenant_id = ? AND is_active = 1 ORDER BY sort_order, id');
-                $st->execute([$tenantId]);
+                $st = $pdo->prepare('SELECT setting_key, color_value FROM color_settings WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY sort_order, id');
+                $st->execute($thP([$tenantId]));
                 $colorRows = $st->fetchAll(PDO::FETCH_ASSOC);
 
                 // font_settings: setting_key, font_family, font_size, font_weight, line_height
-                $st = $pdo->prepare('SELECT setting_key, font_family, font_size, font_weight, line_height FROM font_settings WHERE tenant_id = ? AND is_active = 1 ORDER BY sort_order');
-                $st->execute([$tenantId]);
+                $st = $pdo->prepare('SELECT setting_key, font_family, font_size, font_weight, line_height FROM font_settings WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY sort_order');
+                $st->execute($thP([$tenantId]));
                 $fonts = $st->fetchAll(PDO::FETCH_ASSOC);
 
                 // design_settings: setting_key, setting_value
-                $st = $pdo->prepare('SELECT setting_key, setting_value, setting_type FROM design_settings WHERE tenant_id = ? AND is_active = 1 ORDER BY sort_order');
-                $st->execute([$tenantId]);
+                $st = $pdo->prepare('SELECT setting_key, setting_value, setting_type FROM design_settings WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY sort_order');
+                $st->execute($thP([$tenantId]));
                 $designs = $st->fetchAll(PDO::FETCH_ASSOC);
 
                 // button_styles
-                $st = $pdo->prepare('SELECT slug, button_type, background_color, text_color, border_color, border_width, border_radius, padding, font_size, font_weight, hover_background_color, hover_text_color FROM button_styles WHERE tenant_id = ? AND is_active = 1 ORDER BY button_type');
-                $st->execute([$tenantId]);
+                $st = $pdo->prepare('SELECT slug, button_type, background_color, text_color, border_color, border_width, border_radius, padding, font_size, font_weight, hover_background_color, hover_text_color FROM button_styles WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY button_type');
+                $st->execute($thP([$tenantId]));
                 $buttons = $st->fetchAll(PDO::FETCH_ASSOC);
 
                 // card_styles
-                $st = $pdo->prepare('SELECT slug, card_type, background_color, border_color, border_width, border_radius, shadow_style, padding FROM card_styles WHERE tenant_id = ? AND is_active = 1 ORDER BY card_type');
-                $st->execute([$tenantId]);
+                $st = $pdo->prepare('SELECT slug, card_type, background_color, border_color, border_width, border_radius, shadow_style, padding FROM card_styles WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY card_type');
+                $st->execute($thP([$tenantId]));
                 $cards = $st->fetchAll(PDO::FETCH_ASSOC);
 
                 if ($colorRows || $fonts || $designs || $buttons || $cards) {
                     $theme = $defaults;
 
                     // Map color_settings keys to theme keys
+                    // Covers both possible naming conventions (noun_adjective vs adjective_noun)
                     $colorMap = [
                         'primary_color'        => 'primary',
                         'secondary_color'      => 'secondary',
                         'accent_color'         => 'accent',
+                        // "Main Background" — try both naming variants
                         'background_main'      => 'background',
+                        'main_background'      => 'background',
+                        'background_color_main'=> 'background',
+                        // "Secondary Background"
                         'background_secondary' => 'surface',
+                        'secondary_background' => 'surface',
+                        // "Primary Text"
                         'text_primary'         => 'text',
+                        'primary_text'         => 'text',
+                        'text_color_primary'   => 'text',
+                        // "Secondary Text"
                         'text_secondary'       => 'text_muted',
+                        'secondary_text'       => 'text_muted',
+                        // Border
                         'border_color'         => 'border',
+                        // Header/Footer background
                         'header_bg_color'      => 'header_bg',
+                        'header_background'    => 'header_bg',
                         'footer_bg_color'      => 'footer_bg',
+                        'footer_background'    => 'footer_bg',
                     ];
                     foreach ($colorRows as $row) {
                         $k = $row['setting_key'] ?? '';
