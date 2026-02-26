@@ -796,7 +796,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
    21. RTL adjustments
    ----------------------------------------------------- */
 [dir="rtl"] .pub-section-title::before { margin-inline-end: 0; margin-inline-start: 4px; }
-[dir="rtl"] .pub-mobile-nav-inner { box-shadow: -4px 0 20px rgba(0,0,0,0.25); border-inline-start: 1px solid rgba(255,255,255,0.1); }
+[dir="rtl"] .pub-mobile-nav-inner { box-shadow: -4px 0 20px rgba(0,0,0,0.25); border-right: 1px solid rgba(255,255,255,0.1); }
 
 /* -------------------------------------------------------
    22. Print / accessibility helpers
@@ -860,7 +860,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .pub-cat-badge {
   position: absolute;
   top: 8px;
-  inset-inline-start: 8px;
+  left: 8px;
   background: var(--pub-accent);
   color: #fff;
   font-size: 0.68rem;
@@ -868,6 +868,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   padding: 2px 7px;
   border-radius: 20px;
 }
+[dir="rtl"] .pub-cat-badge { left: auto; right: 8px; }
 .pub-cat-body {
   padding: 12px 14px;
   flex: 1;
@@ -1109,9 +1110,10 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .pub-gallery-main-img { width: 100%; height: 100%; object-fit: contain; display: block; cursor: zoom-in; }
 .pub-gallery-placeholder { font-size: 4rem; color: var(--pub-border); }
 .pub-gallery-badges {
-  position: absolute; top: 10px; inset-inline-start: 10px;
+  position: absolute; top: 10px; left: 10px;
   display: flex; flex-direction: column; gap: 5px;
 }
+[dir="rtl"] .pub-gallery-badges { left: auto; right: 10px; }
 .pub-gallery-thumbs {
   display: flex; gap: 8px; flex-wrap: wrap;
 }
@@ -1197,7 +1199,8 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   width: 48px;
   text-align: center;
   border: none;
-  border-inline: 1px solid var(--pub-border);
+  border-left: 1px solid var(--pub-border);
+  border-right: 1px solid var(--pub-border);
   font-size: 0.95rem;
   height: 40px;
   padding: 0;

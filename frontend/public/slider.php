@@ -151,7 +151,8 @@ include dirname(__DIR__) . '/partials/header.php';
 .pub-slider-caption {
     position: absolute;
     bottom: 0;
-    inset-inline: 0;
+    left: 0;
+    right: 0;
     padding: 24px;
     background: linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%);
     color: #fff;
@@ -183,7 +184,8 @@ include dirname(__DIR__) . '/partials/header.php';
 .pub-slider-dots {
     position: absolute;
     bottom: 10px;
-    inset-inline: 0;
+    left: 0;
+    right: 0;
     display: flex;
     justify-content: center;
     gap: 6px;
