@@ -96,16 +96,17 @@ if (!function_exists('pub_detect_lang')) {
 /* -------------------------------------------------------
  * 4. Resolve active language
  * ----------------------------------------------------- */
-// URL ?lang=xx overrides (useful for testing), then session, then app default
-// Browser Accept-Language is intentionally NOT used — platform default_lang takes precedence.
+// Priority: URL ?lang=xx (explicit override) → HTTP_ACCEPT_LANGUAGE → app default_lang
+// Session is used ONLY when user explicitly chose a language via URL param.
+// This prevents stale language being "stuck" from a previous visit.
 if (isset($_GET['lang']) && preg_match('/^[a-z]{2,5}$/', $_GET['lang'])) {
     $lang = $_GET['lang'];
-    $_SESSION['pub_lang'] = $lang;
+    $_SESSION['pub_lang'] = $lang;   // save explicit user choice
 } elseif (!empty($_SESSION['pub_lang'])) {
-    $lang = $_SESSION['pub_lang'];
+    $lang = $_SESSION['pub_lang'];   // honour previous explicit choice
 } else {
-    $lang = $appConfig['default_lang'] ?? 'en';
-    $_SESSION['pub_lang'] = $lang;
+    // Auto-detect from browser Accept-Language (no session save — fresh each request)
+    $lang = pub_detect_lang($appConfig['default_lang'] ?? 'en');
 }
 
 // Fallback to 'ar' if no translation file exists

@@ -41,7 +41,7 @@ function pub_section_data(string $type, int $limit, string $lang, int $tenantId,
         'new_products'      => pub_fetch($apiBase . 'public/products?'           . $qs . '&is_new=1')['data']['data'] ?? [],
         'slider','banners'  => pub_fetch($apiBase . 'public/banners?tenant_id='  . $tenantId)['data']['data'] ?? [],
         'deals'             => pub_fetch($apiBase . 'public/discounts?tenant_id='. $tenantId . '&lang=' . urlencode($lang))['data']['data'] ?? [],
-        'brands'            => pub_fetch($apiBase . 'public/entities?'           . $qs . '&per=8')['data']['data'] ?? [],
+        'brands'            => pub_fetch($apiBase . 'public/brands?'            . $qs . '&is_featured=1')['data']['data'] ?? [],
         'vendors'           => pub_fetch($apiBase . 'public/entities?'           . $qs . '&per=6')['data']['data'] ?? [],
         default             => [],
     };
@@ -489,9 +489,9 @@ else:
 <?php endif; /* end sections/fallback */ ?>
 </div><!-- #pub-homepage-sections -->
 
-<?php include dirname(__DIR__) . '/partials/footer.php'; ?>
 <script>
 if (typeof PubHomepageEngine !== 'undefined') {
     PubHomepageEngine.init(<?= (int)$tenantId ?>, '<?= e($lang) ?>');
 }
 </script>
+<?php include dirname(__DIR__) . '/partials/footer.php'; ?>

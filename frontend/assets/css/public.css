@@ -204,7 +204,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   box-shadow: 4px 0 20px rgba(0,0,0,0.25);
   overflow-y: auto;
 }
-[dir="rtl"] .pub-mobile-nav-inner { margin-inline-start: auto; }
+[dir="rtl"] .pub-mobile-nav-inner { margin-inline-end: auto; }
 [dir="ltr"] .pub-mobile-nav-inner { margin-inline-end: auto; }
 
 .pub-mobile-nav-inner a {
@@ -791,7 +791,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
    21. RTL adjustments
    ----------------------------------------------------- */
 [dir="rtl"] .pub-section-title::before { margin-inline-end: 0; margin-inline-start: 4px; }
-[dir="rtl"] .pub-mobile-nav-inner { border-inline-end: none; border-inline-start: 1px solid rgba(255,255,255,0.1); }
+[dir="rtl"] .pub-mobile-nav-inner { margin-inline-end: auto; border-inline-end: none; border-inline-start: 1px solid rgba(255,255,255,0.1); }
 
 /* -------------------------------------------------------
    22. Print / accessibility helpers
@@ -968,4 +968,48 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   font-size: 0.9rem;
   color: var(--pub-muted);
   margin: -12px 0 16px;
+}
+
+/* -------------------------------------------------------
+   27. Brand cards (homepage brands section)
+   ----------------------------------------------------- */
+.pub-brand-card {
+  background: var(--pub-bg);
+  border: 1px solid var(--pub-border);
+  border-radius: var(--pub-radius);
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  transition: box-shadow var(--pub-transition), transform var(--pub-transition);
+  cursor: pointer;
+}
+.pub-brand-card:hover {
+  box-shadow: var(--pub-shadow-hover);
+  transform: translateY(-2px);
+}
+.pub-brand-logo-wrap {
+  width: 96px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.pub-brand-logo {
+  max-width: 100%;
+  max-height: 72px;
+  object-fit: contain;
+}
+.pub-brand-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--pub-text);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
 }

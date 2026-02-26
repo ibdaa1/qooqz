@@ -201,6 +201,36 @@
     appendSection(wrap.el);
   }
 
+  function renderBrands(sec, items) {
+    var wrap = createSection(sec);
+    var grid = document.createElement('div');
+    grid.className = 'pub-grid-md';
+
+    items.forEach(function (b) {
+      var a = document.createElement('a');
+      if (b.website_url) {
+        a.href   = b.website_url;
+        a.target = '_blank';
+        a.rel    = 'noopener noreferrer';
+      } else {
+        a.href = '/frontend/public/products.php?brand_id=' + (parseInt(b.id) || 0);
+      }
+      a.className = 'pub-brand-card';
+      a.style.textDecoration = 'none';
+
+      var imgHtml = b.logo_url
+        ? '<img src="' + esc(imgUrl(b.logo_url)) + '" alt="' + esc(b.name || b.slug || '') + '" class="pub-brand-logo" loading="lazy" onerror="this.style.display=\'none\'">'
+        : '<span class="pub-img-placeholder" aria-hidden="true">🏷️</span>';
+
+      a.innerHTML = '<div class="pub-brand-logo-wrap">' + imgHtml + '</div>'
+        + '<p class="pub-brand-name">' + esc(b.name || b.slug || '') + '</p>';
+      grid.appendChild(a);
+    });
+
+    wrap.inner.appendChild(grid);
+    appendSection(wrap.el);
+  }
+
   function renderEntities(sec, items) {
     var wrap = createSection(sec);
     var grid = document.createElement('div');
@@ -240,7 +270,7 @@
     'featured_products': renderProducts,
     'new_products':      renderProducts,
     'deals':             renderDeals,
-    'brands':            renderEntities,
+    'brands':            renderBrands,
     'vendors':           renderEntities,
   };
 
@@ -255,7 +285,7 @@
     'featured_products': '/products?is_featured=1',
     'new_products':      '/products?is_new=1',
     'deals':             '/discounts',
-    'brands':            '/entities',
+    'brands':            '/brands?is_featured=1',
     'vendors':           '/entities',
   };
 
