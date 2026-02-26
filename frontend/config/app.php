@@ -3,7 +3,7 @@
 
 return [
     'name'     => 'QOOQZ',
-    'default_lang' => 'en',
+    'default_lang' => 'ar',
     'currency' => 'USD',
     'timezone' => 'UTC',
 ];

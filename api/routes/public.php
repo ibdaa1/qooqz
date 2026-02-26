@@ -12,7 +12,12 @@ declare(strict_types=1);
  *  - $GLOBALS['ADMIN_DB'] (PDO|null)
  */
 
-$segments = $_GET['segments'] ?? [];
+// Derive sub-route segments from the request URI.
+// The Kernel loads this file for all /api/public/* requests but does NOT
+// inject $_GET['segments'], so we parse the URI path here.
+$pubUri  = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+$pubRel  = (string)preg_replace('#^/api/public/?#i', '', (string)$pubUri);
+$segments = array_values(array_filter(explode('/', trim($pubRel, '/'))));
 $first    = strtolower($segments[0] ?? '');
 
 /** @var PDO|null $pdo */
@@ -108,17 +113,30 @@ if ($first === 'products') {
         exit;
     }
 
-    $where  = 'WHERE p.is_active = 1';
-    $params = [$lang];
-    if ($tenantId) { $where .= ' AND p.tenant_id = ?'; $params[] = $tenantId; }
+    // $whereParams: params for WHERE clause only (no lang — lang is for the translation JOIN)
+    $where       = 'WHERE p.is_active = 1';
+    $whereParams = [];
+    if ($tenantId) { $where .= ' AND p.tenant_id = ?'; $whereParams[] = $tenantId; }
     if (!empty($_GET['brand_id']) && is_numeric($_GET['brand_id'])) {
-        $where .= ' AND p.brand_id = ?'; $params[] = (int)$_GET['brand_id'];
+        $where .= ' AND p.brand_id = ?'; $whereParams[] = (int)$_GET['brand_id'];
     }
     if (!empty($_GET['is_featured'])) {
-        $where .= ' AND p.is_featured = ?'; $params[] = (int)$_GET['is_featured'];
+        $where .= ' AND p.is_featured = ?'; $whereParams[] = (int)$_GET['is_featured'];
+    }
+    if (!empty($_GET['category_id']) && is_numeric($_GET['category_id'])) {
+        $where .= ' AND p.id IN (SELECT product_id FROM product_categories WHERE category_id = ?)';
+        $whereParams[] = (int)$_GET['category_id'];
+    }
+    if (!empty($_GET['search'])) {
+        // Escape LIKE wildcards in the search term to prevent unintended broad matches
+        $kw = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], trim($_GET['search'])) . '%';
+        $where .= ' AND (p.slug LIKE ? OR p.id IN (SELECT product_id FROM product_translations WHERE name LIKE ? AND language_code = ?))';
+        $whereParams[] = $kw;
+        $whereParams[] = $kw;
+        $whereParams[] = $lang;
     }
 
-    $total = $pdoCount("SELECT COUNT(*) FROM products p $where", $params);
+    $total = $pdoCount("SELECT COUNT(*) FROM products p $where", $whereParams);
     $rows  = $pdoList(
         "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.sku, p.slug, p.is_featured, p.tenant_id,
                 pp.price, pp.currency_code,
@@ -129,7 +147,7 @@ if ($first === 'products') {
       LEFT JOIN images i ON i.owner_id = p.id AND i.is_main = 1
              AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product_thumb' LIMIT 1)
          $where ORDER BY p.id DESC LIMIT ? OFFSET ?",
-        array_merge($params, [$per, $offset])
+        array_merge([$lang], $whereParams, [$per, $offset])
     );
 
     ResponseFormatter::success([
@@ -167,27 +185,30 @@ if ($first === 'categories') {
         exit;
     }
 
-    $where  = "WHERE c.status = 'active'";
-    $params = [$lang];
-    if ($tenantId)                          { $where .= ' AND c.tenant_id = ?';   $params[] = $tenantId; }
+    // $whereParams: params for WHERE only (no lang — lang is for the translation JOIN)
+    $where       = "WHERE c.status = 'active'";
+    $whereParams = [];
+    if ($tenantId) { $where .= ' AND c.tenant_id = ?'; $whereParams[] = $tenantId; }
     if (isset($_GET['parent_id'])) {
         if ($_GET['parent_id'] === '0' || $_GET['parent_id'] === '') {
             $where .= ' AND (c.parent_id IS NULL OR c.parent_id = 0)';
         } elseif (is_numeric($_GET['parent_id'])) {
-            $where .= ' AND c.parent_id = ?'; $params[] = (int)$_GET['parent_id'];
+            $where .= ' AND c.parent_id = ?'; $whereParams[] = (int)$_GET['parent_id'];
         }
     }
-    if (!empty($_GET['featured']))           { $where .= ' AND c.is_featured = ?'; $params[] = 1; }
+    if (!empty($_GET['featured'])) { $where .= ' AND c.is_featured = ?'; $whereParams[] = 1; }
 
-    $total = $pdoCount("SELECT COUNT(*) FROM categories c $where", $params);
+    $total = $pdoCount("SELECT COUNT(*) FROM categories c $where", $whereParams);
     $rows  = $pdoList(
         "SELECT c.id, COALESCE(ct.name, c.slug) AS name, c.slug,
                 c.image_url, c.is_featured, c.status, c.parent_id, c.sort_order, c.tenant_id,
-                (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.is_active = 1) AS product_count
+                (SELECT COUNT(*) FROM products p
+                  INNER JOIN product_categories pc ON pc.product_id = p.id AND pc.category_id = c.id
+                  WHERE p.is_active = 1) AS product_count
            FROM categories c
       LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
           $where ORDER BY c.is_featured DESC, c.sort_order ASC, c.id ASC LIMIT ? OFFSET ?",
-        array_merge($params, [$per, $offset])
+        array_merge([$lang], $whereParams, [$per, $offset])
     );
 
     ResponseFormatter::success([
