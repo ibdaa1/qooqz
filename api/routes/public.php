@@ -124,6 +124,31 @@ if ($first === 'ui') {
             $css .= '  --' . preg_replace('/[^a-z0-9_\-]/', '-', strtolower((string)$c['key'])) . ': ' . $esc((string)$c['value']) . ";\n";
         }
     }
+    // CSS variable aliases: map DB setting_key names (underscore) to --pub-* / --color-*
+    // so public.css and variables.css receive the correct DB values directly.
+    $uiAliases = [
+        'primary_color'        => ['color-primary',  'pub-primary'],
+        'secondary_color'      => ['color-secondary', 'pub-secondary'],
+        'accent_color'         => ['color-accent',    'pub-accent'],
+        'background_main'      => ['pub-bg'],
+        'background_secondary' => ['pub-surface'],
+        'text_primary'         => ['pub-text'],
+        'text_secondary'       => ['pub-muted'],
+        'border_color'         => ['pub-border'],
+    ];
+    $colorKeyVal = [];
+    foreach ($colors as $c) {
+        if (!empty($c['key'])) {
+            $colorKeyVal[$c['key']] = $c['value'] ?? '';
+        }
+    }
+    foreach ($uiAliases as $srcKey => $aliases) {
+        if (empty($colorKeyVal[$srcKey])) continue;
+        $val = $esc($colorKeyVal[$srcKey]);
+        foreach ($aliases as $alias) {
+            $css .= '  --' . $alias . ': ' . $val . ";\n";
+        }
+    }
     foreach ($fonts as $f) {
         if (!empty($f['setting_key'])) {
             $sk = preg_replace('/[^a-z0-9_\-]/', '-', strtolower((string)$f['setting_key']));

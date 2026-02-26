@@ -157,7 +157,7 @@
 
     items.forEach(function (p) {
       var a = document.createElement('a');
-      a.href = '/frontend/public/products.php?id=' + (parseInt(p.id) || 0);
+      a.href = '/frontend/public/product.php?id=' + (parseInt(p.id) || 0);
       a.className = 'pub-product-card';
       a.style.textDecoration = 'none';
 

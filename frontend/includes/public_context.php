@@ -283,15 +283,6 @@ if (!function_exists('pub_load_theme')) {
                     return $themeDbId ? array_merge($base, [$themeDbId]) : $base;
                 };
 
-                // Include theme_id in session cache key so stale caches auto-bust
-                $cacheKey = 'pub_theme_' . $tenantId . '_' . ($themeDbId ?? '0');
-
-                // Session cache check (TTL: 5 min) placed here so key includes theme_id
-                if (!empty($_SESSION[$cacheKey]) && !empty($_SESSION[$cacheKey . '_ts'])
-                    && (time() - $_SESSION[$cacheKey . '_ts']) < 300) {
-                    return $_SESSION[$cacheKey];
-                }
-
                 // color_settings: setting_key, color_value
                 $st = $pdo->prepare('SELECT setting_key, color_value FROM color_settings WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY sort_order, id');
                 $st->execute($thP([$tenantId]));
@@ -373,6 +364,26 @@ if (!function_exists('pub_load_theme')) {
                     foreach ($colors as $k => $v) {
                         $css .= '  --' . preg_replace('/[^a-z0-9_\-]/', '-', strtolower($k)) . ': ' . $cssEsc($v) . ";\n";
                     }
+                    // CSS variable aliases: bridge DB setting_key names (underscore) to
+                    // --pub-* and --color-* names used in public.css / variables.css so
+                    // DB colours render correctly without relying solely on the PHP bridge.
+                    $pubAliases = [
+                        'primary_color'        => ['color-primary',  'pub-primary'],
+                        'secondary_color'      => ['color-secondary', 'pub-secondary'],
+                        'accent_color'         => ['color-accent',    'pub-accent'],
+                        'background_main'      => ['pub-bg'],
+                        'background_secondary' => ['pub-surface'],
+                        'text_primary'         => ['pub-text'],
+                        'text_secondary'       => ['pub-muted'],
+                        'border_color'         => ['pub-border'],
+                    ];
+                    foreach ($pubAliases as $srcKey => $aliases) {
+                        if (empty($colors[$srcKey])) continue;
+                        $val = $cssEsc($colors[$srcKey]);
+                        foreach ($aliases as $alias) {
+                            $css .= '  --' . $alias . ': ' . $val . ";\n";
+                        }
+                    }
                     foreach ($fonts as $f) {
                         if (empty($f['setting_key'])) continue;
                         $sk = preg_replace('/[^a-z0-9_\-]/', '-', strtolower($f['setting_key']));
@@ -416,8 +427,6 @@ if (!function_exists('pub_load_theme')) {
                     }
                     $theme['generated_css'] = $css;
 
-                    $_SESSION[$cacheKey]         = $theme;
-                    $_SESSION[$cacheKey . '_ts'] = time();
                     return $theme;
                 }
             } catch (Throwable $_) {
@@ -432,23 +441,26 @@ if (!function_exists('pub_load_theme')) {
             $theme = $defaults;
             $theme['generated_css'] = $resp['data']['generated_css'];
             // Also apply color map from response
+            $httpColorMap = [
+                'primary_color'        => 'primary',
+                'secondary_color'      => 'secondary',
+                'accent_color'         => 'accent',
+                'background_main'      => 'background',
+                'background_secondary' => 'surface',
+                'text_primary'         => 'text',
+                'text_secondary'       => 'text_muted',
+                'border_color'         => 'border',
+                'header_bg_color'      => 'header_bg',
+                'footer_bg_color'      => 'footer_bg',
+            ];
             foreach ($resp['data']['colors'] ?? [] as $item) {
                 $k = $item['key'] ?? '';
                 $v = $item['value'] ?? '';
-                $colorMap = [
-                    'primary_color'   => 'primary',
-                    'secondary_color' => 'secondary',
-                    'accent_color'    => 'accent',
-                    'header_bg_color' => 'header_bg',
-                    'footer_bg_color' => 'footer_bg',
-                ];
-                if ($k && $v && isset($colorMap[$k])) $theme[$colorMap[$k]] = $v;
+                if ($k && $v && isset($httpColorMap[$k])) $theme[$httpColorMap[$k]] = $v;
             }
             if (empty($theme['header_bg']) || $theme['header_bg'] === $defaults['header_bg']) {
                 $theme['header_bg'] = $theme['primary'];
             }
-            $_SESSION[$cacheKey]         = $theme;
-            $_SESSION[$cacheKey . '_ts'] = time();
             return $theme;
         }
 
