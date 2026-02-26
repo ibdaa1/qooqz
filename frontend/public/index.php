@@ -242,7 +242,7 @@ include dirname(__DIR__) . '/partials/header.php';
         elseif (in_array($secType, ['featured_products', 'new_products'], true)): ?>
         <div class="pub-grid">
             <?php foreach ($items as $p): ?>
-            <a href="/frontend/public/products.php?id=<?= (int)($p['id'] ?? 0) ?>"
+            <a href="/frontend/public/product.php?id=<?= (int)($p['id'] ?? 0) ?>"
                class="pub-product-card" style="text-decoration:none;">
                 <div class="pub-cat-img-wrap" style="aspect-ratio:1;">
                     <?php if (!empty($p['image_url'])): ?>
@@ -361,7 +361,7 @@ else:
         </div>
         <div class="pub-grid">
             <?php foreach ($featuredProducts as $p): ?>
-            <a href="/frontend/public/products.php?id=<?= (int)($p['id'] ?? 0) ?>"
+            <a href="/frontend/public/product.php?id=<?= (int)($p['id'] ?? 0) ?>"
                class="pub-product-card" style="text-decoration:none;">
                 <div class="pub-cat-img-wrap" style="aspect-ratio:1;">
                     <?php if (!empty($p['image_url'])): ?>

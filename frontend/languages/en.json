@@ -52,7 +52,19 @@
         "clear": "Clear",
         "empty": "No products available at the moment",
         "product_count": "product(s)",
-        "view_product": "View Product"
+        "view_product": "View Product",
+        "new": "New",
+        "bestseller": "Bestseller",
+        "in_stock": "In Stock",
+        "out_of_stock": "Out of Stock",
+        "low_stock": "Only {count} left!",
+        "description": "Description",
+        "specifications": "Specifications",
+        "reviews": "reviews",
+        "off": "OFF",
+        "sku": "SKU",
+        "categories": "Categories",
+        "related": "Related Products"
     },
     "categories": {
         "page_title": "Categories",
@@ -60,7 +72,7 @@
         "filter": "Filter",
         "clear": "Clear",
         "empty": "No categories available at the moment",
-        "category_count": "category\/categories",
+        "category_count": "category/categories",
         "subcategories": "Subcategories",
         "browse": "Browse",
         "all_categories": "All Categories",
@@ -100,7 +112,7 @@
         "filter": "Search",
         "clear": "Clear",
         "empty": "No entities available at the moment",
-        "entity_count": "entity\/entities"
+        "entity_count": "entity/entities"
     },
     "tenants": {
         "page_title": "Tenants",
@@ -145,7 +157,9 @@
         "subtotal": "Subtotal",
         "shipping": "Shipping",
         "total": "Total",
-        "remove": "Remove"
+        "remove": "Remove",
+        "add": "Add to Cart",
+        "added": "Added!"
     },
     "checkout": {
         "title": "Checkout",
@@ -185,5 +199,13 @@
     "deals": {
         "title": "🔥 Hot Deals",
         "expires": "Expires"
+    },
+    "slider": {
+        "title": "Promotions & Offers",
+        "empty": "No active promotions at this time",
+        "prev": "Previous slide",
+        "next": "Next slide",
+        "goto": "Go to slide {n}",
+        "all_promotions": "All Promotions"
     }
 }

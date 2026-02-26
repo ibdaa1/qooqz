@@ -168,21 +168,86 @@ if ($first === 'ui') {
  * ----------------------------------------------------- */
 if ($first === 'products') {
     $id = $_GET['id'] ?? (isset($segments[1]) && ctype_digit((string)$segments[1]) ? (int)$segments[1] : null);
+    if (!$id && !empty($_GET['slug'])) {
+        $slugParams = [$_GET['slug']];
+        $slugCond = ' AND is_active = 1';
+        if ($tenantId) { $slugCond .= ' AND tenant_id = ?'; $slugParams[] = $tenantId; }
+        $slugRow = $pdoOne('SELECT id FROM products WHERE slug = ?' . $slugCond . ' LIMIT 1', $slugParams);
+        if ($slugRow) $id = (int)$slugRow['id'];
+    }
 
     if ($id) {
-        // Params: 1=$lang (for LEFT JOIN language_code), 2=$id (for WHERE p.id), 3=$tenantId (optional)
+        // Full product detail: translations, pricing, brand, main image
         $qParams = [$lang, (int)$id];
-        $tid = '';
-        if ($tenantId) { $tid = ' AND p.tenant_id = ?'; $qParams[] = $tenantId; }
-        $row  = $pdoOne(
-            "SELECT p.id, pt.name, p.price, p.is_active, p.sku, p.slug, p.tenant_id
+        $tidCond = '';
+        if ($tenantId) { $tidCond = ' AND p.tenant_id = ?'; $qParams[] = $tenantId; }
+        $row = $pdoOne(
+            "SELECT p.id, p.sku, p.slug, p.barcode, p.brand_id,
+                    p.is_active, p.is_featured, p.is_new, p.is_bestseller,
+                    p.stock_quantity, p.stock_status, p.rating_average, p.rating_count,
+                    p.views_count, p.tenant_id,
+                    COALESCE(pt.name, p.slug) AS name,
+                    pt.short_description, pt.description, pt.specifications, pt.meta_title,
+                    pp.price, pp.compare_at_price, pp.currency_code,
+                    b.name AS brand_name,
+                    i.url AS image_url, i.thumb_url AS image_thumb_url
                FROM products p
           LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
-              WHERE p.id = ?" . $tid . " LIMIT 1",
+          LEFT JOIN product_pricing pp ON pp.product_id = p.id AND pp.variant_id IS NULL AND pp.is_active = 1
+          LEFT JOIN brands b ON b.id = p.brand_id
+          LEFT JOIN images i ON i.owner_id = p.id AND i.is_main = 1
+                 AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
+              WHERE p.id = ? AND p.is_active = 1" . $tidCond . " LIMIT 1",
             $qParams
         );
-        if ($row) ResponseFormatter::success(['ok' => true, 'product' => $row]);
-        else      ResponseFormatter::notFound('Product not found');
+        if (!$row) { ResponseFormatter::notFound('Product not found'); exit; }
+
+        // All product images (gallery)
+        $productImages = $pdoList(
+            "SELECT i.id, i.url, i.thumb_url, i.alt_text, i.sort_order
+               FROM images i
+               JOIN image_types it ON it.id = i.image_type_id AND it.code = 'product'
+              WHERE i.owner_id = ?
+              ORDER BY i.is_main DESC, i.sort_order ASC, i.id ASC LIMIT 10",
+            [(int)$id]
+        );
+
+        // Categories
+        $productCategories = $pdoList(
+            "SELECT c.id, COALESCE(ct.name, c.slug) AS name, c.slug
+               FROM categories c
+         INNER JOIN product_categories pc ON pc.category_id = c.id AND pc.product_id = ?
+          LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
+              LIMIT 5",
+            [(int)$id, $lang]
+        );
+
+        // Related products (same first category)
+        $related = [];
+        if (!empty($productCategories[0]['id'])) {
+            $related = $pdoList(
+                "SELECT p2.id, COALESCE(pt2.name, p2.slug) AS name, p2.slug,
+                        pp2.price, pp2.currency_code,
+                        i2.url AS image_url
+                   FROM products p2
+             INNER JOIN product_categories pc2 ON pc2.product_id = p2.id AND pc2.category_id = ?
+              LEFT JOIN product_translations pt2 ON pt2.product_id = p2.id AND pt2.language_code = ?
+              LEFT JOIN product_pricing pp2 ON pp2.product_id = p2.id AND pp2.variant_id IS NULL AND pp2.is_active = 1
+              LEFT JOIN images i2 ON i2.owner_id = p2.id AND i2.is_main = 1
+                     AND i2.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
+                  WHERE p2.is_active = 1 AND p2.id != ? AND p2.tenant_id = ?
+                  ORDER BY p2.is_featured DESC, p2.id DESC LIMIT 8",
+                [(int)$productCategories[0]['id'], $lang, (int)$id, (int)$row['tenant_id']]
+            );
+        }
+
+        ResponseFormatter::success([
+            'ok'         => true,
+            'product'    => $row,
+            'images'     => $productImages,
+            'categories' => $productCategories,
+            'related'    => $related,
+        ]);
         exit;
     }
 
@@ -602,9 +667,9 @@ if ($first === 'entity_types') {
 if ($first === 'homepage_sections') {
     if (!$tenantId) { ResponseFormatter::success(['ok' => true, 'data' => []]); exit; }
     $rows = $pdoList(
-        "SELECT hs.id, hs.section_type, hs.layout_type, hs.items_per_row,
-                hs.background_color, hs.text_color, hs.padding,
-                hs.data_source, hs.sort_order, hs.is_active,
+        "SELECT hs.id, hs.section_type, hs.component, hs.layout_type, hs.layout_config,
+                hs.items_per_row, hs.background_color, hs.text_color, hs.padding,
+                hs.custom_css, hs.data_source, hs.sort_order, hs.is_active,
                 COALESCE(hst.title, hs.title)       AS title,
                 COALESCE(hst.subtitle, hs.subtitle) AS subtitle
            FROM homepage_sections hs

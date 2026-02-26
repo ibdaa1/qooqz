@@ -83,7 +83,7 @@ include dirname(__DIR__) . '/partials/header.php';
     <?php if (!empty($products)): ?>
     <div class="pub-grid">
         <?php foreach ($products as $p): ?>
-        <a href="/frontend/public/products.php?id=<?= (int)($p['id'] ?? 0) ?>"
+        <a href="/frontend/public/product.php?id=<?= (int)($p['id'] ?? 0) ?>"
            class="pub-product-card" style="text-decoration:none;" aria-label="<?= e($p['name'] ?? '') ?>">
             <div class="pub-cat-img-wrap" style="aspect-ratio:1;">
                 <?php $imgSrc = pub_img($p['image_thumb_url'] ?? $p['image_url'] ?? null, 'product_thumb'); ?>

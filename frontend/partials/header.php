@@ -77,7 +77,6 @@ $_fontUrl = $dir === 'rtl'
         --pub-footer-bg:  <?= e($theme['footer_bg']  ?? '#1a1a2e') ?>;
     }
     .pub-header  { background: var(--pub-header-bg) !important; }
-    .pub-footer  { background: var(--pub-footer-bg) !important; }
     .pub-hero    { background: linear-gradient(135deg, var(--pub-header-bg) 0%, var(--pub-accent) 100%) !important; }
     </style>
     <?php if (!empty($theme['generated_css'])): ?>
