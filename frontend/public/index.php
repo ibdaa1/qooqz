@@ -24,7 +24,8 @@ $GLOBALS['PUB_PAGE_DESC']  = t('hero.subtitle');
  * Fetch homepage sections from DB
  * ----------------------------------------------------- */
 $sectionsResp = pub_fetch($apiBase . 'public/homepage_sections?tenant_id=' . $tenantId . '&lang=' . urlencode($lang));
-$sections     = $sectionsResp['data'] ?? [];
+// ResponseFormatter wraps data in {success,message,data:{ok,data:[...]}}, so we need ['data']['data']
+$sections     = $sectionsResp['data']['data'] ?? [];
 
 /* -------------------------------------------------------
  * Helper: load section data based on section_type
@@ -38,8 +39,8 @@ function pub_section_data(string $type, int $limit, string $lang, int $tenantId,
         'categories'        => pub_fetch($apiBase . 'public/categories?'         . $qs . '&featured=1')['data']['data'] ?? [],
         'featured_products' => pub_fetch($apiBase . 'public/products?'           . $qs . '&is_featured=1')['data']['data'] ?? [],
         'new_products'      => pub_fetch($apiBase . 'public/products?'           . $qs . '&is_new=1')['data']['data'] ?? [],
-        'slider','banners'  => pub_fetch($apiBase . 'public/banners?tenant_id='  . $tenantId)['data'] ?? [],
-        'deals'             => pub_fetch($apiBase . 'public/discounts?tenant_id='. $tenantId . '&lang=' . urlencode($lang))['data'] ?? [],
+        'slider','banners'  => pub_fetch($apiBase . 'public/banners?tenant_id='  . $tenantId)['data']['data'] ?? [],
+        'deals'             => pub_fetch($apiBase . 'public/discounts?tenant_id='. $tenantId . '&lang=' . urlencode($lang))['data']['data'] ?? [],
         'brands'            => pub_fetch($apiBase . 'public/entities?'           . $qs . '&per=8')['data']['data'] ?? [],
         'vendors'           => pub_fetch($apiBase . 'public/entities?'           . $qs . '&per=6')['data']['data'] ?? [],
         default             => [],
@@ -124,6 +125,7 @@ include dirname(__DIR__) . '/partials/header.php';
     </div>
 </div>
 
+<div id="pub-homepage-sections">
 <?php if (!empty($sections)):
     foreach ($sections as $sec):
         $secType   = $sec['section_type'] ?? '';
@@ -485,5 +487,11 @@ else:
 <?php endif; ?>
 
 <?php endif; /* end sections/fallback */ ?>
+</div><!-- #pub-homepage-sections -->
 
 <?php include dirname(__DIR__) . '/partials/footer.php'; ?>
+<script>
+if (typeof PubHomepageEngine !== 'undefined') {
+    PubHomepageEngine.init(<?= (int)$tenantId ?>, '<?= e($lang) ?>');
+}
+</script>

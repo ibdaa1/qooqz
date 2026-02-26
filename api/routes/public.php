@@ -311,13 +311,13 @@ if ($first === 'jobs') {
     $id = $_GET['id'] ?? (isset($segments[1]) && ctype_digit((string)$segments[1]) ? (int)$segments[1] : null);
 
     if ($id) {
-        $row = $pdoOne("SELECT * FROM jobs WHERE id = ? AND status = 'published' LIMIT 1", [$id]);
+        $row = $pdoOne("SELECT * FROM jobs WHERE id = ? AND status NOT IN ('cancelled','filled','closed') LIMIT 1", [$id]);
         if ($row) ResponseFormatter::success(['ok' => true, 'job' => $row]);
         else      ResponseFormatter::notFound('Job not found');
         exit;
     }
 
-    $where  = "WHERE j.status = 'published'";
+    $where  = "WHERE j.status NOT IN ('cancelled', 'filled', 'closed')";
     $params = [];
     if (!empty($_GET['is_featured'])) { $where .= ' AND j.is_featured = ?'; $params[] = 1; }
     if (!empty($_GET['is_urgent']))   { $where .= ' AND j.is_urgent = ?';   $params[] = 1; }

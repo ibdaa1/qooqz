@@ -56,9 +56,10 @@ $_fontUrl = $dir === 'rtl'
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="<?= e($_fontUrl) ?>" rel="stylesheet">
 
-    <!-- Base styles + Public UI styles -->
-    <link rel="stylesheet" href="/frontend/assets/css/main.css">
+    <!-- Public UI styles -->
     <link rel="stylesheet" href="/frontend/assets/css/public.css">
+    <!-- Homepage section engine (loaded early so init() can be called inline) -->
+    <script src="/frontend/assets/js/homepage-engine.js"></script>
 
     <!-- Theme: inject CSS variables from DB color_settings -->
     <?php if (!empty($theme)): ?>

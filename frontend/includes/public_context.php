@@ -40,13 +40,15 @@ if (php_sapi_name() !== 'cli' && session_status() === PHP_SESSION_NONE) {
 }
 
 /* -------------------------------------------------------
- * 3. Auto-detect language (no visible language button)
- *    Priority: URL param → session → browser Accept-Language → app default
+ * 3. Language resolution (no visible language button)
+ *    Priority: URL ?lang=xx → session → app default_lang
+ *    Browser Accept-Language is NOT used (platform default takes precedence).
  * ----------------------------------------------------- */
 if (!function_exists('pub_detect_lang')) {
     /**
      * Detect best language code from HTTP_ACCEPT_LANGUAGE.
      * Returns the 2-letter language code if a translation file exists.
+     * (Kept for potential future use but not called in the main flow.)
      */
     function pub_detect_lang(string $default = 'ar'): string {
         $langDir = FRONTEND_BASE . '/languages';
@@ -94,14 +96,15 @@ if (!function_exists('pub_detect_lang')) {
 /* -------------------------------------------------------
  * 4. Resolve active language
  * ----------------------------------------------------- */
-// URL ?lang=xx overrides (useful for testing), then session, then browser
+// URL ?lang=xx overrides (useful for testing), then session, then app default
+// Browser Accept-Language is intentionally NOT used — platform default_lang takes precedence.
 if (isset($_GET['lang']) && preg_match('/^[a-z]{2,5}$/', $_GET['lang'])) {
     $lang = $_GET['lang'];
     $_SESSION['pub_lang'] = $lang;
 } elseif (!empty($_SESSION['pub_lang'])) {
     $lang = $_SESSION['pub_lang'];
 } else {
-    $lang = pub_detect_lang($appConfig['default_lang'] ?? 'ar');
+    $lang = $appConfig['default_lang'] ?? 'en';
     $_SESSION['pub_lang'] = $lang;
 }
 
