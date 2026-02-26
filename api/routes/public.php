@@ -322,15 +322,16 @@ if ($first === 'entity') {
     }
 
     // Full entity profile — images fetched from images table (entity_logo / entity_cover)
+    // entities table has vendor_type (varchar code), not entity_type_id — join entity_types by code
     $entity = $pdoOne(
         "SELECT e.id, e.store_name, e.slug, e.vendor_type, e.store_type,
                 e.is_verified, e.phone, e.mobile, e.email, e.website_url AS website,
                 e.status, e.tenant_id, e.created_at,
-                et.name AS type_name, et.icon AS type_icon,
+                et.name AS type_name,
                 logo_i.url AS logo_url, logo_i.thumb_url AS logo_thumb_url,
                 cover_i.url AS cover_url
            FROM entities e
-      LEFT JOIN entity_types et ON et.id = e.entity_type_id
+      LEFT JOIN entity_types et ON et.code = e.vendor_type
       LEFT JOIN images logo_i ON logo_i.owner_id = e.id AND logo_i.is_main = 1
              AND logo_i.image_type_id = (SELECT id FROM image_types WHERE code = 'entity_logo' LIMIT 1)
       LEFT JOIN images cover_i ON cover_i.owner_id = e.id AND cover_i.is_main = 1
@@ -363,32 +364,38 @@ if ($first === 'entity') {
         [$entityId]
     );
 
-    // Addresses (with coordinates)
+    // Addresses (with coordinates) — addresses table has no label column
     $addresses = $pdoList(
-        "SELECT id, label, address_line1, address_line2, city_id, country_id,
-                latitude, longitude, is_primary
+        "SELECT id, address_line1, address_line2, city_id, country_id,
+                postal_code, latitude, longitude, is_primary
            FROM addresses
           WHERE owner_type = 'entity' AND owner_id = ? ORDER BY is_primary DESC, id ASC LIMIT 5",
         [$entityId]
     );
 
-    // Payment methods
+    // Payment methods — payment_methods columns: method_name, method_key, icon_url
     $paymentMethods = $pdoList(
-        "SELECT pm.id, pm.name, pm.code, pm.icon, epm.is_active
+        "SELECT pm.id, pm.method_name AS name, pm.method_key AS code, pm.icon_url AS icon, epm.is_active
            FROM entity_payment_methods epm
       LEFT JOIN payment_methods pm ON pm.id = epm.payment_method_id
           WHERE epm.entity_id = ? AND epm.is_active = 1",
         [$entityId]
     );
 
-    // Attributes
+    // Attributes — name from entities_attribute_translations; entity_type_id via entity_types.code = vendor_type
     $attributes = $pdoList(
-        "SELECT ea.attribute_name, eav.value
+        "SELECT COALESCE(eat.name, ea.attribute_type) AS attribute_name, eav.value
            FROM entities_attributes ea
+      LEFT JOIN entities_attribute_translations eat ON eat.attribute_id = ea.id AND eat.language_code = ?
       LEFT JOIN entities_attribute_values eav ON eav.attribute_id = ea.id AND eav.entity_id = ?
-          WHERE ea.entity_type_id IS NULL OR ea.entity_type_id = (SELECT entity_type_id FROM entities WHERE id = ?)
+          WHERE ea.entity_type_id IS NULL
+             OR ea.entity_type_id = (
+                    SELECT et.id FROM entity_types et
+                    INNER JOIN entities ev ON et.code = ev.vendor_type
+                    WHERE ev.id = ? LIMIT 1
+                )
           LIMIT 20",
-        [$entityId, $entityId]
+        [$lang, $entityId, $entityId]
     );
 
     ResponseFormatter::success([
@@ -451,7 +458,7 @@ if ($first === 'tenants') {
     $id = $_GET['id'] ?? (isset($segments[1]) && ctype_digit((string)$segments[1]) ? (int)$segments[1] : null);
 
     if ($id) {
-        $row = $pdoOne("SELECT id, name, store_name, domain, status, plan_id FROM tenants WHERE id = ? AND status = 'active' LIMIT 1", [$id]);
+        $row = $pdoOne("SELECT id, name, domain, status FROM tenants WHERE id = ? AND status = 'active' LIMIT 1", [$id]);
         if ($row) ResponseFormatter::success(['ok' => true, 'tenant' => $row]);
         else      ResponseFormatter::notFound('Tenant not found');
         exit;
@@ -467,7 +474,7 @@ if ($first === 'tenants') {
 
     $total = $pdoCount("SELECT COUNT(*) FROM tenants t $where", $params);
     $rows  = $pdoList(
-        "SELECT t.id, t.name, t.store_name, t.domain, t.status,
+        "SELECT t.id, t.name, t.domain, t.status,
                 sp.plan_name
            FROM tenants t
       LEFT JOIN subscription_plans sp ON sp.id = (
@@ -501,6 +508,40 @@ if ($first === 'vendors') {
         $rows = $pdoList('SELECT id, store_name AS name, is_active FROM entities LIMIT ? OFFSET ?', [$per, $offset]);
         ResponseFormatter::success(['ok' => true, 'data' => $rows]);
     }
+    exit;
+}
+
+/* -------------------------------------------------------
+ * Route: Entity Types (public list — used for filter dropdown)
+ * GET /api/public/entity_types
+ * ----------------------------------------------------- */
+if ($first === 'entity_types') {
+    $rows = $pdoList("SELECT id, code, name, description FROM entity_types ORDER BY id ASC");
+    ResponseFormatter::success(['ok' => true, 'data' => $rows]);
+    exit;
+}
+
+/* -------------------------------------------------------
+ * Route: Homepage Sections
+ * GET /api/public/homepage_sections?tenant_id=X&lang=Y
+ * Returns active sections with translated title/subtitle
+ * ----------------------------------------------------- */
+if ($first === 'homepage_sections') {
+    if (!$tenantId) { ResponseFormatter::success(['ok' => true, 'data' => []]); exit; }
+    $rows = $pdoList(
+        "SELECT hs.id, hs.section_type, hs.layout_type, hs.items_per_row,
+                hs.background_color, hs.text_color, hs.padding,
+                hs.data_source, hs.sort_order, hs.is_active,
+                COALESCE(hst.title, hs.title)       AS title,
+                COALESCE(hst.subtitle, hs.subtitle) AS subtitle
+           FROM homepage_sections hs
+      LEFT JOIN homepage_section_translations hst
+             ON hst.section_id = hs.id AND hst.language_code = ?
+          WHERE hs.tenant_id = ? AND hs.is_active = 1
+          ORDER BY hs.sort_order ASC, hs.id ASC",
+        [$lang, $tenantId]
+    );
+    ResponseFormatter::success(['ok' => true, 'data' => $rows]);
     exit;
 }
 

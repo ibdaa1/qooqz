@@ -35,14 +35,15 @@ $meta     = $resp['data']['meta']  ?? [];
 $total    = (int)($meta['total'] ?? count($entities));
 $totalPg  = (int)($meta['total_pages'] ?? (($limit > 0 && $total > 0) ? (int)ceil($total / $limit) : 1));
 
-$vendorTypes = [
-    ''           => t('entities.type_all'),
-    'company'    => t('entities.type_company'),
-    'store'      => t('entities.type_store'),
-    'restaurant' => t('entities.type_restaurant'),
-    'medical'    => t('entities.type_medical'),
-    'training'   => t('entities.type_training'),
-];
+/* Fetch entity types from API for the filter dropdown */
+$etResp      = pub_fetch(pub_api_url('public/entity_types'));
+$etRows      = $etResp['data']['data'] ?? ($etResp['data'] ?? []);
+$vendorTypes = ['' => t('entities.type_all')];
+foreach ($etRows as $et) {
+    if (!empty($et['code'])) {
+        $vendorTypes[$et['code']] = $et['name'] ?? $et['code'];
+    }
+}
 
 include dirname(__DIR__) . '/partials/header.php';
 ?>

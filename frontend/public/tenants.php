@@ -79,7 +79,7 @@ include dirname(__DIR__) . '/partials/header.php';
                     <p class="pub-entity-desc"><?= e($ten['plan_name']) ?></p>
                 <?php endif; ?>
                 <span class="pub-entity-verified">
-                    <?= !empty($ten['is_active']) ? '🟢 ' . e(t('tenants.active')) : '🔴 ' . e(t('tenants.inactive')) ?>
+                    <?= ($ten['status'] ?? '') === 'active' ? '🟢 ' . e(t('tenants.active')) : '🔴 ' . e(t('tenants.inactive')) ?>
                 </span>
             </div>
         </a>
