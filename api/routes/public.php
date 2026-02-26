@@ -171,13 +171,18 @@ if ($first === 'products') {
 if ($first === 'categories') {
     $id = $_GET['id'] ?? (isset($segments[1]) && ctype_digit((string)$segments[1]) ? (int)$segments[1] : null);
 
+    // Pre-fetch category image_type id once to avoid per-row subquery
+    $catImgRow    = $pdoOne('SELECT id FROM image_types WHERE code = ? LIMIT 1', ['category']);
+    $catImgTypeId = (int)($catImgRow['id'] ?? 0);
+
     if ($id) {
         $row = $pdoOne(
             "SELECT c.id, COALESCE(ct.name, c.slug) AS name, c.slug, c.description,
-                    c.image_url, c.is_featured, c.status, c.parent_id, c.sort_order, c.tenant_id
+                    i.url AS image_url, c.is_featured, c.is_active, c.parent_id, c.sort_order, c.tenant_id
                FROM categories c
           LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
-              WHERE c.id = ? AND c.status = 'active' LIMIT 1",
+          LEFT JOIN images i ON i.owner_id = c.id AND i.is_main = 1 AND i.image_type_id = $catImgTypeId
+              WHERE c.id = ? AND c.is_active = 1 LIMIT 1",
             [$lang, (int)$id]
         );
         if ($row) ResponseFormatter::success(['ok' => true, 'category' => $row]);
@@ -186,7 +191,7 @@ if ($first === 'categories') {
     }
 
     // $whereParams: params for WHERE only (no lang — lang is for the translation JOIN)
-    $where       = "WHERE c.status = 'active'";
+    $where       = 'WHERE c.is_active = 1';
     $whereParams = [];
     if ($tenantId) { $where .= ' AND c.tenant_id = ?'; $whereParams[] = $tenantId; }
     if (isset($_GET['parent_id'])) {
@@ -201,12 +206,13 @@ if ($first === 'categories') {
     $total = $pdoCount("SELECT COUNT(*) FROM categories c $where", $whereParams);
     $rows  = $pdoList(
         "SELECT c.id, COALESCE(ct.name, c.slug) AS name, c.slug,
-                c.image_url, c.is_featured, c.status, c.parent_id, c.sort_order, c.tenant_id,
+                i.url AS image_url, c.is_featured, c.is_active, c.parent_id, c.sort_order, c.tenant_id,
                 (SELECT COUNT(*) FROM products p
                   INNER JOIN product_categories pc ON pc.product_id = p.id AND pc.category_id = c.id
                   WHERE p.is_active = 1) AS product_count
            FROM categories c
       LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
+      LEFT JOIN images i ON i.owner_id = c.id AND i.is_main = 1 AND i.image_type_id = $catImgTypeId
           $where ORDER BY c.is_featured DESC, c.sort_order ASC, c.id ASC LIMIT ? OFFSET ?",
         array_merge([$lang], $whereParams, [$per, $offset])
     );
@@ -284,10 +290,17 @@ if ($first === 'entity') {
     }
 
     // Sub-route: entity products
+    // Products have no entity_id column; use entity's tenant_id to scope products
     if ($sub === 'products') {
-        $where  = 'WHERE p.is_active = 1 AND p.entity_id = ?';
-        $params = [$entityId];
-        if (!empty($_GET['category_id'])) { $where .= ' AND p.category_id = ?'; $params[] = (int)$_GET['category_id']; }
+        $entityRow = $pdoOne('SELECT tenant_id FROM entities WHERE id = ? LIMIT 1', [$entityId]);
+        if (!$entityRow) { ResponseFormatter::notFound('Entity not found'); exit; }
+        $entityTenantId = (int)$entityRow['tenant_id'];
+        $where  = 'WHERE p.is_active = 1 AND p.tenant_id = ?';
+        $params = [$entityTenantId];
+        if (!empty($_GET['category_id']) && is_numeric($_GET['category_id'])) {
+            $where .= ' AND EXISTS (SELECT 1 FROM product_categories pc2 WHERE pc2.product_id = p.id AND pc2.category_id = ?)';
+            $params[] = (int)$_GET['category_id'];
+        }
         $total = $pdoCount("SELECT COUNT(*) FROM products p $where", $params);
         $rows  = $pdoList(
             "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.sku, p.slug,
