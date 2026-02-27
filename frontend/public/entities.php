@@ -64,6 +64,15 @@ include dirname(__DIR__) . '/partials/header.php';
         </span>
     </div>
 
+    <!-- Join as Vendor CTA -->
+    <div class="pub-cta-banner">
+        <div>
+            <h2>🚀 <?= e(t('join_entity.cta_title')) ?></h2>
+            <p><?= e(t('join_entity.cta_subtitle')) ?></p>
+        </div>
+        <a href="/frontend/public/join_entity.php" class="pub-btn--cta"><?= e(t('join_entity.cta_btn')) ?></a>
+    </div>
+
     <!-- Filters -->
     <form method="get" class="pub-filter-bar">
         <input type="search" name="q" class="pub-search-input" style="max-width:240px;"

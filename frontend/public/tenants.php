@@ -52,6 +52,15 @@ include dirname(__DIR__) . '/partials/header.php';
         </span>
     </div>
 
+    <!-- Join as Tenant CTA -->
+    <div class="pub-cta-banner">
+        <div>
+            <h2>🌐 <?= e(t('join_tenant.cta_title')) ?></h2>
+            <p><?= e(t('join_tenant.cta_subtitle')) ?></p>
+        </div>
+        <a href="/frontend/public/join_tenant.php" class="pub-btn--cta"><?= e(t('join_tenant.cta_btn')) ?></a>
+    </div>
+
     <!-- Filter -->
     <form method="get" class="pub-filter-bar">
         <input type="search" name="q" class="pub-search-input" style="max-width:300px;"

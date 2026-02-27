@@ -135,8 +135,8 @@ $_fontUrl = $dir === 'rtl'
             if (!empty($_logoUrl)):
             ?>
                 <img src="<?= e($_logoUrl) ?>" alt="<?= e($_appName) ?>" class="pub-logo-img"
-                     style="max-height:40px;width:auto;vertical-align:middle;object-fit:contain;">
-                <span class="pub-logo-name" style="margin-inline-start:8px;font-weight:700;letter-spacing:0.5px;"><?= e($_appName) ?></span>
+                     style="max-height:40px;width:auto;vertical-align:middle;object-fit:contain;flex-shrink:0;">
+                <span class="pub-logo-name" style="margin-inline-start:4px;font-weight:700;letter-spacing:0.5px;"><?= e($_appName) ?></span>
             <?php else: ?>
                 <span class="pub-logo-icon" aria-hidden="true">🌐</span>
                 <?= e($_appName) ?>
