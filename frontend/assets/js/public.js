@@ -423,9 +423,11 @@ function pubAddToCart(btn) {
       badge.style.display = total ? 'inline-flex' : 'none';
     });
 
-  // ── 4. Visual feedback ────────────────────────────────────────────────────
+  // ── 4. Visual feedback + navigate to cart ─────────────────────────────────
   var orig = btn.textContent;
   btn.textContent = btn.dataset.addedText || '✅';
   btn.disabled = true;
-  setTimeout(function () { btn.textContent = orig; btn.disabled = false; }, 1800);
+  setTimeout(function () {
+    window.location.href = '/frontend/public/cart.php';
+  }, 1200);
 }

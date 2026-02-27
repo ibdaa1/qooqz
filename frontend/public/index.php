@@ -242,31 +242,56 @@ include dirname(__DIR__) . '/partials/header.php';
         elseif (in_array($secType, ['featured_products', 'new_products'], true)): ?>
         <div class="pub-grid">
             <?php foreach ($items as $p): ?>
-            <a href="/frontend/public/product.php?id=<?= (int)($p['id'] ?? 0) ?>"
-               class="pub-product-card" style="text-decoration:none;">
-                <div class="pub-cat-img-wrap" style="aspect-ratio:1;">
-                    <?php if (!empty($p['image_url'])): ?>
-                        <img src="<?= e(pub_img($p['image_url'], 'product')) ?>"
-                             alt="<?= e($p['name'] ?? '') ?>" class="pub-cat-img" loading="lazy"
-                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-                        <span class="pub-img-placeholder" style="display:none;" aria-hidden="true">🖼️</span>
-                    <?php else: ?>
-                        <span class="pub-img-placeholder" aria-hidden="true">🖼️</span>
-                    <?php endif; ?>
+            <?php
+                $pId2   = (int)($p['id'] ?? 0);
+                $pName2 = $p['name'] ?? '';
+                $pPrice2= $p['price'] ?? null;
+                $pCur2  = $p['currency_code'] ?? t('common.currency');
+                $pImg2  = pub_img($p['image_url'] ?? $p['image_thumb_url'] ?? null, 'product');
+            ?>
+            <div class="pub-product-card" style="position:relative;">
+                <a href="/frontend/public/product.php?id=<?= $pId2 ?>"
+                   style="text-decoration:none;display:flex;flex-direction:column;flex:1;"
+                   aria-label="<?= e($pName2) ?>">
+                    <div class="pub-cat-img-wrap" style="aspect-ratio:1;">
+                        <?php if ($pImg2): ?>
+                            <img src="<?= e($pImg2) ?>"
+                                 alt="<?= e($pName2) ?>" class="pub-cat-img" loading="lazy"
+                                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                            <span class="pub-img-placeholder" style="display:none;" aria-hidden="true">🖼️</span>
+                        <?php else: ?>
+                            <span class="pub-img-placeholder" aria-hidden="true">🖼️</span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="pub-product-card-body">
+                        <?php if (!empty($p['is_featured'])): ?>
+                            <span class="pub-product-badge"><?= e(t('products.featured')) ?></span>
+                        <?php endif; ?>
+                        <p class="pub-product-name"><?= e($pName2) ?></p>
+                        <?php if ($pPrice2 !== null): ?>
+                            <p class="pub-product-price">
+                                <?= number_format((float)$pPrice2, 2) ?>
+                                <small><?= e($pCur2) ?></small>
+                            </p>
+                        <?php endif; ?>
+                    </div>
+                </a>
+                <div style="padding:0 14px 12px;">
+                    <button class="pub-btn pub-btn--primary pub-btn--sm"
+                            style="width:100%;justify-content:center;"
+                            type="button"
+                            data-product-id="<?= $pId2 ?>"
+                            data-product-name="<?= e($pName2) ?>"
+                            data-product-price="<?= e((string)($pPrice2 ?? '0')) ?>"
+                            data-product-image="<?= e($pImg2 ?: '') ?>"
+                            data-product-sku="<?= e($p['sku'] ?? '') ?>"
+                            data-currency="<?= e($pCur2) ?>"
+                            data-added-text="✅ <?= e(t('cart.added')) ?>"
+                            onclick="pubAddToCart(this)">
+                        🛒 <?= e(t('cart.add')) ?>
+                    </button>
                 </div>
-                <div class="pub-product-card-body">
-                    <?php if (!empty($p['is_featured'])): ?>
-                        <span class="pub-product-badge"><?= e(t('products.featured')) ?></span>
-                    <?php endif; ?>
-                    <p class="pub-product-name"><?= e($p['name'] ?? '') ?></p>
-                    <?php if (!empty($p['price'])): ?>
-                        <p class="pub-product-price">
-                            <?= number_format((float)$p['price'], 2) ?>
-                            <?= e($p['currency_code'] ?? t('common.currency')) ?>
-                        </p>
-                    <?php endif; ?>
-                </div>
-            </a>
+            </div>
             <?php endforeach; ?>
         </div>
 

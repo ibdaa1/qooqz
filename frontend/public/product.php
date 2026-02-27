@@ -104,22 +104,29 @@ if ($pdo) {
                 $categories = $st->fetchAll();
 
                 // Related products (same first category)
+                // Uses scalar subqueries for price — avoids JOIN on pp2.variant_id which
+                // may not exist in all product_pricing schema versions.
                 if (!empty($categories[0]['id'])) {
-                    $st = $pdo->prepare(
-                        "SELECT p2.id, COALESCE(pt2.name, p2.slug) AS name, p2.slug,
-                                pp2.price, pp2.currency_code,
-                                (SELECT i2.url FROM images i2 WHERE i2.owner_id = p2.id
-                                   ORDER BY i2.is_main DESC, i2.id ASC LIMIT 1) AS image_url
-                           FROM products p2
-                     INNER JOIN product_categories pc2 ON pc2.product_id = p2.id AND pc2.category_id = ?
-                      LEFT JOIN product_translations pt2 ON pt2.product_id = p2.id AND pt2.language_code = ?
-                      LEFT JOIN product_pricing pp2 ON pp2.product_id = p2.id
-                             AND pp2.variant_id IS NULL
-                          WHERE p2.is_active = 1 AND p2.id != ? AND p2.tenant_id = ?
-                          ORDER BY p2.is_featured DESC, p2.id DESC LIMIT 8"
-                    );
-                    $st->execute([(int)$categories[0]['id'], $lang, $productId, (int)$product['tenant_id']]);
-                    $related = $st->fetchAll();
+                    try {
+                        $st = $pdo->prepare(
+                            "SELECT p2.id, COALESCE(pt2.name, p2.slug) AS name, p2.slug,
+                                    (SELECT pp2.price FROM product_pricing pp2
+                                       WHERE pp2.product_id = p2.id ORDER BY pp2.id ASC LIMIT 1) AS price,
+                                    (SELECT pp2.currency_code FROM product_pricing pp2
+                                       WHERE pp2.product_id = p2.id ORDER BY pp2.id ASC LIMIT 1) AS currency_code,
+                                    (SELECT i2.url FROM images i2 WHERE i2.owner_id = p2.id
+                                       ORDER BY i2.is_main DESC, i2.id ASC LIMIT 1) AS image_url
+                               FROM products p2
+                         INNER JOIN product_categories pc2 ON pc2.product_id = p2.id AND pc2.category_id = ?
+                          LEFT JOIN product_translations pt2 ON pt2.product_id = p2.id AND pt2.language_code = ?
+                              WHERE p2.is_active = 1 AND p2.id != ?
+                              ORDER BY p2.is_featured DESC, p2.id DESC LIMIT 8"
+                        );
+                        $st->execute([(int)$categories[0]['id'], $lang, $productId]);
+                        $related = $st->fetchAll();
+                    } catch (Throwable $_) {
+                        $related = []; // non-critical: related products failing must not affect main product
+                    }
                 }
             }
         }
