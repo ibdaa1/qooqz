@@ -199,7 +199,9 @@
     "success_msg": "شكراً لك. سيتم التواصل معك قريباً لتأكيد الطلب.",
     "order_number": "رقم الطلب",
     "error_fields_required": "يرجى إدخال الاسم ورقم الهاتف.",
-    "secure_transaction": "معاملاتك آمنة ومشفرة"
+    "secure_transaction": "معاملاتك آمنة ومشفرة",
+    "no_payment_methods": "لا توجد طرق دفع متاحة",
+    "cash_on_delivery": "الدفع عند الاستلام"
   },
   "entity": {
     "products_tab": "المنتجات",

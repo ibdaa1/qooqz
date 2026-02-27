@@ -1159,6 +1159,18 @@ if ($first === 'orders') {
             $iSt->execute([$tenantId, $orderId, $entityId, $pId, $pName, $pSku, $qty, $price, $itSub, $itSub]);
         }
 
+        // Mark user's active cart as converted
+        $userCart = $pdoOne(
+            "SELECT id FROM carts WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1",
+            [$sessUserId]
+        );
+        if ($userCart) {
+            $pdo->prepare(
+                "UPDATE carts SET status = 'converted', converted_to_order_id = ?, updated_at = NOW()
+                   WHERE id = ?"
+            )->execute([$orderId, (int)$userCart['id']]);
+        }
+
         $pdo->commit();
 
         ResponseFormatter::success([

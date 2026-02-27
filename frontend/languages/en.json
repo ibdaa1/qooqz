@@ -199,7 +199,9 @@
     "success_msg": "Thank you! We will contact you shortly to confirm your order.",
     "order_number": "Order #",
     "error_fields_required": "Please enter your name and phone number.",
-    "secure_transaction": "Your transaction is secure and encrypted"
+    "secure_transaction": "Your transaction is secure and encrypted",
+    "no_payment_methods": "No payment methods available",
+    "cash_on_delivery": "Cash on Delivery"
   },
   "entity": {
     "products_tab": "Products",
