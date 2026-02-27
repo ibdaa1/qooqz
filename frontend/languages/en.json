@@ -165,7 +165,9 @@
     "loading": "Loading...",
     "error": "An error occurred",
     "no_image": "No image",
-    "currency": "SAR"
+    "currency": "SAR",
+    "cancel": "Cancel",
+    "delete": "Delete"
   },
   "cart": {
     "title": "Shopping Cart",
@@ -187,6 +189,9 @@
     "name": "Full Name",
     "phone": "Phone Number",
     "address": "Delivery Address",
+    "address2": "Address line 2",
+    "country": "Country",
+    "postal_code": "Postal Code",
     "notes": "Order Notes",
     "payment": "Payment Method",
     "place_order": "Place Order",
@@ -233,5 +238,19 @@
     "logout": "Logout",
     "login": "Login",
     "register": "Register"
+  },
+  "profile": {
+    "account_info": "Account Information",
+    "full_name": "Full Name",
+    "email": "Email",
+    "language": "Language",
+    "addresses": "My Addresses",
+    "add_address": "Add Address",
+    "save_address": "Save Address",
+    "no_addresses": "No addresses saved yet",
+    "primary": "Primary",
+    "set_primary": "Set as primary address",
+    "confirm_delete": "Delete this address?",
+    "set_as_primary": "Set as primary"
   }
 }

@@ -27,43 +27,31 @@ $apiConfigFile = FRONTEND_BASE . '/config/api.php';
 $apiConfig = is_readable($apiConfigFile) ? (require $apiConfigFile) : [];
 
 /* -------------------------------------------------------
- * 2. Session (safe)
- *    Include the SAME shared session config the API and admin panel use.
- *    This ensures identical session.save_path (/api/storage/sessions),
- *    session name (APP_SESSID), and cookie settings — so login cookies set
- *    by /api/auth are readable here without any extra configuration.
- *    Pattern mirrors admin/includes/admin_context.php exactly.
+ * 2. Session — mirrors admin/includes/admin_context.php exactly.
+ *    DOCUMENT_ROOT is the primary path (same as admin uses).
  * ----------------------------------------------------- */
 if (php_sapi_name() !== 'cli' && session_status() === PHP_SESSION_NONE) {
-    // Build path using __DIR__ (reliable) AND DOCUMENT_ROOT (admin approach), try both.
-    // dirname(FRONTEND_BASE) = parent of /frontend/ = document root on standard deployments.
-    $__candidates = [
-        dirname(FRONTEND_BASE) . '/api/shared/config/session.php',
-        ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/shared/config/session.php',
-    ];
+    // Primary: DOCUMENT_ROOT (same as admin_context.php line 28)
+    // Fallback: dirname(FRONTEND_BASE) for CLI / non-standard webroot setups
     $__sharedSession = null;
-    foreach ($__candidates as $__c) {
+    foreach ([
+        ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/shared/config/session.php',
+        dirname(FRONTEND_BASE)           . '/api/shared/config/session.php',
+    ] as $__c) {
         if ($__c && file_exists($__c)) { $__sharedSession = $__c; break; }
     }
-    unset($__candidates, $__c);
+    unset($__c);
 
     if ($__sharedSession) {
-        // Shared config sets save_path, session_name('APP_SESSID'), cookie params, and starts session.
         require_once $__sharedSession;
     } else {
-        // Fallback: set the same save_path and name manually so it still works.
-        $__sp = dirname(FRONTEND_BASE) . '/api/storage/sessions';
-        if (!is_dir($__sp)) $__sp = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/storage/sessions';
+        // Last-resort manual fallback
+        $__sp = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/storage/sessions';
+        if (!is_dir($__sp)) $__sp = dirname(FRONTEND_BASE) . '/api/storage/sessions';
         if (is_dir($__sp)) ini_set('session.save_path', $__sp);
         if (session_name() !== 'APP_SESSID') session_name('APP_SESSID');
-        $__isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-                   || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
-        session_start([
-            'cookie_httponly' => true,
-            'cookie_secure'   => $__isSecure,
-            'cookie_samesite' => 'Lax',
-        ]);
-        unset($__sp, $__isSecure);
+        session_start(['cookie_httponly' => true, 'cookie_samesite' => 'Lax']);
+        unset($__sp);
     }
     unset($__sharedSession);
 }
@@ -125,16 +113,16 @@ if (!function_exists('pub_detect_lang')) {
 /* -------------------------------------------------------
  * 4. Resolve active language
  * ----------------------------------------------------- */
-// Priority: URL ?lang=xx (explicit override) → HTTP_ACCEPT_LANGUAGE → app default_lang
-// Session is used ONLY when user explicitly chose a language via URL param.
-// This prevents stale language being "stuck" from a previous visit.
+// Priority: URL ?lang=xx → user preferred_language → session pub_lang → app default_lang
 if (isset($_GET['lang']) && preg_match('/^[a-z]{2,5}$/', $_GET['lang'])) {
     $lang = $_GET['lang'];
     $_SESSION['pub_lang'] = $lang;   // save explicit user choice
+} elseif (!empty($_SESSION['user']['preferred_language'])) {
+    // Use the logged-in user's preferred language
+    $lang = (string)$_SESSION['user']['preferred_language'];
 } elseif (!empty($_SESSION['pub_lang'])) {
-    $lang = $_SESSION['pub_lang'];   // honour previous explicit choice
+    $lang = $_SESSION['pub_lang'];
 } else {
-    // Auto-detect from browser Accept-Language (no session save — fresh each request)
     $lang = pub_detect_lang($appConfig['default_lang'] ?? 'en');
 }
 
@@ -502,13 +490,30 @@ if (!function_exists('pub_load_theme')) {
  *    Returns PDO instance or null on failure.
  *    Used by product.php and other pages to avoid HTTP loopback
  *    self-referencing requests that may fail on shared hosting.
+ *    Uses DOCUMENT_ROOT as primary path (same as admin_context.php).
  * ----------------------------------------------------- */
 if (!function_exists('pub_get_pdo')) {
     function pub_get_pdo(): ?PDO {
-        $dbFile = FRONTEND_BASE . '/../api/shared/config/db.php';
-        if (!is_readable($dbFile)) return null;
-        $dbConf = require $dbFile;
-        if (!is_array($dbConf)) return null;
+        // Cache per request — avoid opening multiple connections (one from pub_load_theme + one from here)
+        static $__pdo = false;
+        if ($__pdo !== false) return $__pdo;
+
+        // DOCUMENT_ROOT first (same as admin_context.php line 45), then relative path as fallback
+        $candidates = [
+            ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/shared/config/db.php',
+            FRONTEND_BASE . '/../api/shared/config/db.php',
+            realpath(FRONTEND_BASE . '/../api/shared/config/db.php') ?: '',
+        ];
+        $dbConf = null;
+        foreach ($candidates as $f) {
+            if ($f && is_readable($f)) {
+                $dbConf = require $f;
+                if (is_array($dbConf)) break;
+                $dbConf = null;
+            }
+        }
+        if (!$dbConf) { $__pdo = null; return null; }
+
         try {
             $dsn = sprintf(
                 'mysql:host=%s;port=%d;dbname=%s;charset=%s',
@@ -517,12 +522,14 @@ if (!function_exists('pub_get_pdo')) {
                 $dbConf['name'],
                 $dbConf['charset'] ?? 'utf8mb4'
             );
-            return new PDO($dsn, $dbConf['user'], $dbConf['pass'], [
-                PDO::ATTR_TIMEOUT        => 3,
+            $__pdo = new PDO($dsn, $dbConf['user'], $dbConf['pass'], [
+                PDO::ATTR_TIMEOUT        => 5,
                 PDO::ATTR_ERRMODE        => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ]);
+            return $__pdo;
         } catch (Throwable $_) {
+            $__pdo = null;
             return null;
         }
     }
@@ -645,11 +652,31 @@ $_SESSION['pub_tenant_id'] = $tenantId;
 
 $theme = pub_load_theme($tenantId);
 
+// Resolve logged-in user from session.
+// Supports two formats set by different auth paths:
+//   - $_SESSION['user'] = [...] (full array, set by API auth)
+//   - $_SESSION['user_id'] = 7  (scalar, load user from DB)
+$_pubUser = $_SESSION['user'] ?? $_SESSION['current_user'] ?? null;
+if (empty($_pubUser['id']) && !empty($_SESSION['user_id'])) {
+    // user_id is set but full user array is missing — load from DB
+    $_pdo2 = pub_get_pdo();
+    if ($_pdo2) {
+        try {
+            $__us = $_pdo2->prepare('SELECT id, name, username, email, preferred_language, is_active FROM users WHERE id = ? LIMIT 1');
+            $__us->execute([(int)$_SESSION['user_id']]);
+            $_pubUser = $__us->fetch() ?: null;
+            if ($_pubUser) $_SESSION['user'] = $_pubUser; // cache for next request
+        } catch (Throwable $_) {}
+    }
+    unset($_pdo2, $__us);
+}
+
 $GLOBALS['PUB_CONTEXT'] = [
     'lang'      => $lang,
     'dir'       => $dir,
     'tenant_id' => $tenantId,
     'theme'     => $theme,
     'app'       => $appConfig,
-    'user'      => $_SESSION['user'] ?? $_SESSION['current_user'] ?? null,
+    'user'      => $_pubUser,
 ];
+unset($_pubUser);
