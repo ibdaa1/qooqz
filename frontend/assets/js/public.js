@@ -276,17 +276,29 @@
 
   /* -------------------------------------------------------
    * 9b. User display: read localStorage.pubUser set by login.js
-   *     Updates the header login link to show username when
-   *     localStorage shows the user is logged in.
-   *     This works even when PHP session detection fails.
+   *     Falls back to window.pubSessionUser injected by PHP (header.php)
+   *     so users who logged in via the admin panel are also recognised.
    * ----------------------------------------------------- */
   function updateUserDisplay() {
     try {
+      var u = null;
       var raw = localStorage.getItem('pubUser');
-      if (!raw) return;
-      var u = JSON.parse(raw);
-      if (!u || !u.name) return;
-      // Update only elements that are specifically the header login button
+      if (raw) { try { u = JSON.parse(raw); } catch (e) {} }
+
+      // Fallback: PHP session user injected in <head> by header.php
+      if (!u || !u.id) {
+        u = (typeof window.pubSessionUser !== 'undefined' && window.pubSessionUser) ? window.pubSessionUser : null;
+        // Sync to localStorage so future checks (pubAddToCart, job.php) also see it
+        if (u && u.id) {
+          try { localStorage.setItem('pubUser', JSON.stringify(u)); } catch (e) {}
+        }
+      }
+
+      if (!u || !u.id) return;
+
+      var displayName = u.name || u.username || 'User';
+
+      // Update header login link(s) that still point to login.php
       var loginLinks = document.querySelectorAll('a.pub-login-btn');
       loginLinks.forEach(function (el) {
         if (el.href && el.href.indexOf('login.php') !== -1) {
@@ -338,9 +350,16 @@ function pubQtyChange(delta) {
  * Quantity is taken from #pubQtyInput (defaults to 1).
  */
 function pubAddToCart(btn) {
-  // Require login - redirect if user not in localStorage
+  // Require login — check localStorage first, then window.pubSessionUser (PHP session)
   try {
     var pubU = JSON.parse(localStorage.getItem('pubUser') || 'null');
+    if (!pubU || !pubU.id) {
+      // Try server-injected session user (for users who logged in via admin panel)
+      if (typeof window.pubSessionUser !== 'undefined' && window.pubSessionUser && window.pubSessionUser.id) {
+        pubU = window.pubSessionUser;
+        try { localStorage.setItem('pubUser', JSON.stringify(pubU)); } catch (e) {}
+      }
+    }
     if (!pubU || !pubU.id) {
       window.location.href = '/frontend/login.php?redirect=' + encodeURIComponent(window.location.href);
       return;

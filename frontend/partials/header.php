@@ -85,6 +85,21 @@ $_fontUrl = $dir === 'rtl'
     <?php endif; ?>
     <script type="application/json" id="pubThemeData"><?= json_encode($theme, JSON_HEX_TAG | JSON_UNESCAPED_UNICODE) ?></script>
     <?php endif; ?>
+    <?php
+    // Inject PHP session user so JS can show username even when localStorage is empty
+    // (happens when user logged in via admin panel instead of frontend login.php).
+    // Only safe non-sensitive fields are exposed: id, name, username, email.
+    $_phpUser = null;
+    if ($_isLoggedIn && !empty($_user['id'])) {
+        $_phpUser = [
+            'id'       => (int)$_user['id'],
+            'name'     => $_user['name'] ?? $_user['username'] ?? '',
+            'username' => $_user['username'] ?? '',
+            'email'    => $_user['email']    ?? '',
+        ];
+    }
+    ?>
+    <script>window.pubSessionUser = <?= json_encode($_phpUser, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;</script>
 </head>
 
 <body class="pub-body <?= e($dir) ?>">
@@ -121,9 +136,12 @@ $_fontUrl = $dir === 'rtl'
         <div class="pub-header-actions">
             <!-- Login / user — no language switcher button (auto-detected) -->
             <?php if ($_isLoggedIn): ?>
-                <a href="/frontend/profile.php" class="pub-login-btn">
+                <a href="/frontend/profile.php" class="pub-login-btn" style="margin-inline-end:6px;">
                     <?= e($_user['name'] ?? $_user['username'] ?? t('nav.account')) ?>
                 </a>
+                <a href="/frontend/logout.php"
+                   class="pub-btn pub-btn--ghost pub-btn--sm"
+                   style="font-size:0.8rem;padding:4px 10px;"><?= e(t('nav.logout')) ?></a>
             <?php else: ?>
                 <a href="/frontend/login.php" class="pub-login-btn"><?= e(t('nav.login')) ?></a>
             <?php endif; ?>

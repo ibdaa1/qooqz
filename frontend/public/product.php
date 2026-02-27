@@ -49,6 +49,8 @@ if ($pdo) {
         if ($productId) {
             // Main product row — no tenant_id filter when loading by explicit ID.
             // Products are public; restricting by tenant_id breaks cross-tenant links.
+            // Uses scalar subqueries for pricing and images to avoid multi-row JOIN issues
+            // (eliminates dependency on pp.is_active column existing in product_pricing).
             $qParams = [$lang, $productId];
 
             $st = $pdo->prepare(
@@ -58,17 +60,21 @@ if ($pdo) {
                         p.views_count, p.tenant_id,
                         COALESCE(pt.name, p.slug) AS name,
                         pt.short_description, pt.description, pt.specifications,
-                        pp.price, pp.compare_at_price, pp.currency_code,
+                        (SELECT pp.price FROM product_pricing pp
+                           WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
+                        (SELECT pp.compare_at_price FROM product_pricing pp
+                           WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS compare_at_price,
+                        (SELECT pp.currency_code FROM product_pricing pp
+                           WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
                         b.name AS brand_name,
-                        i.url AS image_url, i.thumb_url AS image_thumb_url
+                        (SELECT i.url FROM images i WHERE i.owner_id = p.id
+                           ORDER BY i.is_main DESC, i.sort_order ASC, i.id ASC LIMIT 1) AS image_url,
+                        (SELECT i.thumb_url FROM images i WHERE i.owner_id = p.id
+                           ORDER BY i.is_main DESC, i.sort_order ASC, i.id ASC LIMIT 1) AS image_thumb_url
                    FROM products p
               LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
-              LEFT JOIN product_pricing pp ON pp.product_id = p.id AND pp.variant_id IS NULL
               LEFT JOIN brands b ON b.id = p.brand_id
-              LEFT JOIN images i ON i.owner_id = p.id AND i.is_main = 1
-                     AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
-                  WHERE p.id = ?
-                  ORDER BY pp.is_active DESC LIMIT 1"
+                  WHERE p.id = ?"
             );
             $st->execute($qParams);
             $product = $st->fetch() ?: null;

@@ -142,4 +142,17 @@ document.addEventListener('DOMContentLoaded', function () {
     if (params.get('tab') === 'register') {
         showForm('register');
     }
+
+    // If user is already logged in (PHP session user injected by header.php),
+    // sync to localStorage so other pages know about the session.
+    // This handles the case where the user logged in via admin panel.
+    try {
+        const existing = localStorage.getItem('pubUser');
+        if (!existing && typeof window.pubSessionUser !== 'undefined' && window.pubSessionUser && window.pubSessionUser.id) {
+            localStorage.setItem('pubUser', JSON.stringify(window.pubSessionUser));
+            // Already logged in — redirect away from login page
+            const redirect = new URLSearchParams(window.location.search).get('redirect');
+            window.location.href = redirect || '/frontend/public/index.php';
+        }
+    } catch (e) {}
 });

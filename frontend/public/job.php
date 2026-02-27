@@ -291,10 +291,16 @@ include dirname(__DIR__) . '/partials/header.php';
 
   if (!form) return;
 
-  // Require login - check localStorage before showing/submitting form
+  // Require login — check localStorage first, then window.pubSessionUser (PHP session)
   (function () {
     try {
       var pubU = JSON.parse(localStorage.getItem('pubUser') || 'null');
+      if (!pubU || !pubU.id) {
+        if (typeof window.pubSessionUser !== 'undefined' && window.pubSessionUser && window.pubSessionUser.id) {
+          pubU = window.pubSessionUser;
+          try { localStorage.setItem('pubUser', JSON.stringify(pubU)); } catch (e) {}
+        }
+      }
       if (!pubU || !pubU.id) {
         form.innerHTML = '<div style="padding:20px;text-align:center;">'
           + '<p style="color:var(--pub-muted);margin-bottom:12px;"><?= e(t('auth.login_required', ['default'=>'Please login to apply'])) ?></p>'
@@ -311,6 +317,11 @@ include dirname(__DIR__) . '/partials/header.php';
     // Re-check login on submit
     try {
       var pubU2 = JSON.parse(localStorage.getItem('pubUser') || 'null');
+      if (!pubU2 || !pubU2.id) {
+        if (typeof window.pubSessionUser !== 'undefined' && window.pubSessionUser && window.pubSessionUser.id) {
+          pubU2 = window.pubSessionUser;
+        }
+      }
       if (!pubU2 || !pubU2.id) {
         window.location.href = '/frontend/login.php?redirect=' + encodeURIComponent(window.location.href);
         return;
