@@ -28,20 +28,34 @@ $apiConfig = is_readable($apiConfigFile) ? (require $apiConfigFile) : [];
 
 /* -------------------------------------------------------
  * 2. Session (safe)
+ *    Include the SAME shared session config the API and admin panel use.
+ *    This ensures identical session.save_path (/api/storage/sessions),
+ *    session name (APP_SESSID), and cookie settings — so login cookies set
+ *    by /api/auth are readable here without any extra configuration.
+ *    Pattern mirrors admin/includes/admin_context.php exactly.
  * ----------------------------------------------------- */
 if (php_sapi_name() !== 'cli' && session_status() === PHP_SESSION_NONE) {
-    // Use the same session name as the API auth (api/routes/auth.php uses APP_SESSID)
-    // so that login cookies are shared and the user's session data is visible here.
-    if (session_name() === 'PHPSESSID' || session_name() === '') {
-        session_name('APP_SESSID');
+    $sharedSession = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/shared/config/session.php';
+    if ($sharedSession && file_exists($sharedSession)) {
+        // Shared config sets save_path, session_name('APP_SESSID'), cookie params, and starts session.
+        require_once $sharedSession;
+    } else {
+        // Fallback: set the same save_path and name manually so it still works.
+        $sessionSavePath = dirname(FRONTEND_BASE) . '/api/storage/sessions';
+        if (is_dir($sessionSavePath)) {
+            ini_set('session.save_path', $sessionSavePath);
+        }
+        if (session_name() !== 'APP_SESSID') {
+            session_name('APP_SESSID');
+        }
+        $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                 || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
+        session_start([
+            'cookie_httponly' => true,
+            'cookie_secure'   => $isSecure,
+            'cookie_samesite' => 'Lax',
+        ]);
     }
-    $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-             || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
-    session_start([
-        'cookie_httponly' => true,
-        'cookie_secure'   => $isSecure,
-        'cookie_samesite' => 'Lax',
-    ]);
 }
 
 /* -------------------------------------------------------

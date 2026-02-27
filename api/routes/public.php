@@ -230,11 +230,11 @@ if ($first === 'products') {
                     i.url AS image_url, i.thumb_url AS image_thumb_url
                FROM products p
           LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
-          LEFT JOIN product_pricing pp ON pp.product_id = p.id AND pp.variant_id IS NULL AND pp.is_active = 1
+          LEFT JOIN product_pricing pp ON pp.product_id = p.id AND pp.variant_id IS NULL
           LEFT JOIN brands b ON b.id = p.brand_id
           LEFT JOIN images i ON i.owner_id = p.id AND i.is_main = 1
                  AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
-              WHERE p.id = ? AND p.is_active = 1" . $tidCond . " LIMIT 1",
+              WHERE p.id = ? AND p.is_active = 1" . $tidCond . " ORDER BY pp.is_active DESC LIMIT 1",
             $qParams
         );
         if (!$row) { ResponseFormatter::notFound('Product not found'); exit; }
@@ -269,7 +269,7 @@ if ($first === 'products') {
                    FROM products p2
              INNER JOIN product_categories pc2 ON pc2.product_id = p2.id AND pc2.category_id = ?
               LEFT JOIN product_translations pt2 ON pt2.product_id = p2.id AND pt2.language_code = ?
-              LEFT JOIN product_pricing pp2 ON pp2.product_id = p2.id AND pp2.variant_id IS NULL AND pp2.is_active = 1
+              LEFT JOIN product_pricing pp2 ON pp2.product_id = p2.id AND pp2.variant_id IS NULL
               LEFT JOIN images i2 ON i2.owner_id = p2.id AND i2.is_main = 1
                      AND i2.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
                   WHERE p2.is_active = 1 AND p2.id != ? AND p2.tenant_id = ?
@@ -318,7 +318,7 @@ if ($first === 'products') {
                 i.url AS image_url, i.thumb_url AS image_thumb_url
            FROM products p
       LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
-      LEFT JOIN product_pricing pp ON pp.product_id = p.id AND pp.variant_id IS NULL AND pp.is_active = 1
+      LEFT JOIN product_pricing pp ON pp.product_id = p.id AND pp.variant_id IS NULL
       LEFT JOIN images i ON i.owner_id = p.id AND i.is_main = 1
              AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
          $where ORDER BY p.id DESC LIMIT ? OFFSET ?",
@@ -502,7 +502,7 @@ if ($first === 'entity') {
                     i.url AS image_url, i.thumb_url AS image_thumb_url
                FROM products p
           LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
-          LEFT JOIN product_pricing pp ON pp.product_id = p.id AND pp.variant_id IS NULL AND pp.is_active = 1
+          LEFT JOIN product_pricing pp ON pp.product_id = p.id AND pp.variant_id IS NULL
           LEFT JOIN images i ON i.owner_id = p.id AND i.is_main = 1
                  AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
               $where ORDER BY p.is_featured DESC, p.id DESC LIMIT ? OFFSET ?",
