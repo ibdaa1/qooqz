@@ -17,6 +17,12 @@ $dir      = $ctx['dir'];
 $tenantId = $ctx['tenant_id'];
 $user     = $ctx['user'] ?? null;
 
+// Require login — redirect to login page if not authenticated
+if (!$user || empty($user['id'])) {
+    header('Location: /frontend/login.php?redirect=' . urlencode('/frontend/public/checkout.php' . ($_SERVER['QUERY_STRING'] ? '?' . $_SERVER['QUERY_STRING'] : '')));
+    exit;
+}
+
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = t('checkout.title') . ' — QOOQZ';
@@ -86,6 +92,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
             CURLOPT_TIMEOUT        => 8,
             CURLOPT_SSL_VERIFYPEER => false,
+            // Forward the session cookie so /api/public/orders can verify the logged-in user
+            CURLOPT_COOKIE         => session_name() . '=' . session_id(),
         ]);
         $resp     = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);

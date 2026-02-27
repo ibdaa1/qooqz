@@ -209,12 +209,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // set session + global user
         $user = [
-            'id' => isset($row['id']) ? (int)$row['id'] : null,
-            'username' => $row['username'] ?? $row['email'] ?? null,
-            'email' => $row['email'] ?? null,
-            'role_id' => isset($row['role_id']) ? (int)$row['role_id'] : null,
+            'id'                 => isset($row['id']) ? (int)$row['id'] : null,
+            'name'               => $row['name'] ?? $row['full_name'] ?? $row['username'] ?? null,
+            'username'           => $row['username'] ?? $row['email'] ?? null,
+            'email'              => $row['email'] ?? null,
+            'role_id'            => isset($row['role_id']) ? (int)$row['role_id'] : null,
             'preferred_language' => $row['preferred_language'] ?? null,
-            'is_active' => !empty($row['is_active']),
+            'is_active'          => !empty($row['is_active']),
         ];
 
         $rbac = _load_user_rbac($pdo, (int)$user['id'], $user['role_id'] ?? null);

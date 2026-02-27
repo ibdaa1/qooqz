@@ -97,10 +97,10 @@ async function postToApi(formId) {
                     const u = (data.data && data.data.user)
                         ? data.data.user
                         : (data.user || null);
-                    if (u && u.id && u.name) {
+                    if (u && u.id) {
                         localStorage.setItem('pubUser', JSON.stringify({
                             id:   u.id,
-                            name: u.name || u.username || u.email || '',
+                            name: u.name || u.username || u.email || 'User',
                         }));
                     }
                 } catch (e) {}

@@ -290,7 +290,7 @@
       var loginLinks = document.querySelectorAll('a.pub-login-btn');
       loginLinks.forEach(function (el) {
         if (el.href && el.href.indexOf('login.php') !== -1) {
-          el.textContent = u.name;
+          el.textContent = displayName;
           el.href = '/frontend/profile.php';
         }
       });
@@ -338,6 +338,18 @@ function pubQtyChange(delta) {
  * Quantity is taken from #pubQtyInput (defaults to 1).
  */
 function pubAddToCart(btn) {
+  // Require login - redirect if user not in localStorage
+  try {
+    var pubU = JSON.parse(localStorage.getItem('pubUser') || 'null');
+    if (!pubU || !pubU.id) {
+      window.location.href = '/frontend/login.php?redirect=' + encodeURIComponent(window.location.href);
+      return;
+    }
+  } catch (e) {
+    window.location.href = '/frontend/login.php';
+    return;
+  }
+
   var qtyInput = document.getElementById('pubQtyInput');
   var qty      = qtyInput ? (parseInt(qtyInput.value, 10) || 1) : 1;
   var id    = parseInt(btn.dataset.productId, 10);

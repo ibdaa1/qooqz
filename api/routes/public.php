@@ -881,6 +881,14 @@ if ($first === 'orders') {
     if (is_string($rawItems)) $rawItems = json_decode($rawItems, true);
     $items = is_array($rawItems) ? $rawItems : [];
 
+    // Require authenticated user
+    $sessUser   = $_SESSION['user'] ?? null;
+    $sessUserId = isset($sessUser['id']) ? (int)$sessUser['id'] : 0;
+    if (!$sessUserId) {
+        ResponseFormatter::error('Login required to place an order', 401);
+        exit;
+    }
+
     // Validate
     if (!$entityId || !$custName || !$custPhone || empty($items)) {
         ResponseFormatter::error('entity_id, customer_name, customer_phone, items are required', 422);
@@ -922,12 +930,12 @@ if ($first === 'orders') {
                (tenant_id, entity_id, order_number, user_id, status, payment_status,
                 subtotal, tax_amount, shipping_cost, discount_amount, total_amount, grand_total,
                 currency_code, customer_notes, ip_address)
-             VALUES (?, ?, ?, 0, 'pending', 'pending',
+             VALUES (?, ?, ?, ?, 'pending', 'pending',
                      ?, 0, 0, 0, ?, ?,
                      ?, ?, ?)"
         );
         $oSt->execute([
-            $tenantId, $entityId, $orderNumber,
+            $tenantId, $entityId, $orderNumber, $sessUserId,
             $subtotal, $grandTotal, $grandTotal,
             $currencyCode, $notes,
             $_SERVER['REMOTE_ADDR'] ?? null,
@@ -991,6 +999,14 @@ if ($first === 'job_applications') {
     $portfolioUrl = trim((string)($body['portfolio_url'] ?? ''));
     $linkedinUrl  = trim((string)($body['linkedin_url']  ?? ''));
 
+    // Require authenticated user
+    $jobSessUser   = $_SESSION['user'] ?? null;
+    $jobSessUserId = isset($jobSessUser['id']) ? (int)$jobSessUser['id'] : 0;
+    if (!$jobSessUserId) {
+        ResponseFormatter::error('Login required to apply for a job', 401);
+        exit;
+    }
+
     if (!$jobId || !$fullName || !$email) {
         ResponseFormatter::error('job_id, full_name and email are required', 422);
         exit;
@@ -1013,12 +1029,12 @@ if ($first === 'job_applications') {
                (job_id, user_id, full_name, email, phone,
                 cover_letter, portfolio_url, linkedin_url, cv_file_url,
                 status, ip_address)
-             VALUES (?, 0, ?, ?, ?,
+             VALUES (?, ?, ?, ?, ?,
                      ?, ?, ?, ?,
                      'submitted', ?)"
         );
         $st->execute([
-            $jobId,
+            $jobId, $jobSessUserId,
             $fullName, $email, $phone,
             $coverLetter, $portfolioUrl, $linkedinUrl, $cvFileUrl,
             $_SERVER['REMOTE_ADDR'] ?? null,

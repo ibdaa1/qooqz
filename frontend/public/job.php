@@ -291,8 +291,32 @@ include dirname(__DIR__) . '/partials/header.php';
 
   if (!form) return;
 
+  // Require login - check localStorage before showing/submitting form
+  (function () {
+    try {
+      var pubU = JSON.parse(localStorage.getItem('pubUser') || 'null');
+      if (!pubU || !pubU.id) {
+        form.innerHTML = '<div style="padding:20px;text-align:center;">'
+          + '<p style="color:var(--pub-muted);margin-bottom:12px;"><?= e(t('auth.login_required', ['default'=>'Please login to apply'])) ?></p>'
+          + '<a href="/frontend/login.php?redirect=' + encodeURIComponent(window.location.href) + '" class="pub-btn pub-btn--primary">Login</a>'
+          + '</div>';
+        return;
+      }
+    } catch (e2) {}
+  })();
+
   form.addEventListener('submit', function (e) {
     e.preventDefault();
+
+    // Re-check login on submit
+    try {
+      var pubU2 = JSON.parse(localStorage.getItem('pubUser') || 'null');
+      if (!pubU2 || !pubU2.id) {
+        window.location.href = '/frontend/login.php?redirect=' + encodeURIComponent(window.location.href);
+        return;
+      }
+    } catch (e3) {}
+
     success.style.display = 'none';
     errBox.style.display  = 'none';
 
@@ -316,6 +340,7 @@ include dirname(__DIR__) . '/partials/header.php';
 
     fetch('/api/public/job_applications', {
       method:  'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(data),
     })
