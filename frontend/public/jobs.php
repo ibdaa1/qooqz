@@ -98,7 +98,7 @@ include dirname(__DIR__) . '/partials/header.php';
     <?php if (!empty($jobs)): ?>
     <div class="pub-grid-lg">
         <?php foreach ($jobs as $j): ?>
-        <a href="/frontend/public/jobs.php?id=<?= (int)($j['id'] ?? 0) ?>"
+        <a href="/frontend/public/job.php?id=<?= (int)($j['id'] ?? 0) ?>"
            class="pub-job-card" style="text-decoration:none;">
             <h2 class="pub-job-title"><?= e($j['title'] ?? '') ?></h2>
             <div class="pub-job-meta">

@@ -299,52 +299,6 @@ include dirname(__DIR__) . '/partials/header.php';
 </main>
 
 <script>
-/* Quantity controls */
-function pubQtyChange(delta) {
-    var inp = document.getElementById('pubQtyInput');
-    if (!inp) return;
-    var v = parseInt(inp.value, 10) || 1;
-    v = Math.max(1, Math.min(parseInt(inp.max, 10) || 999, v + delta));
-    inp.value = v;
-}
-
-/* Add to cart — stores in localStorage under 'pub_cart' */
-function pubAddToCart(btn) {
-    var qty   = parseInt(document.getElementById('pubQtyInput').value, 10) || 1;
-    var id    = parseInt(btn.dataset.productId, 10);
-    var name  = btn.dataset.productName;
-    var price = parseFloat(btn.dataset.productPrice) || 0;
-    var img   = btn.dataset.productImage;
-    var cur   = btn.dataset.currency;
-
-    var cart  = [];
-    try { cart = JSON.parse(localStorage.getItem('pub_cart') || '[]'); } catch (e) {}
-    if (!Array.isArray(cart)) cart = [];
-
-    var found = false;
-    cart.forEach(function(item) {
-        if (item.id === id) { item.qty = (item.qty || 1) + qty; found = true; }
-    });
-    if (!found) {
-        cart.push({ id: id, name: name, price: price, qty: qty, image: img, currency: cur });
-    }
-    localStorage.setItem('pub_cart', JSON.stringify(cart));
-
-    /* Update cart count badge if present */
-    var badge = document.getElementById('pubCartCount');
-    if (badge) {
-        var total = cart.reduce(function(s, i) { return s + (i.qty || 1); }, 0);
-        badge.textContent = total;
-        badge.style.display = total ? 'inline-flex' : 'none';
-    }
-
-    /* Visual feedback */
-    var orig = btn.textContent;
-    btn.textContent = btn.dataset.addedText || '✅';
-    btn.disabled = true;
-    setTimeout(function() { btn.textContent = orig; btn.disabled = false; }, 1800);
-}
-
 /* Tab switcher */
 function pubTabSwitch(btn, panelId) {
     document.querySelectorAll('.pub-tab').forEach(function(t) { t.classList.remove('active'); });

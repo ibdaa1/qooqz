@@ -413,32 +413,51 @@ if ($first === 'jobs') {
     $id = $_GET['id'] ?? (isset($segments[1]) && ctype_digit((string)$segments[1]) ? (int)$segments[1] : null);
 
     if ($id) {
-        $row = $pdoOne("SELECT * FROM jobs WHERE id = ? AND status NOT IN ('cancelled','filled','closed') LIMIT 1", [$id]);
+        // Full job detail with translated title/description via job_translations
+        $row = $pdoOne(
+            "SELECT j.*, COALESCE(jt.job_title, j.slug) AS title,
+                    jt.description, jt.requirements, jt.benefits
+               FROM jobs j
+          LEFT JOIN job_translations jt ON jt.job_id = j.id AND jt.language_code = ?
+              WHERE j.id = ? AND j.status NOT IN ('cancelled','filled','closed') LIMIT 1",
+            [$lang, $id]
+        );
         if ($row) ResponseFormatter::success(['ok' => true, 'job' => $row]);
         else      ResponseFormatter::notFound('Job not found');
         exit;
     }
 
-    $where  = "WHERE j.status NOT IN ('cancelled', 'filled', 'closed')";
-    $params = [];
-    if (!empty($_GET['is_featured'])) { $where .= ' AND j.is_featured = ?'; $params[] = 1; }
-    if (!empty($_GET['is_urgent']))   { $where .= ' AND j.is_urgent = ?';   $params[] = 1; }
-    if (!empty($_GET['is_remote']))   { $where .= ' AND j.is_remote = ?';   $params[] = 1; }
+    // $whereParams: params for WHERE only (no $lang — $lang is for the JOIN)
+    $where       = "WHERE j.status NOT IN ('cancelled', 'filled', 'closed')";
+    $whereParams = [];
+    if (!empty($_GET['is_featured']))    { $where .= ' AND j.is_featured = ?'; $whereParams[] = 1; }
+    if (!empty($_GET['is_urgent']))      { $where .= ' AND j.is_urgent = ?';   $whereParams[] = 1; }
+    if (!empty($_GET['is_remote']))      { $where .= ' AND j.is_remote = ?';   $whereParams[] = 1; }
     if (!empty($_GET['employment_type'])) {
-        $where .= ' AND j.employment_type = ?'; $params[] = $_GET['employment_type'];
+        // Frontend sends full_time/part_time/etc., stored in j.job_type (not j.employment_type)
+        $where .= ' AND j.job_type = ?'; $whereParams[] = $_GET['employment_type'];
     }
     if (!empty($_GET['search'])) {
-        $where .= ' AND (j.title LIKE ? OR j.description LIKE ?)';
-        $kw     = '%' . $_GET['search'] . '%';
-        $params = array_merge($params, [$kw, $kw]);
+        // Escape LIKE wildcards so user-typed % or _ match literally; SQL injection prevented by PDO params.
+        $kw = '%' . str_replace(['\\','%','_'], ['\\\\','\\%','\\_'], trim($_GET['search'])) . '%';
+        $where .= ' AND (j.slug LIKE ? OR j.id IN (SELECT job_id FROM job_translations WHERE job_title LIKE ? AND language_code = ?))';
+        $whereParams[] = $kw;
+        $whereParams[] = $kw;
+        $whereParams[] = $lang;
     }
 
-    $total = $pdoCount("SELECT COUNT(*) FROM jobs j $where", $params);
+    $total = $pdoCount("SELECT COUNT(*) FROM jobs j $where", $whereParams);
     $rows  = $pdoList(
-        "SELECT j.id, j.title, j.employment_type, j.is_remote, j.is_featured, j.is_urgent,
-                j.deadline, j.city_id, j.entity_id, j.created_at
-           FROM jobs j $where ORDER BY j.is_featured DESC, j.created_at DESC LIMIT ? OFFSET ?",
-        array_merge($params, [$per, $offset])
+        "SELECT j.id, COALESCE(jt.job_title, j.slug) AS title,
+                j.job_type AS employment_type,
+                j.is_remote, j.is_featured, j.is_urgent,
+                j.application_deadline AS deadline,
+                j.salary_min, j.salary_max, j.salary_currency,
+                j.city_id, j.entity_id, j.created_at
+           FROM jobs j
+      LEFT JOIN job_translations jt ON jt.job_id = j.id AND jt.language_code = ?
+         $where ORDER BY j.is_featured DESC, j.created_at DESC LIMIT ? OFFSET ?",
+        array_merge([$lang], $whereParams, [$per, $offset])
     );
 
     ResponseFormatter::success([
@@ -917,6 +936,71 @@ if ($first === 'orders') {
     } catch (Throwable $ex) {
         try { $pdo->rollBack(); } catch (Throwable $rb) {}
         ResponseFormatter::error('Order creation failed', 500);
+    }
+    exit;
+}
+
+/* -------------------------------------------------------
+ * POST /api/public/job_applications — guest job application
+ * Accepts: job_id, full_name, email, phone, cover_letter,
+ *          cv_file_url, portfolio_url, linkedin_url
+ * ----------------------------------------------------- */
+if ($first === 'job_applications') {
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+        ResponseFormatter::error('Method not allowed', 405);
+        exit;
+    }
+    if (!$pdo instanceof PDO) { ResponseFormatter::error('Database unavailable', 503); exit; }
+
+    $raw  = file_get_contents('php://input');
+    $body = ($raw && str_starts_with(trim((string)($_SERVER['CONTENT_TYPE'] ?? '')), 'application/json'))
+          ? (json_decode($raw, true) ?? []) : $_POST;
+
+    $jobId        = isset($body['job_id'])  && is_numeric($body['job_id'])  ? (int)$body['job_id']  : 0;
+    $fullName     = trim((string)($body['full_name']     ?? $body['name']    ?? ''));
+    $email        = trim((string)($body['email']         ?? ''));
+    $phone        = trim((string)($body['phone']         ?? ''));
+    $coverLetter  = trim((string)($body['cover_letter']  ?? ''));
+    $cvFileUrl    = trim((string)($body['cv_file_url']   ?? ''));
+    $portfolioUrl = trim((string)($body['portfolio_url'] ?? ''));
+    $linkedinUrl  = trim((string)($body['linkedin_url']  ?? ''));
+
+    if (!$jobId || !$fullName || !$email) {
+        ResponseFormatter::error('job_id, full_name and email are required', 422);
+        exit;
+    }
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        ResponseFormatter::error('Invalid email address', 422);
+        exit;
+    }
+
+    // Verify job exists and is open
+    $jobRow = $pdoOne(
+        "SELECT id FROM jobs WHERE id = ? AND status NOT IN ('cancelled','filled','closed') LIMIT 1",
+        [$jobId]
+    );
+    if (!$jobRow) { ResponseFormatter::notFound('Job not found or no longer accepting applications'); exit; }
+
+    try {
+        $st = $pdo->prepare(
+            "INSERT INTO job_applications
+               (job_id, user_id, full_name, email, phone,
+                cover_letter, portfolio_url, linkedin_url, cv_file_url,
+                status, ip_address)
+             VALUES (?, 0, ?, ?, ?,
+                     ?, ?, ?, ?,
+                     'submitted', ?)"
+        );
+        $st->execute([
+            $jobId,
+            $fullName, $email, $phone,
+            $coverLetter, $portfolioUrl, $linkedinUrl, $cvFileUrl,
+            $_SERVER['REMOTE_ADDR'] ?? null,
+        ]);
+        $appId = (int)$pdo->lastInsertId();
+        ResponseFormatter::success(['ok' => true, 'id' => $appId], 'Application submitted', 201);
+    } catch (Throwable $ex) {
+        ResponseFormatter::error('Application submission failed', 500);
     }
     exit;
 }

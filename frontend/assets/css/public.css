@@ -361,7 +361,17 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 }
 
 /* -------------------------------------------------------
-   9. Product Card
+   9. Generic Card
+   ----------------------------------------------------- */
+.pub-card {
+  background: var(--pub-surface);
+  border: 1px solid var(--pub-border);
+  border-radius: var(--pub-radius);
+  box-shadow: var(--pub-shadow);
+}
+
+/* -------------------------------------------------------
+   10. Product Card
    ----------------------------------------------------- */
 .pub-product-card {
   background: var(--pub-bg);
