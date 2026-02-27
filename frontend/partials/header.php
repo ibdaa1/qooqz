@@ -30,6 +30,7 @@ $_navItems = [
     t('nav.home')       => $_basePath . '/index.php',
     t('nav.products')   => $_basePath . '/products.php',
     t('nav.categories') => $_basePath . '/categories.php',
+    t('nav.offers')     => $_basePath . '/discounts.php',
     t('nav.jobs')       => $_basePath . '/jobs.php',
     t('nav.entities')   => $_basePath . '/entities.php',
     t('nav.tenants')    => $_basePath . '/tenants.php',

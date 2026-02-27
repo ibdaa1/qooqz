@@ -15,7 +15,8 @@
     "account": "My Account",
     "logout": "Logout",
     "menu_open": "Open menu",
-    "menu_close": "Close menu"
+    "menu_close": "Close menu",
+    "offers": "Offers"
   },
   "hero": {
     "title": "QOOQZ Global Platform",
@@ -226,7 +227,9 @@
     "closed": "Closed",
     "share": "Share",
     "copy_link": "Copy Link",
-    "all_categories": "All"
+    "all_categories": "All",
+    "open_now": "Open Now",
+    "discounts_tab": "Offers & Discounts"
   },
   "deals": {
     "title": "🔥 Hot Deals",
@@ -305,5 +308,14 @@
     "submitting": "Creating...",
     "success": "Your workspace has been created! You can now start adding vendors and products.",
     "error": "Creation failed. Please try again."
+  },
+  "discounts": {
+    "page_title": "Offers & Discounts",
+    "page_subtitle": "Latest deals and promo codes",
+    "copy_code": "Copy Code",
+    "expires": "Expires",
+    "remaining": "uses left",
+    "terms": "Terms & Conditions",
+    "none": "No active offers at this time"
   }
 }

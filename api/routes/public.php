@@ -501,8 +501,10 @@ if ($first === 'jobs') {
 
 /* -------------------------------------------------------
  * Route: Entity detail — full vendor profile
- * GET /api/public/entity/{id}         — full entity profile
- * GET /api/public/entity/{id}/products — entity products
+ * GET /api/public/entity/{id}           — full entity profile
+ * GET /api/public/entity/{id}/products  — entity products
+ * GET /api/public/entity/{id}/categories — entity categories
+ * GET /api/public/entity/{id}/discounts  — entity discounts
  * ----------------------------------------------------- */
 if ($first === 'entity') {
     $entityId = isset($segments[1]) && ctype_digit((string)$segments[1]) ? (int)$segments[1] : (int)($_GET['id'] ?? 0);
@@ -526,6 +528,26 @@ if ($first === 'entity') {
                JOIN products p ON p.id = pc.product_id AND p.tenant_id = ? AND p.is_active = 1
               ORDER BY c.sort_order ASC, c.id ASC LIMIT 50",
             [$lang, $eTenId]
+        );
+        ResponseFormatter::success(['ok' => true, 'data' => $rows]);
+        exit;
+    }
+
+    // Sub-route: entity discounts — active discounts for this entity
+    if ($sub === 'discounts') {
+        $rows = $pdoList(
+            "SELECT d.id, d.code, d.type, d.auto_apply, d.currency_code,
+                    d.starts_at, d.ends_at, d.max_redemptions, d.current_redemptions,
+                    COALESCE(dt.name, d.code) AS title,
+                    dt.description, dt.marketing_badge, dt.terms_conditions
+               FROM discounts d
+          LEFT JOIN discount_translations dt ON dt.discount_id = d.id AND dt.language_code = ?
+              WHERE d.entity_id = ?
+                AND d.status = 'active'
+                AND (d.starts_at IS NULL OR d.starts_at <= NOW())
+                AND (d.ends_at   IS NULL OR d.ends_at   >= NOW())
+              ORDER BY d.priority DESC, d.id DESC LIMIT 30",
+            [$lang, $entityId]
         );
         ResponseFormatter::success(['ok' => true, 'data' => $rows]);
         exit;
@@ -837,7 +859,7 @@ if ($first === 'discounts') {
         "SELECT d.id, d.code, d.type, d.auto_apply, d.currency_code,
                 d.starts_at, d.ends_at, d.max_redemptions, d.current_redemptions,
                 COALESCE(dt.name, d.code) AS title,
-                dt.description, dt.terms_and_conditions
+                dt.description, dt.terms_conditions
            FROM discounts d
       LEFT JOIN discount_translations dt ON dt.discount_id = d.id AND dt.language_code = ?
           WHERE d.entity_id IN (SELECT id FROM entities WHERE tenant_id = ?)

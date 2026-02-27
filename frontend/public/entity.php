@@ -64,12 +64,53 @@ $productMeta = $rp['data']['meta'] ?? ['total' => count($products), 'total_pages
 $catResp   = pub_fetch(pub_api_url('public/entity/' . ($entity['id'] ?? $entityId) . '/categories') . '?' . $qs);
 $categories = $catResp['data']['data'] ?? [];
 
+/* Fetch discounts for this entity */
+$discResp  = pub_fetch(pub_api_url('public/entity/' . ($entity['id'] ?? $entityId) . '/discounts') . '?' . $qs);
+$discounts = $discResp['data']['data'] ?? [];
+
 $GLOBALS['PUB_PAGE_TITLE'] = e($entity['store_name'] ?? '') . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_DESC']  = e($entity['description'] ?? '');
 
 /* -------------------------------------------------------
- * Day names from translation file — day_of_week is tinyint 0=Sun … 6=Sat
+ * Open / Closed status — calculate from working_hours + current local time
+ * working_hours is already in $entity from the API call
+ * day_of_week: 0=Sun, 1=Mon … 6=Sat  (PHP: 0=Sun via date('w'))
  * ----------------------------------------------------- */
+$entityIsOpen    = null;   // null = unknown (no hours data)
+$entityOpenLabel = '';
+$workingHoursArr = $entity['working_hours'] ?? [];
+if (!empty($workingHoursArr)) {
+    $nowDow   = (int)date('w');                  // 0(Sun)…6(Sat)
+    $nowMins  = (int)date('H') * 60 + (int)date('i');
+    foreach ($workingHoursArr as $h) {
+        if ((int)($h['day_of_week'] ?? -1) !== $nowDow) continue;
+        if (empty($h['is_open'])) {
+            $entityIsOpen    = false;
+            $entityOpenLabel = t('entity.closed');
+            break;
+        }
+        $openMin  = 0;
+        $closeMin = 24 * 60;
+        if (!empty($h['open_time'])) {
+            [$oh, $om] = array_map('intval', explode(':', $h['open_time']));
+            $openMin = $oh * 60 + $om;
+        }
+        if (!empty($h['close_time'])) {
+            [$ch, $cm] = array_map('intval', explode(':', $h['close_time']));
+            $closeMin = $ch * 60 + $cm;
+        }
+        if ($nowMins >= $openMin && ($closeMin === 0 || $nowMins < $closeMin)) {
+            $entityIsOpen    = true;
+            $entityOpenLabel = t('entity.open_now');
+        } else {
+            $entityIsOpen    = false;
+            $entityOpenLabel = t('entity.closed');
+        }
+        break;
+    }
+}
+
+/* Day names */
 $dayNames = [
     0 => t('entity.day_sunday'),
     1 => t('entity.day_monday'),
@@ -119,6 +160,11 @@ include dirname(__DIR__) . '/partials/header.php';
                 <h1 class="pub-entity-profile-name"><?= e($entity['store_name'] ?? '') ?></h1>
                 <?php if (!empty($entity['is_verified'])): ?>
                     <span class="pub-entity-verified">✅ <?= e(t('entities.verified')) ?></span>
+                <?php endif; ?>
+                <?php if ($entityIsOpen !== null): ?>
+                    <span class="pub-open-badge <?= $entityIsOpen ? 'pub-open-badge--open' : 'pub-open-badge--closed' ?>">
+                        <?= $entityIsOpen ? '🟢' : '🔴' ?> <?= e($entityOpenLabel) ?>
+                    </span>
                 <?php endif; ?>
                 <?php if (!empty($entity['type_name'] ?? $entity['vendor_type'])): ?>
                     <span class="pub-tag" style="font-size:0.8rem;">
@@ -211,6 +257,13 @@ include dirname(__DIR__) . '/partials/header.php';
                 aria-selected="false" aria-controls="tabMap">
             🗺️ <?= e(t('entity.location_tab')) ?>
         </button>
+        <?php if (!empty($discounts)): ?>
+        <button class="pub-tab" data-tab="discounts" role="tab"
+                aria-selected="false" aria-controls="tabDiscounts">
+            🏷️ <?= e(t('entity.discounts_tab')) ?>
+            <span class="pub-tab-count"><?= count($discounts) ?></span>
+        </button>
+        <?php endif; ?>
     </div>
 
     <!-- TAB: Products -->
@@ -395,6 +448,64 @@ include dirname(__DIR__) . '/partials/header.php';
 
 </div><!-- /.pub-container -->
 
+<?php if (!empty($discounts)): ?>
+<!-- TAB: Discounts (rendered outside container so it spans full context) -->
+<?php endif; ?>
+
+<!-- Discounts tab panel (inside container) -->
+<div class="pub-container">
+
+    <!-- TAB: Discounts panel -->
+    <div class="pub-tab-panel" id="tabDiscounts" style="display:none;">
+        <?php if (!empty($discounts)): ?>
+        <div style="margin-top:20px;display:grid;gap:14px;">
+            <?php foreach ($discounts as $d): ?>
+            <div class="pub-discount-card">
+                <?php if (!empty($d['marketing_badge'])): ?>
+                    <span class="pub-discount-badge-top"><?= e($d['marketing_badge']) ?></span>
+                <?php endif; ?>
+                <div class="pub-discount-inner">
+                    <div class="pub-discount-icon">🏷️</div>
+                    <div class="pub-discount-body">
+                        <p class="pub-discount-title"><?= e($d['title'] ?? $d['code'] ?? '') ?></p>
+                        <?php if (!empty($d['description'])): ?>
+                            <p class="pub-discount-desc"><?= e($d['description']) ?></p>
+                        <?php endif; ?>
+                        <?php if (!empty($d['code'])): ?>
+                            <div class="pub-discount-code-row">
+                                <span class="pub-discount-code"><?= e($d['code']) ?></span>
+                                <button class="pub-btn pub-btn--ghost pub-btn--sm"
+                                        onclick="pubCopyDiscount('<?= e(addslashes($d['code'])) ?>', this)">
+                                    📋 <?= e(t('discounts.copy_code')) ?>
+                                </button>
+                            </div>
+                        <?php endif; ?>
+                        <?php if (!empty($d['ends_at'])): ?>
+                            <p class="pub-discount-expires">
+                                ⏰ <?= e(t('discounts.expires')) ?>: <?= e(substr($d['ends_at'], 0, 10)) ?>
+                            </p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php if (!empty($d['terms_conditions'])): ?>
+                    <details class="pub-discount-terms">
+                        <summary><?= e(t('discounts.terms')) ?></summary>
+                        <p><?= e($d['terms_conditions']) ?></p>
+                    </details>
+                <?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php else: ?>
+        <div class="pub-empty" style="margin-top:40px;">
+            <div class="pub-empty-icon">🏷️</div>
+            <p class="pub-empty-msg"><?= e(t('discounts.none')) ?></p>
+        </div>
+        <?php endif; ?>
+    </div>
+
+</div><!-- /.pub-container discounts -->
+
 <script>
 // Simple tab switcher
 document.querySelectorAll('.pub-tab').forEach(function(btn) {
@@ -444,6 +555,26 @@ function pubCopyLink() {
         alert('✅');
     }
 }
+
+function pubCopyDiscount(code, btn) {
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(code).then(function() {
+            var orig = btn.textContent;
+            btn.textContent = '✅';
+            setTimeout(function() { btn.textContent = orig; }, 1800);
+        });
+    } else {
+        var ta = document.createElement('textarea');
+        ta.value = code;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        var orig = btn.textContent;
+        btn.textContent = '✅';
+        setTimeout(function() { btn.textContent = orig; }, 1800);
+    }
+}
 </script>
 
 <?php
@@ -491,6 +622,33 @@ echo '<style>
   border:none; border-radius:0 0 var(--pub-radius) var(--pub-radius); font-size:0.82rem; font-weight:600;
   cursor:pointer; transition:opacity 0.2s; }
 .pub-cart-add-btn:hover { opacity:0.85; }
+/* Open/closed badge */
+.pub-open-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px;
+  font-size:0.78rem; font-weight:700; }
+.pub-open-badge--open  { background:#d1fae5; color:#065f46; }
+.pub-open-badge--closed{ background:#fee2e2; color:#991b1b; }
+/* Tab count badge */
+.pub-tab-count { background:var(--pub-primary); color:#fff; border-radius:20px; padding:1px 6px;
+  font-size:0.72rem; font-weight:700; margin-inline-start:4px; }
+/* Discount cards */
+.pub-discount-card { background:var(--pub-surface); border:1px solid var(--pub-border); border-radius:var(--pub-radius);
+  overflow:hidden; position:relative; }
+.pub-discount-badge-top { position:absolute; top:0; right:0; background:var(--pub-accent,#F59E0B); color:#000;
+  font-size:0.72rem; font-weight:800; padding:3px 10px;
+  border-bottom-left-radius:var(--pub-radius); }
+.pub-discount-inner { display:flex; gap:14px; padding:14px 16px; align-items:flex-start; }
+.pub-discount-icon { font-size:2rem; flex-shrink:0; }
+.pub-discount-body { flex:1; min-width:0; }
+.pub-discount-title { font-size:1rem; font-weight:700; margin:0 0 4px; color:var(--pub-text); }
+.pub-discount-desc  { font-size:0.85rem; color:var(--pub-muted); margin:0 0 8px; }
+.pub-discount-code-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+.pub-discount-code { font-family:monospace; font-size:0.9rem; font-weight:800; letter-spacing:2px;
+  background:var(--pub-bg); border:1px dashed var(--pub-border); padding:4px 12px;
+  border-radius:6px; color:var(--pub-primary); }
+.pub-discount-expires { font-size:0.78rem; color:var(--pub-muted); margin:0; }
+.pub-discount-terms { padding:8px 16px 12px; border-top:1px solid var(--pub-border); }
+.pub-discount-terms summary { font-size:0.82rem; color:var(--pub-muted); cursor:pointer; }
+.pub-discount-terms p { font-size:0.82rem; color:var(--pub-muted); margin:6px 0 0; }
 </style>';
 ?>
 
