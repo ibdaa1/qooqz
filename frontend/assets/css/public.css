@@ -251,6 +251,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0; /* prevent hamburger from being squeezed off screen */
 }
 
 .pub-lang-btn {
@@ -867,6 +868,18 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 @media (min-width: 768px) {
   .pub-nav { display: flex; }
   .pub-hamburger { display: none; }
+}
+
+/* On mobile: hide login/logout buttons from header bar (they live in the drawer).
+   This prevents the header from overflowing on narrow screens when a logo is present. */
+@media (max-width: 767px) {
+  .pub-header-actions .pub-login-btn { display: none; }
+  .pub-header-actions .pub-btn--ghost { display: none; }
+  /* Constrain logo image on mobile so it doesn't push hamburger off screen */
+  .pub-logo-img { max-width: 100px !important; max-height: 34px !important; }
+  /* Give logo a bit more room, and let it grow to fill available space */
+  .pub-logo { max-width: unset; flex: 1; overflow: hidden; }
+  .pub-logo-name { max-width: 110px; }
 }
 
 /* -------------------------------------------------------
