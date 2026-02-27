@@ -99,7 +99,10 @@ $_fontUrl = $dir === 'rtl'
         ];
     }
     ?>
-    <script>window.pubSessionUser = <?= json_encode($_phpUser, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;</script>
+    <script>window.pubSessionUser = <?= json_encode($_phpUser, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
+    window.PUB_TENANT_ID = <?= (int)($ctx['tenant_id'] ?? 1) ?>;
+    window.PUB_LANG = <?= json_encode($ctx['lang'] ?? 'en', JSON_HEX_TAG) ?>;
+    </script>
 </head>
 
 <body class="pub-body <?= e($dir) ?>">

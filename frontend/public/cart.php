@@ -139,11 +139,14 @@ include dirname(__DIR__) . '/partials/header.php';
 
 <script>
 (function () {
-  var CURRENCY = <?= json_encode(t('common.currency')) ?>;
+  var CURRENCY      = <?= json_encode(t('common.currency')) ?>;
   var REMOVE_CONFIRM = <?= json_encode(t('cart.remove') . '?') ?>;
-  var ITEMS_LABEL    = <?= json_encode(t('cart.items')) ?>;
+  var ITEMS_LABEL   = <?= json_encode(t('cart.items')) ?>;
+  var TENANT_ID     = <?= (int)($tenantId ?? 1) ?>;
 
-  /* esc: XSS-safe string for innerHTML */
+  /* ──────────────────────────────────────────────────
+   * Helpers
+   * ────────────────────────────────────────────────── */
   function esc(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -158,15 +161,13 @@ include dirname(__DIR__) . '/partials/header.php';
     return '/uploads/images/' + path;
   }
 
-  function getCart() {
-    var raw = [];
-    try { raw = JSON.parse(localStorage.getItem('pub_cart') || '[]'); } catch (e) {}
-    return Array.isArray(raw) ? raw : [];
+  /* ── localStorage helpers ─────────────────────────── */
+  function getLocalCart() {
+    try { return JSON.parse(localStorage.getItem('pub_cart') || '[]'); } catch (e) { return []; }
   }
 
-  function saveCart(cart) {
-    localStorage.setItem('pub_cart', JSON.stringify(cart));
-    /* also refresh header badge if pubCartCount exists (mirrors pubAddToCart logic) */
+  function saveLocalCart(cart) {
+    try { localStorage.setItem('pub_cart', JSON.stringify(cart)); } catch (e) {}
     var total = cart.reduce(function(s,i){ return s + Math.max(1, parseInt(i.qty,10)||1); }, 0);
     ['pubCartCount','pubCartCountMobile'].forEach(function(id){
       var el = document.getElementById(id);
@@ -176,13 +177,13 @@ include dirname(__DIR__) . '/partials/header.php';
     });
   }
 
-  function renderCart() {
-    var cart = getCart();
+  /* ── Render ───────────────────────────────────────── */
+  function renderCart(cartItems) {
     var body = document.getElementById('pubCartBody');
     var countLabel = document.getElementById('cartCountLabel');
     if (!body) return;
 
-    if (cart.length === 0) {
+    if (!cartItems || cartItems.length === 0) {
       var tmpl = document.getElementById('tmplCartEmpty');
       body.innerHTML = '';
       body.appendChild(tmpl.content.cloneNode(true));
@@ -190,27 +191,28 @@ include dirname(__DIR__) . '/partials/header.php';
       return;
     }
 
-    /* clone layout template */
     var tmpl = document.getElementById('tmplCartLayout');
     body.innerHTML = '';
     body.appendChild(tmpl.content.cloneNode(true));
 
     var list = document.getElementById('cartItemsList');
-    var total = 0;
-    var itemCount = 0;
+    var total = 0, itemCount = 0;
 
-    cart.forEach(function (item, idx) {
-      var price = parseFloat(item.price) || 0;
-      var qty   = Math.max(1, parseInt(item.qty, 10) || 1);
+    cartItems.forEach(function (item, idx) {
+      var price   = parseFloat(item.price) || 0;
+      var qty     = Math.max(1, parseInt(item.qty, 10) || 1);
       var subtotal = price * qty;
-      total += subtotal;
+      total    += subtotal;
       itemCount += qty;
+      var dbId  = item._db_item_id || 0;  // 0 = localStorage-only item
 
       var img = item.image ? '<img src="' + esc(imgUrl(item.image)) + '" alt="' + esc(item.name) + '" loading="lazy" onerror="this.style.display=\'none\'">' : '🖼️';
 
       var div = document.createElement('div');
       div.className = 'pub-cart-item';
-      div.dataset.cartIdx = idx;
+      div.dataset.cartIdx   = idx;
+      div.dataset.dbItemId  = dbId;
+      div.dataset.productId = item.id;
       div.innerHTML =
         '<div class="pub-cart-item-img">' + img + '</div>'
         + '<div class="pub-cart-item-info">'
@@ -219,68 +221,155 @@ include dirname(__DIR__) . '/partials/header.php';
         + '</div>'
         + '<div class="pub-cart-item-actions">'
         + '<div class="pub-qty-form">'
-        + '<button class="pub-qty-btn" type="button" data-idx="' + idx + '" data-delta="-1">−</button>'
-        + '<input type="number" class="pub-qty-input cart-qty-inp" value="' + qty + '" min="1" max="999" data-idx="' + idx + '" data-price="' + price + '">'
-        + '<button class="pub-qty-btn" type="button" data-idx="' + idx + '" data-delta="1">+</button>'
+        + '<button class="pub-qty-btn" type="button" data-idx="' + idx + '" data-db-id="' + dbId + '" data-delta="-1">−</button>'
+        + '<input type="number" class="pub-qty-input cart-qty-inp" value="' + qty + '" min="1" max="999" data-idx="' + idx + '" data-db-id="' + dbId + '" data-price="' + price + '">'
+        + '<button class="pub-qty-btn" type="button" data-idx="' + idx + '" data-db-id="' + dbId + '" data-delta="1">+</button>'
         + '</div>'
         + '<p class="pub-cart-item-subtotal">= ' + subtotal.toFixed(2) + ' ' + esc(CURRENCY) + '</p>'
-        + '<button class="pub-remove-btn" type="button" data-idx="' + idx + '" title="✕">✕</button>'
+        + '<button class="pub-remove-btn" type="button" data-idx="' + idx + '" data-db-id="' + dbId + '" title="✕">✕</button>'
         + '</div>';
       list.appendChild(div);
     });
 
-    /* totals */
-    var subEl    = document.getElementById('cartSubtotal');
-    var grandEl  = document.getElementById('cartGrandTotal');
+    var subEl   = document.getElementById('cartSubtotal');
+    var grandEl = document.getElementById('cartGrandTotal');
     if (subEl)   subEl.textContent   = total.toFixed(2) + ' ' + CURRENCY;
     if (grandEl) grandEl.textContent = total.toFixed(2) + ' ' + CURRENCY;
     if (countLabel) countLabel.textContent = '(' + itemCount + ' ' + ITEMS_LABEL + ')';
   }
 
-  /* Event delegation on body */
+  /* ── DB cart helpers ──────────────────────────────── */
+  function dbUpdate(itemId, qty, cb) {
+    if (!itemId) return cb && cb();
+    fetch('/api/public/cart/update?tenant_id=' + TENANT_ID, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ item_id: itemId, qty: qty })
+    }).then(function() { cb && cb(); }).catch(function() { cb && cb(); });
+  }
+
+  function dbRemove(itemId, cb) {
+    if (!itemId) return cb && cb();
+    fetch('/api/public/cart/remove?tenant_id=' + TENANT_ID, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ item_id: itemId })
+    }).then(function() { cb && cb(); }).catch(function() { cb && cb(); });
+  }
+
+  /* ── Load DB cart, fall back to localStorage ──────── */
+  var _cartItems = []; // current items being displayed
+
+  function loadCart() {
+    var loading = document.getElementById('cartLoading');
+    fetch('/api/public/cart?tenant_id=' + TENANT_ID, {
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
+    })
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function(resp) {
+      var dbItems = (resp.data && resp.data.items) ? resp.data.items : null;
+      if (dbItems && dbItems.length > 0) {
+        // Map DB items to our display format
+        _cartItems = dbItems.map(function(ci) {
+          return {
+            id: ci.product_id,
+            name: ci.product_name,
+            price: parseFloat(ci.unit_price) || 0,
+            qty: parseInt(ci.quantity, 10) || 1,
+            sku: ci.sku || '',
+            image: '',   // DB doesn't store image URL in cart_items
+            _db_item_id: ci.id
+          };
+        });
+        // Enrich images from localStorage where available (same product_id)
+        var localCart = getLocalCart();
+        _cartItems.forEach(function(ci) {
+          var lc = localCart.find(function(l) { return l.id === ci.id; });
+          if (lc && lc.image) ci.image = lc.image;
+        });
+        // Sync localStorage to match DB
+        saveLocalCart(_cartItems.map(function(ci) {
+          return { id: ci.id, name: ci.name, price: ci.price, qty: ci.qty, sku: ci.sku, image: ci.image };
+        }));
+      } else {
+        // No DB items — use localStorage
+        _cartItems = getLocalCart().map(function(i, idx) {
+          return Object.assign({}, i, { _db_item_id: 0 });
+        });
+      }
+      if (loading) loading.style.display = 'none';
+      renderCart(_cartItems);
+    })
+    .catch(function() {
+      // DB load failed — fall back to localStorage
+      _cartItems = getLocalCart().map(function(i) {
+        return Object.assign({}, i, { _db_item_id: 0 });
+      });
+      if (loading) loading.style.display = 'none';
+      renderCart(_cartItems);
+    });
+  }
+
+  /* ── Event delegation ─────────────────────────────── */
   document.addEventListener('click', function (e) {
-    /* ± buttons */
+    // ± buttons
     var btn = e.target.closest('.pub-qty-btn[data-delta]');
     if (btn) {
       var idx   = parseInt(btn.dataset.idx, 10);
       var delta = parseInt(btn.dataset.delta, 10);
-      var cart  = getCart();
-      if (!cart[idx]) return;
-      cart[idx].qty = Math.max(1, (parseInt(cart[idx].qty,10)||1) + delta);
-      saveCart(cart);
-      renderCart();
+      var dbId  = parseInt(btn.dataset.dbId, 10) || 0;
+      if (!_cartItems[idx]) return;
+      var newQty = Math.max(1, (_cartItems[idx].qty || 1) + delta);
+      _cartItems[idx].qty = newQty;
+      // Update localStorage
+      var lc = getLocalCart();
+      var pid = _cartItems[idx].id;
+      lc.forEach(function(li) { if (li.id === pid) li.qty = newQty; });
+      saveLocalCart(lc);
+      renderCart(_cartItems);
+      dbUpdate(dbId, newQty, null);
       return;
     }
 
-    /* Remove button */
+    // Remove button
     var rmBtn = e.target.closest('.pub-remove-btn[data-idx]');
     if (rmBtn) {
       if (!confirm(REMOVE_CONFIRM)) return;
       var idx  = parseInt(rmBtn.dataset.idx, 10);
-      var cart = getCart();
-      cart.splice(idx, 1);
-      saveCart(cart);
-      renderCart();
+      var dbId = parseInt(rmBtn.dataset.dbId, 10) || 0;
+      if (!_cartItems[idx]) return;
+      var pid = _cartItems[idx].id;
+      _cartItems.splice(idx, 1);
+      // Update localStorage
+      var lc = getLocalCart().filter(function(li) { return li.id !== pid; });
+      saveLocalCart(lc);
+      renderCart(_cartItems);
+      dbRemove(dbId, null);
       return;
     }
   });
 
-  /* Qty input: direct edit */
+  // Qty input direct edit
   document.addEventListener('change', function (e) {
     if (!e.target.classList.contains('cart-qty-inp')) return;
-    var idx  = parseInt(e.target.dataset.idx, 10);
-    var cart = getCart();
-    if (!cart[idx]) return;
-    cart[idx].qty = Math.max(1, parseInt(e.target.value, 10) || 1);
-    saveCart(cart);
-    renderCart();
+    var idx   = parseInt(e.target.dataset.idx, 10);
+    var dbId  = parseInt(e.target.dataset.dbId, 10) || 0;
+    var newQty = Math.max(1, parseInt(e.target.value, 10) || 1);
+    if (!_cartItems[idx]) return;
+    var pid = _cartItems[idx].id;
+    _cartItems[idx].qty = newQty;
+    var lc = getLocalCart();
+    lc.forEach(function(li) { if (li.id === pid) li.qty = newQty; });
+    saveLocalCart(lc);
+    renderCart(_cartItems);
+    dbUpdate(dbId, newQty, null);
   });
 
-  /* Initial render */
-  document.addEventListener('DOMContentLoaded', function () {
-    document.getElementById('cartLoading').style.display = 'none';
-    renderCart();
-  });
+  /* ── Init ─────────────────────────────────────────── */
+  document.addEventListener('DOMContentLoaded', loadCart);
 }());
 </script>
 

@@ -345,16 +345,17 @@ function pubQtyChange(delta) {
 }
 
 /**
- * Add a product to the cart (localStorage 'pub_cart').
+ * Add a product to the cart.
+ * Saves to DB (via /api/public/cart/add) when logged in, always to localStorage as fallback.
  * Accepts a button/span element with data-product-* attributes.
  * Quantity is taken from #pubQtyInput (defaults to 1).
  */
 function pubAddToCart(btn) {
   // Require login — check localStorage first, then window.pubSessionUser (PHP session)
+  var pubU = null;
   try {
-    var pubU = JSON.parse(localStorage.getItem('pubUser') || 'null');
+    pubU = JSON.parse(localStorage.getItem('pubUser') || 'null');
     if (!pubU || !pubU.id) {
-      // Try server-injected session user (for users who logged in via admin panel)
       if (typeof window.pubSessionUser !== 'undefined' && window.pubSessionUser && window.pubSessionUser.id) {
         pubU = window.pubSessionUser;
         try { localStorage.setItem('pubUser', JSON.stringify(pubU)); } catch (e) {}
@@ -371,15 +372,17 @@ function pubAddToCart(btn) {
 
   var qtyInput = document.getElementById('pubQtyInput');
   var qty      = qtyInput ? (parseInt(qtyInput.value, 10) || 1) : 1;
-  var id    = parseInt(btn.dataset.productId, 10);
-  var name  = btn.dataset.productName  || '';
-  var price = parseFloat(btn.dataset.productPrice) || 0;
-  var img   = btn.dataset.productImage || '';
-  var cur   = btn.dataset.currency     || '';
-  var sku   = btn.dataset.productSku   || '';
+  var id       = parseInt(btn.dataset.productId, 10);
+  var name     = btn.dataset.productName  || '';
+  var price    = parseFloat(btn.dataset.productPrice) || 0;
+  var img      = btn.dataset.productImage || '';
+  var cur      = btn.dataset.currency     || '';
+  var sku      = btn.dataset.productSku   || '';
+  var eid      = parseInt(btn.dataset.entityId, 10) || 1;
 
   if (!id) return;
 
+  // ── 1. Always update localStorage immediately (works offline) ────────────
   var cart = [];
   try { cart = JSON.parse(localStorage.getItem('pub_cart') || '[]'); } catch (e) {}
   if (!Array.isArray(cart)) cart = [];
@@ -391,21 +394,36 @@ function pubAddToCart(btn) {
   if (!found) {
     cart.push({ id: id, name: name, price: price, qty: qty, image: img, currency: cur, sku: sku });
   }
-  localStorage.setItem('pub_cart', JSON.stringify(cart));
+  try { localStorage.setItem('pub_cart', JSON.stringify(cart)); } catch (e) {}
 
-  /* Update cart count badges if present */
-  var badges = [
-    document.getElementById('pubCartCount'),
-    document.getElementById('pubCartCountMobile'),
-  ];
+  // ── 2. Sync to DB (fire-and-forget — user is logged in) ──────────────────
+  var tenantId = (typeof window.PUB_TENANT_ID !== 'undefined') ? window.PUB_TENANT_ID : 1;
+  if (typeof fetch !== 'undefined') {
+    fetch('/api/public/cart/add?tenant_id=' + tenantId, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        product_id: id,
+        product_name: name,
+        sku: sku,
+        unit_price: price,
+        qty: qty,
+        entity_id: eid
+      })
+    }).catch(function () {}); // silent fail — localStorage is the fallback
+  }
+
+  // ── 3. Update header cart count badges ───────────────────────────────────
   var total = cart.reduce(function (s, i) { return s + (Math.max(1, parseInt(i.qty, 10) || 1)); }, 0);
-  badges.forEach(function (badge) {
-    if (!badge) return;
-    badge.textContent = total;
-    badge.style.display = total ? 'inline-flex' : 'none';
-  });
+  [document.getElementById('pubCartCount'), document.getElementById('pubCartCountMobile')]
+    .forEach(function (badge) {
+      if (!badge) return;
+      badge.textContent = total;
+      badge.style.display = total ? 'inline-flex' : 'none';
+    });
 
-  /* Visual feedback */
+  // ── 4. Visual feedback ────────────────────────────────────────────────────
   var orig = btn.textContent;
   btn.textContent = btn.dataset.addedText || '✅';
   btn.disabled = true;
