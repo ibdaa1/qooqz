@@ -130,7 +130,15 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   flex-shrink: 0;
 }
 
-/* CTA Banner (join/promo strips) */
+/* Logo image: constrained globally */
+.pub-logo-img {
+  max-height: 38px;
+  max-width: 140px;
+  width: auto;
+  object-fit: contain;
+}
+
+
 .pub-cta-banner {
   background: linear-gradient(135deg, var(--pub-primary, #03874e) 0%, var(--pub-accent, #F59E0B) 100%);
   color: #fff;
@@ -876,7 +884,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   .pub-header-actions .pub-login-btn { display: none; }
   .pub-header-actions .pub-btn--ghost { display: none; }
   /* Constrain logo image on mobile so it doesn't push hamburger off screen */
-  .pub-logo-img { max-width: 100px !important; max-height: 34px !important; }
+  .pub-logo-img { max-width: 90px; max-height: 30px; }
   /* Give logo a bit more room, and let it grow to fill available space */
   .pub-logo { max-width: unset; flex: 1; overflow: hidden; }
   .pub-logo-name { max-width: 110px; }

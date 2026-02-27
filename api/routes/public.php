@@ -598,7 +598,7 @@ if ($first === 'entity') {
              AND logo_i.image_type_id = (SELECT id FROM image_types WHERE code = 'entity_logo' LIMIT 1)
       LEFT JOIN images cover_i ON cover_i.owner_id = e.id AND cover_i.is_main = 1
              AND cover_i.image_type_id = (SELECT id FROM image_types WHERE code = 'entity_cover' LIMIT 1)
-          WHERE e.id = ? AND e.status = 'approved' LIMIT 1",
+          WHERE e.id = ? AND e.status NOT IN ('suspended','rejected') LIMIT 1",
         [$entityId]
     );
 
@@ -1471,7 +1471,7 @@ if ($first === 'register') {
             }
             $st = $pdo->prepare(
                 'INSERT INTO tenants (name, domain, owner_user_id, status, created_at)
-                 VALUES (?, ?, ?, "active", NOW())'
+                 VALUES (?, ?, ?, "suspended", NOW())'
             );
             $st->execute([$tName, $tDomain, $regUserId]);
             $newTenantId = (int)$pdo->lastInsertId();

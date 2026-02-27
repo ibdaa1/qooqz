@@ -649,6 +649,17 @@ echo '<style>
 .pub-discount-terms { padding:8px 16px 12px; border-top:1px solid var(--pub-border); }
 .pub-discount-terms summary { font-size:0.82rem; color:var(--pub-muted); cursor:pointer; }
 .pub-discount-terms p { font-size:0.82rem; color:var(--pub-muted); margin:6px 0 0; }
+/* Mobile entity profile */
+@media(max-width:600px){
+  .pub-entity-profile-header { flex-direction:column; align-items:center; text-align:center; gap:10px; margin-top:-36px; }
+  .pub-entity-profile-info { padding-top:0; width:100%; }
+  .pub-entity-profile-logo { width:72px; height:72px; margin:0 auto; }
+  .pub-entity-profile-name { font-size:1.15rem; }
+  .pub-entity-contacts { justify-content:center; }
+  .pub-entity-social { justify-content:center; }
+  .pub-attr-key { min-width:80px; }
+  .pub-cat-tab-btn { padding:5px 10px; font-size:0.78rem; }
+}
 </style>';
 ?>
 
