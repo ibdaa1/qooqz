@@ -5,9 +5,19 @@ declare(strict_types=1);
  * Handles logout for public frontend users.
  */
 
-// Use same session name as login.php / API auth
-session_name('APP_SESSID');
-session_start();
+// Use same session config as login.php / API auth
+if (session_status() === PHP_SESSION_NONE) {
+    $__sharedSess = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/shared/config/session.php';
+    if (file_exists($__sharedSess)) {
+        require_once $__sharedSess;
+    } else {
+        $__sp = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/storage/sessions';
+        session_name('APP_SESSID');
+        if (is_dir($__sp)) ini_set('session.save_path', $__sp);
+        session_start();
+    }
+    unset($__sharedSess, $__sp);
+}
 
 // Allow both GET (link click) and POST (form submit)
 // For GET requests we skip CSRF check (acceptable for a public frontend logout link)
@@ -35,6 +45,11 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('Expires: 0');
 
-// Redirect to public login page
-header('Location: /frontend/login.php');
+// Clear client-side auth data (localStorage.pubUser) then redirect
+echo '<!doctype html><html><head><title>Logging out...</title></head><body>';
+echo '<script>';
+echo 'try{localStorage.removeItem("pubUser");}catch(e){}';
+echo 'window.location.replace("/frontend/login.php");';
+echo '</script>';
+echo '</body></html>';
 exit;

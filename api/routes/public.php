@@ -75,6 +75,30 @@ if ($first === '' || $first === 'home') {
 }
 
 /* -------------------------------------------------------
+ * Route: Current user (for JS-based auth display)
+ * GET /api/public/me
+ * Returns logged-in user info from session, or null.
+ * Used by public.js to update header login button without
+ * relying on PHP session detection in public_context.php.
+ * ----------------------------------------------------- */
+if ($first === 'me') {
+    $sessUser = $_SESSION['user'] ?? null;
+    $sessUserId = isset($sessUser['id']) ? (int)$sessUser['id'] : 0;
+    if ($sessUser && $sessUserId > 0) {
+        ResponseFormatter::success([
+            'user' => [
+                'id'    => $sessUserId,
+                'name'  => $sessUser['name'] ?? $sessUser['username'] ?? '',
+                'email' => $sessUser['email'] ?? '',
+            ],
+        ]);
+    } else {
+        ResponseFormatter::success(['user' => null]);
+    }
+    exit;
+}
+
+/* -------------------------------------------------------
  * Route: UI (theme / color / font / design / button / card settings)
  * GET /api/public/ui?tenant_id=X
  * All settings needed by the frontend to render dynamic theme.
@@ -214,7 +238,9 @@ if ($first === 'products') {
     }
 
     if ($id) {
-        // Full product detail: translations, pricing, brand, main image
+        // Full product detail: translations, pricing, brand, main image.
+        // When loading by explicit numeric ID, do NOT filter by is_active —
+        // the product may be inactive/draft but still accessible via direct link.
         $qParams = [$lang, (int)$id];
         $tidCond = '';
         if ($tenantId) { $tidCond = ' AND p.tenant_id = ?'; $qParams[] = $tenantId; }
@@ -234,7 +260,7 @@ if ($first === 'products') {
           LEFT JOIN brands b ON b.id = p.brand_id
           LEFT JOIN images i ON i.owner_id = p.id AND i.is_main = 1
                  AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
-              WHERE p.id = ? AND p.is_active = 1" . $tidCond . " ORDER BY pp.is_active DESC LIMIT 1",
+              WHERE p.id = ?" . $tidCond . " ORDER BY pp.is_active DESC LIMIT 1",
             $qParams
         );
         if (!$row) { ResponseFormatter::notFound('Product not found'); exit; }

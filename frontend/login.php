@@ -4,14 +4,25 @@ declare(strict_types=1);
 /**
  * frontend/login.php
  * Public frontend login/register page.
- * Uses APP_SESSID to match the API auth session.
+ *
+ * Session handling: include the SAME shared session config the API uses so
+ * that session.save_path, session_name (APP_SESSID), and cookie params all
+ * match.  This ensures only ONE APP_SESSID cookie exists in the browser and
+ * the API can find the session when the user submits the login form.
  */
 
-// Use same session name as API auth (api/routes/auth.php)
-session_name('APP_SESSID');
-
 if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+    $__sharedSess = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/shared/config/session.php';
+    if (file_exists($__sharedSess)) {
+        require_once $__sharedSess;   // sets save_path, session_name(APP_SESSID), starts session
+    } else {
+        // Fallback: configure manually to match the API settings
+        $__sp = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/storage/sessions';
+        session_name('APP_SESSID');
+        if (is_dir($__sp)) ini_set('session.save_path', $__sp);
+        session_start();
+    }
+    unset($__sharedSess, $__sp);
 }
 
 ini_set('display_errors', '0');

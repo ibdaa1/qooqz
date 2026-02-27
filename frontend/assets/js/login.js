@@ -91,7 +91,20 @@ async function postToApi(formId) {
         if (success) {
             setResult(data.message || 'Success', true);
             if (formId === 'loginForm') {
-                // Redirect to admin dashboard after short delay
+                // Store user display info in localStorage so the header can show the
+                // username immediately after redirect, without relying on PHP sessions.
+                try {
+                    const u = (data.data && data.data.user)
+                        ? data.data.user
+                        : (data.user || null);
+                    if (u && u.id && u.name) {
+                        localStorage.setItem('pubUser', JSON.stringify({
+                            id:   u.id,
+                            name: u.name || u.username || u.email || '',
+                        }));
+                    }
+                } catch (e) {}
+                // Redirect to homepage after short delay
                 setTimeout(() => { window.location.href = '/frontend/public/index.php'; }, 600);
             }
         } else {

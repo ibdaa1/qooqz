@@ -67,7 +67,7 @@ if ($pdo) {
               LEFT JOIN brands b ON b.id = p.brand_id
               LEFT JOIN images i ON i.owner_id = p.id AND i.is_main = 1
                      AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
-                  WHERE p.id = ? AND p.is_active = 1
+                  WHERE p.id = ?
                   ORDER BY pp.is_active DESC LIMIT 1"
             );
             $st->execute($qParams);

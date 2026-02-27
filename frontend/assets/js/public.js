@@ -275,7 +275,30 @@
   }
 
   /* -------------------------------------------------------
-   * 9. Init all on DOMContentLoaded
+   * 9b. User display: read localStorage.pubUser set by login.js
+   *     Updates the header login link to show username when
+   *     localStorage shows the user is logged in.
+   *     This works even when PHP session detection fails.
+   * ----------------------------------------------------- */
+  function updateUserDisplay() {
+    try {
+      var raw = localStorage.getItem('pubUser');
+      if (!raw) return;
+      var u = JSON.parse(raw);
+      if (!u || !u.name) return;
+      // Update only elements that are specifically the header login button
+      var loginLinks = document.querySelectorAll('a.pub-login-btn');
+      loginLinks.forEach(function (el) {
+        if (el.href && el.href.indexOf('login.php') !== -1) {
+          el.textContent = u.name;
+          el.href = '/frontend/profile.php';
+        }
+      });
+    } catch (e) {}
+  }
+
+  /* -------------------------------------------------------
+   * 10. Init all on DOMContentLoaded
    * ----------------------------------------------------- */
   document.addEventListener('DOMContentLoaded', function () {
     applyTheme();
@@ -288,6 +311,7 @@
     initFilterSelects();
     initBackToTop();
     initCartBadge();
+    updateUserDisplay();
   });
 
 })();

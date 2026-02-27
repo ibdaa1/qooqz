@@ -35,27 +35,37 @@ $apiConfig = is_readable($apiConfigFile) ? (require $apiConfigFile) : [];
  *    Pattern mirrors admin/includes/admin_context.php exactly.
  * ----------------------------------------------------- */
 if (php_sapi_name() !== 'cli' && session_status() === PHP_SESSION_NONE) {
-    $sharedSession = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/shared/config/session.php';
-    if ($sharedSession && file_exists($sharedSession)) {
+    // Build path using __DIR__ (reliable) AND DOCUMENT_ROOT (admin approach), try both.
+    // dirname(FRONTEND_BASE) = parent of /frontend/ = document root on standard deployments.
+    $__candidates = [
+        dirname(FRONTEND_BASE) . '/api/shared/config/session.php',
+        ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/shared/config/session.php',
+    ];
+    $__sharedSession = null;
+    foreach ($__candidates as $__c) {
+        if ($__c && file_exists($__c)) { $__sharedSession = $__c; break; }
+    }
+    unset($__candidates, $__c);
+
+    if ($__sharedSession) {
         // Shared config sets save_path, session_name('APP_SESSID'), cookie params, and starts session.
-        require_once $sharedSession;
+        require_once $__sharedSession;
     } else {
         // Fallback: set the same save_path and name manually so it still works.
-        $sessionSavePath = dirname(FRONTEND_BASE) . '/api/storage/sessions';
-        if (is_dir($sessionSavePath)) {
-            ini_set('session.save_path', $sessionSavePath);
-        }
-        if (session_name() !== 'APP_SESSID') {
-            session_name('APP_SESSID');
-        }
-        $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-                 || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
+        $__sp = dirname(FRONTEND_BASE) . '/api/storage/sessions';
+        if (!is_dir($__sp)) $__sp = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/storage/sessions';
+        if (is_dir($__sp)) ini_set('session.save_path', $__sp);
+        if (session_name() !== 'APP_SESSID') session_name('APP_SESSID');
+        $__isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                   || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
         session_start([
             'cookie_httponly' => true,
-            'cookie_secure'   => $isSecure,
+            'cookie_secure'   => $__isSecure,
             'cookie_samesite' => 'Lax',
         ]);
+        unset($__sp, $__isSecure);
     }
+    unset($__sharedSession);
 }
 
 /* -------------------------------------------------------
