@@ -92,7 +92,7 @@ async function postToApi(formId) {
             setResult(data.message || 'Success', true);
             if (formId === 'loginForm') {
                 // Redirect to admin dashboard after short delay
-                setTimeout(() => { window.location.href = '/admin/dashboard.php'; }, 600);
+                setTimeout(() => { window.location.href = '/frontend/public/index.php'; }, 600);
             }
         } else {
             // Show errors if any
