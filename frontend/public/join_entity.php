@@ -18,6 +18,36 @@ $GLOBALS['PUB_PAGE_TITLE'] = t('join_entity.page_title') . ' — QOOQZ';
 
 $user = $ctx['user'] ?? [];
 $isLoggedIn = !empty($user['id']);
+$userId = (int)($user['id'] ?? 0);
+
+/* Load tenants user belongs to (for the tenant selector) */
+$userTenants = [];
+if ($isLoggedIn) {
+    $pdo = pub_get_pdo();
+    if ($pdo) {
+        try {
+            $st = $pdo->prepare(
+                'SELECT t.id, t.name FROM tenants t
+                 INNER JOIN tenant_users tu ON tu.tenant_id = t.id AND tu.user_id = ? AND tu.is_active = 1
+                 WHERE t.status = \'active\'
+                 ORDER BY t.name ASC LIMIT 50'
+            );
+            $st->execute([$userId]);
+            $userTenants = $st->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable) {}
+    }
+    /* Fallback: use session tenant_users data */
+    if (empty($userTenants) && !empty($_SESSION['tenant_users'])) {
+        $tu = $_SESSION['tenant_users'];
+        if (isset($tu['tenant_id'])) {
+            /* single tenant (flat array in session) */
+            $userTenants = [['id' => $tu['tenant_id'], 'name' => $tu['tenant_name'] ?? 'Tenant #' . $tu['tenant_id']]];
+        }
+    }
+}
+
+/* Default tenant_id (pre-select) */
+$defaultTenantId = (int)($_SESSION['pub_tenant_id'] ?? $_SESSION['tenant_id'] ?? (isset($userTenants[0]) ? $userTenants[0]['id'] : 1));
 
 include dirname(__DIR__) . '/partials/header.php';
 ?>
@@ -46,6 +76,24 @@ include dirname(__DIR__) . '/partials/header.php';
 
     <form id="joinEntityForm">
         <div class="pub-join-fieldset">
+
+            <?php if (count($userTenants) > 1): ?>
+            <!-- Tenant selector — only shown when user belongs to multiple tenants -->
+            <div class="pub-join-group full">
+                <label for="jTenant"><?= e(t('join_entity.tenant')) ?> *</label>
+                <select id="jTenant" name="tenant_id" required>
+                    <?php foreach ($userTenants as $ut): ?>
+                    <option value="<?= (int)$ut['id'] ?>"
+                        <?= ((int)$ut['id'] === $defaultTenantId) ? 'selected' : '' ?>>
+                        <?= e($ut['name']) ?> (#<?= (int)$ut['id'] ?>)
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php else: ?>
+            <!-- Single tenant: hidden field -->
+            <input type="hidden" name="tenant_id" value="<?= $defaultTenantId ?>">
+            <?php endif; ?>
 
             <div class="pub-join-group full">
                 <label for="jStore"><?= e(t('join_entity.store_name')) ?> *</label>

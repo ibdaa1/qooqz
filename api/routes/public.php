@@ -1375,7 +1375,8 @@ if ($first === 'register') {
             if ($existing) {
                 $slug = $slug . '-' . substr(md5(uniqid()), 0, 6);
             }
-            $regTenantId = $tenantId ?? (int)($_SESSION['pub_tenant_id'] ?? $_SESSION['tenant_id'] ?? 1);
+            $regTenantId = (int)($_POST['tenant_id'] ?? 0)
+                ?: ($tenantId ?? (int)($_SESSION['pub_tenant_id'] ?? $_SESSION['tenant_id'] ?? 1));
             $st = $pdo->prepare(
                 'INSERT INTO entities
                     (parent_id, tenant_id, user_id, store_name, slug, vendor_type, store_type,

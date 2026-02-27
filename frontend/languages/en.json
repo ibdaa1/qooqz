@@ -262,6 +262,7 @@
     "page_title": "Register as Vendor",
     "subtitle": "Fill in your basic information and our team will review your application.",
     "notice": "Your account will be reviewed before going live. You will be notified once approved.",
+    "tenant": "Select Workspace / Tenant",
     "store_name": "Store / Business Name",
     "store_name_ph": "e.g. My Store",
     "slug": "URL Slug",

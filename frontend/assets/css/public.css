@@ -36,6 +36,7 @@
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
+  overflow-x: hidden; /* prevent horizontal scroll on all screens */
 }
 
 body {
@@ -46,6 +47,7 @@ body {
   color: var(--pub-text);
   background: var(--pub-bg);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden; /* prevent content overflow on mobile */
 }
 
 img, video, svg { max-width: 100%; height: auto; display: block; }
@@ -143,7 +145,9 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 }
 .pub-cta-banner h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .pub-cta-banner p  { margin: 0; opacity: 0.9; font-size: 0.92rem; }
-.pub-cta-banner .pub-btn--cta {
+
+/* Standalone .pub-btn--cta — works inside or outside .pub-cta-banner */
+.pub-btn--cta {
   background: #fff;
   color: var(--pub-primary, #03874e);
   font-weight: 700;
@@ -153,8 +157,21 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   transition: opacity 0.2s;
   text-decoration: none;
   display: inline-block;
+  border: none;
+  cursor: pointer;
+  font-size: 0.92rem;
 }
-.pub-cta-banner .pub-btn--cta:hover { opacity: 0.9; }
+.pub-btn--cta:hover { opacity: 0.9; color: var(--pub-primary, #03874e); }
+
+/* Stack CTA vertically on small screens */
+@media (max-width: 480px) {
+  .pub-cta-banner {
+    flex-direction: column;
+    text-align: center;
+    padding: 20px 16px;
+  }
+  .pub-btn--cta { width: 100%; text-align: center; }
+}
 
 /* Join form page */
 .pub-join-wrap {
@@ -164,6 +181,10 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   border-radius: var(--pub-radius, 10px);
   padding: 36px 32px;
   box-shadow: var(--pub-shadow, 0 2px 12px rgba(0,0,0,.08));
+}
+/* Reduce padding on mobile so the form doesn't overflow */
+@media (max-width: 560px) {
+  .pub-join-wrap { margin: 16px; padding: 24px 16px; }
 }
 .pub-join-wrap h1 { margin: 0 0 6px; font-size: 1.5rem; }
 .pub-join-wrap .pub-join-sub { color: var(--pub-muted, #6c757d); margin-bottom: 28px; font-size: 0.92rem; }
@@ -433,20 +454,26 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
    ----------------------------------------------------- */
 .pub-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* 140px fits 2 cols on 320px screens */
+  gap: 12px;
 }
 
 .pub-grid-md {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* 200px fits 1 col on ≤360px, 2 on 500px+ */
+  gap: 14px;
 }
 
 .pub-grid-lg {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+@media (min-width: 600px) {
+  .pub-grid    { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+  .pub-grid-md { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+  .pub-grid-lg { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
 }
 
 @media (min-width: 768px) {
@@ -879,6 +906,11 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   overflow: hidden;
   margin: 32px 0;
 }
+/* Stack stats into 2×2 grid on small screens */
+@media (max-width: 480px) {
+  .pub-stats-row { flex-wrap: wrap; }
+  .pub-stat-item { flex: 0 0 calc(50% - 1px); }
+}
 .pub-stat-item {
   flex: 1;
   background: var(--pub-bg);
@@ -915,11 +947,11 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
    ----------------------------------------------------- */
 .pub-grid-cat {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
 }
-@media (min-width: 600px) { .pub-grid-cat { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 18px; } }
-@media (min-width: 900px) { .pub-grid-cat { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; } }
+@media (min-width: 600px) { .pub-grid-cat { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; } }
+@media (min-width: 900px) { .pub-grid-cat { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 18px; } }
 
 .pub-cat-card {
   background: var(--pub-bg);
