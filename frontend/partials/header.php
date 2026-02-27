@@ -122,12 +122,10 @@ $_fontUrl = $dir === 'rtl'
             <!-- Login / user — no language switcher button (auto-detected) -->
             <?php if ($_isLoggedIn): ?>
                 <a href="/frontend/profile.php" class="pub-login-btn">
-                    <?= e($_user['username'] ?? t('nav.account')) ?>
+                    <?= e($_user['name'] ?? $_user['username'] ?? t('nav.account')) ?>
                 </a>
             <?php else: ?>
-                <a href="/frontend/login.html" class="pub-login-btn">
-                    <?= e(t('nav.login')) ?>
-                </a>
+                <a href="/frontend/login.php" class="pub-login-btn"><?= e(t('nav.login')) ?></a>
             <?php endif; ?>
 
             <!-- Hamburger (mobile) -->
@@ -161,8 +159,8 @@ $_fontUrl = $dir === 'rtl'
             <a href="/frontend/profile.php"><?= e(t('nav.account')) ?></a>
             <a href="/frontend/logout.php"><?= e(t('nav.logout')) ?></a>
         <?php else: ?>
-            <a href="/frontend/login.html"><?= e(t('nav.login')) ?></a>
-            <a href="/frontend/register.html"><?= e(t('nav.register')) ?></a>
+            <a href="/frontend/login.php"><?= e(t('nav.login')) ?></a>
+            <a href="/frontend/login.php?tab=register"><?= e(t('nav.register')) ?></a>
         <?php endif; ?>
     </nav>
 </div>

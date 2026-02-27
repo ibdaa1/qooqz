@@ -4,6 +4,7 @@ declare(strict_types=1);
  * frontend/public/product.php
  * QOOQZ — Product Detail Page
  * Shows full product info: gallery, description, price, brand, categories, related products.
+ * Uses direct PDO queries (not HTTP loopback) for reliability on all hosting environments.
  */
 
 require_once dirname(__DIR__) . '/includes/public_context.php';
@@ -12,33 +13,125 @@ $ctx      = $GLOBALS['PUB_CONTEXT'];
 $lang     = $ctx['lang'];
 $dir      = $ctx['dir'];
 $tenantId = $ctx['tenant_id'];
-$apiBase  = pub_api_url('');
 
 // Accept id or slug
 $productId   = isset($_GET['id']) && ctype_digit((string)$_GET['id']) ? (int)$_GET['id'] : 0;
-$productSlug = $_GET['slug'] ?? '';
+$productSlug = isset($_GET['slug']) ? trim($_GET['slug']) : '';
 
-if (!$productId && !$productSlug) {
+if (!$productId && $productSlug === '') {
     header('Location: /frontend/public/products.php');
     exit;
 }
 
-$qs = 'lang=' . urlencode($lang) . '&tenant_id=' . $tenantId;
-// Use query-param format (?id=X) — safer than path format (/products/X) across all server configs
-$url = $productId
-    ? $apiBase . 'public/products?id=' . $productId . '&' . $qs
-    : $apiBase . 'public/products?slug=' . urlencode($productSlug) . '&' . $qs;
+// -------------------------------------------------------
+// Load product via direct PDO (avoids HTTP loopback issues)
+// Falls back to pub_fetch() HTTP call if PDO unavailable.
+// -------------------------------------------------------
+$product    = null;
+$images     = [];
+$categories = [];
+$related    = [];
 
-$resp        = pub_fetch($url);
-$product     = $resp['data']['product']    ?? null;
-$images      = $resp['data']['images']     ?? [];
-$categories  = $resp['data']['categories'] ?? [];
-$related     = $resp['data']['related']    ?? [];
+$pdo = pub_get_pdo();
+if ($pdo) {
+    try {
+        // Resolve slug → id
+        if (!$productId && $productSlug !== '') {
+            $params = [$productSlug];
+            $cond   = ' AND is_active = 1';
+            if ($tenantId) { $cond .= ' AND tenant_id = ?'; $params[] = $tenantId; }
+            $st = $pdo->prepare('SELECT id FROM products WHERE slug = ?' . $cond . ' LIMIT 1');
+            $st->execute($params);
+            $r = $st->fetch();
+            if ($r) $productId = (int)$r['id'];
+        }
 
-// If not found, redirect to listing
+        if ($productId) {
+            // Main product row
+            $qParams = [$lang, $productId];
+            $tidCond = '';
+            if ($tenantId) { $tidCond = ' AND p.tenant_id = ?'; $qParams[] = $tenantId; }
+
+            $st = $pdo->prepare(
+                "SELECT p.id, p.sku, p.slug, p.barcode, p.brand_id,
+                        p.is_active, p.is_featured, p.is_new, p.is_bestseller,
+                        p.stock_quantity, p.stock_status, p.rating_average, p.rating_count,
+                        p.views_count, p.tenant_id,
+                        COALESCE(pt.name, p.slug) AS name,
+                        pt.short_description, pt.description, pt.specifications,
+                        pp.price, pp.compare_at_price, pp.currency_code,
+                        b.name AS brand_name,
+                        i.url AS image_url, i.thumb_url AS image_thumb_url
+                   FROM products p
+              LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
+              LEFT JOIN product_pricing pp ON pp.product_id = p.id AND pp.variant_id IS NULL AND pp.is_active = 1
+              LEFT JOIN brands b ON b.id = p.brand_id
+              LEFT JOIN images i ON i.owner_id = p.id AND i.is_main = 1
+                     AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
+                  WHERE p.id = ? AND p.is_active = 1" . $tidCond . " LIMIT 1"
+            );
+            $st->execute($qParams);
+            $product = $st->fetch() ?: null;
+
+            if ($product) {
+                // Gallery images
+                $st = $pdo->prepare(
+                    "SELECT i.id, i.url, i.thumb_url, i.alt_text, i.sort_order
+                       FROM images i
+                       JOIN image_types it ON it.id = i.image_type_id AND it.code = 'product'
+                      WHERE i.owner_id = ?
+                      ORDER BY i.is_main DESC, i.sort_order ASC, i.id ASC LIMIT 10"
+                );
+                $st->execute([$productId]);
+                $images = $st->fetchAll();
+
+                // Categories
+                $st = $pdo->prepare(
+                    "SELECT c.id, COALESCE(ct.name, c.slug) AS name, c.slug
+                       FROM categories c
+                 INNER JOIN product_categories pc ON pc.category_id = c.id AND pc.product_id = ?
+                  LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
+                      LIMIT 5"
+                );
+                $st->execute([$productId, $lang]);
+                $categories = $st->fetchAll();
+
+                // Related products (same first category)
+                if (!empty($categories[0]['id'])) {
+                    $st = $pdo->prepare(
+                        "SELECT p2.id, COALESCE(pt2.name, p2.slug) AS name, p2.slug,
+                                pp2.price, pp2.currency_code,
+                                i2.url AS image_url
+                           FROM products p2
+                     INNER JOIN product_categories pc2 ON pc2.product_id = p2.id AND pc2.category_id = ?
+                      LEFT JOIN product_translations pt2 ON pt2.product_id = p2.id AND pt2.language_code = ?
+                      LEFT JOIN product_pricing pp2 ON pp2.product_id = p2.id AND pp2.variant_id IS NULL AND pp2.is_active = 1
+                      LEFT JOIN images i2 ON i2.owner_id = p2.id AND i2.is_main = 1
+                             AND i2.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
+                          WHERE p2.is_active = 1 AND p2.id != ? AND p2.tenant_id = ?
+                          ORDER BY p2.is_featured DESC, p2.id DESC LIMIT 8"
+                    );
+                    $st->execute([(int)$categories[0]['id'], $lang, $productId, (int)$product['tenant_id']]);
+                    $related = $st->fetchAll();
+                }
+            }
+        }
+    } catch (Throwable $_) {
+        $product = null; // fall through to HTTP fallback
+    }
+}
+
+// HTTP fallback when PDO unavailable or failed
 if (!$product) {
-    header('Location: /frontend/public/products.php');
-    exit;
+    $qs  = 'lang=' . urlencode($lang) . '&tenant_id=' . $tenantId;
+    $url = $productId
+        ? pub_api_url('') . 'public/products?id=' . $productId . '&' . $qs
+        : pub_api_url('') . 'public/products?slug=' . urlencode($productSlug) . '&' . $qs;
+    $resp       = pub_fetch($url);
+    $product    = $resp['data']['product']    ?? null;
+    $images     = $resp['data']['images']     ?? [];
+    $categories = $resp['data']['categories'] ?? [];
+    $related    = $resp['data']['related']    ?? [];
 }
 
 $productName  = $product['name'] ?? $product['slug'] ?? '';
@@ -65,6 +158,22 @@ $inStock = in_array($stockStatus, ['in_stock', ''], true);
 
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
+
+// Show a "not found" page if product is still null (no redirect — user sees 404)
+if (!$product) {
+    $GLOBALS['PUB_PAGE_TITLE'] = e(t('products.not_found_title', ['default' => 'Product Not Found'])) . ' — QOOQZ';
+    include dirname(__DIR__) . '/partials/header.php';
+    echo '<main class="pub-container" style="padding:60px 0;text-align:center;">';
+    echo '<div class="pub-empty-icon" style="font-size:4rem;">🔍</div>';
+    echo '<h1 style="margin:16px 0 8px;">' . e(t('products.not_found_title', ['default' => 'Product Not Found'])) . '</h1>';
+    echo '<p style="color:var(--pub-muted);">' . e(t('products.not_found_msg', ['default' => 'This product is unavailable or does not exist.'])) . '</p>';
+    echo '<a href="/frontend/public/products.php" class="pub-btn pub-btn--primary" style="margin-top:24px;display:inline-block;">'
+       . e(t('nav.products')) . '</a>';
+    echo '</main>';
+    include dirname(__DIR__) . '/partials/footer.php';
+    exit;
+}
+
 $GLOBALS['PUB_PAGE_TITLE'] = e($productName) . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_DESC']  = strip_tags($productDesc ?: $productName);
 

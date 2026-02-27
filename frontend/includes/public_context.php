@@ -30,6 +30,11 @@ $apiConfig = is_readable($apiConfigFile) ? (require $apiConfigFile) : [];
  * 2. Session (safe)
  * ----------------------------------------------------- */
 if (php_sapi_name() !== 'cli' && session_status() === PHP_SESSION_NONE) {
+    // Use the same session name as the API auth (api/routes/auth.php uses APP_SESSID)
+    // so that login cookies are shared and the user's session data is visible here.
+    if (session_name() === 'PHPSESSID' || session_name() === '') {
+        session_name('APP_SESSID');
+    }
     $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
              || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
     session_start([
@@ -469,7 +474,38 @@ if (!function_exists('pub_load_theme')) {
 }
 
 /* -------------------------------------------------------
- * 7. XSS escape helper
+ * 7. Direct PDO helper — reuse the same DB connection as the API
+ *    Returns PDO instance or null on failure.
+ *    Used by product.php and other pages to avoid HTTP loopback
+ *    self-referencing requests that may fail on shared hosting.
+ * ----------------------------------------------------- */
+if (!function_exists('pub_get_pdo')) {
+    function pub_get_pdo(): ?PDO {
+        $dbFile = FRONTEND_BASE . '/../api/shared/config/db.php';
+        if (!is_readable($dbFile)) return null;
+        $dbConf = require $dbFile;
+        if (!is_array($dbConf)) return null;
+        try {
+            $dsn = sprintf(
+                'mysql:host=%s;port=%d;dbname=%s;charset=%s',
+                $dbConf['host'] ?? 'localhost',
+                (int)($dbConf['port'] ?? 3306),
+                $dbConf['name'],
+                $dbConf['charset'] ?? 'utf8mb4'
+            );
+            return new PDO($dsn, $dbConf['user'], $dbConf['pass'], [
+                PDO::ATTR_TIMEOUT        => 3,
+                PDO::ATTR_ERRMODE        => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ]);
+        } catch (Throwable $_) {
+            return null;
+        }
+    }
+}
+
+/* -------------------------------------------------------
+ * 8. XSS escape helper
  * ----------------------------------------------------- */
 if (!function_exists('e')) {
     function e($v): string {
@@ -478,7 +514,7 @@ if (!function_exists('e')) {
 }
 
 /* -------------------------------------------------------
- * 8. Pagination helper
+ * 9. Pagination helper
  * ----------------------------------------------------- */
 if (!function_exists('pub_paginate')) {
     /**
@@ -591,5 +627,5 @@ $GLOBALS['PUB_CONTEXT'] = [
     'tenant_id' => $tenantId,
     'theme'     => $theme,
     'app'       => $appConfig,
-    'user'      => $_SESSION['current_user'] ?? null,
+    'user'      => $_SESSION['user'] ?? $_SESSION['current_user'] ?? null,
 ];

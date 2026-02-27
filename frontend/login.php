@@ -2,11 +2,12 @@
 declare(strict_types=1);
 
 /**
- * admin/login.php
- * Fixed: Use APP_SESSID to match API
+ * frontend/login.php
+ * Public frontend login/register page.
+ * Uses APP_SESSID to match the API auth session.
  */
 
-// ✅ Use same session name as API
+// Use same session name as API auth (api/routes/auth.php)
 session_name('APP_SESSID');
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -16,14 +17,17 @@ if (session_status() === PHP_SESSION_NONE) {
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
+// If already logged in, redirect to homepage
+if (!empty($_SESSION['user'])) {
+    header('Location: /frontend/public/index.php');
+    exit;
+}
+
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
 $csrf = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-
-error_log('[login.php] Session ID: ' . session_id());
-error_log('[login.php] Session name: ' . session_name());
 ?>
 <!doctype html>
 <html lang="en">
@@ -87,14 +91,6 @@ error_log('[login.php] Session name: ' . session_name());
         </form>
 
         <div id="result" class="result" role="status" aria-live="polite"></div>
-        
-        <!-- ✅ Debug info -->
-        <div style="margin-top: 2rem; padding: 1rem; background: #f3f4f6; border-radius: 8px; font-size: 0.875rem;">
-            <strong>Debug:</strong><br>
-            Session Name: <?= session_name() ?><br>
-            Session ID: <?= session_id() ?><br>
-            Session Data: <?= json_encode($_SESSION) ?>
-        </div>
     </div>
 </div>
 

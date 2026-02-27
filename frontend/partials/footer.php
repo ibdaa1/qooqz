@@ -51,8 +51,8 @@ if (!function_exists('t')) {
             <!-- Auth -->
             <div class="pub-footer-col">
                 <p class="pub-footer-col-title"><?= e(t('footer.account')) ?></p>
-                <a href="/frontend/login.html"><?= e(t('nav.login')) ?></a>
-                <a href="/frontend/register.html"><?= e(t('nav.register')) ?></a>
+                <a href="/frontend/login.php"><?= e(t('nav.login')) ?></a>
+                <a href="/frontend/login.php?tab=register"><?= e(t('nav.register')) ?></a>
             </div>
 
         </div>

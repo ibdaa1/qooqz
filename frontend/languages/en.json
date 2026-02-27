@@ -64,7 +64,9 @@
         "off": "OFF",
         "sku": "SKU",
         "categories": "Categories",
-        "related": "Related Products"
+        "related": "Related Products",
+        "not_found_title": "Product Not Found",
+        "not_found_msg": "This product is unavailable or does not exist."
     },
     "categories": {
         "page_title": "Categories",

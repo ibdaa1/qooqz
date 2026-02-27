@@ -123,4 +123,10 @@ document.addEventListener('DOMContentLoaded', function () {
         e.preventDefault();
         postToApi('registerForm');
     });
+
+    // Auto-switch to register tab if URL has ?tab=register
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tab') === 'register') {
+        showForm('register');
+    }
 });

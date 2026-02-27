@@ -64,7 +64,9 @@
         "off": "خصم",
         "sku": "رمز المنتج",
         "categories": "الأقسام",
-        "related": "منتجات مشابهة"
+        "related": "منتجات مشابهة",
+        "not_found_title": "المنتج غير موجود",
+        "not_found_msg": "هذا المنتج غير متاح أو غير موجود."
     },
     "categories": {
         "page_title": "التصنيفات",
