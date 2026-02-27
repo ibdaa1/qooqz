@@ -536,17 +536,15 @@ if ($first === 'entity') {
     // Sub-route: entity discounts — active discounts for this entity
     if ($sub === 'discounts') {
         $rows = $pdoList(
-            "SELECT d.id, d.code, d.type, d.auto_apply, d.currency_code,
+            "SELECT d.id, d.code, d.type, d.auto_apply, d.currency_code, d.status,
                     d.starts_at, d.ends_at, d.max_redemptions, d.current_redemptions,
                     COALESCE(dt.name, d.code) AS title,
                     dt.description, dt.marketing_badge, dt.terms_conditions
                FROM discounts d
           LEFT JOIN discount_translations dt ON dt.discount_id = d.id AND dt.language_code = ?
               WHERE d.entity_id = ?
-                AND d.status = 'active'
-                AND (d.starts_at IS NULL OR d.starts_at <= NOW())
-                AND (d.ends_at   IS NULL OR d.ends_at   >= NOW())
-              ORDER BY d.priority DESC, d.id DESC LIMIT 30",
+                AND d.status NOT IN ('cancelled','deleted')
+              ORDER BY d.status ASC, d.priority DESC, d.id DESC LIMIT 30",
             [$lang, $entityId]
         );
         ResponseFormatter::success(['ok' => true, 'data' => $rows]);
@@ -684,11 +682,17 @@ if ($first === 'entities') {
         exit;
     }
 
-    $where  = "WHERE e.status = 'approved'";
+    $where  = "WHERE e.status NOT IN ('suspended','rejected')";
     $params = [];
     if ($tenantId)                          { $where .= ' AND e.tenant_id = ?';    $params[] = $tenantId; }
     if (!empty($_GET['vendor_type']))        { $where .= ' AND e.vendor_type = ?'; $params[] = $_GET['vendor_type']; }
     if (!empty($_GET['is_verified']))        { $where .= ' AND e.is_verified = ?'; $params[] = 1; }
+    if (!empty($_GET['q'])) {
+        $like = '%' . str_replace(['%','_','\\'], ['\\%','\\_','\\\\'], $_GET['q']) . '%';
+        $where .= ' AND (e.store_name LIKE ? OR e.email LIKE ?)';
+        $params[] = $like;
+        $params[] = $like;
+    }
 
     $total = $pdoCount("SELECT COUNT(*) FROM entities e $where", $params);
     $rows  = $pdoList(
@@ -856,17 +860,15 @@ if ($first === 'banners') {
 if ($first === 'discounts') {
     if (!$tenantId) { ResponseFormatter::success(['ok' => true, 'data' => []]); exit; }
     $rows = $pdoList(
-        "SELECT d.id, d.code, d.type, d.auto_apply, d.currency_code,
+        "SELECT d.id, d.code, d.type, d.auto_apply, d.currency_code, d.status,
                 d.starts_at, d.ends_at, d.max_redemptions, d.current_redemptions,
                 COALESCE(dt.name, d.code) AS title,
-                dt.description, dt.terms_conditions
+                dt.description, dt.terms_conditions, dt.marketing_badge
            FROM discounts d
       LEFT JOIN discount_translations dt ON dt.discount_id = d.id AND dt.language_code = ?
           WHERE d.entity_id IN (SELECT id FROM entities WHERE tenant_id = ?)
-            AND d.status = 'active'
-            AND (d.starts_at IS NULL OR d.starts_at <= NOW())
-            AND (d.ends_at   IS NULL OR d.ends_at   >= NOW())
-          ORDER BY d.id DESC LIMIT 20",
+            AND d.status NOT IN ('cancelled','deleted')
+          ORDER BY d.status ASC, d.id DESC LIMIT 50",
         [$lang, $tenantId]
     );
     ResponseFormatter::success(['ok' => true, 'data' => $rows]);

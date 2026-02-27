@@ -316,6 +316,8 @@
     "expires": "Expires",
     "remaining": "uses left",
     "terms": "Terms & Conditions",
-    "none": "No active offers at this time"
+    "none": "No active offers at this time",
+    "expired": "Expired",
+    "inactive": "Inactive"
   }
 }

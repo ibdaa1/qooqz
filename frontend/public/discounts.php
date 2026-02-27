@@ -55,6 +55,17 @@ include dirname(__DIR__) . '/partials/header.php';
                 <span class="pub-discount-badge-top"><?= e($d['marketing_badge']) ?></span>
             <?php endif; ?>
 
+            <?php
+            // Status / expiry badge
+            $dStatus = $d['status'] ?? 'active';
+            $dExpired = !empty($d['ends_at']) && strtotime($d['ends_at']) < time();
+            ?>
+            <?php if ($dExpired): ?>
+                <span style="position:absolute;top:8px;inset-inline-end:8px;background:#666;color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:999px;">⏰ <?= e(t('discounts.expired')) ?></span>
+            <?php elseif ($dStatus === 'inactive'): ?>
+                <span style="position:absolute;top:8px;inset-inline-end:8px;background:#888;color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:999px;">⬛ <?= e(t('discounts.inactive')) ?></span>
+            <?php endif; ?>
+
             <div class="pub-discount-inner">
                 <div class="pub-discount-icon">🏷️</div>
                 <div class="pub-discount-body">

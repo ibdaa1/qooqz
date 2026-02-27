@@ -28,6 +28,7 @@ $qs = http_build_query(array_filter([
     'limit'       => $limit,
     'tenant_id'   => $tenantId,
     'vendor_type' => $vType ?: null,
+    'q'           => $search ?: null,
 ]));
 $resp     = pub_fetch(pub_api_url('public/entities') . '?' . $qs);
 $entities = $resp['data']['data'] ?? ($resp['data']['items'] ?? []);
