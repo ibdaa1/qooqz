@@ -119,8 +119,28 @@ $_fontUrl = $dir === 'rtl'
 
         <!-- Logo -->
         <a href="<?= e($_basePath . '/index.php') ?>" class="pub-logo" aria-label="<?= e($_appName) ?>">
-            <span class="pub-logo-icon" aria-hidden="true">🌐</span>
-            <?= e($_appName) ?>
+            <?php
+            $_logoUrl = $theme['logo_url'] ?? '';
+            // Also check static file fallback: /frontend/assets/images/logo.{png,svg,webp}
+            if (empty($_logoUrl)) {
+                $_baseImgDir = FRONTEND_BASE . '/assets/images/';
+                foreach (['logo.png', 'logo.svg', 'logo.webp'] as $_lf) {
+                    if (@file_exists($_baseImgDir . $_lf)) {
+                        $_logoUrl = '/frontend/assets/images/' . $_lf;
+                        break;
+                    }
+                }
+                unset($_baseImgDir, $_lf);
+            }
+            if (!empty($_logoUrl)):
+            ?>
+                <img src="<?= e($_logoUrl) ?>" alt="<?= e($_appName) ?>" class="pub-logo-img"
+                     style="max-height:40px;width:auto;vertical-align:middle;object-fit:contain;">
+                <span class="pub-logo-name" style="margin-inline-start:8px;font-weight:700;letter-spacing:0.5px;"><?= e($_appName) ?></span>
+            <?php else: ?>
+                <span class="pub-logo-icon" aria-hidden="true">🌐</span>
+                <?= e($_appName) ?>
+            <?php endif; ?>
         </a>
 
         <!-- Desktop navigation -->

@@ -258,6 +258,7 @@ if (!function_exists('pub_load_theme')) {
             'border'     => '#333333',
             'header_bg'  => '#03874e',
             'footer_bg'  => '#1e2a38',
+            'logo_url'   => '',          // set from design_settings WHERE setting_key='logo_url'
             'generated_css' => '',
             'fonts'      => [],
             'design'     => [],
@@ -383,6 +384,31 @@ if (!function_exists('pub_load_theme')) {
                     $theme['design']  = $designs;
                     $theme['buttons'] = $buttons;
                     $theme['cards']   = $cards;
+
+                    // Extract logo_url from design_settings (setting_key = 'logo_url')
+                    foreach ($designs as $d) {
+                        if (($d['setting_key'] ?? '') === 'logo_url' && !empty($d['setting_value'])) {
+                            $theme['logo_url'] = (string)$d['setting_value'];
+                            break;
+                        }
+                    }
+                    // Fallback: check images table for a tenant logo (image_type code='logo' or 'entity_logo')
+                    if (empty($theme['logo_url'])) {
+                        try {
+                            $logoSt = $pdo->prepare(
+                                "SELECT i.url FROM images i
+                                 LEFT JOIN image_types it ON it.id = i.image_type_id
+                                 WHERE i.owner_type = 'tenant' AND i.owner_id = ?
+                                   AND (it.code = 'logo' OR it.code = 'entity_logo')
+                                 ORDER BY i.id ASC LIMIT 1"
+                            );
+                            $logoSt->execute([$tenantId]);
+                            $logoRow = $logoSt->fetch(PDO::FETCH_ASSOC);
+                            if ($logoRow && !empty($logoRow['url'])) {
+                                $theme['logo_url'] = (string)$logoRow['url'];
+                            }
+                        } catch (Throwable $_) {}
+                    }
 
                     // Generate complete CSS string (mirrors AdminUiThemeLoader::generateCss)
                     // Escape values to prevent CSS/HTML injection (</style> breakout)

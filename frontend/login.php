@@ -42,6 +42,7 @@ $isRtl     = $loginDir === 'rtl';
 
 // Load available languages from DB for the preferred_language dropdown
 $availLangs = [];
+$loginLogoUrl = '';  // logo URL for brand panel
 try {
     $__dbFile = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/shared/config/db.php';
     if (!is_readable($__dbFile)) $__dbFile = dirname(__DIR__) . '/api/shared/config/db.php';
@@ -52,7 +53,14 @@ try {
         $__pdoL = new PDO($__dsn, $__dbc['user'], $__dbc['pass'], [PDO::ATTR_TIMEOUT => 3]);
         $__stL  = $__pdoL->query('SELECT code, name FROM languages ORDER BY name');
         $availLangs = $__stL ? $__stL->fetchAll(PDO::FETCH_ASSOC) : [];
-        unset($__pdoL, $__stL, $__dbc, $__dsn);
+        // Load logo_url from design_settings
+        $__stLogo = $__pdoL->prepare("SELECT setting_value FROM design_settings WHERE setting_key = 'logo_url' AND tenant_id = ? AND is_active = 1 LIMIT 1");
+        $__stLogo->execute([(int)($_SESSION['pub_tenant_id'] ?? 1)]);
+        $__logoRow = $__stLogo->fetch(PDO::FETCH_ASSOC);
+        if ($__logoRow && !empty($__logoRow['setting_value'])) {
+            $loginLogoUrl = $__logoRow['setting_value'];
+        }
+        unset($__pdoL, $__stL, $__stLogo, $__logoRow, $__dbc, $__dsn);
     }
     unset($__dbFile);
 } catch (Throwable $_) {}
@@ -128,7 +136,15 @@ $tr = $isRtl ? [
     <!-- Brand panel -->
     <div class="lq-brand" aria-hidden="true">
         <div class="lq-brand-inner">
-            <div class="lq-logo">🌐</div>
+            <?php if (!empty($loginLogoUrl)): ?>
+                <div class="lq-logo">
+                    <img src="<?= htmlspecialchars($loginLogoUrl, ENT_QUOTES, 'UTF-8') ?>"
+                         alt="QOOQZ"
+                         style="max-width:120px;max-height:80px;object-fit:contain;display:block;margin:0 auto;">
+                </div>
+            <?php else: ?>
+                <div class="lq-logo">🌐</div>
+            <?php endif; ?>
             <h1 class="lq-brand-name">QOOQZ</h1>
             <p class="lq-brand-tagline"><?= htmlspecialchars($tr['tagline']) ?></p>
         </div>
