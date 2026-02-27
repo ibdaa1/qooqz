@@ -20,8 +20,11 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
         'httponly' => true,
         'samesite' => 'Lax'
     ];
-    // session_name can be set centrally in bootstrap; set here only if not set
-    if (session_name() === '') session_name('APP_SESSID');
+    // Always use APP_SESSID to match admin/login.php and public_context.php.
+    // PHP default session_name() is 'PHPSESSID' (never empty), so the old
+    // `=== ''` guard never fired → sessions were created under PHPSESSID
+    // while the frontend read APP_SESSID → user always appeared logged out.
+    if (session_name() !== 'APP_SESSID') session_name('APP_SESSID');
     // some PHP versions accept array param
     if (PHP_VERSION_ID >= 70300) {
         session_set_cookie_params($cookieParams);

@@ -47,10 +47,9 @@ if ($pdo) {
         }
 
         if ($productId) {
-            // Main product row
+            // Main product row — no tenant_id filter when loading by explicit ID.
+            // Products are public; restricting by tenant_id breaks cross-tenant links.
             $qParams = [$lang, $productId];
-            $tidCond = '';
-            if ($tenantId) { $tidCond = ' AND p.tenant_id = ?'; $qParams[] = $tenantId; }
 
             $st = $pdo->prepare(
                 "SELECT p.id, p.sku, p.slug, p.barcode, p.brand_id,
@@ -68,7 +67,7 @@ if ($pdo) {
               LEFT JOIN brands b ON b.id = p.brand_id
               LEFT JOIN images i ON i.owner_id = p.id AND i.is_main = 1
                      AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
-                  WHERE p.id = ? AND p.is_active = 1" . $tidCond . " LIMIT 1"
+                  WHERE p.id = ? AND p.is_active = 1 LIMIT 1"
             );
             $st->execute($qParams);
             $product = $st->fetch() ?: null;
@@ -123,10 +122,11 @@ if ($pdo) {
 
 // HTTP fallback when PDO unavailable or failed
 if (!$product) {
-    $qs  = 'lang=' . urlencode($lang) . '&tenant_id=' . $tenantId;
+    // No tenant_id filter for direct ID lookup — product is public regardless of tenant
+    $qs  = 'lang=' . urlencode($lang);
     $url = $productId
         ? pub_api_url('') . 'public/products?id=' . $productId . '&' . $qs
-        : pub_api_url('') . 'public/products?slug=' . urlencode($productSlug) . '&' . $qs;
+        : pub_api_url('') . 'public/products?slug=' . urlencode($productSlug) . '&' . $qs . '&tenant_id=' . $tenantId;
     $resp       = pub_fetch($url);
     $product    = $resp['data']['product']    ?? null;
     $images     = $resp['data']['images']     ?? [];

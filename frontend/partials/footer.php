@@ -72,6 +72,6 @@ if (!function_exists('t')) {
                justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.2);">↑</button>
 
 <!-- Public JS -->
-<script src="/frontend/assets/js/public.js" defer></script>
+<script src="/frontend/assets/js/public.js"></script>
 </body>
 </html>
