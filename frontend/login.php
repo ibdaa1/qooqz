@@ -27,16 +27,13 @@ if (session_status() === PHP_SESSION_NONE) {
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
-// Already logged in — redirect to homepage
-if (!empty($_SESSION['user'])) {
-    header('Location: /frontend/public/index.php');
-    exit;
-}
-
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 $csrf = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+// Current logged-in user (if any) — used for the "already logged in" notice
+$loginPageUser = !empty($_SESSION['user']) ? $_SESSION['user'] : null;
 
 // Detect page language from session (set by public pages)
 $loginLang = $_SESSION['pub_lang'] ?? $_SESSION['user']['preferred_language'] ?? 'en';
@@ -75,6 +72,9 @@ $tr = $isRtl ? [
     'tagline'        => 'منصة QOOQZ العالمية',
     'already'        => 'لديك حساب؟',
     'no_account'     => 'ليس لديك حساب؟',
+    'logged_in_as'   => 'أنت مسجّل الدخول بوصفك',
+    'go_home'        => 'الذهاب إلى الرئيسية',
+    'logout'         => 'تسجيل الخروج',
 ] : [
     'login_title'    => 'Sign In',
     'register_title' => 'Create Account',
@@ -89,6 +89,9 @@ $tr = $isRtl ? [
     'tagline'        => 'QOOQZ Global Platform',
     'already'        => 'Already have an account?',
     'no_account'     => "Don't have an account?",
+    'logged_in_as'   => 'You are signed in as',
+    'go_home'        => 'Go to Homepage',
+    'logout'         => 'Sign Out',
 ];
 ?>
 <!doctype html>
@@ -107,6 +110,18 @@ $tr = $isRtl ? [
     <link rel="stylesheet" href="assets/css/login.css">
 </head>
 <body class="<?= $loginDir ?>">
+
+<?php if ($loginPageUser): ?>
+<!-- Already-logged-in notice — shown at top of page instead of forcing a redirect -->
+<div class="lq-already-notice" role="alert">
+    <span>
+        <?= htmlspecialchars($tr['logged_in_as']) ?>
+        <strong><?= htmlspecialchars($loginPageUser['username'] ?? $loginPageUser['email'] ?? 'User') ?></strong>
+    </span>
+    <a href="/frontend/public/index.php" class="lq-notice-btn"><?= htmlspecialchars($tr['go_home']) ?></a>
+    <a href="/frontend/logout.php" class="lq-notice-btn lq-notice-btn-out"><?= htmlspecialchars($tr['logout']) ?></a>
+</div>
+<?php endif; ?>
 
 <div class="lq-wrapper">
 
