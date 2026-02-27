@@ -24,8 +24,9 @@ if (!$productId && !$productSlug) {
 }
 
 $qs = 'lang=' . urlencode($lang) . '&tenant_id=' . $tenantId;
+// Use query-param format (?id=X) — safer than path format (/products/X) across all server configs
 $url = $productId
-    ? $apiBase . 'public/products/' . $productId . '?' . $qs
+    ? $apiBase . 'public/products?id=' . $productId . '&' . $qs
     : $apiBase . 'public/products?slug=' . urlencode($productSlug) . '&' . $qs;
 
 $resp        = pub_fetch($url);

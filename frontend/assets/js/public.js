@@ -256,6 +256,25 @@
   }
 
   /* -------------------------------------------------------
+   * 9. Cart badge — read localStorage and update #pubCartCount
+   * ----------------------------------------------------- */
+  function initCartBadge() {
+    var badges = [
+      document.getElementById('pubCartCount'),
+      document.getElementById('pubCartCountMobile'),
+    ];
+    var cart = [];
+    try { cart = JSON.parse(localStorage.getItem('pub_cart') || '[]'); } catch (e) {}
+    if (!Array.isArray(cart)) cart = [];
+    var total = cart.reduce(function (s, i) { return s + (Math.max(1, parseInt(i.qty, 10) || 1)); }, 0);
+    badges.forEach(function (badge) {
+      if (!badge) return;
+      badge.textContent = total;
+      badge.style.display = total ? 'inline-flex' : 'none';
+    });
+  }
+
+  /* -------------------------------------------------------
    * 9. Init all on DOMContentLoaded
    * ----------------------------------------------------- */
   document.addEventListener('DOMContentLoaded', function () {
@@ -268,6 +287,7 @@
     animateCounters();
     initFilterSelects();
     initBackToTop();
+    initCartBadge();
   });
 
 })();
@@ -318,13 +338,17 @@ function pubAddToCart(btn) {
   }
   localStorage.setItem('pub_cart', JSON.stringify(cart));
 
-  /* Update cart count badge if present */
-  var badge = document.getElementById('pubCartCount');
-  if (badge) {
-    var total = cart.reduce(function (s, i) { return s + (i.qty || 1); }, 0);
+  /* Update cart count badges if present */
+  var badges = [
+    document.getElementById('pubCartCount'),
+    document.getElementById('pubCartCountMobile'),
+  ];
+  var total = cart.reduce(function (s, i) { return s + (Math.max(1, parseInt(i.qty, 10) || 1)); }, 0);
+  badges.forEach(function (badge) {
+    if (!badge) return;
     badge.textContent = total;
     badge.style.display = total ? 'inline-flex' : 'none';
-  }
+  });
 
   /* Visual feedback */
   var orig = btn.textContent;

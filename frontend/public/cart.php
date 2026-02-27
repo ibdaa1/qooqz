@@ -4,7 +4,9 @@ declare(strict_types=1);
  * frontend/public/cart.php
  * QOOQZ — Shopping Cart Page
  *
- * Uses: /api/carts + /api/cart_items (session-based for guests, user_id for logged-in)
+ * Cart items are stored in the browser's localStorage under key 'pub_cart'.
+ * This page renders an empty shell and JavaScript fills it from localStorage.
+ * This matches the pubAddToCart() function in public.js.
  */
 
 require_once dirname(__DIR__) . '/includes/public_context.php';
@@ -12,51 +14,10 @@ require_once dirname(__DIR__) . '/includes/public_context.php';
 $ctx      = $GLOBALS['PUB_CONTEXT'];
 $lang     = $ctx['lang'];
 $tenantId = $ctx['tenant_id'];
-$user     = $ctx['user'] ?? null;
 
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = t('cart.title') . ' — QOOQZ';
-
-$sessionId = session_id();
-$base      = pub_api_url('');
-
-/* -------------------------------------------------------
- * Handle AJAX/form actions via POST
- * ----------------------------------------------------- */
-$action   = $_POST['action'] ?? $_GET['action'] ?? '';
-$entityId = (int)($_POST['entity_id'] ?? $_GET['entity_id'] ?? 1);
-
-// -------------------------------------------------------
-// Get or create cart
-// -------------------------------------------------------
-$cartQs = $user
-    ? "user_id={$user['id']}&entity_id={$entityId}&tenant_id={$tenantId}&lang={$lang}"
-    : "session_id={$sessionId}&entity_id={$entityId}&tenant_id={$tenantId}&lang={$lang}";
-
-$cartResp = pub_fetch($base . "carts?{$cartQs}");
-$cart     = $cartResp['data'] ?? $cartResp['cart'] ?? null;
-$cartId   = (int)($cart['id'] ?? 0);
-
-// -------------------------------------------------------
-// Cart items
-// -------------------------------------------------------
-$cartItems  = [];
-$cartTotal  = 0.0;
-$cartCount  = 0;
-
-if ($cartId) {
-    $itemsResp = pub_fetch($base . "cart_items?cart_id={$cartId}&tenant_id={$tenantId}&lang={$lang}&limit=100");
-    $cartItems = $itemsResp['data']['items'] ?? $itemsResp['items'] ?? [];
-}
-
-// Compute totals
-foreach ($cartItems as $item) {
-    $price = (float)($item['price'] ?? $item['unit_price'] ?? 0);
-    $qty   = (int)($item['quantity'] ?? 1);
-    $cartTotal += $price * $qty;
-    $cartCount += $qty;
-}
 
 include dirname(__DIR__) . '/partials/header.php';
 ?>
@@ -70,85 +31,32 @@ include dirname(__DIR__) . '/partials/header.php';
         <span>🛒 <?= e(t('cart.title')) ?></span>
     </nav>
 
-    <h1 style="font-size:1.4rem;margin:0 0 24px;">
-        🛒 <?= e(t('cart.title')) ?>
-        <?php if ($cartCount > 0): ?>
-            <span style="font-size:0.85rem;font-weight:400;color:var(--pub-muted);">
-                (<?= $cartCount ?> <?= e(t('cart.items')) ?>)
-            </span>
-        <?php endif; ?>
-    </h1>
+    <!-- Title row — JS fills in item count -->
+    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:24px;">
+        <h1 style="font-size:1.4rem;margin:0;">🛒 <?= e(t('cart.title')) ?></h1>
+        <span id="cartCountLabel" style="font-size:0.85rem;font-weight:400;color:var(--pub-muted);"></span>
+    </div>
 
-    <?php if (!empty($cartItems)): ?>
-    <div class="pub-cart-layout">
-
-        <!-- Items list -->
-        <div class="pub-cart-items">
-            <?php foreach ($cartItems as $item): ?>
-            <?php
-                $itemId   = (int)($item['id'] ?? 0);
-                $prodName = $item['product_name'] ?? $item['name'] ?? t('nav.products');
-                $varName  = $item['variant_name'] ?? '';
-                $price    = (float)($item['price'] ?? $item['unit_price'] ?? 0);
-                $qty      = (int)($item['quantity'] ?? 1);
-                $imgUrl   = pub_img($item['image_url'] ?? null, 'product_thumb');
-                $prodId   = (int)($item['product_id'] ?? 0);
-            ?>
-            <div class="pub-cart-item" id="cartItem<?= $itemId ?>">
-
-                <!-- Product image -->
-                <div class="pub-cart-item-img">
-                    <?php if ($imgUrl): ?>
-                        <img src="<?= e($imgUrl) ?>" alt="<?= e($prodName) ?>" loading="lazy"
-                             onerror="this.style.display='none'">
-                    <?php else: ?>
-                        <span style="font-size:2rem;">🖼️</span>
-                    <?php endif; ?>
-                </div>
-
-                <!-- Product info -->
-                <div class="pub-cart-item-info">
-                    <a href="/frontend/public/products.php?id=<?= $prodId ?>" class="pub-cart-item-name">
-                        <?= e($prodName) ?>
-                    </a>
-                    <?php if ($varName): ?>
-                        <p style="font-size:0.8rem;color:var(--pub-muted);margin:2px 0 0;"><?= e($varName) ?></p>
-                    <?php endif; ?>
-                    <p class="pub-cart-item-price">
-                        <?= number_format($price, 2) ?> <?= e(t('common.currency')) ?>
-                    </p>
-                </div>
-
-                <!-- Qty + remove -->
-                <div class="pub-cart-item-actions">
-                    <form method="post" class="pub-qty-form" data-item-id="<?= $itemId ?>">
-                        <input type="hidden" name="action" value="update_qty">
-                        <input type="hidden" name="cart_item_id" value="<?= $itemId ?>">
-                        <input type="hidden" name="entity_id" value="<?= $entityId ?>">
-                        <button type="button" class="pub-qty-btn" onclick="changeQty(<?= $itemId ?>,-1)">−</button>
-                        <input type="number" name="quantity" class="pub-qty-input"
-                               value="<?= $qty ?>" min="1" max="999" id="qty<?= $itemId ?>">
-                        <button type="button" class="pub-qty-btn" onclick="changeQty(<?= $itemId ?>,1)">+</button>
-                    </form>
-                    <p class="pub-cart-item-subtotal">
-                        = <?= number_format($price * $qty, 2) ?> <?= e(t('common.currency')) ?>
-                    </p>
-                    <button class="pub-remove-btn" onclick="removeItem(<?= $itemId ?>)"
-                     title="<?= e(t('cart.remove')) ?>">✕</button>
-                </div>
-            </div>
-            <?php endforeach; ?>
+    <!-- JS renders the cart here: either items or empty message -->
+    <div id="pubCartBody">
+        <!-- Loading state -->
+        <div id="cartLoading" style="text-align:center;padding:60px 0;color:var(--pub-muted);">
+            ⏳ <?= e(t('common.loading')) ?>
         </div>
+    </div>
 
-        <!-- Order summary -->
+</div>
+
+<!-- Cart item template: two-column layout (items | summary) -->
+<template id="tmplCartLayout">
+    <div class="pub-cart-layout">
+        <div class="pub-cart-items" id="cartItemsList"></div>
         <div class="pub-cart-summary">
             <div class="pub-cart-summary-inner">
-                <h2 class="pub-cart-summary-title">
-                    📋 <?= e(t('cart.order_summary')) ?>
-                </h2>
+                <h2 class="pub-cart-summary-title">📋 <?= e(t('cart.order_summary')) ?></h2>
                 <div class="pub-summary-row">
                     <span><?= e(t('cart.subtotal')) ?></span>
-                    <strong><?= number_format($cartTotal, 2) ?> <?= e(t('common.currency')) ?></strong>
+                    <strong id="cartSubtotal">0.00</strong>
                 </div>
                 <div class="pub-summary-row" style="color:var(--pub-muted);font-size:0.84rem;">
                     <span><?= e(t('cart.shipping')) ?></span>
@@ -156,10 +64,11 @@ include dirname(__DIR__) . '/partials/header.php';
                 </div>
                 <div class="pub-summary-row pub-summary-total">
                     <span><?= e(t('cart.total')) ?></span>
-                    <strong id="cartGrandTotal"><?= number_format($cartTotal, 2) ?> <?= e(t('common.currency')) ?></strong>
+                    <strong id="cartGrandTotal">0.00</strong>
                 </div>
-                <a href="/frontend/public/checkout.php?cart_id=<?= $cartId ?>&entity_id=<?= $entityId ?>"
-                   class="pub-btn pub-btn--primary" style="width:100%;text-align:center;margin-top:16px;display:block;font-size:1rem;padding:12px;">
+                <a href="/frontend/public/checkout.php"
+                   class="pub-btn pub-btn--primary"
+                   style="width:100%;text-align:center;margin-top:16px;display:block;font-size:1rem;padding:12px;">
                     💳 <?= e(t('cart.checkout')) ?>
                 </a>
                 <a href="/frontend/public/products.php" class="pub-btn pub-btn--ghost pub-btn--sm"
@@ -169,9 +78,10 @@ include dirname(__DIR__) . '/partials/header.php';
             </div>
         </div>
     </div>
+</template>
 
-    <?php else: ?>
-    <!-- Empty cart -->
+<!-- Empty cart template -->
+<template id="tmplCartEmpty">
     <div class="pub-empty" style="padding:60px 0;">
         <div class="pub-empty-icon">🛒</div>
         <p class="pub-empty-msg" style="font-size:1.1rem;margin-bottom:20px;">
@@ -181,16 +91,12 @@ include dirname(__DIR__) . '/partials/header.php';
             🛍️ <?= e(t('hero.browse_products')) ?>
         </a>
     </div>
-    <?php endif; ?>
-
-</div>
+</template>
 
 <style>
 .pub-cart-layout { display:grid; gap:24px; }
 @media(min-width:900px){ .pub-cart-layout { grid-template-columns: 1fr 340px; align-items:start; } }
-
 .pub-cart-items { display:grid; gap:12px; }
-
 .pub-cart-item {
     background:var(--pub-bg);
     border:1px solid var(--pub-border);
@@ -202,10 +108,8 @@ include dirname(__DIR__) . '/partials/header.php';
     transition:box-shadow var(--pub-transition);
 }
 .pub-cart-item:hover { box-shadow:var(--pub-shadow); }
-
 .pub-cart-item-img {
-    width:72px;
-    height:72px;
+    width:72px; height:72px;
     border-radius:var(--pub-radius-sm);
     overflow:hidden;
     background:var(--pub-surface);
@@ -215,47 +119,18 @@ include dirname(__DIR__) . '/partials/header.php';
     justify-content:center;
 }
 .pub-cart-item-img img { width:100%;height:100%;object-fit:cover; }
-
 .pub-cart-item-info { flex:1; min-width:0; }
 .pub-cart-item-name { font-size:0.92rem;font-weight:600;color:var(--pub-text);display:block;margin-bottom:4px; }
 .pub-cart-item-price { font-size:0.88rem;color:var(--pub-primary);font-weight:700;margin:4px 0 0; }
-
-.pub-cart-item-actions {
-    display:flex;
-    flex-direction:column;
-    align-items:flex-end;
-    gap:8px;
-    flex-shrink:0;
-}
+.pub-cart-item-actions { display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0; }
 .pub-qty-form { display:flex; align-items:center; gap:4px; }
-.pub-qty-btn {
-    width:28px;height:28px;border-radius:50%;border:1px solid var(--pub-border);
-    background:var(--pub-surface);color:var(--pub-text);font-size:1.1rem;
-    cursor:pointer;display:flex;align-items:center;justify-content:center;
-    transition:background var(--pub-transition);
-}
+.pub-qty-btn { width:28px;height:28px;border-radius:50%;border:1px solid var(--pub-border);background:var(--pub-surface);color:var(--pub-text);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background var(--pub-transition); }
 .pub-qty-btn:hover { background:var(--pub-primary);color:#fff;border-color:var(--pub-primary); }
-.pub-qty-input {
-    width:48px;height:28px;text-align:center;
-    border:1px solid var(--pub-border);border-radius:var(--pub-radius-sm);
-    background:var(--pub-bg);color:var(--pub-text);font-size:0.88rem;
-}
+.pub-qty-input { width:48px;height:28px;text-align:center;border:1px solid var(--pub-border);border-radius:var(--pub-radius-sm);background:var(--pub-bg);color:var(--pub-text);font-size:0.88rem; }
 .pub-cart-item-subtotal { font-size:0.88rem;font-weight:700;color:var(--pub-text);margin:0; }
-.pub-remove-btn {
-    background:none;border:none;color:var(--pub-muted);cursor:pointer;
-    font-size:1rem;padding:4px;border-radius:4px;
-    transition:color var(--pub-transition);
-}
+.pub-remove-btn { background:none;border:none;color:var(--pub-muted);cursor:pointer;font-size:1rem;padding:4px;border-radius:4px;transition:color var(--pub-transition); }
 .pub-remove-btn:hover { color:#e74c3c; }
-
-.pub-cart-summary-inner {
-    background:var(--pub-bg);
-    border:1px solid var(--pub-border);
-    border-radius:var(--pub-radius);
-    padding:20px;
-    position:sticky;
-    top:calc(var(--pub-header-h) + 16px);
-}
+.pub-cart-summary-inner { background:var(--pub-bg);border:1px solid var(--pub-border);border-radius:var(--pub-radius);padding:20px;position:sticky;top:calc(var(--pub-header-h) + 16px); }
 .pub-cart-summary-title { font-size:1rem;font-weight:700;margin:0 0 16px;color:var(--pub-text); }
 .pub-summary-row { display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--pub-border); }
 .pub-summary-row:last-of-type { border-bottom:none; }
@@ -263,43 +138,150 @@ include dirname(__DIR__) . '/partials/header.php';
 </style>
 
 <script>
-var CART_LANG    = <?= json_encode($lang) ?>;
-var CART_ID      = <?= $cartId ?>;
-var ENTITY_ID    = <?= $entityId ?>;
-var TENANT_ID    = <?= $tenantId ?>;
-var SESSION_ID   = <?= json_encode($sessionId) ?>;
-var REMOVE_CONFIRM = <?= json_encode(t('cart.remove') . '?') ?>;
+(function () {
+  var CURRENCY = <?= json_encode(t('common.currency')) ?>;
+  var REMOVE_CONFIRM = <?= json_encode(t('cart.remove') . '?') ?>;
+  var ITEMS_LABEL    = <?= json_encode(t('cart.items')) ?>;
 
-function changeQty(itemId, delta) {
-    var input = document.getElementById('qty' + itemId);
-    if (!input) return;
-    var newQty = Math.max(1, parseInt(input.value) + delta);
-    input.value = newQty;
-    updateCartItem(itemId, newQty);
-}
+  /* esc: XSS-safe string for innerHTML */
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
 
-function updateCartItem(itemId, qty) {
-    fetch('/api/cart_items', {
-        method:'PUT',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({id: itemId, quantity: qty, tenant_id: TENANT_ID})
-    }).then(function(r){ return r.json(); }).then(function(data){
-        location.reload();
-    }).catch(function(){ location.reload(); });
-}
+  function imgUrl(path) {
+    if (!path) return '';
+    if (/^https?:\/\/|^\/\//.test(path)) return path;
+    if (path.charAt(0) === '/') return path;
+    if (/^(uploads\/|admin\/uploads\/)/.test(path)) return '/' + path;
+    return '/uploads/images/' + path;
+  }
 
-function removeItem(itemId) {
-    if(!confirm(REMOVE_CONFIRM)) return;
-    fetch('/api/cart_items', {
-        method:'DELETE',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({id: itemId, tenant_id: TENANT_ID})
-    }).then(function(r){ return r.json(); }).then(function(){
-        var el = document.getElementById('cartItem' + itemId);
-        if(el) el.remove();
-        location.reload();
+  function getCart() {
+    var raw = [];
+    try { raw = JSON.parse(localStorage.getItem('pub_cart') || '[]'); } catch (e) {}
+    return Array.isArray(raw) ? raw : [];
+  }
+
+  function saveCart(cart) {
+    localStorage.setItem('pub_cart', JSON.stringify(cart));
+    /* also refresh header badge if pubCartCount exists (mirrors pubAddToCart logic) */
+    var total = cart.reduce(function(s,i){ return s + Math.max(1, parseInt(i.qty,10)||1); }, 0);
+    ['pubCartCount','pubCartCountMobile'].forEach(function(id){
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = total;
+      el.style.display = total ? 'inline-flex' : 'none';
     });
-}
+  }
+
+  function renderCart() {
+    var cart = getCart();
+    var body = document.getElementById('pubCartBody');
+    var countLabel = document.getElementById('cartCountLabel');
+    if (!body) return;
+
+    if (cart.length === 0) {
+      var tmpl = document.getElementById('tmplCartEmpty');
+      body.innerHTML = '';
+      body.appendChild(tmpl.content.cloneNode(true));
+      if (countLabel) countLabel.textContent = '';
+      return;
+    }
+
+    /* clone layout template */
+    var tmpl = document.getElementById('tmplCartLayout');
+    body.innerHTML = '';
+    body.appendChild(tmpl.content.cloneNode(true));
+
+    var list = document.getElementById('cartItemsList');
+    var total = 0;
+    var itemCount = 0;
+
+    cart.forEach(function (item, idx) {
+      var price = parseFloat(item.price) || 0;
+      var qty   = Math.max(1, parseInt(item.qty, 10) || 1);
+      var subtotal = price * qty;
+      total += subtotal;
+      itemCount += qty;
+
+      var img = item.image ? '<img src="' + esc(imgUrl(item.image)) + '" alt="' + esc(item.name) + '" loading="lazy" onerror="this.style.display=\'none\'">' : '🖼️';
+
+      var div = document.createElement('div');
+      div.className = 'pub-cart-item';
+      div.dataset.cartIdx = idx;
+      div.innerHTML =
+        '<div class="pub-cart-item-img">' + img + '</div>'
+        + '<div class="pub-cart-item-info">'
+        + '<a href="/frontend/public/product.php?id=' + (parseInt(item.id)||0) + '" class="pub-cart-item-name">' + esc(item.name || '') + '</a>'
+        + '<p class="pub-cart-item-price">' + price.toFixed(2) + ' ' + esc(CURRENCY) + '</p>'
+        + '</div>'
+        + '<div class="pub-cart-item-actions">'
+        + '<div class="pub-qty-form">'
+        + '<button class="pub-qty-btn" type="button" data-idx="' + idx + '" data-delta="-1">−</button>'
+        + '<input type="number" class="pub-qty-input cart-qty-inp" value="' + qty + '" min="1" max="999" data-idx="' + idx + '" data-price="' + price + '">'
+        + '<button class="pub-qty-btn" type="button" data-idx="' + idx + '" data-delta="1">+</button>'
+        + '</div>'
+        + '<p class="pub-cart-item-subtotal">= ' + subtotal.toFixed(2) + ' ' + esc(CURRENCY) + '</p>'
+        + '<button class="pub-remove-btn" type="button" data-idx="' + idx + '" title="✕">✕</button>'
+        + '</div>';
+      list.appendChild(div);
+    });
+
+    /* totals */
+    var subEl    = document.getElementById('cartSubtotal');
+    var grandEl  = document.getElementById('cartGrandTotal');
+    if (subEl)   subEl.textContent   = total.toFixed(2) + ' ' + CURRENCY;
+    if (grandEl) grandEl.textContent = total.toFixed(2) + ' ' + CURRENCY;
+    if (countLabel) countLabel.textContent = '(' + itemCount + ' ' + ITEMS_LABEL + ')';
+  }
+
+  /* Event delegation on body */
+  document.addEventListener('click', function (e) {
+    /* ± buttons */
+    var btn = e.target.closest('.pub-qty-btn[data-delta]');
+    if (btn) {
+      var idx   = parseInt(btn.dataset.idx, 10);
+      var delta = parseInt(btn.dataset.delta, 10);
+      var cart  = getCart();
+      if (!cart[idx]) return;
+      cart[idx].qty = Math.max(1, (parseInt(cart[idx].qty,10)||1) + delta);
+      saveCart(cart);
+      renderCart();
+      return;
+    }
+
+    /* Remove button */
+    var rmBtn = e.target.closest('.pub-remove-btn[data-idx]');
+    if (rmBtn) {
+      if (!confirm(REMOVE_CONFIRM)) return;
+      var idx  = parseInt(rmBtn.dataset.idx, 10);
+      var cart = getCart();
+      cart.splice(idx, 1);
+      saveCart(cart);
+      renderCart();
+      return;
+    }
+  });
+
+  /* Qty input: direct edit */
+  document.addEventListener('change', function (e) {
+    if (!e.target.classList.contains('cart-qty-inp')) return;
+    var idx  = parseInt(e.target.dataset.idx, 10);
+    var cart = getCart();
+    if (!cart[idx]) return;
+    cart[idx].qty = Math.max(1, parseInt(e.target.value, 10) || 1);
+    saveCart(cart);
+    renderCart();
+  });
+
+  /* Initial render */
+  document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('cartLoading').style.display = 'none';
+    renderCart();
+  });
+}());
 </script>
 
 <?php include dirname(__DIR__) . '/partials/footer.php'; ?>

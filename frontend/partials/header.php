@@ -33,8 +33,9 @@ $_navItems = [
     t('nav.jobs')       => $_basePath . '/jobs.php',
     t('nav.entities')   => $_basePath . '/entities.php',
     t('nav.tenants')    => $_basePath . '/tenants.php',
-    t('nav.cart') => $_basePath . '/cart.php',
 ];
+$_cartUrl   = $_basePath . '/cart.php';
+$_cartLabel = e(t('nav.cart'));
 
 // Font: Cairo for Arabic/RTL, Inter for LTR
 $_fontUrl = $dir === 'rtl'
@@ -105,6 +106,15 @@ $_fontUrl = $dir === 'rtl'
             <?php foreach ($_navItems as $label => $href): ?>
                 <a href="<?= e($href) ?>"><?= e($label) ?></a>
             <?php endforeach; ?>
+            <!-- Cart link with live count badge -->
+            <a href="<?= e($_cartUrl) ?>" class="pub-cart-nav-link" style="position:relative;display:inline-flex;align-items:center;gap:4px;">
+                🛒 <?= $_cartLabel ?>
+                <span id="pubCartCount"
+                      style="display:none;background:var(--pub-accent,#F59E0B);color:#000;
+                             border-radius:50%;min-width:18px;height:18px;padding:0 4px;
+                             font-size:0.7rem;font-weight:800;line-height:18px;
+                             text-align:center;vertical-align:middle;"></span>
+            </a>
         </nav>
 
         <!-- Header actions -->
@@ -137,6 +147,15 @@ $_fontUrl = $dir === 'rtl'
         <?php foreach ($_navItems as $label => $href): ?>
             <a href="<?= e($href) ?>"><?= e($label) ?></a>
         <?php endforeach; ?>
+        <!-- Cart link -->
+        <a href="<?= e($_cartUrl) ?>">
+            🛒 <?= $_cartLabel ?>
+            <span id="pubCartCountMobile"
+                  style="display:none;background:var(--pub-accent,#F59E0B);color:#000;
+                         border-radius:50%;min-width:18px;height:18px;padding:0 4px;
+                         font-size:0.7rem;font-weight:800;line-height:18px;
+                         text-align:center;vertical-align:middle;margin-inline-start:4px;"></span>
+        </a>
         <hr style="border-color:rgba(255,255,255,0.15);margin:12px 0;">
         <?php if ($_isLoggedIn): ?>
             <a href="/frontend/profile.php"><?= e(t('nav.account')) ?></a>
