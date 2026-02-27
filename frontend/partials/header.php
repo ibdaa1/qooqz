@@ -57,10 +57,14 @@ $_fontUrl = $dir === 'rtl'
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="<?= e($_fontUrl) ?>" rel="stylesheet">
 
-    <!-- Public UI styles -->
-    <link rel="stylesheet" href="/frontend/assets/css/public.css">
+    <!-- Public UI styles — ?v= cache-busting: forces browser to re-download on every deploy -->
+    <?php
+    $_pubCssV = @filemtime(FRONTEND_BASE . '/assets/css/public.css') ?: '1';
+    $_pubHjV  = @filemtime(FRONTEND_BASE . '/assets/js/homepage-engine.js') ?: '1';
+    ?>
+    <link rel="stylesheet" href="/frontend/assets/css/public.css?v=<?= $_pubCssV ?>">
     <!-- Homepage section engine (loaded early so init() can be called inline) -->
-    <script src="/frontend/assets/js/homepage-engine.js"></script>
+    <script src="/frontend/assets/js/homepage-engine.js?v=<?= $_pubHjV ?>"></script>
 
     <!-- Theme: inject CSS variables from DB color_settings -->
     <?php if (!empty($theme)): ?>

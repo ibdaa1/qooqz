@@ -71,7 +71,8 @@ if (!function_exists('t')) {
                border:none;border-radius:50%;font-size:1.2rem;cursor:pointer;align-items:center;
                justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.2);">↑</button>
 
-<!-- Public JS -->
-<script src="/frontend/assets/js/public.js"></script>
+<!-- Public JS — ?v= cache-busting -->
+<?php $_pubJsV = @filemtime(FRONTEND_BASE . '/assets/js/public.js') ?: '1'; ?>
+<script src="/frontend/assets/js/public.js?v=<?= $_pubJsV ?>"></script>
 </body>
 </html>

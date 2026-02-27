@@ -57,6 +57,16 @@ if (php_sapi_name() !== 'cli' && session_status() === PHP_SESSION_NONE) {
 }
 
 /* -------------------------------------------------------
+ * 2b. Cache-Control — prevent proxies/CDNs from caching
+ *     PHP pages (ensures fresh content after every deploy).
+ * ----------------------------------------------------- */
+if (php_sapi_name() !== 'cli' && !headers_sent()) {
+    header('Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+}
+
+/* -------------------------------------------------------
  * 3. Language resolution (no visible language button)
  *    Priority: URL ?lang=xx → session → app default_lang
  *    Browser Accept-Language is NOT used (platform default takes precedence).

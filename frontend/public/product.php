@@ -84,8 +84,9 @@ if ($pdo) {
                 $st = $pdo->prepare(
                     "SELECT i.id, i.url, i.thumb_url, i.alt_text, i.sort_order
                        FROM images i
-                       JOIN image_types it ON it.id = i.image_type_id AND it.code = 'product'
+                  LEFT JOIN image_types it ON it.id = i.image_type_id
                       WHERE i.owner_id = ?
+                        AND (it.code IS NULL OR it.code IN ('product','product_thumb'))
                       ORDER BY i.is_main DESC, i.sort_order ASC, i.id ASC LIMIT 10"
                 );
                 $st->execute([$productId]);
@@ -107,13 +108,13 @@ if ($pdo) {
                     $st = $pdo->prepare(
                         "SELECT p2.id, COALESCE(pt2.name, p2.slug) AS name, p2.slug,
                                 pp2.price, pp2.currency_code,
-                                i2.url AS image_url
+                                (SELECT i2.url FROM images i2 WHERE i2.owner_id = p2.id
+                                   ORDER BY i2.is_main DESC, i2.id ASC LIMIT 1) AS image_url
                            FROM products p2
                      INNER JOIN product_categories pc2 ON pc2.product_id = p2.id AND pc2.category_id = ?
                       LEFT JOIN product_translations pt2 ON pt2.product_id = p2.id AND pt2.language_code = ?
-                      LEFT JOIN product_pricing pp2 ON pp2.product_id = p2.id AND pp2.variant_id IS NULL AND pp2.is_active = 1
-                      LEFT JOIN images i2 ON i2.owner_id = p2.id AND i2.is_main = 1
-                             AND i2.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
+                      LEFT JOIN product_pricing pp2 ON pp2.product_id = p2.id
+                             AND pp2.variant_id IS NULL
                           WHERE p2.is_active = 1 AND p2.id != ? AND p2.tenant_id = ?
                           ORDER BY p2.is_featured DESC, p2.id DESC LIMIT 8"
                     );
