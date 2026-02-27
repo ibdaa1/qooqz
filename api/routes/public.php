@@ -513,6 +513,24 @@ if ($first === 'entity') {
         exit;
     }
 
+    // Sub-route: entity categories — categories with products in this entity's tenant
+    if ($sub === 'categories') {
+        $entityRow = $pdoOne('SELECT tenant_id FROM entities WHERE id = ? LIMIT 1', [$entityId]);
+        if (!$entityRow) { ResponseFormatter::notFound('Entity not found'); exit; }
+        $eTenId = (int)$entityRow['tenant_id'];
+        $rows   = $pdoList(
+            "SELECT DISTINCT c.id, COALESCE(ct.name, c.name) AS name, c.slug
+               FROM product_categories pc
+               JOIN categories c ON c.id = pc.category_id AND c.is_active = 1
+          LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
+               JOIN products p ON p.id = pc.product_id AND p.tenant_id = ? AND p.is_active = 1
+              ORDER BY c.sort_order ASC, c.id ASC LIMIT 50",
+            [$lang, $eTenId]
+        );
+        ResponseFormatter::success(['ok' => true, 'data' => $rows]);
+        exit;
+    }
+
     // Sub-route: entity products
     // Products have no entity_id column; use entity's tenant_id to scope products
     if ($sub === 'products') {
@@ -580,11 +598,11 @@ if ($first === 'entity') {
         if (!empty($translation['description'])) $entity['description'] = $translation['description'];
     }
 
-    // Working hours
+    // Working hours — table has is_open (tinyint), not is_closed; day_of_week is tinyint 0-6
     $workingHours = $pdoList(
-        "SELECT day_of_week, open_time, close_time, is_closed
+        "SELECT day_of_week, open_time, close_time, is_open
            FROM entities_working_hours
-          WHERE entity_id = ? ORDER BY FIELD(day_of_week,'sunday','monday','tuesday','wednesday','thursday','friday','saturday')",
+          WHERE entity_id = ? ORDER BY day_of_week ASC",
         [$entityId]
     );
 
@@ -606,20 +624,16 @@ if ($first === 'entity') {
         [$entityId]
     );
 
-    // Attributes — name from entities_attribute_translations; entity_type_id via entity_types.code = vendor_type
+    // Attributes — entities_attributes has NO entity_type_id column; start from values table
     $attributes = $pdoList(
-        "SELECT COALESCE(eat.name, ea.attribute_type) AS attribute_name, eav.value
-           FROM entities_attributes ea
-      LEFT JOIN entities_attribute_translations eat ON eat.attribute_id = ea.id AND eat.language_code = ?
-      LEFT JOIN entities_attribute_values eav ON eav.attribute_id = ea.id AND eav.entity_id = ?
-          WHERE ea.entity_type_id IS NULL
-             OR ea.entity_type_id = (
-                    SELECT et.id FROM entity_types et
-                    INNER JOIN entities ev ON et.code = ev.vendor_type
-                    WHERE ev.id = ? LIMIT 1
-                )
+        "SELECT COALESCE(eat.name, ea.slug) AS attribute_name, eav.value
+           FROM entities_attribute_values eav
+      LEFT JOIN entities_attributes ea  ON ea.id = eav.attribute_id
+      LEFT JOIN entities_attribute_translations eat
+             ON eat.attribute_id = ea.id AND eat.language_code = ?
+          WHERE eav.entity_id = ? AND eav.value IS NOT NULL AND eav.value != ''
           LIMIT 20",
-        [$lang, $entityId, $entityId]
+        [$lang, $entityId]
     );
 
     ResponseFormatter::success([
@@ -679,7 +693,30 @@ if ($first === 'entities') {
  * GET /api/public/tenants[/{id}]
  * ----------------------------------------------------- */
 if ($first === 'tenants') {
-    $id = $_GET['id'] ?? (isset($segments[1]) && ctype_digit((string)$segments[1]) ? (int)$segments[1] : null);
+    $id  = $_GET['id'] ?? (isset($segments[1]) && ctype_digit((string)$segments[1]) ? (int)$segments[1] : null);
+    $sub = strtolower($segments[2] ?? '');
+
+    // GET /api/public/tenants/{id}/entities
+    if ($id && $sub === 'entities') {
+        $total = $pdoCount(
+            "SELECT COUNT(*) FROM entities e WHERE e.tenant_id = ? AND e.status = 'approved'",
+            [(int)$id]
+        );
+        $rows  = $pdoList(
+            "SELECT e.id, e.store_name, e.slug, e.vendor_type, e.is_verified, e.phone,
+                    COALESCE(logo_i.url, logo_i.thumb_url) AS logo_url
+               FROM entities e
+          LEFT JOIN images logo_i ON logo_i.owner_id = e.id AND logo_i.is_main = 1
+                 AND logo_i.image_type_id = (SELECT id FROM image_types WHERE code = 'entity_logo' LIMIT 1)
+              WHERE e.tenant_id = ? AND e.status = 'approved'
+              ORDER BY e.id ASC LIMIT ? OFFSET ?",
+            [(int)$id, $per, $offset]
+        );
+        ResponseFormatter::success(['ok' => true, 'data' => $rows,
+            'meta' => ['total' => $total, 'page' => $page, 'per_page' => $per,
+                       'total_pages' => $per > 0 ? (int)ceil($total / $per) : 1]]);
+        exit;
+    }
 
     if ($id) {
         $row = $pdoOne("SELECT id, name, domain, status FROM tenants WHERE id = ? AND status = 'active' LIMIT 1", [$id]);

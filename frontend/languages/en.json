@@ -142,7 +142,9 @@
     "filter": "Search",
     "clear": "Clear",
     "empty": "No tenants available at the moment",
-    "tenant_count": "tenant(s)"
+    "tenant_count": "tenant(s)",
+    "not_found": "Tenant not found",
+    "active_status": "Active"
   },
   "pagination": {
     "prev": "Prev",
@@ -221,7 +223,10 @@
     "day_thursday": "Thursday",
     "day_friday": "Friday",
     "day_saturday": "Saturday",
-    "closed": "Closed"
+    "closed": "Closed",
+    "share": "Share",
+    "copy_link": "Copy Link",
+    "all_categories": "All"
   },
   "deals": {
     "title": "🔥 Hot Deals",

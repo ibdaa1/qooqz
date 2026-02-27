@@ -50,27 +50,34 @@ if (empty($entity)) {
  * ----------------------------------------------------- */
 $productPage  = max(1, (int)($_GET['page'] ?? 1));
 $productLimit = 12;
+$selectedCat  = (int)($_GET['cat'] ?? 0);  // category filter
+
 $rp = pub_fetch(
     pub_api_url('public/entity/' . ($entity['id'] ?? $entityId) . '/products')
     . '?' . $qs . '&per=' . $productLimit . '&page=' . $productPage
+    . ($selectedCat ? '&category_id=' . $selectedCat : '')
 );
 $products    = $rp['data']['data'] ?? ($rp['data']['items'] ?? []);
 $productMeta = $rp['data']['meta'] ?? ['total' => count($products), 'total_pages' => 1];
+
+/* Fetch categories for this entity */
+$catResp   = pub_fetch(pub_api_url('public/entity/' . ($entity['id'] ?? $entityId) . '/categories') . '?' . $qs);
+$categories = $catResp['data']['data'] ?? [];
 
 $GLOBALS['PUB_PAGE_TITLE'] = e($entity['store_name'] ?? '') . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_DESC']  = e($entity['description'] ?? '');
 
 /* -------------------------------------------------------
- * Day names from translation file
+ * Day names from translation file — day_of_week is tinyint 0=Sun … 6=Sat
  * ----------------------------------------------------- */
 $dayNames = [
-    'sunday'    => t('entity.day_sunday'),
-    'monday'    => t('entity.day_monday'),
-    'tuesday'   => t('entity.day_tuesday'),
-    'wednesday' => t('entity.day_wednesday'),
-    'thursday'  => t('entity.day_thursday'),
-    'friday'    => t('entity.day_friday'),
-    'saturday'  => t('entity.day_saturday'),
+    0 => t('entity.day_sunday'),
+    1 => t('entity.day_monday'),
+    2 => t('entity.day_tuesday'),
+    3 => t('entity.day_wednesday'),
+    4 => t('entity.day_thursday'),
+    5 => t('entity.day_friday'),
+    6 => t('entity.day_saturday'),
 ];
 
 include dirname(__DIR__) . '/partials/header.php';
@@ -163,6 +170,26 @@ include dirname(__DIR__) . '/partials/header.php';
                     </a>
                 <?php endforeach; ?>
             </div>
+
+            <!-- Share button -->
+            <div style="margin-top:12px;">
+                <button class="pub-btn pub-btn--ghost pub-btn--sm" id="pubShareBtn"
+                        onclick="pubShareEntity()" style="display:inline-flex;align-items:center;gap:6px;">
+                    📤 <?= e(t('entity.share')) ?>
+                </button>
+                <div id="pubSharePanel" style="display:none;margin-top:10px;padding:12px;
+                     background:var(--pub-surface);border:1px solid var(--pub-border);
+                     border-radius:var(--pub-radius);max-width:320px;">
+                    <p style="margin:0 0 10px;font-size:0.85rem;font-weight:600;"><?= e(t('entity.share')) ?></p>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <a href="https://api.whatsapp.com/send?text=<?= urlencode($entity['store_name'] ?? '') ?>%20" id="pubShareWA"
+                           target="_blank" rel="noopener" class="pub-social-btn">💬 WhatsApp</a>
+                        <a href="https://twitter.com/intent/tweet?text=<?= urlencode($entity['store_name'] ?? '') ?>&url=" id="pubShareTW"
+                           target="_blank" rel="noopener" class="pub-social-btn">🐦 Twitter/X</a>
+                        <button class="pub-social-btn" onclick="pubCopyLink()">🔗 <?= e(t('entity.copy_link')) ?></button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -188,11 +215,28 @@ include dirname(__DIR__) . '/partials/header.php';
 
     <!-- TAB: Products -->
     <div class="pub-tab-panel active" id="tabProducts">
+        <!-- Category filter tabs -->
+        <?php if (!empty($categories)): ?>
+        <div class="pub-cat-tabs" style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;overflow-x:auto;padding-bottom:4px;">
+            <a href="?id=<?= $entityId ?>"
+               class="pub-cat-tab-btn <?= !$selectedCat ? 'active' : '' ?>">
+                <?= e(t('entity.all_categories')) ?>
+            </a>
+            <?php foreach ($categories as $cat): ?>
+            <a href="?id=<?= $entityId ?>&cat=<?= (int)($cat['id'] ?? 0) ?>"
+               class="pub-cat-tab-btn <?= $selectedCat === (int)($cat['id'] ?? 0) ? 'active' : '' ?>">
+                <?= e($cat['name'] ?? '') ?>
+            </a>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
         <?php if (!empty($products)): ?>
         <div class="pub-grid" style="margin-top:20px;">
             <?php foreach ($products as $p): ?>
-            <a href="/frontend/public/products.php?id=<?= (int)($p['id'] ?? 0) ?>"
-               class="pub-product-card" style="text-decoration:none;">
+            <div class="pub-product-card">
+                <a href="/frontend/public/product.php?id=<?= (int)($p['id'] ?? 0) ?>"
+                   style="text-decoration:none;display:block;">
                 <div class="pub-cat-img-wrap" style="aspect-ratio:1;">
                     <?php if (!empty($p['image_url'])): ?>
                         <img src="<?= e(pub_img($p['image_url'], 'product_thumb')) ?>"
@@ -212,14 +256,24 @@ include dirname(__DIR__) . '/partials/header.php';
                         <p class="pub-product-price"><?= number_format((float)$p['price'], 2) ?> <?= e(t('common.currency')) ?></p>
                     <?php endif; ?>
                 </div>
-            </a>
+                </a>
+                <button class="pub-cart-add-btn"
+                        onclick="pubAddToCart(this)"
+                        data-product-id="<?= (int)($p['id'] ?? 0) ?>"
+                        data-product-name="<?= e($p['name'] ?? '') ?>"
+                        data-product-price="<?= (float)($p['price'] ?? 0) ?>"
+                        data-product-image="<?= e($p['image_url'] ?? '') ?>"
+                        data-product-sku="<?= e($p['sku'] ?? '') ?>">
+                    🛒 <?= e(t('cart.add')) ?>
+                </button>
+            </div>
             <?php endforeach; ?>
         </div>
         <!-- Product pagination -->
         <?php
         $totalPg = (int)($productMeta['total_pages'] ?? 1);
         if ($totalPg > 1):
-            $pg_url = fn(int $pg) => '?id=' . $entityId . '&page=' . $pg . '#tabProducts';
+            $pg_url = fn(int $pg) => '?id=' . $entityId . ($selectedCat ? '&cat=' . $selectedCat : '') . '&page=' . $pg . '#tabProducts';
         ?>
         <nav class="pub-pagination" style="margin-top:24px;">
             <a href="<?= $pg_url(max(1,$productPage-1)) ?>" class="pub-page-btn <?= $productPage<=1?'disabled':'' ?>">
@@ -284,10 +338,10 @@ include dirname(__DIR__) . '/partials/header.php';
             <h3 class="pub-info-card-title">🕐 <?= e(t('entity.hours_tab')) ?></h3>
             <div class="pub-hours-table">
                 <?php foreach ($entity['working_hours'] as $h): ?>
-                <div class="pub-hours-row <?= !empty($h['is_closed']) ? 'pub-hours-row--closed' : '' ?>">
-                    <span class="pub-hours-day"><?= e($dayNames[$h['day_of_week']] ?? $h['day_of_week']) ?></span>
+                <div class="pub-hours-row <?= empty($h['is_open']) ? 'pub-hours-row--closed' : '' ?>">
+                    <span class="pub-hours-day"><?= e($dayNames[(int)($h['day_of_week'] ?? 0)] ?? $h['day_of_week']) ?></span>
                     <span class="pub-hours-time">
-                        <?php if (!empty($h['is_closed'])): ?>
+                        <?php if (empty($h['is_open'])): ?>
                             <span style="color:var(--pub-muted);"><?= e(t('entity.closed')) ?></span>
                         <?php else: ?>
                             <?= e($h['open_time'] ?? '') ?> — <?= e($h['close_time'] ?? '') ?>
@@ -360,6 +414,36 @@ document.querySelectorAll('.pub-tab').forEach(function(btn) {
         if (panel) { panel.style.display = ''; panel.classList.add('active'); }
     });
 });
+
+// Share panel toggle
+function pubShareEntity() {
+    var panel = document.getElementById('pubSharePanel');
+    if (!panel) return;
+    var isOpen = panel.style.display !== 'none';
+    panel.style.display = isOpen ? 'none' : 'block';
+    if (!isOpen) {
+        var url = encodeURIComponent(window.location.href);
+        var wa = document.getElementById('pubShareWA');
+        var tw = document.getElementById('pubShareTW');
+        if (wa) wa.href = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(document.title + ' ') + url;
+        if (tw) tw.href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(document.title) + '&url=' + url;
+    }
+}
+
+function pubCopyLink() {
+    var url = window.location.href;
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(function() { alert('✅'); });
+    } else {
+        var ta = document.createElement('textarea');
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        alert('✅');
+    }
+}
 </script>
 
 <?php
@@ -394,6 +478,19 @@ echo '<style>
 .pub-hours-row--closed { opacity:0.5; }
 .pub-hours-day { font-weight:600; font-size:0.88rem; color:var(--pub-text); }
 .pub-hours-time { font-size:0.88rem; color:var(--pub-muted); }
+/* Category filter tabs */
+.pub-cat-tabs { border-bottom:1px solid var(--pub-border); margin-bottom:4px; }
+.pub-cat-tab-btn { padding:7px 16px; border-radius:var(--pub-radius) var(--pub-radius) 0 0; font-size:0.85rem; font-weight:600;
+  color:var(--pub-muted); text-decoration:none; white-space:nowrap; border:1px solid transparent;
+  border-bottom:none; transition:background 0.15s,color 0.15s; display:inline-block; }
+.pub-cat-tab-btn:hover { background:var(--pub-surface); color:var(--pub-text); }
+.pub-cat-tab-btn.active { background:var(--pub-bg); color:var(--pub-primary); border-color:var(--pub-border);
+  border-bottom-color:var(--pub-bg); margin-bottom:-1px; }
+/* Cart add button on product card */
+.pub-cart-add-btn { width:100%; margin-top:6px; padding:7px 0; background:var(--pub-primary,#03874e); color:#fff;
+  border:none; border-radius:0 0 var(--pub-radius) var(--pub-radius); font-size:0.82rem; font-weight:600;
+  cursor:pointer; transition:opacity 0.2s; }
+.pub-cart-add-btn:hover { opacity:0.85; }
 </style>';
 ?>
 

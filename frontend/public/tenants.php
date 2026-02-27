@@ -76,7 +76,7 @@ include dirname(__DIR__) . '/partials/header.php';
     <?php if (!empty($tenants)): ?>
     <div class="pub-grid-md">
         <?php foreach ($tenants as $ten): ?>
-        <a href="/frontend/public/tenants.php?id=<?= (int)($ten['id'] ?? 0) ?>"
+        <a href="/frontend/public/tenant.php?id=<?= (int)($ten['id'] ?? 0) ?>"
            class="pub-entity-card" style="text-decoration:none;">
             <div class="pub-entity-avatar">🏪</div>
             <div class="pub-entity-info">

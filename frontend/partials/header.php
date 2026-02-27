@@ -201,7 +201,7 @@ $_fontUrl = $dir === 'rtl'
         </a>
         <hr style="border-color:rgba(255,255,255,0.15);margin:12px 0;">
         <?php if ($_isLoggedIn): ?>
-            <a href="/frontend/profile.php"><?= e(t('nav.account')) ?></a>
+            <a href="/frontend/profile.php">👤 <?= e($_user['name'] ?? $_user['username'] ?? t('nav.account')) ?></a>
             <a href="/frontend/logout.php"><?= e(t('nav.logout')) ?></a>
         <?php else: ?>
             <a href="/frontend/login.php"><?= e(t('nav.login')) ?></a>
