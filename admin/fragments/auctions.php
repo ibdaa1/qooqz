@@ -589,13 +589,13 @@ $apiBase = '/api';
                                 <th data-i18n="table.headers.tenant"><?= __t('table.headers.tenant', 'Tenant') ?></th>
                                 <?php endif; ?>
                                 <th data-i18n="table.headers.entity"><?= __t('table.headers.entity', 'Entity') ?></th>
-                                <th><?= __t('table.headers.title', 'Title') ?></th>
-                                <th><?= __t('table.headers.type', 'Type') ?></th>
-                                <th><?= __t('table.headers.status', 'Status') ?></th>
-                                <th><?= __t('table.headers.current_price', 'Current Price') ?></th>
-                                <th><?= __t('table.headers.bids', 'Bids') ?></th>
-                                <th><?= __t('table.headers.end_date', 'End Date') ?></th>
-                                <th><?= __t('table.headers.actions', 'Actions') ?></th>
+                                <th data-i18n="table.headers.title"><?= __t('table.headers.title', 'Title') ?></th>
+                                <th data-i18n="table.headers.type"><?= __t('table.headers.type', 'Type') ?></th>
+                                <th data-i18n="table.headers.status"><?= __t('table.headers.status', 'Status') ?></th>
+                                <th data-i18n="table.headers.current_price"><?= __t('table.headers.current_price', 'Current Price') ?></th>
+                                <th data-i18n="table.headers.bids"><?= __t('table.headers.bids', 'Bids') ?></th>
+                                <th data-i18n="table.headers.end_date"><?= __t('table.headers.end_date', 'End Date') ?></th>
+                                <th data-i18n="table.headers.actions"><?= __t('table.headers.actions', 'Actions') ?></th>
                             </tr>
                         </thead>
                         <tbody id="auctionTableBody"></tbody>
