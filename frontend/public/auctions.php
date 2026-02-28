@@ -19,17 +19,55 @@ $page   = max(1, (int)($_GET['page'] ?? 1));
 $status = in_array($_GET['status'] ?? 'active', ['active','scheduled','ended','all'], true) ? $_GET['status'] : 'active';
 $type   = in_array($_GET['type'] ?? '', ['normal','reserve','buy_now','dutch','sealed_bid'], true) ? $_GET['type'] : '';
 
-$qs = http_build_query(array_filter([
-    'lang'      => $lang,
-    'page'      => $page,
-    'per'       => 24,
-    'tenant_id' => $tenantId ?: null,
-    'status'    => $status,
-    'type'      => $type ?: null,
-]));
-$apiData  = pub_fetch(pub_api_url('public/auctions') . '?' . $qs);
-$auctions = $apiData['auctions'] ?? [];
-$total    = count($auctions);
+$per    = 24;
+$offset = ($page - 1) * $per;
+$auctions = [];
+
+$pdo = pub_get_pdo();
+if ($pdo) {
+    try {
+        $aWhere  = '1=1';
+        $aParams = [$lang]; // first param is for the translation subquery
+        if ($status !== 'all')    { $aWhere .= ' AND a.status = ?';       $aParams[] = $status; }
+        if ($type)                { $aWhere .= ' AND a.auction_type = ?'; $aParams[] = $type; }
+        if ($tenantId)            { $aWhere .= ' AND a.tenant_id = ?';    $aParams[] = $tenantId; }
+        $aParams[] = $per;
+        $aParams[] = $offset;
+
+        $st = $pdo->prepare(
+            "SELECT a.id, a.slug, a.auction_type, a.status, a.starting_price, a.current_price,
+                    a.buy_now_price, a.bid_increment, a.total_bids, a.total_bidders,
+                    a.start_date, a.end_date, a.is_featured, a.condition_type, a.quantity,
+                    a.entity_id,
+                    (SELECT i.url FROM images i WHERE i.owner_id = a.product_id ORDER BY i.id ASC LIMIT 1) AS image_url,
+                    (SELECT at2.title FROM auction_translations at2
+                     WHERE at2.auction_id = a.id AND at2.language_code = ? LIMIT 1) AS title
+             FROM auctions a
+             WHERE $aWhere
+             ORDER BY a.is_featured DESC, a.end_date ASC
+             LIMIT ? OFFSET ?"
+        );
+        $st->execute($aParams);
+        $auctions = $st->fetchAll(PDO::FETCH_ASSOC);
+
+        // Fallback title to slug when translation is missing
+        foreach ($auctions as &$a) {
+            if (empty($a['title'])) $a['title'] = $a['slug'];
+        }
+        unset($a);
+    } catch (Throwable $e) {
+        error_log('[auctions.php] ' . $e->getMessage());
+    }
+} else {
+    // HTTP fallback
+    $qs = http_build_query(array_filter([
+        'lang' => $lang, 'page' => $page, 'per' => $per,
+        'tenant_id' => $tenantId ?: null, 'status' => $status, 'type' => $type ?: null,
+    ]));
+    $apiData  = pub_fetch(pub_api_url('public/auctions') . '?' . $qs);
+    $auctions = $apiData['data']['auctions'] ?? $apiData['auctions'] ?? [];
+}
+$total = count($auctions);
 
 function auc_countdown_label(string $endDate, string $lang): string {
     $diff = strtotime($endDate) - time();
