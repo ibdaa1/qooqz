@@ -1819,7 +1819,7 @@ if ($first === 'compare') {
                 [$lang, (int)$cmpRow['id']]
             );
         }
-        ResponseFormatter::success(['ok' => true, 'data' => $rows]);
+        ResponseFormatter::success(['ok' => true, 'products' => $rows]);
     } catch (Throwable $ex) { ResponseFormatter::error($ex->getMessage(), 500); }
     exit;
 }
