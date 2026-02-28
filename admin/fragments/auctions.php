@@ -189,6 +189,15 @@ $apiBase = '/api';
                                 <option value=""><?= __t('form.fields.product_id.select', 'Select product (optional)') ?></option>
                             </select>
                         </div>
+
+                        <div class="form-group">
+                            <label for="auctionEntity" class="required" data-i18n="form.fields.entity_id.label">
+                                <?= __t('form.fields.entity_id.label', 'Entity') ?>
+                            </label>
+                            <select id="auctionEntity" name="entity_id" class="form-control" required>
+                                <option value=""><?= __t('form.fields.entity_id.select', 'Select entity') ?></option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="form-row">
@@ -575,10 +584,11 @@ $apiBase = '/api';
                     <table class="data-table" id="auctionsTable">
                         <thead>
                             <tr>
-                                <th>ID</th>
+                                <th data-i18n="table.headers.id"><?= __t('table.headers.id', 'ID') ?></th>
                                 <?php if (is_super_admin()): ?>
-                                <th>Tenant</th>
+                                <th data-i18n="table.headers.tenant"><?= __t('table.headers.tenant', 'Tenant') ?></th>
                                 <?php endif; ?>
+                                <th data-i18n="table.headers.entity"><?= __t('table.headers.entity', 'Entity') ?></th>
                                 <th><?= __t('table.headers.title', 'Title') ?></th>
                                 <th><?= __t('table.headers.type', 'Type') ?></th>
                                 <th><?= __t('table.headers.status', 'Status') ?></th>

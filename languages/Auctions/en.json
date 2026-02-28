@@ -34,6 +34,10 @@
           "label": "Product",
           "select": "Select product (optional)"
         },
+        "entity_id": {
+          "label": "Entity",
+          "select": "Select entity"
+        },
         "auction_type": {
           "label": "Auction Type",
           "normal": "Normal",
@@ -143,6 +147,7 @@
       "headers": {
         "id": "ID",
         "tenant": "Tenant",
+        "entity": "Entity",
         "title": "Title",
         "type": "Type",
         "status": "Status",

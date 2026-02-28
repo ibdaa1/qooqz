@@ -20,7 +20,8 @@
         translations: CONFIG.translationsApi || '/api/auction_translations',
         products:     CONFIG.productsApi     || '/api/products',
         currencies:   CONFIG.currenciesApi   || '/api/currencies',
-        languages:    CONFIG.languagesApi    || '/api/languages'
+        languages:    CONFIG.languagesApi    || '/api/languages',
+        entities:     CONFIG.entitiesApi     || '/api/entities'
     };
 
     const state = {
@@ -32,6 +33,7 @@
         currencies:     [],
         currencyMap:    {}, // keyed by code for fast lookup
         products:       [],
+        entities:       [],
         filters:        {},
         currentAuction: null,
         permissions:    PERMS,
@@ -207,6 +209,20 @@
         } catch (e) {
             console.warn('[Auctions] Failed to load products:', e);
         }
+
+        // Entities (for entity selector)
+        try {
+            const res = await apiCall(`${API.entities}?format=json&tenant_id=${state.tenantId}&lang=${state.language}&limit=500`);
+            if (res.success) {
+                const data = res.data?.items || (Array.isArray(res.data) ? res.data : []);
+                state.entities = Array.isArray(data) ? data : [];
+                if (el.auctionEntity) {
+                    populateDropdown(el.auctionEntity, state.entities, 'id', 'store_name', t('form.fields.entity_id.select', 'Select entity'));
+                }
+            }
+        } catch (e) {
+            console.warn('[Auctions] Failed to load entities:', e);
+        }
     }
 
     /** Store currencies in state and refresh the currency dropdown. */
@@ -272,6 +288,8 @@
             const endDate        = a.end_date ? new Date(a.end_date).toLocaleString() : '—';
             const title          = a.translated_title || a.title || `Auction #${a.id}`;
             const featured       = a.is_featured == 1 ? ' <i class="fas fa-star" style="color:#f59e0b;font-size:0.75rem;" title="Featured"></i>' : '';
+            const entityName     = a.entity_name  || `#${a.entity_id || ''}`;
+            const tenantDisplay  = a.tenant_name  || `#${a.tenant_id || ''}`;
 
             const canEdit   = state.permissions.canEdit   || state.permissions.canEditAll   ||
                               (state.permissions.canEditOwn && a.created_by == window.APP_CONFIG?.USER_ID);
@@ -281,7 +299,8 @@
             return `
                 <tr data-id="${esc(a.id)}">
                     <td>${esc(a.id)}</td>
-                    ${isSuperAdmin ? `<td>${esc(a.tenant_id||'')}</td>` : ''}
+                    ${isSuperAdmin ? `<td>${esc(tenantDisplay)}</td>` : ''}
+                    <td>${esc(entityName)}</td>
                     <td>
                         <strong>${esc(title)}${featured}</strong>
                         <br><small style="color:var(--text-secondary,#94a3b8);">${esc(a.slug||'')}</small>
@@ -358,6 +377,7 @@
             if (el.auctionTitle)   el.auctionTitle.value   = auction.title || '';
             if (el.auctionSlug)    el.auctionSlug.value    = auction.slug  || '';
             if (el.auctionProduct) el.auctionProduct.value = auction.product_id || '';
+            if (el.auctionEntity)  el.auctionEntity.value  = auction.entity_id  || '';
             if (el.auctionType)    el.auctionType.value    = auction.auction_type  || 'normal';
             if (el.auctionStatus)  el.auctionStatus.value  = auction.status        || 'draft';
             if (el.auctionCondition) el.auctionCondition.value = auction.condition_type || 'new';
@@ -436,7 +456,7 @@
 
             const data = {
                 tenant_id:             state.tenantId,
-                entity_id:             1, // default entity
+                entity_id:             parseInt(formData.get('entity_id'), 10) || null,
                 title:                 formData.get('title') || '',
                 slug:                  formData.get('slug')  || generateSlug(formData.get('title') || ''),
                 product_id:            formData.get('product_id')   || null,
@@ -859,6 +879,7 @@
             auctionTitle:     $id('auctionTitle'),
             auctionSlug:      $id('auctionSlug'),
             auctionProduct:   $id('auctionProduct'),
+            auctionEntity:    $id('auctionEntity'),
             auctionType:      $id('auctionType'),
             auctionStatus:    $id('auctionStatus'),
             auctionCondition: $id('auctionCondition'),

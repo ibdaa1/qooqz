@@ -37,11 +37,15 @@ final class PdoAuctionsRepository implements AuctionsRepositoryInterface
                    c.code            AS currency_code,
                    c.symbol          AS currency_symbol,
                    c.symbol_position AS currency_symbol_position,
-                   c.decimal_places  AS currency_decimal_places
+                   c.decimal_places  AS currency_decimal_places,
+                   e.store_name      AS entity_name,
+                   tn.name           AS tenant_name
             FROM " . self::TABLE . " a
             LEFT JOIN auction_translations at
                 ON at.auction_id = a.id AND at.language_code = :lang
-            LEFT JOIN currencies c ON c.id = a.currency_id
+            LEFT JOIN currencies c  ON c.id  = a.currency_id
+            LEFT JOIN entities e    ON e.id  = a.entity_id
+            LEFT JOIN tenants tn    ON tn.id = a.tenant_id
             WHERE a.tenant_id = :tenant_id
         ";
         $params = [':tenant_id' => $tenantId, ':lang' => $lang];
@@ -106,11 +110,15 @@ final class PdoAuctionsRepository implements AuctionsRepositoryInterface
                    c.code            AS currency_code,
                    c.symbol          AS currency_symbol,
                    c.symbol_position AS currency_symbol_position,
-                   c.decimal_places  AS currency_decimal_places
+                   c.decimal_places  AS currency_decimal_places,
+                   e.store_name      AS entity_name,
+                   tn.name           AS tenant_name
             FROM " . self::TABLE . " a
             LEFT JOIN auction_translations at
                 ON at.auction_id = a.id AND at.language_code = :lang
-            LEFT JOIN currencies c ON c.id = a.currency_id
+            LEFT JOIN currencies c  ON c.id  = a.currency_id
+            LEFT JOIN entities e    ON e.id  = a.entity_id
+            LEFT JOIN tenants tn    ON tn.id = a.tenant_id
             WHERE a.tenant_id = :tenant_id AND a.id = :id
             LIMIT 1
         ");
