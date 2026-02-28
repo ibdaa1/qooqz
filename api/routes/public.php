@@ -2088,15 +2088,31 @@ if ($first === 'auctions') {
             $minBid = (float)$aRow['current_price'] + (float)$aRow['bid_increment'];
             if ($bidAmount < $minBid) { ResponseFormatter::error("Minimum bid is $minBid", 422); exit; }
             $pdo->beginTransaction();
-            // Mark previous winning bid as not winning
-            $pdo->prepare('UPDATE auction_bids SET is_winning=0 WHERE auction_id=?')->execute([$auctionId]);
+            // Use FOR UPDATE to prevent race conditions on concurrent bids
+            $pdo->prepare('SELECT id FROM auctions WHERE id=? FOR UPDATE')->execute([$auctionId]);
+            // Re-read current price under lock
+            $aLocked = $pdoOne('SELECT current_price, bid_increment, status, end_date FROM auctions WHERE id=?', [$auctionId]);
+            if (!$aLocked || $aLocked['status'] !== 'active') {
+                $pdo->rollBack();
+                ResponseFormatter::error('Auction is no longer available', 422); exit;
+            }
+            $minBidLocked = (float)$aLocked['current_price'] + (float)$aLocked['bid_increment'];
+            if ($bidAmount < $minBidLocked) {
+                $pdo->rollBack();
+                ResponseFormatter::error("Minimum bid is $minBidLocked", 422); exit;
+            }
+            // Mark only the previous winning bid as not winning (targeted update)
+            $pdo->prepare('UPDATE auction_bids SET is_winning=0 WHERE auction_id=? AND is_winning=1')->execute([$auctionId]);
             // Insert new bid
             $stB = $pdo->prepare('INSERT INTO auction_bids (auction_id, user_id, bid_amount, bid_type, is_winning, ip_address, created_at) VALUES (?,?,?,?,1,?,NOW())');
             $stB->execute([$auctionId, $auctionUserId, $bidAmount, 'manual', $_SERVER['REMOTE_ADDR'] ?? null]);
             $newBidId = (int)$pdo->lastInsertId();
-            // Update auction current price + bid count
-            $pdo->prepare('UPDATE auctions SET current_price=?, total_bids=total_bids+1, winner_user_id=?, winner_bid_id=? WHERE id=?')
-                ->execute([$bidAmount, $auctionUserId, $newBidId, $auctionId]);
+            // Update auction: current price, bid count, unique bidder count, winner
+            $pdo->prepare(
+                'UPDATE auctions SET current_price=?, total_bids=total_bids+1,
+                 total_bidders=(SELECT COUNT(DISTINCT user_id) FROM auction_bids WHERE auction_id=?),
+                 winner_user_id=?, winner_bid_id=? WHERE id=?'
+            )->execute([$bidAmount, $auctionId, $auctionUserId, $newBidId, $auctionId]);
             $pdo->commit();
             ResponseFormatter::success(['ok' => true, 'bid_id' => $newBidId, 'new_price' => $bidAmount], 'Bid placed', 201);
         } catch (Throwable $ex) {
@@ -2113,6 +2129,11 @@ if ($first === 'auctions') {
         if ($maxBid <= 0) { ResponseFormatter::error('Invalid max bid', 422); exit; }
         if (!$pdo) { ResponseFormatter::error('DB unavailable', 503); exit; }
         try {
+            // Validate max_bid >= current minimum bid
+            $aAbRow = $pdoOne('SELECT current_price, bid_increment FROM auctions WHERE id=? AND status="active" LIMIT 1', [$auctionId]);
+            if (!$aAbRow) { ResponseFormatter::error('Auction not found or not active', 422); exit; }
+            $abMinBid = (float)$aAbRow['current_price'] + (float)$aAbRow['bid_increment'];
+            if ($maxBid < $abMinBid) { ResponseFormatter::error("Max bid must be at least $abMinBid", 422); exit; }
             $stAB = $pdo->prepare('INSERT INTO auto_bid_settings (auction_id, user_id, max_bid_amount, is_active, created_at, updated_at) VALUES (?,?,?,1,NOW(),NOW()) ON DUPLICATE KEY UPDATE max_bid_amount=VALUES(max_bid_amount), is_active=1, updated_at=NOW()');
             $stAB->execute([$auctionId, $auctionUserId, $maxBid]);
             ResponseFormatter::success(['ok' => true, 'max_bid' => $maxBid], 'Auto-bid set');

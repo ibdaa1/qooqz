@@ -369,7 +369,7 @@ var AUC_ACTIVE = <?= $aIsActive ? 'true' : 'false' ?>;
 // ---- Countdown ----
 function aucUpdateCountdown() {
   if (!AUC_END || !AUC_ACTIVE) return;
-  var end  = new Date(AUC_END.replace(' ','T')).getTime();
+  var end  = new Date(AUC_END.replace(/\s/, 'T')).getTime();
   var diff = Math.floor((end - Date.now()) / 1000);
   if (diff <= 0) {
     document.getElementById('aucDays').textContent = '00';
@@ -394,7 +394,15 @@ function aucPollStatus() {
       if (!d.success || !d.data || !d.data.status) return;
       var s = d.data.status;
       var priceEl = document.getElementById('aucCurrentPrice');
-      if (priceEl) priceEl.firstChild.textContent = parseFloat(s.current_price || 0).toFixed(2) + ' ';
+      if (priceEl) {
+        var priceSpan = priceEl.querySelector('.pub-auc-price-currency');
+        var priceText = parseFloat(s.current_price || 0).toFixed(2) + ' ';
+        if (priceSpan) {
+          priceEl.childNodes[0].textContent = priceText;
+        } else {
+          priceEl.textContent = priceText;
+        }
+      }
       var bidsEl = document.getElementById('aucTotalBids');
       if (bidsEl) bidsEl.textContent = s.total_bids || 0;
       var bdrsEl = document.getElementById('aucBidders');

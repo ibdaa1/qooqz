@@ -69,7 +69,7 @@ include dirname(__DIR__) . '/partials/header.php';
         <option value="reserve"   <?= $type==='reserve'   ? 'selected' : '' ?>><?= e(t('auctions.type_reserve')) ?></option>
         <option value="buy_now"   <?= $type==='buy_now'   ? 'selected' : '' ?>><?= e(t('auctions.type_buy_now')) ?></option>
         <option value="dutch"     <?= $type==='dutch'     ? 'selected' : '' ?>><?= e(t('auctions.type_dutch')) ?></option>
-        <option value="sealed_bid"<?= $type==='sealed_bid'? 'selected' : '' ?>><?= e(t('auctions.type_sealed_bid')) ?></option>
+        <option value="sealed_bid" <?= $type==='sealed_bid'? 'selected' : '' ?>><?= e(t('auctions.type_sealed_bid')) ?></option>
       </select>
     </form>
 
@@ -149,7 +149,7 @@ include dirname(__DIR__) . '/partials/header.php';
 (function(){
   function updateTimers() {
     document.querySelectorAll('[data-end]').forEach(function(el) {
-      var end = new Date(el.dataset.end.replace(' ', 'T')).getTime();
+      var end = new Date(el.dataset.end.replace(/\s/, 'T')).getTime();
       var now = Date.now();
       var diff = Math.floor((end - now) / 1000);
       if (diff <= 0) { el.textContent = '<?= addslashes(t('auctions.ended')) ?>'; return; }
