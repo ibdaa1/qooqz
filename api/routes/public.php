@@ -252,8 +252,7 @@ if ($first === 'products') {
                     pt.short_description, pt.description, pt.specifications, pt.meta_title,
                     (SELECT pp.price FROM product_pricing pp
                        WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
-                    (SELECT pp.compare_at_price FROM product_pricing pp
-                       WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS compare_at_price,
+                    NULL AS compare_at_price,
                     (SELECT pp.currency_code FROM product_pricing pp
                        WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
                     b.name AS brand_name,

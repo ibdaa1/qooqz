@@ -34,9 +34,8 @@ if (!$productId && $productSlug === '') {
 }
 
 // -------------------------------------------------------
-// Load product — HTTP API first (same approach as products.php, proven to work on live server),
-// PDO as fallback for when HTTP API is unavailable or returns no data.
-// Secondary data (gallery, categories, etc.) loaded via PDO when available.
+// Load product — PDO first (direct DB, proven working on live server per debug_product.php Step 3).
+// HTTP API as fallback for when PDO path fails.
 // -------------------------------------------------------
 $product    = null;
 $images     = [];
@@ -47,26 +46,7 @@ $reviews    = [];
 $questions  = [];
 $relations  = [];
 
-// Step 1: HTTP API — same pattern as products.php which works reliably.
-// The public API at /api/public/products?id=X returns {"success":true,"data":{"product":{...},...}}
-$_apiQs = http_build_query(array_filter([
-    'id'   => $productId ?: null,
-    'slug' => $productSlug ?: null,
-    'lang' => $lang,
-]));
-$_apiResp = pub_fetch(pub_api_url('public/products') . '?' . $_apiQs);
-if (!empty($_apiResp['data']['product'])) {
-    $product    = $_apiResp['data']['product'];
-    $images     = $_apiResp['data']['images']     ?? [];
-    $categories = $_apiResp['data']['categories'] ?? [];
-    $related    = $_apiResp['data']['related']    ?? [];
-    // Resolve product ID from API response (needed for PDO secondary queries below)
-    if (!$productId && !empty($product['id'])) {
-        $productId = (int)$product['id'];
-    }
-}
-
-// Step 2: PDO fallback — used when HTTP API is blocked or fails on shared hosting.
+// Step 1: PDO (direct DB) — proven working by debug_product.php Step 3.
 $pdo = pub_get_pdo();
 if (!$product && $pdo) {
     try {
@@ -91,8 +71,7 @@ if (!$product && $pdo) {
                         pt.short_description, pt.description, pt.specifications,
                         (SELECT pp.price FROM product_pricing pp
                            WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
-                        (SELECT pp.compare_at_price FROM product_pricing pp
-                           WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS compare_at_price,
+                        NULL AS compare_at_price,
                         (SELECT pp.currency_code FROM product_pricing pp
                            WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
                         b.name AS brand_name,
@@ -263,8 +242,26 @@ if (!$product && $pdo) {
     }
 }
 
-// Step 3: When product was loaded via HTTP API (Step 1), still load secondary enrichment
-// via PDO when available (variants, reviews, Q&A — not returned by the API).
+// Step 2: HTTP API fallback — if PDO fails or returns null, try the public API.
+if (!$product) {
+    $_apiQs = http_build_query(array_filter([
+        'id'   => $productId ?: null,
+        'slug' => $productSlug ?: null,
+        'lang' => $lang,
+    ]));
+    $_apiResp = pub_fetch(pub_api_url('public/products') . '?' . $_apiQs);
+    if (!empty($_apiResp['data']['product'])) {
+        $product    = $_apiResp['data']['product'];
+        $images     = $_apiResp['data']['images']     ?? [];
+        $categories = $_apiResp['data']['categories'] ?? [];
+        $related    = $_apiResp['data']['related']    ?? [];
+        if (!$productId && !empty($product['id'])) {
+            $productId = (int)$product['id'];
+        }
+    }
+}
+
+// Step 3: Load secondary data (variants, reviews, Q&A) via PDO when available.
 if ($product && $pdo && $productId) {
     // Variants
     if (empty($variants)) {
