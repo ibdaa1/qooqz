@@ -158,6 +158,11 @@ $_fontUrl = $dir === 'rtl'
                              font-size:0.7rem;font-weight:800;line-height:18px;
                              text-align:center;vertical-align:middle;"></span>
             </a>
+            <!-- Wishlist link with live count badge -->
+            <a href="/frontend/public/wishlist.php" class="pub-wishlist-badge" style="position:relative;display:inline-flex;align-items:center;gap:4px;" title="<?= e(t('nav.wishlist')) ?>">
+                ♡ <?= e(t('nav.wishlist')) ?>
+                <span id="pubWishlistCount"></span>
+            </a>
         </nav>
 
         <!-- Header actions -->
@@ -199,6 +204,11 @@ $_fontUrl = $dir === 'rtl'
                          border-radius:50%;min-width:18px;height:18px;padding:0 4px;
                          font-size:0.7rem;font-weight:800;line-height:18px;
                          text-align:center;vertical-align:middle;margin-inline-start:4px;"></span>
+        </a>
+        <!-- Wishlist link -->
+        <a href="/frontend/public/wishlist.php">
+            ♡ <?= e(t('nav.wishlist')) ?>
+            <span id="pubWishlistCountMobile"></span>
         </a>
         <hr style="border-color:rgba(255,255,255,0.15);margin:12px 0;">
         <?php if ($_isLoggedIn): ?>

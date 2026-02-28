@@ -91,6 +91,13 @@ include dirname(__DIR__) . '/partials/header.php';
             $imgSrc = pub_img($p['image_thumb_url'] ?? $p['image_url'] ?? null, 'product_thumb');
         ?>
         <div class="pub-product-card" style="position:relative;">
+            <!-- Wishlist heart -->
+            <button class="pub-wishlist-btn"
+                    type="button"
+                    data-product-id="<?= $pId ?>"
+                    data-entity-id="<?= $p['entity_id'] ?? 1 ?>"
+                    onclick="pubToggleWishlist(this)"
+                    title="<?= e(t('wishlist.add')) ?>">♡</button>
             <a href="/frontend/public/product.php?id=<?= $pId ?>"
                style="text-decoration:none;display:flex;flex-direction:column;flex:1;"
                aria-label="<?= e($pName) ?>">

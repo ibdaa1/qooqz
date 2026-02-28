@@ -431,3 +431,84 @@ function pubAddToCart(btn) {
     window.location.href = '/frontend/public/cart.php';
   }, 1200);
 }
+
+// ── Wishlist ─────────────────────────────────────────────────────────────────
+
+/** Toggle wishlist state for a product. Called by heart buttons. */
+function pubToggleWishlist(btn) {
+  var u = window.pubSessionUser || JSON.parse(localStorage.getItem('pubUser') || 'null');
+  if (!u || !u.id) {
+    window.location.href = '/frontend/login.php?redirect=' + encodeURIComponent(window.location.href);
+    return;
+  }
+  var productId = btn.dataset.productId;
+  if (!productId) return;
+  var active = btn.classList.contains('pub-wishlist-active');
+  var action = active ? 'remove' : 'add';
+  btn.disabled = true;
+
+  var fd = new FormData();
+  fd.append('product_id', productId);
+  fd.append('entity_id', btn.dataset.entityId || '1');
+
+  fetch('/api/public/wishlist/' + action, {
+    method: 'POST',
+    credentials: 'include',
+    body: fd
+  })
+  .then(function (r) { return r.json(); })
+  .then(function (data) {
+    if (data.success || data.ok) {
+      if (active) {
+        btn.classList.remove('pub-wishlist-active');
+        btn.title = 'Add to wishlist';
+        btn.textContent = '♡';
+      } else {
+        btn.classList.add('pub-wishlist-active');
+        btn.title = 'In wishlist';
+        btn.textContent = '♥';
+      }
+      // Update badge count
+      pubRefreshWishlistBadge();
+    }
+  })
+  .catch(function () {})
+  .finally(function () { btn.disabled = false; });
+}
+
+/** Refresh wishlist badge in header */
+function pubRefreshWishlistBadge() {
+  fetch('/api/public/wishlist/ids', { credentials: 'include' })
+  .then(function (r) { return r.json(); })
+  .then(function (data) {
+    var ids = (data.data && data.data.ids) ? data.data.ids : [];
+    var count = ids.length;
+    // Update badge
+    var badge = document.getElementById('pubWishlistCount');
+    if (badge) { badge.textContent = count; badge.style.display = count ? 'inline-flex' : 'none'; }
+    var badgeMob = document.getElementById('pubWishlistCountMobile');
+    if (badgeMob) { badgeMob.textContent = count; badgeMob.style.display = count ? 'inline-flex' : 'none'; }
+    // Update heart buttons on page
+    document.querySelectorAll('.pub-wishlist-btn').forEach(function (btn) {
+      var pid = String(btn.dataset.productId);
+      if (ids.map(String).indexOf(pid) !== -1) {
+        btn.classList.add('pub-wishlist-active');
+        btn.textContent = '♥';
+        btn.title = 'In wishlist';
+      } else {
+        btn.classList.remove('pub-wishlist-active');
+        btn.textContent = '♡';
+        btn.title = 'Add to wishlist';
+      }
+    });
+  })
+  .catch(function () {});
+}
+
+// ── Init on page load ─────────────────────────────────────────────────────────
+(function () {
+  var u = window.pubSessionUser || JSON.parse(localStorage.getItem('pubUser') || 'null');
+  if (u && u.id && document.querySelector('.pub-wishlist-btn')) {
+    pubRefreshWishlistBadge();
+  }
+})();

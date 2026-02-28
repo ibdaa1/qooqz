@@ -328,6 +328,14 @@ include dirname(__DIR__) . '/partials/header.php';
                         onclick="pubAddToCart(this)">
                     🛒 <?= e(t('cart.add')) ?>
                 </button>
+                <!-- Wishlist heart button on detail page -->
+                <button class="pub-wishlist-btn"
+                        type="button"
+                        style="position:static;border-radius:8px;width:auto;padding:0 16px;height:40px;line-height:40px;font-size:1.3rem;"
+                        data-product-id="<?= (int)$product['id'] ?>"
+                        data-entity-id="<?= (int)($product['entity_id'] ?? 1) ?>"
+                        onclick="pubToggleWishlist(this)"
+                        title="<?= e(t('wishlist.add')) ?>">♡</button>
             </div>
             <?php endif; ?>
 

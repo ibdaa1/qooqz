@@ -16,7 +16,8 @@
     "logout": "Logout",
     "menu_open": "Open menu",
     "menu_close": "Close menu",
-    "offers": "Offers"
+    "offers": "Offers",
+    "wishlist": "Wishlist"
   },
   "hero": {
     "title": "QOOQZ Global Platform",
@@ -319,5 +320,17 @@
     "none": "No active offers at this time",
     "expired": "Expired",
     "inactive": "Inactive"
+  },
+  "wishlist": {
+    "page_title": "My Wishlist",
+    "page_subtitle": "Products you have saved for later",
+    "empty": "Your wishlist is empty.",
+    "browse_products": "Browse Products",
+    "items_count": "items saved",
+    "clear_all": "Clear All",
+    "confirm_clear": "Remove all items from your wishlist?",
+    "add": "Add to wishlist",
+    "remove": "Remove from wishlist",
+    "added": "Added to wishlist"
   }
 }
