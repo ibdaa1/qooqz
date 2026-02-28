@@ -258,9 +258,9 @@ if ($first === 'products') {
                        WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
                     b.name AS brand_name,
                     (SELECT i.url FROM images i WHERE i.owner_id = p.id
-                       ORDER BY i.is_main DESC, i.sort_order ASC, i.id ASC LIMIT 1) AS image_url,
+                       ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_url,
                     (SELECT i.thumb_url FROM images i WHERE i.owner_id = p.id
-                       ORDER BY i.is_main DESC, i.sort_order ASC, i.id ASC LIMIT 1) AS image_thumb_url
+                       ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_thumb_url
                FROM products p
           LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
           LEFT JOIN brands b ON b.id = p.brand_id
@@ -272,10 +272,10 @@ if ($first === 'products') {
         // All product images (gallery) — no image_type filter to avoid failures
         // when image_types table is empty or has different code values.
         $productImages = $pdoList(
-            "SELECT i.id, i.url, i.thumb_url, i.alt_text, i.sort_order
+            "SELECT i.id, i.url, i.thumb_url, i.alt_text
                FROM images i
               WHERE i.owner_id = ?
-              ORDER BY i.is_main DESC, i.sort_order ASC, i.id ASC LIMIT 10",
+              ORDER BY i.is_main DESC, i.id ASC LIMIT 10",
             [(int)$id]
         );
 

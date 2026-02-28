@@ -1,11 +1,21 @@
 <?php
-declare(strict_types=1);
 /**
  * frontend/public/product.php
  * QOOQZ — Product Detail Page
  * Shows full product info: gallery, description, price, brand, categories, related products.
  * Uses direct PDO queries (not HTTP loopback) for reliability on all hosting environments.
+ * Note: No declare(strict_types=1) — PDO FETCH_ASSOC returns string values for all columns
+ *       and strict typing causes TypeErrors with int/float comparisons in production.
  */
+
+// Top-level exception handler — prevents HTTP 500 even if unexpected error occurs.
+// Logs the error for server-side debugging and shows a friendly page.
+set_exception_handler(function (Throwable $ex) {
+    error_log('[product.php] Uncaught exception: ' . $ex->getMessage() . ' at ' . $ex->getFile() . ':' . $ex->getLine());
+    if (!headers_sent()) { http_response_code(200); }
+    echo '<p style="padding:40px;text-align:center;font-family:sans-serif;">⚠️ Unable to load product. Please try again later.</p>';
+    exit;
+});
 
 require_once dirname(__DIR__) . '/includes/public_context.php';
 
@@ -72,9 +82,9 @@ if ($pdo) {
                            WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
                         b.name AS brand_name,
                         (SELECT i.url FROM images i WHERE i.owner_id = p.id
-                           ORDER BY i.is_main DESC, i.sort_order ASC, i.id ASC LIMIT 1) AS image_url,
+                           ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_url,
                         (SELECT i.thumb_url FROM images i WHERE i.owner_id = p.id
-                           ORDER BY i.is_main DESC, i.sort_order ASC, i.id ASC LIMIT 1) AS image_thumb_url
+                           ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_thumb_url
                    FROM products p
               LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
               LEFT JOIN brands b ON b.id = p.brand_id
