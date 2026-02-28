@@ -104,7 +104,8 @@
             const result = await apiFetch('/api/languages');
             
             if (result.success && result.data) {
-                languages = result.data;
+                languages = result.data.items || result.data;
+                if (!Array.isArray(languages)) languages = [];
 
                 const filterSelect = getEl('languageFilter');
                 if (filterSelect) {

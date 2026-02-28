@@ -256,32 +256,51 @@
 
         cacheElements() {
             this.el = {
-                container: document.getElementById('jobsTab'),
+                container: document.getElementById('jobsPageContainer'),
                 formContainer: document.getElementById('jobFormContainer'),
-                tableContainer: document.getElementById('jobsTableContainer'),
-                tableBody: document.getElementById('jobsTableBody'),
-                loading: document.getElementById('jobsTableLoading'),
-                emptyState: document.getElementById('jobsEmptyState'),
-                pagination: document.getElementById('jobsPagination'),
-                paginationInfo: document.getElementById('jobsPaginationInfo'),
-                addBtn: document.getElementById('jobsAddBtn'),
+                tableContainer: document.getElementById('tableContainer'),
+                tableBody: document.getElementById('tableBody'),
+                loading: document.getElementById('tableLoading'),
+                emptyState: document.getElementById('emptyState'),
+                pagination: document.getElementById('pagination'),
+                paginationInfo: document.getElementById('paginationInfo'),
+                addBtn: document.getElementById('btnAddJob'),
                 exportBtn: document.getElementById('jobsExportBtn'),
-                applyFilters: document.getElementById('jobsApplyFilters'),
-                resetFilters: document.getElementById('jobsResetFilters'),
-                searchInput: document.getElementById('jobsSearchInput'),
-                statusFilter: document.getElementById('jobsStatusFilter'),
-                jobTypeFilter: document.getElementById('jobsJobTypeFilter'),
-                experienceFilter: document.getElementById('jobsExperienceFilter'),
+                applyFilters: document.getElementById('btnApplyFilters'),
+                resetFilters: document.getElementById('btnResetFilters'),
+                searchInput: document.getElementById('searchInput'),
+                statusFilter: document.getElementById('statusFilter'),
+                jobTypeFilter: document.getElementById('jobTypeFilter'),
+                experienceFilter: document.getElementById('experienceLevelFilter'),
                 form: document.getElementById('jobForm'),
                 formTitle: document.getElementById('formTitle'),
                 closeForm: document.getElementById('btnCloseForm'),
                 cancelForm: document.getElementById('btnCancelForm'),
-                // Add other form fields as needed (e.g., jobTitle, jobType, etc.) - keep original
                 jobTitle: document.getElementById('jobTitle'),
                 jobType: document.getElementById('jobType'),
+                employmentType: document.getElementById('employmentType'),
                 experienceLevel: document.getElementById('experienceLevel'),
                 jobCategory: document.getElementById('jobCategory'),
-                // ... etc
+                jobDepartment: document.getElementById('jobDepartment'),
+                positionsAvailable: document.getElementById('positionsAvailable'),
+                jobStatus: document.getElementById('jobStatus'),
+                startDate: document.getElementById('startDate'),
+                isFeatured: document.getElementById('isFeatured'),
+                isUrgent: document.getElementById('isUrgent'),
+                salaryMin: document.getElementById('salaryMin'),
+                salaryMax: document.getElementById('salaryMax'),
+                salaryCurrency: document.getElementById('salaryCurrency'),
+                salaryPeriod: document.getElementById('salaryPeriod'),
+                salaryNegotiable: document.getElementById('salaryNegotiable'),
+                countryId: document.getElementById('countryId'),
+                cityId: document.getElementById('cityId'),
+                workLocation: document.getElementById('workLocation'),
+                isRemote: document.getElementById('isRemote'),
+                applicationFormType: document.getElementById('applicationFormType'),
+                externalApplicationUrl: document.getElementById('externalApplicationUrl'),
+                applicationDeadline: document.getElementById('applicationDeadline'),
+                jobSlug: document.getElementById('jobSlug'),
+                jobEntityId: document.getElementById('jobEntityId')
             };
         },
 
@@ -293,6 +312,17 @@
             if (this.el.form) this.el.form.onsubmit = (e) => this.save(e);
             if (this.el.closeForm) this.el.closeForm.onclick = () => this.hideForm();
             if (this.el.cancelForm) this.el.cancelForm.onclick = () => this.hideForm();
+            // Form tab navigation
+            document.querySelectorAll('.form-tabs .tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const tab = btn.dataset.tab;
+                    document.querySelectorAll('.form-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.querySelectorAll('.tab-content').forEach(c => {
+                        c.style.display = c.id === `tab-${tab}` ? 'block' : 'none';
+                    });
+                });
+            });
         },
 
         async load(page = 1) {
@@ -398,19 +428,43 @@
         },
 
         showForm(job = null) {
-            // Use original showForm logic (adapt to use this.el)
-            // For brevity, I'm not rewriting the entire form handling here.
-            // You should copy the original showForm function from the original jobs.js and adapt it to use this.el.
-            // Example:
             if (this.el.formContainer) this.el.formContainer.style.display = 'block';
             if (this.el.tableContainer) this.el.tableContainer.style.display = 'none';
+            // Reset to first tab
+            document.querySelectorAll('.form-tabs .tab-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
+            document.querySelectorAll('.tab-content').forEach((c, i) => { c.style.display = i === 0 ? 'block' : 'none'; });
             if (job) {
-                this.el.formTitle.textContent = t('form.edit_title', 'Edit Job');
-                // populate fields
+                if (this.el.formTitle) this.el.formTitle.textContent = t('form.edit_title', 'Edit Job');
                 if (this.el.jobTitle) this.el.jobTitle.value = job.job_title || '';
-                // ... etc
+                if (this.el.jobSlug) this.el.jobSlug.value = job.slug || '';
+                if (this.el.jobType) this.el.jobType.value = job.job_type || '';
+                if (this.el.employmentType) this.el.employmentType.value = job.employment_type || 'permanent';
+                if (this.el.experienceLevel) this.el.experienceLevel.value = job.experience_level || '';
+                if (this.el.jobCategory) this.el.jobCategory.value = job.category || '';
+                if (this.el.jobDepartment) this.el.jobDepartment.value = job.department || '';
+                if (this.el.positionsAvailable) this.el.positionsAvailable.value = job.positions_available || 1;
+                if (this.el.jobStatus) this.el.jobStatus.value = job.status || 'draft';
+                if (this.el.startDate) this.el.startDate.value = job.start_date || '';
+                if (this.el.isFeatured) this.el.isFeatured.checked = !!parseInt(job.is_featured);
+                if (this.el.isUrgent) this.el.isUrgent.checked = !!parseInt(job.is_urgent);
+                if (this.el.salaryMin) this.el.salaryMin.value = job.salary_min || '';
+                if (this.el.salaryMax) this.el.salaryMax.value = job.salary_max || '';
+                if (this.el.salaryCurrency) this.el.salaryCurrency.value = job.salary_currency || 'SAR';
+                if (this.el.salaryPeriod) this.el.salaryPeriod.value = job.salary_period || 'monthly';
+                if (this.el.salaryNegotiable) this.el.salaryNegotiable.checked = !!parseInt(job.salary_negotiable);
+                if (this.el.countryId) this.el.countryId.value = job.country_id || '';
+                if (this.el.cityId) this.el.cityId.value = job.city_id || '';
+                if (this.el.workLocation) this.el.workLocation.value = job.work_location || 'onsite';
+                if (this.el.isRemote) this.el.isRemote.checked = !!parseInt(job.is_remote);
+                if (this.el.applicationFormType) this.el.applicationFormType.value = job.application_form_type || 'simple';
+                if (this.el.externalApplicationUrl) this.el.externalApplicationUrl.value = job.external_application_url || '';
+                if (this.el.applicationDeadline) this.el.applicationDeadline.value = job.application_deadline ? job.application_deadline.replace(' ', 'T').substring(0, 16) : '';
+                if (this.el.jobEntityId) this.el.jobEntityId.value = job.entity_id || '';
+                // hidden id
+                const formIdEl = document.getElementById('formId');
+                if (formIdEl) formIdEl.value = job.id || '';
             } else {
-                this.el.formTitle.textContent = t('form.add_title', 'Add Job');
+                if (this.el.formTitle) this.el.formTitle.textContent = t('form.add_title', 'Add Job');
                 if (this.el.form) this.el.form.reset();
             }
         },
@@ -422,12 +476,57 @@
 
         async save(e) {
             e.preventDefault();
-            // Collect form data and call API (original logic)
-            // ...
-            // After success:
-            showNotification(t('strings.save_success'), 'success');
-            this.hideForm();
-            this.load(this.state.page);
+            const formIdEl = document.getElementById('formId');
+            const id = formIdEl?.value || null;
+            const data = {
+                entity_id: this.el.jobEntityId?.value || null,
+                job_title: this.el.jobTitle?.value || '',
+                slug: this.el.jobSlug?.value || '',
+                job_type: this.el.jobType?.value || 'full_time',
+                employment_type: this.el.employmentType?.value || 'permanent',
+                experience_level: this.el.experienceLevel?.value || 'entry',
+                category: this.el.jobCategory?.value || '',
+                department: this.el.jobDepartment?.value || '',
+                positions_available: parseInt(this.el.positionsAvailable?.value) || 1,
+                status: this.el.jobStatus?.value || 'draft',
+                start_date: this.el.startDate?.value || null,
+                is_featured: this.el.isFeatured?.checked ? 1 : 0,
+                is_urgent: this.el.isUrgent?.checked ? 1 : 0,
+                salary_min: this.el.salaryMin?.value || null,
+                salary_max: this.el.salaryMax?.value || null,
+                salary_currency: this.el.salaryCurrency?.value || 'SAR',
+                salary_period: this.el.salaryPeriod?.value || 'monthly',
+                salary_negotiable: this.el.salaryNegotiable?.checked ? 1 : 0,
+                country_id: this.el.countryId?.value || null,
+                city_id: this.el.cityId?.value || null,
+                work_location: this.el.workLocation?.value || null,
+                is_remote: this.el.isRemote?.checked ? 1 : 0,
+                application_form_type: this.el.applicationFormType?.value || 'simple',
+                external_application_url: this.el.externalApplicationUrl?.value || null,
+                application_deadline: this.el.applicationDeadline?.value || null,
+                tenant_id: state.tenantId,
+                created_by: state.userId
+            };
+            if (!data.job_title) {
+                showNotification('Job title is required', 'error');
+                return;
+            }
+            if (id) data.id = id;
+            try {
+                const method = id ? 'PUT' : 'POST';
+                const result = await apiCall(API.jobs, {
+                    method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+                });
+                if (result.success) {
+                    showNotification(id ? t('strings.update_success', 'Updated') : t('strings.save_success', 'Saved'), 'success');
+                    this.hideForm();
+                    this.load(this.state.page);
+                } else {
+                    throw new Error(result.error || result.message || 'Save failed');
+                }
+            } catch (err) {
+                showNotification(err.message, 'error');
+            }
         },
 
         async edit(id) {
@@ -749,8 +848,6 @@
     // MODULE: Interviews (similar structure, abbreviated)
     // ============================================================
     const interviewsModule = {
-        // Similar to applicationsModule, adapt endpoints and fields
-        // For brevity, I'll provide a minimal skeleton.
         state: { page: 1, perPage: 25, total: 0, items: [], filters: {} },
         el: {},
         init() { this.cacheElements(); this.attachEvents(); },
@@ -773,7 +870,6 @@
                 form: document.getElementById('interviewForm'),
                 closeForm: document.getElementById('interviewCloseForm'),
                 cancelForm: document.getElementById('interviewCancelForm'),
-                // form fields
                 interviewId: document.getElementById('interviewId'),
                 interviewType: document.getElementById('interviewType'),
                 interviewDate: document.getElementById('interviewDate'),
@@ -790,17 +886,136 @@
             if (this.el.closeForm) this.el.closeForm.onclick = () => this.hideForm();
             if (this.el.cancelForm) this.el.cancelForm.onclick = () => this.hideForm();
         },
-        async load(page = 1) { /* similar to applicationsModule.load, using API.interviews */ },
-        render() { /* render table with interview fields */ },
-        showForm(interview = null) { /* populate form */ },
-        hideForm() { /* hide form */ },
-        async save(e) { /* save interview */ },
-        async edit(id) { /* load and show */ },
-        async delete(id) { /* delete */ },
-        applyFilters() { /* set filters and load */ },
-        resetFilters() { /* clear filters and load */ },
-        exportToExcel() { /* export */ },
-        // helper methods like showLoading, hideLoading, etc.
+        async load(page = 1) {
+            this.state.page = page;
+            this.showLoading();
+            try {
+                const params = new URLSearchParams({
+                    page, limit: this.state.perPage,
+                    tenant_id: state.tenantId, lang: state.language, format: 'json'
+                });
+                Object.entries(this.state.filters).forEach(([k, v]) => { if (v) params.set(k, v); });
+                const result = await apiCall(`${API.interviews}?${params}`);
+                if (result.success) {
+                    const items = result.data.items || result.data;
+                    this.state.items = Array.isArray(items) ? items : [];
+                    this.state.total = result.data.meta?.total || result.meta?.total || this.state.items.length;
+                    this.render();
+                } else {
+                    throw new Error(result.error || 'Failed to load interviews');
+                }
+            } catch (err) { this.showError(err.message); }
+        },
+        render() {
+            if (!this.state.items.length) { this.showEmpty(); return; }
+            if (this.el.tableBody) {
+                this.el.tableBody.innerHTML = this.state.items.map(iv => `
+                    <tr data-id="${iv.id}">
+                        <td>${esc(iv.id)}</td>
+                        <td>${esc(iv.interview_type || '')}</td>
+                        <td>${esc(iv.interview_date || '')}</td>
+                        <td><span class="badge badge-${iv.status === 'completed' ? 'success' : (iv.status === 'cancelled' ? 'danger' : 'info')}">${esc(iv.status || 'scheduled')}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="Workspace.interviews.edit(${iv.id})"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm btn-danger" onclick="Workspace.interviews.delete(${iv.id})"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+            this.hideLoading();
+        },
+        showLoading() {
+            if (this.el.loading) this.el.loading.style.display = 'flex';
+            if (this.el.tableContainer) this.el.tableContainer.style.display = 'none';
+            if (this.el.emptyState) this.el.emptyState.style.display = 'none';
+        },
+        hideLoading() {
+            if (this.el.loading) this.el.loading.style.display = 'none';
+            if (this.el.tableContainer) this.el.tableContainer.style.display = 'block';
+        },
+        showEmpty() {
+            if (this.el.loading) this.el.loading.style.display = 'none';
+            if (this.el.tableContainer) this.el.tableContainer.style.display = 'none';
+            if (this.el.emptyState) this.el.emptyState.style.display = 'block';
+        },
+        showError(msg) { showNotification(msg, 'error'); this.showEmpty(); },
+        showForm(interview = null) {
+            if (this.el.formContainer) this.el.formContainer.style.display = 'block';
+            if (this.el.tableContainer) this.el.tableContainer.style.display = 'none';
+            if (interview) {
+                if (this.el.interviewId) this.el.interviewId.value = interview.id || '';
+                if (this.el.interviewType) this.el.interviewType.value = interview.interview_type || '';
+                if (this.el.interviewDate) this.el.interviewDate.value = interview.interview_date || '';
+                if (this.el.interviewDuration) this.el.interviewDuration.value = interview.interview_duration || 60;
+                if (this.el.interviewStatus) this.el.interviewStatus.value = interview.status || 'scheduled';
+                if (this.el.interviewFeedback) this.el.interviewFeedback.value = interview.feedback || '';
+            } else {
+                if (this.el.form) this.el.form.reset();
+            }
+        },
+        hideForm() {
+            if (this.el.formContainer) this.el.formContainer.style.display = 'none';
+            if (this.el.tableContainer) this.el.tableContainer.style.display = 'block';
+        },
+        async save(e) {
+            e.preventDefault();
+            const data = {
+                id: this.el.interviewId?.value || null,
+                interview_type: this.el.interviewType?.value,
+                interview_date: this.el.interviewDate?.value,
+                interview_duration: this.el.interviewDuration?.value || 60,
+                status: this.el.interviewStatus?.value,
+                feedback: this.el.interviewFeedback?.value
+            };
+            try {
+                const method = data.id ? 'PUT' : 'POST';
+                const result = await apiCall(API.interviews, {
+                    method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+                });
+                if (result.success) {
+                    showNotification(t('strings.save_success'), 'success');
+                    this.hideForm();
+                    this.load(this.state.page);
+                } else { throw new Error(result.error || 'Save failed'); }
+            } catch (err) { showNotification(err.message, 'error'); }
+        },
+        async edit(id) {
+            try {
+                const result = await apiCall(`${API.interviews}?id=${id}&format=json&tenant_id=${state.tenantId}`);
+                if (result.success) { this.showForm(Array.isArray(result.data) ? result.data[0] : result.data); }
+                else { throw new Error('Interview not found'); }
+            } catch (err) { showNotification(err.message, 'error'); }
+        },
+        async delete(id) {
+            if (!confirm(t('strings.delete_confirm'))) return;
+            try {
+                const result = await apiCall(`${API.interviews}?id=${id}`, { method: 'DELETE' });
+                if (result.success) { showNotification(t('strings.delete_success'), 'success'); this.load(this.state.page); }
+                else { throw new Error(result.error || 'Delete failed'); }
+            } catch (err) { showNotification(err.message, 'error'); }
+        },
+        applyFilters() {
+            this.state.filters = {
+                search: this.el.searchInput?.value || '',
+                status: this.el.statusFilter?.value || '',
+                interview_type: this.el.typeFilter?.value || ''
+            };
+            this.load(1);
+        },
+        resetFilters() {
+            if (this.el.searchInput) this.el.searchInput.value = '';
+            if (this.el.statusFilter) this.el.statusFilter.value = '';
+            if (this.el.typeFilter) this.el.typeFilter.value = '';
+            this.state.filters = {};
+            this.load(1);
+        },
+        exportToExcel() {
+            if (!this.state.items.length) { showNotification('No data to export', 'warning'); return; }
+            exportToCSV(this.state.items, 'interviews_export.csv', [
+                { field: 'id', label: 'ID' }, { field: 'interview_type', label: 'Type' },
+                { field: 'interview_date', label: 'Date' }, { field: 'status', label: 'Status' }
+            ]);
+        }
     };
 
     // ============================================================
@@ -848,6 +1063,137 @@
             if (this.el.closeForm) this.el.closeForm.onclick = () => this.hideForm();
             if (this.el.cancelForm) this.el.cancelForm.onclick = () => this.hideForm();
         },
+        async load(page = 1) {
+            this.state.page = page;
+            this.showLoading();
+            try {
+                const params = new URLSearchParams({
+                    page, limit: this.state.perPage,
+                    tenant_id: state.tenantId, lang: state.language, format: 'json'
+                });
+                Object.entries(this.state.filters).forEach(([k, v]) => { if (v) params.set(k, v); });
+                const result = await apiCall(`${API.alerts}?${params}`);
+                if (result.success) {
+                    const items = result.data.items || result.data;
+                    this.state.items = Array.isArray(items) ? items : [];
+                    this.state.total = result.data.meta?.total || result.meta?.total || this.state.items.length;
+                    this.render();
+                } else {
+                    throw new Error(result.error || 'Failed to load alerts');
+                }
+            } catch (err) { this.showError(err.message); }
+        },
+        render() {
+            if (!this.state.items.length) { this.showEmpty(); return; }
+            if (this.el.tableBody) {
+                this.el.tableBody.innerHTML = this.state.items.map(a => `
+                    <tr data-id="${a.id}">
+                        <td>${esc(a.id)}</td>
+                        <td>${esc(a.alert_name || '')}</td>
+                        <td>${esc(a.keywords || '')}</td>
+                        <td>${esc(a.frequency || 'daily')}</td>
+                        <td><span class="badge badge-${a.is_active ? 'success' : 'secondary'}">${a.is_active ? 'Active' : 'Inactive'}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="Workspace.alerts.edit(${a.id})"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm btn-danger" onclick="Workspace.alerts.delete(${a.id})"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+            this.hideLoading();
+        },
+        showLoading() {
+            if (this.el.loading) this.el.loading.style.display = 'flex';
+            if (this.el.tableContainer) this.el.tableContainer.style.display = 'none';
+            if (this.el.emptyState) this.el.emptyState.style.display = 'none';
+        },
+        hideLoading() {
+            if (this.el.loading) this.el.loading.style.display = 'none';
+            if (this.el.tableContainer) this.el.tableContainer.style.display = 'block';
+        },
+        showEmpty() {
+            if (this.el.loading) this.el.loading.style.display = 'none';
+            if (this.el.tableContainer) this.el.tableContainer.style.display = 'none';
+            if (this.el.emptyState) this.el.emptyState.style.display = 'block';
+        },
+        showError(msg) { showNotification(msg, 'error'); this.showEmpty(); },
+        showForm(alert = null) {
+            if (this.el.formContainer) this.el.formContainer.style.display = 'block';
+            if (this.el.tableContainer) this.el.tableContainer.style.display = 'none';
+            if (alert) {
+                if (this.el.alertId) this.el.alertId.value = alert.id || '';
+                if (this.el.alertName) this.el.alertName.value = alert.alert_name || '';
+                if (this.el.alertKeywords) this.el.alertKeywords.value = alert.keywords || '';
+                if (this.el.alertFrequency) this.el.alertFrequency.value = alert.frequency || 'daily';
+                if (this.el.alertIsActive) this.el.alertIsActive.checked = !!alert.is_active;
+            } else {
+                if (this.el.form) this.el.form.reset();
+            }
+        },
+        hideForm() {
+            if (this.el.formContainer) this.el.formContainer.style.display = 'none';
+            if (this.el.tableContainer) this.el.tableContainer.style.display = 'block';
+        },
+        async save(e) {
+            e.preventDefault();
+            const data = {
+                id: this.el.alertId?.value || null,
+                alert_name: this.el.alertName?.value,
+                keywords: this.el.alertKeywords?.value,
+                frequency: this.el.alertFrequency?.value || 'daily',
+                is_active: this.el.alertIsActive?.checked ? 1 : 0
+            };
+            if (!data.alert_name) { showNotification('Alert name is required', 'error'); return; }
+            try {
+                const method = data.id ? 'PUT' : 'POST';
+                const result = await apiCall(API.alerts, {
+                    method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+                });
+                if (result.success) {
+                    showNotification(t('strings.save_success'), 'success');
+                    this.hideForm();
+                    this.load(this.state.page);
+                } else { throw new Error(result.error || 'Save failed'); }
+            } catch (err) { showNotification(err.message, 'error'); }
+        },
+        async edit(id) {
+            try {
+                const result = await apiCall(`${API.alerts}?id=${id}&format=json&tenant_id=${state.tenantId}`);
+                if (result.success) { this.showForm(Array.isArray(result.data) ? result.data[0] : result.data); }
+                else { throw new Error('Alert not found'); }
+            } catch (err) { showNotification(err.message, 'error'); }
+        },
+        async delete(id) {
+            if (!confirm(t('strings.delete_confirm'))) return;
+            try {
+                const result = await apiCall(`${API.alerts}?id=${id}`, { method: 'DELETE' });
+                if (result.success) { showNotification(t('strings.delete_success'), 'success'); this.load(this.state.page); }
+                else { throw new Error(result.error || 'Delete failed'); }
+            } catch (err) { showNotification(err.message, 'error'); }
+        },
+        applyFilters() {
+            this.state.filters = {
+                search: this.el.searchInput?.value || '',
+                is_active: this.el.activeFilter?.value,
+                frequency: this.el.frequencyFilter?.value || ''
+            };
+            this.load(1);
+        },
+        resetFilters() {
+            if (this.el.searchInput) this.el.searchInput.value = '';
+            if (this.el.activeFilter) this.el.activeFilter.value = '';
+            if (this.el.frequencyFilter) this.el.frequencyFilter.value = '';
+            this.state.filters = {};
+            this.load(1);
+        },
+        exportToExcel() {
+            if (!this.state.items.length) { showNotification('No data to export', 'warning'); return; }
+            exportToCSV(this.state.items, 'alerts_export.csv', [
+                { field: 'id', label: 'ID' }, { field: 'alert_name', label: 'Name' },
+                { field: 'keywords', label: 'Keywords' }, { field: 'frequency', label: 'Frequency' },
+                { field: 'is_active', label: 'Active' }
+            ]);
+        }
         // Implement similar methods as applicationsModule
     };
 
@@ -1198,7 +1544,7 @@
                 }
             }
             const module = this.modules[tab];
-            if (module && module.state.items.length === 0) {
+            if (module && typeof module.load === 'function' && module.state.items.length === 0) {
                 module.load(1);
             }
         },
