@@ -7,7 +7,7 @@ if (!$_isLoggedIn) {
     exit;
 }
 
-pub_set_page_meta(t('wishlist.page_title'), t('wishlist.page_subtitle'));
+$GLOBALS['PUB_PAGE_TITLE'] = e(t('wishlist.page_title')) . ' — QOOQZ';
 include dirname(__DIR__) . '/partials/header.php';
 
 // Load wishlist items via direct PDO for reliability

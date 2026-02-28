@@ -294,16 +294,18 @@ if ($first === 'products') {
         if (!empty($productCategories[0]['id'])) {
             $related = $pdoList(
                 "SELECT p2.id, COALESCE(pt2.name, p2.slug) AS name, p2.slug,
-                        pp2.price, pp2.currency_code,
+                        (SELECT pp2.price FROM product_pricing pp2
+                           WHERE pp2.product_id = p2.id ORDER BY pp2.id ASC LIMIT 1) AS price,
+                        (SELECT pp2.currency_code FROM product_pricing pp2
+                           WHERE pp2.product_id = p2.id ORDER BY pp2.id ASC LIMIT 1) AS currency_code,
                         (SELECT i2.url FROM images i2 WHERE i2.owner_id = p2.id
                          ORDER BY i2.is_main DESC, i2.id ASC LIMIT 1) AS image_url
                    FROM products p2
              INNER JOIN product_categories pc2 ON pc2.product_id = p2.id AND pc2.category_id = ?
               LEFT JOIN product_translations pt2 ON pt2.product_id = p2.id AND pt2.language_code = ?
-              LEFT JOIN product_pricing pp2 ON pp2.product_id = p2.id AND pp2.variant_id IS NULL
-                  WHERE p2.is_active = 1 AND p2.id != ? AND p2.tenant_id = ?
+                  WHERE p2.is_active = 1 AND p2.id != ?
                   ORDER BY p2.is_featured DESC, p2.id DESC LIMIT 8",
-                [(int)$productCategories[0]['id'], $lang, (int)$id, (int)$row['tenant_id']]
+                [(int)$productCategories[0]['id'], $lang, (int)$id]
             );
         }
 
@@ -344,13 +346,12 @@ if ($first === 'products') {
     $rows  = $pdoList(
         "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.sku, p.slug, p.is_featured, p.tenant_id,
                 p.stock_quantity, p.stock_status,
-                pp.price, pp.currency_code,
-                i.url AS image_url, i.thumb_url AS image_thumb_url
+                (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
+                (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
+                (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_url,
+                (SELECT i.thumb_url FROM images i WHERE i.owner_id = p.id ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_thumb_url
            FROM products p
       LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
-      LEFT JOIN product_pricing pp ON pp.product_id = p.id AND pp.variant_id IS NULL
-      LEFT JOIN images i ON i.owner_id = p.id AND i.is_main = 1
-             AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
          $where ORDER BY p.id DESC LIMIT ? OFFSET ?",
         array_merge([$lang], $whereParams, [$per, $offset])
     );
@@ -566,13 +567,13 @@ if ($first === 'entity') {
         $total = $pdoCount("SELECT COUNT(*) FROM products p $where", $params);
         $rows  = $pdoList(
             "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.sku, p.slug,
-                    p.is_featured, pp.price, pp.currency_code,
-                    i.url AS image_url, i.thumb_url AS image_thumb_url
+                    p.is_featured, p.stock_quantity, p.stock_status,
+                    (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
+                    (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
+                    (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_url,
+                    (SELECT i.thumb_url FROM images i WHERE i.owner_id = p.id ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_thumb_url
                FROM products p
           LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
-          LEFT JOIN product_pricing pp ON pp.product_id = p.id AND pp.variant_id IS NULL
-          LEFT JOIN images i ON i.owner_id = p.id AND i.is_main = 1
-                 AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'product' LIMIT 1)
               $where ORDER BY p.is_featured DESC, p.id DESC LIMIT ? OFFSET ?",
             array_merge([$lang], $params, [$per, $offset])
         );
