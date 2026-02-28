@@ -115,6 +115,21 @@ include dirname(__DIR__) . '/partials/header.php';
                         <span class="pub-product-badge"><?= e(t('products.featured')) ?></span>
                     <?php endif; ?>
                     <p class="pub-product-name"><?= e($pName) ?></p>
+                    <?php
+                    $pRating = round((float)($p['rating_average'] ?? 0), 1);
+                    $pRatingCount = (int)($p['rating_count'] ?? 0);
+                    if ($pRating > 0): ?>
+                    <div class="pub-stars" style="font-size:0.85rem;margin:3px 0;" title="<?= $pRating ?>/5">
+                        <?php for ($s = 1; $s <= 5; $s++):
+                            if ($s <= $pRating) echo '<span class="pub-star--full">★</span>';
+                            elseif ($s - 0.5 <= $pRating) echo '<span class="pub-star--half">★</span>';
+                            else echo '<span class="pub-star--empty">☆</span>';
+                        endfor; ?>
+                        <?php if ($pRatingCount > 0): ?>
+                            <span class="pub-rating-count">(<?= $pRatingCount ?>)</span>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
                     <?php if (!empty($p['sku'])): ?>
                         <small style="color:var(--pub-muted);font-size:0.76rem;"><?= e($p['sku']) ?></small>
                     <?php endif; ?>

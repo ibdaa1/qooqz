@@ -44,6 +44,14 @@ $meta       = $resp['data']['meta'] ?? [];
 $total      = (int)($meta['total'] ?? count($categories));
 $totalPg    = (int)($meta['total_pages'] ?? (($limit > 0 && $total > 0) ? (int)ceil($total / $limit) : 1));
 
+// SEO meta for category page
+$GLOBALS['PUB_SEO'] = [
+    'title'       => t('categories.page_title') . ' — QOOQZ',
+    'description' => t('categories.page_description', ['default' => 'Browse all product categories']),
+    'keywords'    => t('categories.page_keywords', ['default' => 'categories, products, shop']),
+    'schema_type' => 'ItemList',
+];
+
 include dirname(__DIR__) . '/partials/header.php';
 ?>
 

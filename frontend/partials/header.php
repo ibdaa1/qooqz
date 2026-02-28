@@ -127,6 +127,24 @@ $_fontUrl = $dir === 'rtl'
                 'name'     => $_appName,
                 'url'      => $_siteUrl,
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG);
+        } elseif ($_pubSeo['schema_type'] === 'LocalBusiness') {
+            $__schema = [
+                '@context' => 'https://schema.org',
+                '@type'    => 'LocalBusiness',
+                'name'     => $_pubSeo['schema_name'] ?? $_pageTitle,
+                'url'      => !empty($_pubSeo['schema_url']) ? $_pubSeo['schema_url'] : $_curUrl,
+            ];
+            if (!empty($_pubSeo['schema_phone'])) $__schema['telephone'] = $_pubSeo['schema_phone'];
+            if (!empty($_pubSeo['schema_email'])) $__schema['email'] = $_pubSeo['schema_email'];
+            if (!empty($_pubSeo['og_image']))     $__schema['image'] = $_siteUrl . $_pubSeo['og_image'];
+            $_schemaMarkup = json_encode($__schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG);
+        } elseif ($_pubSeo['schema_type'] === 'ItemList') {
+            $_schemaMarkup = json_encode([
+                '@context' => 'https://schema.org',
+                '@type'    => 'ItemList',
+                'name'     => $_pageTitle,
+                'url'      => $_curUrl,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG);
         }
     }
     if (!$_schemaMarkup) {

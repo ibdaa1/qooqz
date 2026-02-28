@@ -1745,7 +1745,8 @@ if ($first === 'recent') {
  * POST /api/public/compare/clear   — clear all
  * ----------------------------------------------------- */
 if ($first === 'compare') {
-    if (!$userId) { ResponseFormatter::error('Login required', 401); exit; }
+    $cmpUserId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
+    if (!$cmpUserId) { ResponseFormatter::error('Login required', 401); exit; }
     $cmpSub = $segments[1] ?? '';
 
     if ($cmpSub === 'add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -1753,10 +1754,10 @@ if ($first === 'compare') {
         if (!$cmpPid) { ResponseFormatter::error('product_id required', 422); exit; }
         try {
             // Max 4 products in comparison
-            $cmpCount = (int)($pdoOne('SELECT COUNT(*) AS c FROM product_comparisons WHERE user_id = ?', [$userId])['c'] ?? 0);
+            $cmpCount = (int)($pdoOne('SELECT COUNT(*) AS c FROM product_comparisons WHERE user_id = ?', [$cmpUserId])['c'] ?? 0);
             if ($cmpCount >= 4) { ResponseFormatter::error('Max 4 products in comparison', 400); exit; }
             $pdo->prepare('INSERT IGNORE INTO product_comparisons (user_id, product_id, created_at) VALUES (?, ?, NOW())')
-                ->execute([$userId, $cmpPid]);
+                ->execute([$cmpUserId, $cmpPid]);
             ResponseFormatter::success(['ok' => true]);
         } catch (Throwable $ex) { ResponseFormatter::error($ex->getMessage(), 500); }
         exit;
@@ -1766,7 +1767,7 @@ if ($first === 'compare') {
         $cmpPid = (int)($_POST['product_id'] ?? 0);
         try {
             $pdo->prepare('DELETE FROM product_comparisons WHERE user_id = ? AND product_id = ?')
-                ->execute([$userId, $cmpPid]);
+                ->execute([$cmpUserId, $cmpPid]);
             ResponseFormatter::success(['ok' => true]);
         } catch (Throwable $ex) { ResponseFormatter::error($ex->getMessage(), 500); }
         exit;
@@ -1774,7 +1775,7 @@ if ($first === 'compare') {
 
     if ($cmpSub === 'clear' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
-            $pdo->prepare('DELETE FROM product_comparisons WHERE user_id = ?')->execute([$userId]);
+            $pdo->prepare('DELETE FROM product_comparisons WHERE user_id = ?')->execute([$cmpUserId]);
             ResponseFormatter::success(['ok' => true]);
         } catch (Throwable $ex) { ResponseFormatter::error($ex->getMessage(), 500); }
         exit;
@@ -1797,7 +1798,7 @@ if ($first === 'compare') {
           LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
               WHERE pc.user_id = ?
               ORDER BY pc.created_at ASC",
-            [$lang, $userId]
+            [$lang, $cmpUserId]
         );
         ResponseFormatter::success(['ok' => true, 'data' => $rows]);
     } catch (Throwable $ex) { ResponseFormatter::error($ex->getMessage(), 500); }

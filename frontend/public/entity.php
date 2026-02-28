@@ -70,6 +70,24 @@ $discounts = $discResp['data']['data'] ?? [];
 $GLOBALS['PUB_PAGE_TITLE'] = e($entity['store_name'] ?? '') . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_DESC']  = e($entity['description'] ?? '');
 
+// SEO meta — load from seo_meta table, fallback to entity_translations fields
+$pdo = pub_get_pdo();
+$seoMeta = function_exists('pub_get_seo_meta') ? pub_get_seo_meta('entity', $entity['id'] ?? $entityId, $lang) : [];
+$GLOBALS['PUB_SEO'] = [
+    'title'       => $seoMeta['meta_title']       ?? ($entity['meta_title']       ?? $entity['store_name'] ?? ''),
+    'description' => $seoMeta['meta_description'] ?? ($entity['meta_description'] ?? $entity['description'] ?? ''),
+    'keywords'    => $seoMeta['meta_keywords']     ?? ($entity['meta_keywords']    ?? ''),
+    'og_image'    => $seoMeta['og_image']          ?? ($entity['logo_url']         ?? $entity['cover_url'] ?? ''),
+    'canonical'   => $seoMeta['canonical_url']     ?? '',
+    'robots'      => $seoMeta['robots']            ?? 'index,follow',
+    'schema_markup'=> $seoMeta['schema_markup']    ?? '',
+    'schema_type' => 'LocalBusiness',
+    'schema_name' => $entity['store_name']         ?? '',
+    'schema_phone'=> $entity['phone']              ?? '',
+    'schema_email'=> $entity['email']              ?? '',
+    'schema_url'  => $entity['website_url']        ?? '',
+];
+
 /* -------------------------------------------------------
  * Open / Closed status — calculate from working_hours + current local time
  * working_hours is already in $entity from the API call
