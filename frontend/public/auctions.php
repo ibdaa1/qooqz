@@ -16,8 +16,8 @@ $GLOBALS['PUB_PAGE_DESC']  = t('auctions.page_subtitle');
 $GLOBALS['PUB_SEO']        = ['schema_type' => 'ItemList', 'name' => t('auctions.page_title')];
 
 $page   = max(1, (int)($_GET['page'] ?? 1));
-$status = in_array($_GET['status'] ?? 'active', ['active','scheduled','ended','all'], true) ? $_GET['status'] : 'active';
-$type   = in_array($_GET['type'] ?? '', ['normal','reserve','buy_now','dutch','sealed_bid'], true) ? $_GET['type'] : '';
+$status = in_array($_GET['status'] ?? 'active', ['active','scheduled','ended','all'], true) ? ($_GET['status'] ?? 'active') : 'active';
+$type   = in_array($_GET['type'] ?? '', ['normal','reserve','buy_now','dutch','sealed_bid'], true) ? ($_GET['type'] ?? '') : '';
 
 $per    = 24;
 $offset = ($page - 1) * $per;

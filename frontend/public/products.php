@@ -20,7 +20,7 @@ $limit   = 20;
 $search  = trim($_GET['q'] ?? '');
 $brandId = (int)($_GET['brand_id'] ?? 0);
 $catId   = (int)($_GET['category_id'] ?? 0);
-$sort    = in_array($_GET['sort'] ?? '', ['price_asc','price_desc','newest'], true) ? $_GET['sort'] : 'newest';
+$sort    = in_array($_GET['sort'] ?? '', ['price_asc','price_desc','newest'], true) ? ($_GET['sort'] ?? 'newest') : 'newest';
 
 /* Fetch */
 $qs = http_build_query(array_filter([

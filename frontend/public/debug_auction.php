@@ -54,7 +54,8 @@ try {
         sprintf('mysql:host=%s;port=%d;dbname=%s;charset=%s',
             $dbConf['host'], (int)($dbConf['port'] ?? 3306), $dbConf['name'], $dbConf['charset'] ?? 'utf8mb4'),
         $dbConf['user'], $dbConf['pass'],
-        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+         PDO::ATTR_EMULATE_PREPARES => true]
     );
     echo "<p class='ok'>✅ PDO connected</p>";
 } catch (Throwable $e) {
@@ -88,8 +89,8 @@ $aWhere  = '1=1';
 $aParams = [$lang];
 if ($status !== 'all')    { $aWhere .= ' AND a.status = ?';       $aParams[] = $status; }
 if ($tenantId)            { $aWhere .= ' AND a.tenant_id = ?';    $aParams[] = $tenantId; }
-$aParams[] = $per;
-$aParams[] = $offset;
+// Inline LIMIT/OFFSET (not bound params) — avoids MariaDB LIMIT '24' OFFSET '0' error
+$limitSql = 'LIMIT ' . (int)$per . ' OFFSET ' . (int)$offset;
 
 $sql = "SELECT a.id, a.slug, a.auction_type, a.status, a.starting_price, a.current_price,
                 a.buy_now_price, a.bid_increment, a.total_bids, a.total_bidders,
@@ -101,7 +102,7 @@ $sql = "SELECT a.id, a.slug, a.auction_type, a.status, a.starting_price, a.curre
          FROM auctions a
          WHERE $aWhere
          ORDER BY a.is_featured DESC, a.end_date ASC
-         LIMIT ? OFFSET ?";
+         $limitSql";
 
 echo "<p>SQL:</p><pre>" . htmlspecialchars($sql) . "</pre>";
 echo "<p>Params: <pre>" . htmlspecialchars(json_encode($aParams)) . "</pre></p>";
