@@ -34,8 +34,9 @@ if (!$productId && $productSlug === '') {
 }
 
 // -------------------------------------------------------
-// Load product via direct PDO (avoids HTTP loopback issues)
-// Falls back to pub_fetch() HTTP call if PDO unavailable.
+// Load product — HTTP API first (same approach as products.php, proven to work on live server),
+// PDO as fallback for when HTTP API is unavailable or returns no data.
+// Secondary data (gallery, categories, etc.) loaded via PDO when available.
 // -------------------------------------------------------
 $product    = null;
 $images     = [];
@@ -46,14 +47,33 @@ $reviews    = [];
 $questions  = [];
 $relations  = [];
 
+// Step 1: HTTP API — same pattern as products.php which works reliably.
+// The public API at /api/public/products?id=X returns {"success":true,"data":{"product":{...},...}}
+$_apiQs = http_build_query(array_filter([
+    'id'   => $productId ?: null,
+    'slug' => $productSlug ?: null,
+    'lang' => $lang,
+]));
+$_apiResp = pub_fetch(pub_api_url('public/products') . '?' . $_apiQs);
+if (!empty($_apiResp['data']['product'])) {
+    $product    = $_apiResp['data']['product'];
+    $images     = $_apiResp['data']['images']     ?? [];
+    $categories = $_apiResp['data']['categories'] ?? [];
+    $related    = $_apiResp['data']['related']    ?? [];
+    // Resolve product ID from API response (needed for PDO secondary queries below)
+    if (!$productId && !empty($product['id'])) {
+        $productId = (int)$product['id'];
+    }
+}
+
+// Step 2: PDO fallback — used when HTTP API is blocked or fails on shared hosting.
 $pdo = pub_get_pdo();
-if ($pdo) {
+if (!$product && $pdo) {
     try {
         // Resolve slug → id
         if (!$productId && $productSlug !== '') {
             $params = [$productSlug];
             $cond   = ' AND is_active = 1';
-            if ($tenantId) { $cond .= ' AND tenant_id = ?'; $params[] = $tenantId; }
             $st = $pdo->prepare('SELECT id FROM products WHERE slug = ?' . $cond . ' LIMIT 1');
             $st->execute($params);
             $r = $st->fetch();
@@ -61,12 +81,7 @@ if ($pdo) {
         }
 
         if ($productId) {
-            // Main product row — no tenant_id filter when loading by explicit ID.
-            // Products are public; restricting by tenant_id breaks cross-tenant links.
-            // Uses scalar subqueries for pricing and images to avoid multi-row JOIN issues
-            // (eliminates dependency on pp.is_active column existing in product_pricing).
             $qParams = [$lang, $productId];
-
             $st = $pdo->prepare(
                 "SELECT p.id, p.sku, p.slug, p.barcode, p.brand_id,
                         p.is_active, p.is_featured, p.is_new, p.is_bestseller,
@@ -244,22 +259,44 @@ if ($pdo) {
             }
         }
     } catch (Throwable $_) {
-        $product = null; // fall through to HTTP fallback
+        $product = null;
     }
 }
 
-// HTTP fallback when PDO unavailable or failed
-if (!$product) {
-    // No tenant_id filter for direct ID lookup — product is public regardless of tenant
-    $qs  = 'lang=' . urlencode($lang);
-    $url = $productId
-        ? pub_api_url('') . 'public/products?id=' . $productId . '&' . $qs
-        : pub_api_url('') . 'public/products?slug=' . urlencode($productSlug) . '&' . $qs . '&tenant_id=' . $tenantId;
-    $resp       = pub_fetch($url);
-    $product    = $resp['data']['product']    ?? null;
-    $images     = $resp['data']['images']     ?? [];
-    $categories = $resp['data']['categories'] ?? [];
-    $related    = $resp['data']['related']    ?? [];
+// Step 3: When product was loaded via HTTP API (Step 1), still load secondary enrichment
+// via PDO when available (variants, reviews, Q&A — not returned by the API).
+if ($product && $pdo && $productId) {
+    // Variants
+    if (empty($variants)) {
+        try {
+            $st = $pdo->prepare(
+                "SELECT pv.id, pv.sku, pv.stock_quantity, pv.is_default,
+                        (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = ? AND pp.variant_id = pv.id ORDER BY pp.id ASC LIMIT 1) AS price,
+                        (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = ? AND pp.variant_id = pv.id ORDER BY pp.id ASC LIMIT 1) AS currency_code
+                   FROM product_variants pv
+                  WHERE pv.product_id = ? AND pv.is_active = 1
+                  ORDER BY pv.is_default DESC, pv.id ASC LIMIT 20"
+            );
+            $st->execute([$productId, $productId, $productId]);
+            $variants = $st->fetchAll();
+        } catch (Throwable $_) { $variants = []; }
+    }
+    // Reviews
+    if (empty($reviews)) {
+        try {
+            $st = $pdo->prepare(
+                "SELECT r.id, r.rating, r.title, r.comment, r.is_verified_purchase,
+                        r.helpful_count, r.created_at,
+                        COALESCE(u.name, u.username, 'User') AS author
+                   FROM product_reviews r
+              LEFT JOIN users u ON u.id = r.user_id
+                  WHERE r.product_id = ? AND r.is_approved = 1
+                  ORDER BY r.helpful_count DESC, r.created_at DESC LIMIT 30"
+            );
+            $st->execute([$productId]);
+            $reviews = $st->fetchAll();
+        } catch (Throwable $_) { $reviews = []; }
+    }
 }
 
 $productName  = $product['name'] ?? $product['slug'] ?? '';
