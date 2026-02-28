@@ -7,14 +7,6 @@
     "search_placeholder": "البحث بالاسم المستخدم أو البريد الإلكتروني",
     "language": "اللغة",
     "all_languages": "جميع اللغات",
-    "country": "الدولة",
-    "all_countries": "جميع الدول",
-    "city": "المدينة",
-    "all_cities": "جميع المدن",
-    "timezone": "المنطقة الزمنية",
-    "all_timezones": "جميع المناطق الزمنية",
-    "role": "الدور",
-    "all_roles": "جميع الأدوار",
     "status": "الحالة",
     "all_status": "جميع الحالات",
     "active": "نشط",
@@ -38,15 +30,8 @@
       "password": "كلمة المرور",
       "password_placeholder": "أدخل كلمة المرور",
       "preferred_language": "اللغة المفضلة",
-      "role": "الدور",
-      "select_role": "اختر الدور",
-      "country": "الدولة",
-      "select_country": "اختر الدولة",
-      "city": "المدينة",
-      "select_city": "اختر المدينة",
       "phone": "الهاتف",
       "phone_placeholder": "أدخل رقم الهاتف",
-      "timezone": "المنطقة الزمنية",
       "active": "نشط",
       "save": "حفظ",
       "cancel": "إلغاء",
@@ -56,9 +41,6 @@
       "id": "الرقم",
       "username": "اسم المستخدم",
       "email": "البريد الإلكتروني",
-      "role": "الدور",
-      "country": "الدولة",
-      "city": "المدينة",
       "created_at": "تاريخ الإنشاء",
       "status": "الحالة",
       "actions": "الإجراءات"
@@ -66,10 +48,6 @@
     "filters": {
       "search": "البحث",
       "language": "اللغة",
-      "country": "الدولة",
-      "city": "المدينة",
-      "timezone": "المنطقة الزمنية",
-      "role": "الدور",
       "status": "الحالة",
       "apply": "تطبيق",
       "reset": "إعادة تعيين"
@@ -78,8 +56,5 @@
   "lang": {
     "en": "الإنجليزية",
     "ar": "العربية"
-  },
-  "timezone": {
-    "utc": "التوقيت العالمي"
   }
 }

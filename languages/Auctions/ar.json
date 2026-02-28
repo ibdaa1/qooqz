@@ -138,8 +138,13 @@
       "tenant_id": "معرّف المستأجر",
       "tenant_placeholder": "تصفية حسب المستأجر",
       "status": "الحالة",
+      "all_status": "جميع الحالات",
       "auction_type": "النوع",
+      "all_types": "جميع الأنواع",
       "is_featured": "مميز",
+      "all": "الكل",
+      "featured": "مميز",
+      "not_featured": "غير مميز",
       "apply": "تطبيق",
       "reset": "إعادة ضبط"
     },

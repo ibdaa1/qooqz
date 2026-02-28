@@ -18,11 +18,7 @@
     let currentPage = 1;
     let filters = {};
     let permissions = {};
-    let roles = [];
     let languages = [];
-    let countries = [];
-    let cities = [];
-    let timezones = [];
     let userLanguage = window.USER_LANGUAGE || window.ADMIN_LANG || 'en';
 
     // ════════════════════════════════════════════════════════════
@@ -140,173 +136,6 @@
     }
 
     // ════════════════════════════════════════════════════════════
-    // LOAD COUNTRIES
-    // ════════════════════════════════════════════════════════════
-    
-    async function loadCountries(languageCode = null) {
-        languageCode = languageCode || userLanguage;
-
-        try {
-            let url = '/api/countries';
-            if (languageCode) url += '?language=' + encodeURIComponent(languageCode);
-
-            const result = await apiFetch(url);
-            
-            if (result.success && result.data) {
-                countries = result.data.data || result.data;
-
-                const filterSelect = getEl('countryFilter');
-                if (filterSelect) {
-                    filterSelect.innerHTML = '<option value="">All Countries</option>';
-                    countries.forEach(country => {
-                        const option = document.createElement('option');
-                        option.value = country.id;
-                        option.textContent = country.name;
-                        filterSelect.appendChild(option);
-                    });
-                }
-
-                const formSelect = getEl('country_id');
-                if (formSelect) {
-                    formSelect.innerHTML = '<option value="">Select Country</option>';
-                    countries.forEach(country => {
-                        const option = document.createElement('option');
-                        option.value = country.id;
-                        option.textContent = country.name;
-                        formSelect.appendChild(option);
-                    });
-                }
-
-                console.log('✓ Countries:', countries.length);
-            }
-        } catch (e) {
-            console.error('❌ loadCountries:', e);
-        }
-    }
-
-    // ════════════════════════════════════════════════════════════
-    // LOAD CITIES
-    // ════════════════════════════════════════════════════════════
-    
-    async function loadCities(countryId, languageCode = null, targetSelectId = 'cityFilter') {
-        languageCode = languageCode || userLanguage;
-
-        const select = getEl(targetSelectId);
-        if (!select) return;
-        
-        if (!countryId) {
-            select.innerHTML = '<option value="">All Cities</option>';
-            select.disabled = true;
-            return;
-        }
-
-        try {
-            let url = '/api/cities?country_id=' + encodeURIComponent(countryId);
-            if (languageCode) url += '&language=' + encodeURIComponent(languageCode);
-
-            const result = await apiFetch(url);
-            
-            if (result.success && result.data) {
-                cities = result.data.data || result.data;
-
-                select.innerHTML = '<option value="">All Cities</option>';
-                select.disabled = false;
-                
-                cities.forEach(city => {
-                    const option = document.createElement('option');
-                    option.value = city.id;
-                    option.textContent = city.name;
-                    select.appendChild(option);
-                });
-
-                console.log('✓ Cities:', cities.length);
-            }
-        } catch (e) {
-            console.error('❌ loadCities:', e);
-        }
-    }
-
-    // ════════════════════════════════════════════════════════════
-    // LOAD ROLES
-    // ════════════════════════════════════════════════════════════
-    
-    async function loadRoles() {
-        try {
-            const result = await apiFetch('/api/roles');
-            
-            if (result.success && result.data) {
-                roles = result.data;
-
-                const filterSelect = getEl('roleFilter');
-                if (filterSelect) {
-                    filterSelect.innerHTML = '<option value="">All Roles</option>';
-                    roles.forEach(role => {
-                        const option = document.createElement('option');
-                        option.value = role.id;
-                        option.textContent = role.display_name || role.name;
-                        filterSelect.appendChild(option);
-                    });
-                }
-
-                const formSelect = getEl('role_id');
-                if (formSelect) {
-                    formSelect.innerHTML = '<option value="">Select Role</option>';
-                    roles.forEach(role => {
-                        const option = document.createElement('option');
-                        option.value = role.id;
-                        option.textContent = role.display_name || role.name;
-                        formSelect.appendChild(option);
-                    });
-                }
-
-                console.log('✓ Roles:', roles.length);
-            }
-        } catch (e) {
-            console.error('❌ loadRoles:', e);
-        }
-    }
-
-    // ════════════════════════════════════════════════════════════
-    // LOAD TIMEZONES
-    // ════════════════════════════════════════════════════════════
-    
-    async function loadTimezones() {
-        try {
-            const result = await apiFetch('/api/timezones');
-            
-            if (result.success && result.data) {
-                timezones = result.data;
-
-                const filterSelect = getEl('timezoneFilter');
-                if (filterSelect) {
-                    filterSelect.innerHTML = '<option value="">All Timezones</option>';
-                    timezones.forEach(tz => {
-                        const option = document.createElement('option');
-                        option.value = tz.timezone;
-                        option.textContent = tz.label;
-                        filterSelect.appendChild(option);
-                    });
-                }
-
-                const formSelect = getEl('timezone');
-                if (formSelect) {
-                    formSelect.innerHTML = '';
-                    timezones.forEach(tz => {
-                        const option = document.createElement('option');
-                        option.value = tz.timezone;
-                        option.textContent = tz.label;
-                        formSelect.appendChild(option);
-                    });
-                }
-
-                console.log('✓ Timezones:', timezones.length);
-            }
-        } catch (e) {
-            console.error('❌ loadTimezones:', e);
-        }
-    }
-
-    // ════════════════════════════════════════════════════════════
     // LOAD USERS
     // ════════════════════════════════════════════════════════════
     
@@ -382,9 +211,6 @@
                 <td>${user.id}</td>
                 <td><strong>${escapeHtml(user.username)}</strong></td>
                 <td>${escapeHtml(user.email)}</td>
-                <td>${escapeHtml(user.role_name || 'N/A')}</td>
-                <td>${escapeHtml(user.country_name || 'N/A')}</td>
-                <td>${escapeHtml(user.city_name || 'N/A')}</td>
                 <td>${formatDate(user.created_at)}</td>
                 <td><span class="badge ${statusClass}">${statusText}</span></td>
                 <td class="table-actions">
@@ -471,12 +297,6 @@
         safeSetValue('is_active', true);
         safeHide('btnDeleteUser');
         
-        const citySelect = getEl('city_id');
-        if (citySelect) {
-            citySelect.innerHTML = '<option value="">Select City</option>';
-            citySelect.disabled = true;
-        }
-        
         safeShow('formContainer');
         
         setTimeout(() => {
@@ -506,22 +326,7 @@
                 
                 safeSetText('passwordLabel', '(optional)');
                 safeSetValue('preferred_language', user.preferred_language || 'en');
-                safeSetValue('role_id', user.role_id);
-                safeSetValue('country_id', user.country_id);
-                
-                if (user.country_id) {
-                    await loadCities(user.country_id, userLanguage, 'city_id');
-                    safeSetValue('city_id', user.city_id);
-                } else {
-                    const citySelect = getEl('city_id');
-                    if (citySelect) {
-                        citySelect.innerHTML = '<option value="">Select City</option>';
-                        citySelect.disabled = true;
-                    }
-                }
-                
                 safeSetValue('phone', user.phone);
-                safeSetValue('timezone', user.timezone || 'UTC');
                 safeSetValue('is_active', user.is_active == 1);
                 
                 if (permissions.canDelete) safeShow('btnDeleteUser');
@@ -553,11 +358,7 @@
             username: safeGetValue('username'),
             email: safeGetValue('email'),
             preferred_language: safeGetValue('preferred_language'),
-            role_id: parseInt(safeGetValue('role_id')) || null,
-            country_id: parseInt(safeGetValue('country_id')) || null,
-            city_id: parseInt(safeGetValue('city_id')) || null,
             phone: safeGetValue('phone'),
-            timezone: safeGetValue('timezone'),
             is_active: safeGetValue('is_active') ? 1 : 0
         };
 
@@ -629,18 +430,6 @@
         const language = safeGetValue('languageFilter');
         if (language) filters.preferred_language = language;
 
-        const countryId = safeGetValue('countryFilter');
-        if (countryId) filters.country_id = countryId;
-
-        const cityId = safeGetValue('cityFilter');
-        if (cityId) filters.city_id = cityId;
-
-        const timezone = safeGetValue('timezoneFilter');
-        if (timezone) filters.timezone = timezone;
-
-        const roleId = safeGetValue('roleFilter');
-        if (roleId) filters.role_id = roleId;
-
         const status = safeGetValue('statusFilter');
         if (status !== '' && status !== null) filters.is_active = status;
 
@@ -649,16 +438,13 @@
     }
 
     function resetFilters() {
-        ['searchInput', 'languageFilter', 'countryFilter', 'cityFilter', 'timezoneFilter', 'roleFilter', 'statusFilter'].forEach(id => {
+        ['searchInput', 'languageFilter', 'statusFilter'].forEach(id => {
             const el = getEl(id);
             if (el) {
                 if (el.tagName === 'SELECT') el.selectedIndex = 0;
                 else el.value = '';
             }
         });
-        
-        const cityFilter = getEl('cityFilter');
-        if (cityFilter) cityFilter.disabled = true;
         
         filters = {};
         loadUsers(1);
@@ -718,22 +504,6 @@
             form._bound = true;
         }
 
-        const countryFilter = getEl('countryFilter');
-        if (countryFilter && !countryFilter._bound) {
-            countryFilter.addEventListener('change', (e) => {
-                loadCities(e.target.value, userLanguage, 'cityFilter');
-            });
-            countryFilter._bound = true;
-        }
-
-        const countryForm = getEl('country_id');
-        if (countryForm && !countryForm._bound) {
-            countryForm.addEventListener('change', (e) => {
-                loadCities(e.target.value, userLanguage, 'city_id');
-            });
-            countryForm._bound = true;
-        }
-
         const searchInput = getEl('searchInput');
         if (searchInput && !searchInput._bound) {
             searchInput.addEventListener('keypress', (e) => {
@@ -764,12 +534,7 @@
         bindEvents();
         
         console.log('📥 Loading data...');
-        await Promise.all([
-            loadLanguages(),
-            loadCountries(),
-            loadTimezones(),
-            loadRoles()
-        ]);
+        await loadLanguages();
         
         console.log('📊 Loading users...');
         await loadUsers();

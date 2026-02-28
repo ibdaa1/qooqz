@@ -504,58 +504,59 @@ $apiBase = '/api';
         <div class="card-body">
             <div class="filters-grid">
                 <div class="filter-group">
-                    <label for="auctionSearch"><?= __t('filters.search', 'Search') ?></label>
+                    <label for="auctionSearch" data-i18n="filters.search"><?= __t('filters.search', 'Search') ?></label>
                     <input type="text" id="auctionSearch" class="form-control"
+                           data-i18n-placeholder="filters.search_placeholder"
                            placeholder="<?= __t('filters.search_placeholder', 'Search auctions...') ?>">
                 </div>
 
                 <?php if (is_super_admin()): ?>
                 <div class="filter-group">
-                    <label for="auctionTenantFilter"><?= __t('filters.tenant_id', 'Tenant ID') ?></label>
+                    <label for="auctionTenantFilter" data-i18n="filters.tenant_id"><?= __t('filters.tenant_id', 'Tenant ID') ?></label>
                     <input type="number" id="auctionTenantFilter" class="form-control" value="<?= $tenantId ?>">
                 </div>
                 <?php endif; ?>
 
                 <div class="filter-group">
-                    <label for="auctionStatusFilter"><?= __t('filters.status', 'Status') ?></label>
+                    <label for="auctionStatusFilter" data-i18n="filters.status"><?= __t('filters.status', 'Status') ?></label>
                     <select id="auctionStatusFilter" class="form-control">
-                        <option value="">All Status</option>
-                        <option value="draft">Draft</option>
-                        <option value="scheduled">Scheduled</option>
-                        <option value="active">Active</option>
-                        <option value="paused">Paused</option>
-                        <option value="ended">Ended</option>
-                        <option value="cancelled">Cancelled</option>
-                        <option value="sold">Sold</option>
+                        <option value="" data-i18n="filters.all_status"><?= __t('filters.all_status', 'All Status') ?></option>
+                        <option value="draft" data-i18n="form.fields.status.draft"><?= __t('form.fields.status.draft', 'Draft') ?></option>
+                        <option value="scheduled" data-i18n="form.fields.status.scheduled"><?= __t('form.fields.status.scheduled', 'Scheduled') ?></option>
+                        <option value="active" data-i18n="form.fields.status.active"><?= __t('form.fields.status.active', 'Active') ?></option>
+                        <option value="paused" data-i18n="form.fields.status.paused"><?= __t('form.fields.status.paused', 'Paused') ?></option>
+                        <option value="ended" data-i18n="form.fields.status.ended"><?= __t('form.fields.status.ended', 'Ended') ?></option>
+                        <option value="cancelled" data-i18n="form.fields.status.cancelled"><?= __t('form.fields.status.cancelled', 'Cancelled') ?></option>
+                        <option value="sold" data-i18n="form.fields.status.sold"><?= __t('form.fields.status.sold', 'Sold') ?></option>
                     </select>
                 </div>
 
                 <div class="filter-group">
-                    <label for="auctionTypeFilter"><?= __t('filters.auction_type', 'Type') ?></label>
+                    <label for="auctionTypeFilter" data-i18n="filters.auction_type"><?= __t('filters.auction_type', 'Type') ?></label>
                     <select id="auctionTypeFilter" class="form-control">
-                        <option value="">All Types</option>
-                        <option value="normal">Normal</option>
-                        <option value="reserve">Reserve</option>
-                        <option value="buy_now">Buy Now</option>
-                        <option value="dutch">Dutch</option>
-                        <option value="sealed_bid">Sealed Bid</option>
+                        <option value="" data-i18n="filters.all_types"><?= __t('filters.all_types', 'All Types') ?></option>
+                        <option value="normal" data-i18n="form.fields.auction_type.normal"><?= __t('form.fields.auction_type.normal', 'Normal') ?></option>
+                        <option value="reserve" data-i18n="form.fields.auction_type.reserve"><?= __t('form.fields.auction_type.reserve', 'Reserve') ?></option>
+                        <option value="buy_now" data-i18n="form.fields.auction_type.buy_now"><?= __t('form.fields.auction_type.buy_now', 'Buy Now') ?></option>
+                        <option value="dutch" data-i18n="form.fields.auction_type.dutch"><?= __t('form.fields.auction_type.dutch', 'Dutch') ?></option>
+                        <option value="sealed_bid" data-i18n="form.fields.auction_type.sealed_bid"><?= __t('form.fields.auction_type.sealed_bid', 'Sealed Bid') ?></option>
                     </select>
                 </div>
 
                 <div class="filter-group">
-                    <label for="auctionFeaturedFilter"><?= __t('filters.is_featured', 'Featured') ?></label>
+                    <label for="auctionFeaturedFilter" data-i18n="filters.is_featured"><?= __t('filters.is_featured', 'Featured') ?></label>
                     <select id="auctionFeaturedFilter" class="form-control">
-                        <option value="">All</option>
-                        <option value="1">Featured</option>
-                        <option value="0">Not Featured</option>
+                        <option value="" data-i18n="filters.all"><?= __t('filters.all', 'All') ?></option>
+                        <option value="1" data-i18n="filters.featured"><?= __t('filters.featured', 'Featured') ?></option>
+                        <option value="0" data-i18n="filters.not_featured"><?= __t('filters.not_featured', 'Not Featured') ?></option>
                     </select>
                 </div>
 
                 <div class="filter-actions">
-                    <button id="btnApplyAuctionFilters" class="btn btn-secondary">
+                    <button id="btnApplyAuctionFilters" class="btn btn-secondary" data-i18n="filters.apply">
                         <?= __t('filters.apply', 'Apply') ?>
                     </button>
-                    <button id="btnResetAuctionFilters" class="btn btn-outline">
+                    <button id="btnResetAuctionFilters" class="btn btn-outline" data-i18n="filters.reset">
                         <?= __t('filters.reset', 'Reset') ?>
                     </button>
                 </div>

@@ -138,8 +138,13 @@
       "tenant_id": "Tenant ID",
       "tenant_placeholder": "Filter by tenant",
       "status": "Status",
+      "all_status": "All Status",
       "auction_type": "Type",
+      "all_types": "All Types",
       "is_featured": "Featured",
+      "all": "All",
+      "featured": "Featured",
+      "not_featured": "Not Featured",
       "apply": "Apply",
       "reset": "Reset"
     },
