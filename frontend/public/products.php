@@ -125,6 +125,17 @@ include dirname(__DIR__) . '/partials/header.php';
                             <small><?= e($pCur) ?></small>
                         </p>
                     <?php endif; ?>
+                    <?php
+                    $pStock = $p['stock_status'] ?? '';
+                    $pQty   = (int)($p['stock_quantity'] ?? 0);
+                    if ($pStock === 'out_of_stock'):
+                    ?>
+                        <span class="pub-stock-badge pub-stock-badge--out"><?= e(t('products.out_of_stock')) ?></span>
+                    <?php elseif ($pQty > 0 && $pQty <= 10): ?>
+                        <span class="pub-stock-badge pub-stock-badge--low"><?= e(t('products.low_stock', ['count' => $pQty, 'default' => 'Only '.$pQty.' left'])) ?></span>
+                    <?php elseif ($pStock === 'in_stock' || $pQty > 0): ?>
+                        <span class="pub-stock-badge pub-stock-badge--in"><?= e(t('products.in_stock')) ?></span>
+                    <?php endif; ?>
                 </div>
             </a>
             <!-- Add to Cart button -->

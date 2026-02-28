@@ -163,6 +163,13 @@ $_fontUrl = $dir === 'rtl'
                 ♡ <?= e(t('nav.wishlist')) ?>
                 <span id="pubWishlistCount"></span>
             </a>
+            <!-- Compare link with live count badge -->
+            <a href="/frontend/public/compare.php" style="position:relative;display:inline-flex;align-items:center;gap:4px;" title="<?= e(t('nav.compare', ['default' => 'Compare'])) ?>">
+                ⚖️ <?= e(t('nav.compare', ['default' => 'Compare'])) ?>
+                <span class="pub-compare-badge" style="display:none;background:var(--pub-secondary,#10b981);color:#fff;
+                       border-radius:50%;min-width:18px;height:18px;padding:0 4px;
+                       font-size:0.7rem;font-weight:800;line-height:18px;text-align:center;vertical-align:middle;"></span>
+            </a>
         </nav>
 
         <!-- Header actions -->

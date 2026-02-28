@@ -344,6 +344,7 @@ if ($first === 'products') {
     $total = $pdoCount("SELECT COUNT(*) FROM products p $where", $whereParams);
     $rows  = $pdoList(
         "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.sku, p.slug, p.is_featured, p.tenant_id,
+                p.stock_quantity, p.stock_status,
                 pp.price, pp.currency_code,
                 i.url AS image_url, i.thumb_url AS image_thumb_url
            FROM products p
@@ -1651,6 +1652,201 @@ if ($first === 'wishlist') {
     }
 
     ResponseFormatter::notFound('Unknown wishlist endpoint');
+    exit;
+}
+
+/* -------------------------------------------------------
+ * Route: Recently Viewed Products
+ * GET  /api/public/recent          — list (last 20, newest first)
+ * POST /api/public/recent/add      — record a view
+ * ----------------------------------------------------- */
+if ($first === 'recent') {
+    $sub = $segments[1] ?? '';
+
+    if ($sub === 'add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $recentPid = (int)($_POST['product_id'] ?? 0);
+        if (!$recentPid) { ResponseFormatter::error('product_id required', 422); exit; }
+        $recentUid = $userId ?? null;
+        $recentSid = session_id() ?: null;
+        try {
+            // upsert: update viewed_at if already exists, otherwise insert
+            $pdo->prepare(
+                'INSERT INTO recently_viewed_products (user_id, session_id, product_id, viewed_at)
+                 VALUES (?, ?, ?, NOW())
+                 ON DUPLICATE KEY UPDATE viewed_at = NOW()'
+            )->execute([$recentUid, $recentSid, $recentPid]);
+        } catch (Throwable $_) {
+            // table may not have unique constraint — try insert ignore
+            try {
+                $pdo->prepare(
+                    'INSERT IGNORE INTO recently_viewed_products (user_id, session_id, product_id, viewed_at)
+                     VALUES (?, ?, ?, NOW())'
+                )->execute([$recentUid, $recentSid, $recentPid]);
+            } catch (Throwable $__) { /* non-fatal */ }
+        }
+        ResponseFormatter::success(['ok' => true]);
+        exit;
+    }
+
+    // GET /api/public/recent — list recently viewed for current user/session
+    $recentUid = $userId ?? null;
+    $recentSid = session_id() ?: null;
+    $recentCond = $recentUid ? 'rvp.user_id = ?' : 'rvp.session_id = ?';
+    $recentParam = $recentUid ?? $recentSid;
+    try {
+        $rows = $pdoList(
+            "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.slug,
+                    p.stock_status, p.stock_quantity,
+                    (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
+                    (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
+                    (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_url,
+                    rvp.viewed_at
+               FROM recently_viewed_products rvp
+               JOIN products p ON p.id = rvp.product_id
+          LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
+              WHERE $recentCond
+              ORDER BY rvp.viewed_at DESC LIMIT 20",
+            [$lang, $recentParam]
+        );
+        ResponseFormatter::success(['ok' => true, 'data' => $rows]);
+    } catch (Throwable $ex) {
+        ResponseFormatter::error('Failed: ' . $ex->getMessage(), 500);
+    }
+    exit;
+}
+
+/* -------------------------------------------------------
+ * Route: Product Comparisons
+ * GET  /api/public/compare         — list current comparison
+ * POST /api/public/compare/add     — add product
+ * POST /api/public/compare/remove  — remove product
+ * POST /api/public/compare/clear   — clear all
+ * ----------------------------------------------------- */
+if ($first === 'compare') {
+    if (!$userId) { ResponseFormatter::error('Login required', 401); exit; }
+    $cmpSub = $segments[1] ?? '';
+
+    if ($cmpSub === 'add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $cmpPid = (int)($_POST['product_id'] ?? 0);
+        if (!$cmpPid) { ResponseFormatter::error('product_id required', 422); exit; }
+        try {
+            // Max 4 products in comparison
+            $cmpCount = (int)($pdoOne('SELECT COUNT(*) AS c FROM product_comparisons WHERE user_id = ?', [$userId])['c'] ?? 0);
+            if ($cmpCount >= 4) { ResponseFormatter::error('Max 4 products in comparison', 400); exit; }
+            $pdo->prepare('INSERT IGNORE INTO product_comparisons (user_id, product_id, created_at) VALUES (?, ?, NOW())')
+                ->execute([$userId, $cmpPid]);
+            ResponseFormatter::success(['ok' => true]);
+        } catch (Throwable $ex) { ResponseFormatter::error($ex->getMessage(), 500); }
+        exit;
+    }
+
+    if ($cmpSub === 'remove' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $cmpPid = (int)($_POST['product_id'] ?? 0);
+        try {
+            $pdo->prepare('DELETE FROM product_comparisons WHERE user_id = ? AND product_id = ?')
+                ->execute([$userId, $cmpPid]);
+            ResponseFormatter::success(['ok' => true]);
+        } catch (Throwable $ex) { ResponseFormatter::error($ex->getMessage(), 500); }
+        exit;
+    }
+
+    if ($cmpSub === 'clear' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        try {
+            $pdo->prepare('DELETE FROM product_comparisons WHERE user_id = ?')->execute([$userId]);
+            ResponseFormatter::success(['ok' => true]);
+        } catch (Throwable $ex) { ResponseFormatter::error($ex->getMessage(), 500); }
+        exit;
+    }
+
+    // GET — list products in comparison with full details
+    try {
+        $rows = $pdoList(
+            "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.slug, p.sku,
+                    p.stock_status, p.stock_quantity, p.rating_average, p.rating_count,
+                    p.is_featured, p.is_new, p.is_bestseller,
+                    pt.description, pt.specifications,
+                    b.name AS brand_name,
+                    (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
+                    (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
+                    (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_url,
+                    pc.created_at AS added_at
+               FROM product_comparisons pc
+               JOIN products p ON p.id = pc.product_id
+          LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
+          LEFT JOIN brands b ON b.id = p.brand_id
+              WHERE pc.user_id = ?
+              ORDER BY pc.created_at ASC",
+            [$lang, $userId]
+        );
+        ResponseFormatter::success(['ok' => true, 'data' => $rows]);
+    } catch (Throwable $ex) { ResponseFormatter::error($ex->getMessage(), 500); }
+    exit;
+}
+
+/* -------------------------------------------------------
+ * Route: Product Bundles
+ * GET /api/public/bundles          — list bundles (entity_id filter optional)
+ * GET /api/public/bundles/{id}     — single bundle with items
+ * ----------------------------------------------------- */
+if ($first === 'bundles') {
+    $bundleId = isset($segments[1]) && ctype_digit((string)$segments[1]) ? (int)$segments[1] : null;
+
+    if ($bundleId) {
+        try {
+            $bundle = $pdoOne(
+                "SELECT b.id, b.entity_id, b.bundle_name, b.bundle_name_ar,
+                        b.description, b.description_ar,
+                        b.bundle_image, b.original_total_price, b.bundle_price,
+                        b.discount_amount, b.discount_percentage, b.stock_quantity,
+                        b.is_active, b.start_date, b.end_date, b.sold_count
+                   FROM product_bundles b
+                  WHERE b.id = ? AND b.is_active = 1",
+                [$bundleId]
+            );
+            if (!$bundle) { ResponseFormatter::notFound('Bundle not found'); exit; }
+            $items = $pdoList(
+                "SELECT bi.id, bi.product_id, bi.quantity, bi.product_price,
+                        COALESCE(pt.name, p.slug) AS product_name,
+                        (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_url
+                   FROM product_bundle_items bi
+                   JOIN products p ON p.id = bi.product_id
+              LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
+                  WHERE bi.bundle_id = ?",
+                [$lang, $bundleId]
+            );
+            $bundle['name'] = $lang === 'ar' ? ($bundle['bundle_name_ar'] ?? $bundle['bundle_name']) : $bundle['bundle_name'];
+            $bundle['description_text'] = $lang === 'ar' ? ($bundle['description_ar'] ?? $bundle['description']) : $bundle['description'];
+            $bundle['items'] = $items;
+            ResponseFormatter::success(['ok' => true, 'bundle' => $bundle]);
+        } catch (Throwable $ex) { ResponseFormatter::error($ex->getMessage(), 500); }
+        exit;
+    }
+
+    // List bundles
+    $bundleWhere = 'WHERE b.is_active = 1';
+    $bundleParams = [];
+    if ($tenantId) {
+        $bundleWhere .= ' AND EXISTS (SELECT 1 FROM entities e WHERE e.id = b.entity_id AND e.tenant_id = ?)';
+        $bundleParams[] = $tenantId;
+    }
+    if (!empty($_GET['entity_id'])) {
+        $bundleWhere .= ' AND b.entity_id = ?';
+        $bundleParams[] = (int)$_GET['entity_id'];
+    }
+    try {
+        $rows = $pdoList(
+            "SELECT b.id, b.entity_id,
+                    CASE WHEN ? = 'ar' THEN COALESCE(b.bundle_name_ar, b.bundle_name) ELSE b.bundle_name END AS name,
+                    b.bundle_image, b.original_total_price, b.bundle_price,
+                    b.discount_amount, b.discount_percentage, b.stock_quantity,
+                    b.start_date, b.end_date, b.sold_count
+               FROM product_bundles b
+               $bundleWhere
+              ORDER BY b.discount_percentage DESC, b.id DESC LIMIT ? OFFSET ?",
+            array_merge([$lang], $bundleParams, [$per, $offset])
+        );
+        ResponseFormatter::success(['ok' => true, 'data' => $rows]);
+    } catch (Throwable $ex) { ResponseFormatter::error($ex->getMessage(), 500); }
     exit;
 }
 

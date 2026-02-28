@@ -569,6 +569,34 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   width: fit-content;
 }
 
+/* Stock status badges on listing cards */
+.pub-stock-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.pub-stock-badge--in  { background: rgba(16,185,129,.15); color: #10b981; }
+.pub-stock-badge--out { background: rgba(239,68,68,.15);  color: #ef4444; }
+.pub-stock-badge--low { background: rgba(245,158,11,.15); color: #f59e0b; }
+
+/* Product variant buttons */
+.pub-variant-btn {
+  background: var(--pub-surface);
+  border: 2px solid var(--pub-border);
+  border-radius: 8px;
+  padding: 6px 14px;
+  color: var(--pub-text);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: border-color 0.2s, background 0.2s;
+}
+.pub-variant-btn:hover { border-color: var(--pub-primary); }
+.pub-variant-btn.active { border-color: var(--pub-primary); background: rgba(var(--pub-primary-rgb,45,140,240),.12); }
+
+
 /* -------------------------------------------------------
    10. Job Card
    ----------------------------------------------------- */

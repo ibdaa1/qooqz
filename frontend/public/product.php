@@ -31,6 +31,7 @@ $product    = null;
 $images     = [];
 $categories = [];
 $related    = [];
+$variants   = [];
 
 $pdo = pub_get_pdo();
 if ($pdo) {
@@ -103,6 +104,22 @@ if ($pdo) {
                 $st->execute([$productId, $lang]);
                 $categories = $st->fetchAll();
 
+                // Variants — load active variants with their pricing
+                try {
+                    $st = $pdo->prepare(
+                        "SELECT pv.id, pv.sku, pv.stock_quantity, pv.is_default,
+                                (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = ? AND pp.variant_id = pv.id ORDER BY pp.id ASC LIMIT 1) AS price,
+                                (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = ? AND pp.variant_id = pv.id ORDER BY pp.id ASC LIMIT 1) AS currency_code
+                           FROM product_variants pv
+                          WHERE pv.product_id = ? AND pv.is_active = 1
+                          ORDER BY pv.is_default DESC, pv.id ASC LIMIT 20"
+                    );
+                    $st->execute([$productId, $productId, $productId]);
+                    $variants = $st->fetchAll();
+                } catch (Throwable $_) {
+                    $variants = [];
+                }
+
                 // Related products (same first category)
                 // Uses scalar subqueries for price — avoids JOIN on pp2.variant_id which
                 // may not exist in all product_pricing schema versions.
@@ -110,6 +127,7 @@ if ($pdo) {
                     try {
                         $st = $pdo->prepare(
                             "SELECT p2.id, COALESCE(pt2.name, p2.slug) AS name, p2.slug,
+                                    p2.stock_status, p2.stock_quantity,
                                     (SELECT pp2.price FROM product_pricing pp2
                                        WHERE pp2.product_id = p2.id ORDER BY pp2.id ASC LIMIT 1) AS price,
                                     (SELECT pp2.currency_code FROM product_pricing pp2
@@ -127,6 +145,25 @@ if ($pdo) {
                     } catch (Throwable $_) {
                         $related = []; // non-critical: related products failing must not affect main product
                     }
+                }
+
+                // Auto-record recently viewed (fire and forget — non-fatal)
+                try {
+                    $rvUid = $_SESSION['user_id'] ?? $_SESSION['user']['id'] ?? null;
+                    $rvSid = session_id() ?: null;
+                    $pdo->prepare(
+                        'INSERT INTO recently_viewed_products (user_id, session_id, product_id, viewed_at)
+                         VALUES (?, ?, ?, NOW())
+                         ON DUPLICATE KEY UPDATE viewed_at = NOW()'
+                    )->execute([$rvUid, $rvSid, $productId]);
+                } catch (Throwable $_) {
+                    try {
+                        $rvUid2 = $_SESSION['user_id'] ?? null;
+                        $pdo->prepare(
+                            'INSERT IGNORE INTO recently_viewed_products (user_id, session_id, product_id, viewed_at)
+                             VALUES (?, ?, ?, NOW())'
+                        )->execute([$rvUid2, session_id() ?: null, $productId]);
+                    } catch (Throwable $__) { /* non-fatal */ }
                 }
             }
         }
@@ -308,6 +345,37 @@ include dirname(__DIR__) . '/partials/header.php';
             <p class="pub-product-short-desc"><?= e($product['short_description']) ?></p>
             <?php endif; ?>
 
+            <!-- Variants Selector -->
+            <?php if (!empty($variants)): ?>
+            <div class="pub-variant-wrap" style="margin:12px 0;">
+                <label style="font-size:0.88rem;color:var(--pub-muted);display:block;margin-bottom:6px;">
+                    <?= e(t('products.variant', ['default' => 'Choose Option'])) ?>:
+                </label>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;" id="pubVariantBtns">
+                <?php foreach ($variants as $v):
+                    $vActive = !empty($v['is_default']);
+                    $vLabel  = $v['sku'] ?? 'Variant ' . $v['id'];
+                    $vStock  = (int)($v['stock_quantity'] ?? 0);
+                    $vPrice  = $v['price'] ?? null;
+                ?>
+                    <button type="button"
+                            class="pub-variant-btn<?= $vActive ? ' active' : '' ?>"
+                            data-variant-id="<?= (int)$v['id'] ?>"
+                            data-price="<?= e((string)($vPrice ?? $price ?? '')) ?>"
+                            data-currency="<?= e($v['currency_code'] ?? $currency) ?>"
+                            data-stock="<?= $vStock ?>"
+                            onclick="pubSelectVariant(this)"
+                            <?= $vStock <= 0 ? 'style="opacity:0.5;text-decoration:line-through;"' : '' ?>>
+                        <?= e($vLabel) ?>
+                        <?php if ($vPrice !== null): ?>
+                        <small style="display:block;font-size:0.8em;"><?= number_format((float)$vPrice, 2) ?> <?= e($v['currency_code'] ?? $currency) ?></small>
+                        <?php endif; ?>
+                    </button>
+                <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- Add to cart -->
             <?php if ($inStock): ?>
             <div class="pub-product-cart-row">
@@ -336,6 +404,16 @@ include dirname(__DIR__) . '/partials/header.php';
                         data-entity-id="<?= (int)($product['entity_id'] ?? 1) ?>"
                         onclick="pubToggleWishlist(this)"
                         title="<?= e(t('wishlist.add')) ?>">♡</button>
+                <!-- Compare button -->
+                <button type="button"
+                        id="pubCompareBtn"
+                        class="pub-btn pub-btn--ghost"
+                        style="height:40px;padding:0 14px;font-size:0.9rem;"
+                        data-product-id="<?= (int)$product['id'] ?>"
+                        onclick="pubToggleCompare(this)"
+                        title="<?= e(t('products.compare', ['default' => 'Compare'])) ?>">
+                    ⚖️ <?= e(t('products.compare', ['default' => 'Compare'])) ?>
+                </button>
             </div>
             <?php endif; ?>
 
@@ -445,6 +523,70 @@ function pubTabSwitch(btn, panelId) {
 document.addEventListener('DOMContentLoaded', function() {
     var first = document.querySelector('.pub-gallery-thumb');
     if (first) first.classList.add('active');
+});
+
+/* Variant selector */
+function pubSelectVariant(btn) {
+    document.querySelectorAll('#pubVariantBtns .pub-variant-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    var price    = btn.dataset.price;
+    var currency = btn.dataset.currency;
+    var stock    = parseInt(btn.dataset.stock || '0', 10);
+    // Update displayed price
+    var priceEl = document.querySelector('.pub-product-detail-price');
+    if (priceEl && price) priceEl.textContent = parseFloat(price).toFixed(2) + ' ' + currency;
+    // Update cart button data
+    var cartBtn = document.getElementById('pubAddToCartBtn');
+    if (cartBtn) {
+        cartBtn.dataset.productPrice = price;
+        cartBtn.dataset.currency     = currency;
+        cartBtn.dataset.variantId    = btn.dataset.variantId;
+    }
+    // Update stock indicator
+    var stockEl = document.querySelector('.pub-product-stock');
+    if (stockEl) {
+        if (stock > 0) {
+            stockEl.className = 'pub-product-stock in-stock';
+        } else {
+            stockEl.className = 'pub-product-stock out-stock';
+        }
+    }
+}
+
+/* Compare toggle */
+function pubToggleCompare(btn) {
+    var pid = btn.dataset.productId;
+    var inList = (localStorage.getItem('pub_compare') || '').split(',').filter(Boolean);
+    var idx = inList.indexOf(pid);
+    if (idx >= 0) {
+        inList.splice(idx, 1);
+        btn.textContent = '⚖️ Compare';
+        fetch('/api/public/compare/remove', {method:'POST', credentials:'include', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'product_id='+pid});
+    } else {
+        if (inList.length >= 4) { alert('Max 4 products can be compared.'); return; }
+        inList.push(pid);
+        btn.textContent = '✅ In Compare';
+        fetch('/api/public/compare/add', {method:'POST', credentials:'include', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'product_id='+pid});
+    }
+    localStorage.setItem('pub_compare', inList.join(','));
+    pubUpdateCompareBadge();
+}
+
+/* Compare badge */
+function pubUpdateCompareBadge() {
+    var n = (localStorage.getItem('pub_compare') || '').split(',').filter(Boolean).length;
+    var els = document.querySelectorAll('.pub-compare-badge');
+    els.forEach(function(el) { el.textContent = n; el.style.display = n > 0 ? 'inline-flex' : 'none'; });
+}
+document.addEventListener('DOMContentLoaded', function() {
+    pubUpdateCompareBadge();
+    // Restore compare button state
+    var btn = document.getElementById('pubCompareBtn');
+    if (btn) {
+        var pid = btn.dataset.productId;
+        var inList = (localStorage.getItem('pub_compare') || '').split(',').filter(Boolean);
+        if (inList.indexOf(pid) >= 0) btn.textContent = '✅ In Compare';
+    }
 });
 </script>
 

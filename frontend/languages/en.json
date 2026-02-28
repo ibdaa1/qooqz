@@ -17,7 +17,9 @@
     "menu_open": "Open menu",
     "menu_close": "Close menu",
     "offers": "Offers",
-    "wishlist": "Wishlist"
+    "wishlist": "Wishlist",
+    "compare": "Compare",
+    "bundles": "Bundles"
   },
   "hero": {
     "title": "QOOQZ Global Platform",
@@ -65,8 +67,17 @@
     "reviews": "reviews",
     "off": "OFF",
     "sku": "SKU",
+    "brand": "Brand",
+    "rating": "Rating",
+    "price": "Price",
     "categories": "Categories",
     "related": "Related Products",
+    "variant": "Choose Option",
+    "compare": "Compare",
+    "compare_title": "Compare Products",
+    "compare_clear": "Clear All",
+    "compare_clear_confirm": "Remove all from comparison?",
+    "compare_empty": "No products added to comparison yet. Browse products and click ⚖️ Compare.",
     "not_found_title": "Product Not Found",
     "not_found_msg": "This product is unavailable or does not exist."
   },
@@ -332,5 +343,13 @@
     "add": "Add to wishlist",
     "remove": "Remove from wishlist",
     "added": "Added to wishlist"
+  },
+  "bundles": {
+    "page_title": "Bundle Deals",
+    "page_subtitle": "Save more when you buy product bundles",
+    "empty": "No bundle deals available at the moment",
+    "save": "Save",
+    "view": "View Bundle",
+    "add_to_cart": "Add Bundle to Cart"
   }
 }
