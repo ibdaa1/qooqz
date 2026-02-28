@@ -1503,26 +1503,21 @@ if ($first === 'wishlist') {
 
     /** Helper: get or create default wishlist for user */
     $getDefaultWishlist = function() use ($pdo, $wishUserId, $tenantId) {
+        // tenant_id from GET may be null for POST requests; fall back to session value
+        $wlTenantId = $tenantId ?? (int)($_SESSION['tenant_id'] ?? $_SESSION['pub_tenant_id'] ?? 1);
         $row = $pdo->prepare(
-            'SELECT id FROM wishlists WHERE user_id = ? AND tenant_id = ? AND is_default = 1 AND removed_at IS NULL LIMIT 1'
+            'SELECT id FROM wishlists WHERE user_id = ? AND is_default = 1 LIMIT 1'
         );
-        // wishlists may not have removed_at; try without
-        try {
-            $row->execute([$wishUserId, $tenantId]);
-            $wl = $row->fetch(PDO::FETCH_ASSOC);
-        } catch (Throwable $__) {
-            $row2 = $pdo->prepare('SELECT id FROM wishlists WHERE user_id = ? AND tenant_id = ? AND is_default = 1 LIMIT 1');
-            $row2->execute([$wishUserId, $tenantId]);
-            $wl = $row2->fetch(PDO::FETCH_ASSOC);
-        }
+        $row->execute([$wishUserId]);
+        $wl = $row->fetch(PDO::FETCH_ASSOC);
         if ($wl) return (int)$wl['id'];
         // Create default wishlist
         $ins = $pdo->prepare(
             'INSERT INTO wishlists (user_id, tenant_id, entity_id, wishlist_name, is_default, total_items, created_at, updated_at)
              VALUES (?, ?, 1, ?, 1, 0, NOW(), NOW())'
         );
-        $wlName = ($_GET['lang'] ?? 'en') === 'ar' ? 'قائمة مفضلتي' : 'My Wishlist';
-        $ins->execute([$wishUserId, $tenantId, $wlName]);
+        $wlName = ($_GET['lang'] ?? $_SESSION['user']['preferred_language'] ?? 'en') === 'ar' ? 'قائمة مفضلتي' : 'My Wishlist';
+        $ins->execute([$wishUserId, $wlTenantId, $wlName]);
         return (int)$pdo->lastInsertId();
     };
 
