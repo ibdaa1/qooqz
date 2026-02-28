@@ -31,8 +31,8 @@ if ($pdo) {
         if ($status !== 'all')    { $aWhere .= ' AND a.status = ?';       $aParams[] = $status; }
         if ($type)                { $aWhere .= ' AND a.auction_type = ?'; $aParams[] = $type; }
         if ($tenantId)            { $aWhere .= ' AND a.tenant_id = ?';    $aParams[] = $tenantId; }
-        $aParams[] = $per;
-        $aParams[] = $offset;
+        // Use inline LIMIT/OFFSET (not bound params) — MySQL 5.x native prepares reject ? in LIMIT
+        $limitSql = 'LIMIT ' . (int)$per . ' OFFSET ' . (int)$offset;
 
         $st = $pdo->prepare(
             "SELECT a.id, a.slug, a.auction_type, a.status, a.starting_price, a.current_price,
@@ -45,7 +45,7 @@ if ($pdo) {
              FROM auctions a
              WHERE $aWhere
              ORDER BY a.is_featured DESC, a.end_date ASC
-             LIMIT ? OFFSET ?"
+             $limitSql"
         );
         $st->execute($aParams);
         $auctions = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -57,6 +57,7 @@ if ($pdo) {
         unset($a);
     } catch (Throwable $e) {
         error_log('[auctions.php] ' . $e->getMessage());
+        echo '<!-- [auctions] query error: ' . htmlspecialchars($e->getMessage()) . ' -->';
     }
 } else {
     // HTTP fallback

@@ -602,9 +602,10 @@ if (!function_exists('pub_get_pdo')) {
                 $dbConf['charset'] ?? 'utf8mb4'
             );
             $__pdo = new PDO($dsn, $dbConf['user'], $dbConf['pass'], [
-                PDO::ATTR_TIMEOUT        => 5,
-                PDO::ATTR_ERRMODE        => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_TIMEOUT            => 5,
+                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES   => true,  // ensures LIMIT/OFFSET bound params work on MySQL 5.x
             ]);
             return $__pdo;
         } catch (Throwable $_) {
