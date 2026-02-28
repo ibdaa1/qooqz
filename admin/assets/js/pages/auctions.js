@@ -175,10 +175,10 @@
             console.warn('[Auctions] Failed to load currencies:', e);
             // Minimal fallback keeps the page usable without the API
             applyCurrencies([
-                { code: 'SAR', name: 'Saudi Riyal',  symbol: '﷼',  symbol_position: 'after',  decimal_places: 2 },
-                { code: 'USD', name: 'US Dollar',     symbol: '$',   symbol_position: 'before', decimal_places: 2 },
-                { code: 'EUR', name: 'Euro',           symbol: '€',   symbol_position: 'before', decimal_places: 2 },
-                { code: 'AED', name: 'UAE Dirham',    symbol: 'د.إ', symbol_position: 'after',  decimal_places: 2 }
+                { id: 1, code: 'SAR', name: 'Saudi Riyal',  symbol: '﷼',  symbol_position: 'after',  decimal_places: 2 },
+                { id: 2, code: 'USD', name: 'US Dollar',     symbol: '$',   symbol_position: 'before', decimal_places: 2 },
+                { id: 3, code: 'EUR', name: 'Euro',           symbol: '€',   symbol_position: 'before', decimal_places: 2 },
+                { id: 4, code: 'AED', name: 'UAE Dirham',    symbol: 'د.إ', symbol_position: 'after',  decimal_places: 2 }
             ]);
         }
 
@@ -213,7 +213,7 @@
     function applyCurrencies(data) {
         state.currencies = data;
         state.currencyMap = Object.fromEntries(data.map(c => [c.code, c]));
-        populateCurrencyDropdown(el.auctionCurrency, data, t('form.fields.currency_code.select', 'Select currency'));
+        populateCurrencyDropdown(el.auctionCurrency, data, t('form.fields.currency_id.select', 'Select currency'));
     }
 
     function populateDropdown(selectEl, data, valueKey, textKey, placeholder = '') {
@@ -248,7 +248,7 @@
         }
         currencies.forEach(cur => {
             const opt = document.createElement('option');
-            opt.value = cur.code;
+            opt.value = cur.id;
             const symPart = cur.symbol ? ` (${cur.symbol})` : '';
             opt.textContent = `${cur.code} – ${cur.name}${symPart}`;
             selectEl.appendChild(opt);
@@ -370,7 +370,7 @@
             if (el.auctionReservePrice)  el.auctionReservePrice.value   = auction.reserve_price   || '';
             if (el.auctionBuyNowPrice)   el.auctionBuyNowPrice.value    = auction.buy_now_price   || '';
             if (el.auctionBidIncrement)  el.auctionBidIncrement.value   = auction.bid_increment   || '5.00';
-            if (el.auctionCurrency)      el.auctionCurrency.value       = auction.currency_code   || '';
+            if (el.auctionCurrency)      el.auctionCurrency.value       = auction.currency_id    || '';
             if (el.auctionShipping)      el.auctionShipping.value       = auction.shipping_cost   || '0.00';
             if (el.auctionPaymentDeadline) el.auctionPaymentDeadline.value = auction.payment_deadline_hours || '48';
             // Schedule
@@ -447,7 +447,7 @@
                 current_price:         formData.get('starting_price') || '0',
                 buy_now_price:         formData.get('buy_now_price')  || null,
                 bid_increment:         formData.get('bid_increment')  || '5.00',
-                currency_code:         formData.get('currency_code')  || 'SAR',
+                currency_id:           (v => v > 0 ? v : null)(parseInt(formData.get('currency_id'), 10)),
                 auto_bid_enabled:      formData.get('auto_bid_enabled') ?? '1',
                 start_date:            formData.get('start_date')     || '',
                 end_date:              formData.get('end_date')       || '',

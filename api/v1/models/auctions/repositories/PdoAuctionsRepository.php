@@ -12,7 +12,7 @@ final class PdoAuctionsRepository implements AuctionsRepositoryInterface
     ];
     private const FILTERABLE_COLUMNS = [
         'status', 'auction_type', 'product_id', 'is_featured',
-        'condition_type', 'currency_code'
+        'condition_type', 'currency_id'
     ];
 
     public function __construct(PDO $pdo)
@@ -33,10 +33,15 @@ final class PdoAuctionsRepository implements AuctionsRepositoryInterface
             SELECT a.*,
                    COALESCE(at.title, a.title) AS translated_title,
                    at.description,
-                   at.terms_conditions
+                   at.terms_conditions,
+                   c.code            AS currency_code,
+                   c.symbol          AS currency_symbol,
+                   c.symbol_position AS currency_symbol_position,
+                   c.decimal_places  AS currency_decimal_places
             FROM " . self::TABLE . " a
             LEFT JOIN auction_translations at
                 ON at.auction_id = a.id AND at.language_code = :lang
+            LEFT JOIN currencies c ON c.id = a.currency_id
             WHERE a.tenant_id = :tenant_id
         ";
         $params = [':tenant_id' => $tenantId, ':lang' => $lang];
@@ -97,10 +102,15 @@ final class PdoAuctionsRepository implements AuctionsRepositoryInterface
             SELECT a.*,
                    COALESCE(at.title, a.title) AS translated_title,
                    at.description,
-                   at.terms_conditions
+                   at.terms_conditions,
+                   c.code            AS currency_code,
+                   c.symbol          AS currency_symbol,
+                   c.symbol_position AS currency_symbol_position,
+                   c.decimal_places  AS currency_decimal_places
             FROM " . self::TABLE . " a
             LEFT JOIN auction_translations at
                 ON at.auction_id = a.id AND at.language_code = :lang
+            LEFT JOIN currencies c ON c.id = a.currency_id
             WHERE a.tenant_id = :tenant_id AND a.id = :id
             LIMIT 1
         ");
@@ -133,7 +143,7 @@ final class PdoAuctionsRepository implements AuctionsRepositoryInterface
                     current_price         = :current_price,
                     buy_now_price         = :buy_now_price,
                     bid_increment         = :bid_increment,
-                    currency_code         = :currency_code,
+                    currency_id           = :currency_id,
                     auto_bid_enabled      = :auto_bid_enabled,
                     start_date            = :start_date,
                     end_date              = :end_date,
@@ -156,14 +166,14 @@ final class PdoAuctionsRepository implements AuctionsRepositoryInterface
             INSERT INTO " . self::TABLE . " (
                 tenant_id, entity_id, product_id, title, slug,
                 auction_type, status, starting_price, reserve_price, current_price,
-                buy_now_price, bid_increment, currency_code, auto_bid_enabled,
+                buy_now_price, bid_increment, currency_id, auto_bid_enabled,
                 start_date, end_date, auto_extend, extend_minutes, min_extend_bid_time,
                 is_featured, condition_type, quantity, shipping_cost,
                 payment_deadline_hours, notes, created_by
             ) VALUES (
                 :tenant_id, :entity_id, :product_id, :title, :slug,
                 :auction_type, :status, :starting_price, :reserve_price, :current_price,
-                :buy_now_price, :bid_increment, :currency_code, :auto_bid_enabled,
+                :buy_now_price, :bid_increment, :currency_id, :auto_bid_enabled,
                 :start_date, :end_date, :auto_extend, :extend_minutes, :min_extend_bid_time,
                 :is_featured, :condition_type, :quantity, :shipping_cost,
                 :payment_deadline_hours, :notes, :created_by
@@ -198,7 +208,7 @@ final class PdoAuctionsRepository implements AuctionsRepositoryInterface
             ':current_price'         => $data['current_price'] ?? $data['starting_price'],
             ':buy_now_price'         => $data['buy_now_price'] ?? null,
             ':bid_increment'         => $data['bid_increment'] ?? 5.00,
-            ':currency_code'         => $data['currency_code'],
+            ':currency_id'           => (int)($data['currency_id'] ?? 0),
             ':auto_bid_enabled'      => isset($data['auto_bid_enabled']) ? (int)$data['auto_bid_enabled'] : 1,
             ':start_date'            => $data['start_date'],
             ':end_date'              => $data['end_date'],

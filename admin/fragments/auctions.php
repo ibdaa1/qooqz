@@ -314,11 +314,11 @@ $apiBase = '/api';
                         </div>
 
                         <div class="form-group">
-                            <label for="auctionCurrency" class="required" data-i18n="form.fields.currency_code.label">
-                                <?= __t('form.fields.currency_code.label', 'Currency') ?>
+                            <label for="auctionCurrency" class="required" data-i18n="form.fields.currency_id.label">
+                                <?= __t('form.fields.currency_id.label', 'Currency') ?>
                             </label>
-                            <select id="auctionCurrency" name="currency_code" class="form-control" required>
-                                <option value=""><?= __t('form.fields.currency_code.select', 'Select currency') ?></option>
+                            <select id="auctionCurrency" name="currency_id" class="form-control" required>
+                                <option value=""><?= __t('form.fields.currency_id.select', 'Select currency') ?></option>
                             </select>
                         </div>
 

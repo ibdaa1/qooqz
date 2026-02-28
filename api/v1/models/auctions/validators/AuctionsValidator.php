@@ -20,11 +20,17 @@ final class AuctionsValidator
         }
 
         if ($scenario === 'create') {
-            foreach (['title', 'starting_price', 'currency_code', 'start_date', 'end_date'] as $field) {
+            foreach (['title', 'starting_price', 'currency_id', 'start_date', 'end_date'] as $field) {
                 if (empty($data[$field])) {
                     $this->errors[] = "Field '{$field}' is required";
                 }
             }
+        }
+
+        if (isset($data['currency_id'])
+            && (!is_numeric($data['currency_id']) || (int)$data['currency_id'] <= 0)
+        ) {
+            $this->errors[] = 'currency_id must be a positive integer';
         }
 
         if (!empty($data['auction_type']) && !in_array($data['auction_type'], self::VALID_AUCTION_TYPES, true)) {

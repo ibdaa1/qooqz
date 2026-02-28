@@ -65,7 +65,8 @@ try {
         'product_id'     => $_GET['product_id']     ?? null,
         'is_featured'    => isset($_GET['is_featured']) ? (int)$_GET['is_featured'] : null,
         'condition_type' => $_GET['condition_type'] ?? null,
-        'currency_code'  => $_GET['currency_code']  ?? null,
+        'currency_id'    => isset($_GET['currency_id']) && is_numeric($_GET['currency_id'])
+                                ? (int)$_GET['currency_id'] : null,
         'search'         => $_GET['search']         ?? null,
     ];
 

@@ -91,7 +91,7 @@
         "bid_increment": {
           "label": "زيادة العرض"
         },
-        "currency_code": {
+        "currency_id": {
           "label": "العملة",
           "select": "اختر العملة"
         },

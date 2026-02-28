@@ -91,7 +91,7 @@
         "bid_increment": {
           "label": "Bid Increment"
         },
-        "currency_code": {
+        "currency_id": {
           "label": "Currency",
           "select": "Select currency"
         },
