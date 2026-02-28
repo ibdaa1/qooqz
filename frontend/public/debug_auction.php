@@ -3,7 +3,22 @@
  * QOOQZ Auction Debug — REMOVE AFTER USE
  * Token: ?token=qooqz_debug_2026
  */
-if (($_GET['token'] ?? '') !== 'qooqz_debug_2026') { http_response_code(403); exit('Forbidden'); }
+if (($_GET['token'] ?? '') !== 'qooqz_debug_2026') {
+    http_response_code(403);
+    echo '<!DOCTYPE html><html><head><title>Auction Debug — Token Required</title>'
+        . '<style>body{font:14px monospace;padding:32px;background:#111;color:#eee}'
+        . 'form{margin-top:16px}input{padding:8px;width:320px;background:#222;color:#eee;border:1px solid #444}'
+        . 'button{padding:8px 16px;background:#2563eb;color:#fff;border:0;cursor:pointer;margin-left:8px}'
+        . '</style></head><body>'
+        . '<h2>🔐 QOOQZ Auction Debug</h2>'
+        . '<p>This diagnostic tool requires a token.</p>'
+        . '<form method="get"><input name="token" placeholder="Enter debug token" required>'
+        . '<button type="submit">Run Diagnostics</button></form>'
+        . '<p style="color:#888;font-size:12px;margin-top:24px">Token is: <code>qooqz_debug_2026</code><br>'
+        . 'Or visit: <code>' . htmlspecialchars($_SERVER['PHP_SELF'] ?? '/debug_auction.php') . '?token=qooqz_debug_2026</code></p>'
+        . '</body></html>';
+    exit;
+}
 ?><!DOCTYPE html><html><head><title>Auction Debug</title>
 <style>body{font:14px monospace;padding:16px;background:#111;color:#eee}
 pre{background:#1a1a1a;padding:8px;border-radius:4px;white-space:pre-wrap;word-break:break-all}
