@@ -264,6 +264,44 @@ if ($first === 'ui') {
  * GET /api/public/products[/{id}]
  * ----------------------------------------------------- */
 if ($first === 'products') {
+    // ── POST /api/public/products/{id}/reviews|questions must be caught HERE
+    // before the $id-based product detail path (which also matches and calls exit).
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+        $subPid    = isset($segments[1]) && ctype_digit((string)$segments[1]) ? (int)$segments[1] : 0;
+        $subAction = strtolower($segments[2] ?? '');
+        if ($subPid && in_array($subAction, ['reviews', 'questions'], true)) {
+            $subUserId = $_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? null);
+            if (!$subUserId) { ResponseFormatter::error('Login required', 401); exit; }
+            if (!$pdo) { ResponseFormatter::error('DB unavailable', 503); exit; }
+            if ($subAction === 'reviews') {
+                $rating  = (int)($_POST['rating'] ?? 0);
+                $title   = trim($_POST['title'] ?? '');
+                $comment = trim($_POST['comment'] ?? '');
+                if ($rating < 1 || $rating > 5) { ResponseFormatter::error('Rating must be 1-5', 422); exit; }
+                try {
+                    $st = $pdo->prepare(
+                        'INSERT INTO product_reviews (product_id, user_id, rating, title, comment, is_approved, created_at, updated_at)
+                         VALUES (?, ?, ?, ?, ?, 0, NOW(), NOW())'
+                    );
+                    $st->execute([$subPid, $subUserId, $rating, $title ?: null, $comment ?: null]);
+                    ResponseFormatter::success(['ok' => true, 'id' => (int)$pdo->lastInsertId()], 'Review submitted pending approval', 201);
+                } catch (Throwable $ex) { ResponseFormatter::error('Failed: ' . $ex->getMessage(), 500); }
+            } else {
+                $question = trim($_POST['question'] ?? '');
+                if (strlen($question) < 5) { ResponseFormatter::error('Question too short', 422); exit; }
+                try {
+                    $st = $pdo->prepare(
+                        'INSERT INTO product_questions (product_id, user_id, question, is_approved, created_at, updated_at)
+                         VALUES (?, ?, ?, 0, NOW(), NOW())'
+                    );
+                    $st->execute([$subPid, $subUserId, $question]);
+                    ResponseFormatter::success(['ok' => true, 'id' => (int)$pdo->lastInsertId()], 'Question submitted pending review', 201);
+                } catch (Throwable $ex) { ResponseFormatter::error('Failed: ' . $ex->getMessage(), 500); }
+            }
+            exit;
+        }
+    }
+
     $id = $_GET['id'] ?? (isset($segments[1]) && ctype_digit((string)$segments[1]) ? (int)$segments[1] : null);
     if (!$id && !empty($_GET['slug'])) {
         $slugParams = [$_GET['slug']];
