@@ -23,6 +23,41 @@ $first    = strtolower($segments[0] ?? '');
 /** @var PDO|null $pdo */
 $pdo = $GLOBALS['ADMIN_DB'] ?? null;
 
+// Fallback: on LiteSpeed/cPanel shared hosting ADMIN_DB may be null because
+// the Kernel bootstraps DB lazily or the global is not preserved across requests.
+// Try to build a fresh PDO connection from db.php when ADMIN_DB is missing.
+if (!$pdo instanceof PDO) {
+    $__paths = [
+        ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/shared/config/db.php',
+        dirname(__DIR__) . '/shared/config/db.php',
+    ];
+    foreach ($__paths as $__f) {
+        if ($__f && is_readable($__f)) {
+            $__cfg = require $__f;
+            if (is_array($__cfg) && isset($__cfg['host'], $__cfg['name'], $__cfg['user'])) {
+                try {
+                    $pdo = new PDO(
+                        sprintf('mysql:host=%s;port=%d;dbname=%s;charset=%s',
+                            $__cfg['host'],
+                            (int)($__cfg['port'] ?? 3306),
+                            $__cfg['name'],
+                            $__cfg['charset'] ?? 'utf8mb4'
+                        ),
+                        $__cfg['user'],
+                        $__cfg['pass'] ?? '',
+                        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                         PDO::ATTR_TIMEOUT => 5]
+                    );
+                    $GLOBALS['ADMIN_DB'] = $pdo; // cache for subsequent requires
+                } catch (Throwable $__e) { $pdo = null; }
+                break;
+            }
+        }
+    }
+    unset($__paths, $__f, $__cfg, $__e);
+}
+
 $lang     = $_GET['lang'] ?? 'ar';
 $page     = max(1, (int)($_GET['page'] ?? 1));
 $per      = min(100, max(1, (int)($_GET['per'] ?? $_GET['limit'] ?? 25)));
@@ -257,9 +292,8 @@ if ($first === 'products') {
                        WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
                     b.name AS brand_name,
                     (SELECT i.url FROM images i WHERE i.owner_id = p.id
-                       ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_url,
-                    (SELECT i.thumb_url FROM images i WHERE i.owner_id = p.id
-                       ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_thumb_url
+                       ORDER BY i.id ASC LIMIT 1) AS image_url,
+                    NULL AS image_thumb_url
                FROM products p
           LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
           LEFT JOIN brands b ON b.id = p.brand_id
@@ -268,13 +302,12 @@ if ($first === 'products') {
         );
         if (!$row) { ResponseFormatter::notFound('Product not found'); exit; }
 
-        // All product images (gallery) — no image_type filter to avoid failures
-        // when image_types table is empty or has different code values.
+        // All product images (gallery) — select only id and url (safe columns that always exist)
         $productImages = $pdoList(
-            "SELECT i.id, i.url, i.thumb_url, i.alt_text
+            "SELECT i.id, i.url
                FROM images i
               WHERE i.owner_id = ?
-              ORDER BY i.is_main DESC, i.id ASC LIMIT 10",
+              ORDER BY i.id ASC LIMIT 10",
             [(int)$id]
         );
 
@@ -347,8 +380,8 @@ if ($first === 'products') {
                 p.stock_quantity, p.stock_status,
                 (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
                 (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
-                (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_url,
-                (SELECT i.thumb_url FROM images i WHERE i.owner_id = p.id ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_thumb_url
+                (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url,
+                NULL AS image_thumb_url
            FROM products p
       LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
          $where ORDER BY p.id DESC LIMIT ? OFFSET ?",
@@ -376,17 +409,13 @@ if ($first === 'products') {
 if ($first === 'categories') {
     $id = $_GET['id'] ?? (isset($segments[1]) && ctype_digit((string)$segments[1]) ? (int)$segments[1] : null);
 
-    // Pre-fetch category image_type id once to avoid per-row subquery
-    $catImgRow    = $pdoOne('SELECT id FROM image_types WHERE code = ? LIMIT 1', ['category']);
-    $catImgTypeId = (int)($catImgRow['id'] ?? 0);
-
     if ($id) {
         $row = $pdoOne(
             "SELECT c.id, COALESCE(ct.name, c.slug) AS name, c.slug, c.description,
-                    i.url AS image_url, c.is_featured, c.is_active, c.parent_id, c.sort_order, c.tenant_id
+                    (SELECT i.url FROM images i WHERE i.owner_id = c.id ORDER BY i.id ASC LIMIT 1) AS image_url,
+                    c.is_featured, c.is_active, c.parent_id, c.sort_order, c.tenant_id
                FROM categories c
           LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
-          LEFT JOIN images i ON i.owner_id = c.id AND i.is_main = 1 AND i.image_type_id = $catImgTypeId
               WHERE c.id = ? AND c.is_active = 1 LIMIT 1",
             [$lang, (int)$id]
         );
@@ -411,13 +440,13 @@ if ($first === 'categories') {
     $total = $pdoCount("SELECT COUNT(*) FROM categories c $where", $whereParams);
     $rows  = $pdoList(
         "SELECT c.id, COALESCE(ct.name, c.slug) AS name, c.slug,
-                i.url AS image_url, c.is_featured, c.is_active, c.parent_id, c.sort_order, c.tenant_id,
+                (SELECT i.url FROM images i WHERE i.owner_id = c.id ORDER BY i.id ASC LIMIT 1) AS image_url,
+                c.is_featured, c.is_active, c.parent_id, c.sort_order, c.tenant_id,
                 (SELECT COUNT(*) FROM products p
                   INNER JOIN product_categories pc ON pc.product_id = p.id AND pc.category_id = c.id
                   WHERE p.is_active = 1) AS product_count
            FROM categories c
       LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
-      LEFT JOIN images i ON i.owner_id = c.id AND i.is_main = 1 AND i.image_type_id = $catImgTypeId
           $where ORDER BY c.is_featured DESC, c.sort_order ASC, c.id ASC LIMIT ? OFFSET ?",
         array_merge([$lang], $whereParams, [$per, $offset])
     );
@@ -569,8 +598,8 @@ if ($first === 'entity') {
                     p.is_featured, p.stock_quantity, p.stock_status,
                     (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
                     (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
-                    (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_url,
-                    (SELECT i.thumb_url FROM images i WHERE i.owner_id = p.id ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_thumb_url
+                    (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url,
+                    NULL AS image_thumb_url
                FROM products p
           LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
               $where ORDER BY p.is_featured DESC, p.id DESC LIMIT ? OFFSET ?",
@@ -590,14 +619,11 @@ if ($first === 'entity') {
                 e.is_verified, e.phone, e.mobile, e.email, e.website_url AS website,
                 e.status, e.tenant_id, e.created_at,
                 et.name AS type_name,
-                logo_i.url AS logo_url, logo_i.thumb_url AS logo_thumb_url,
-                cover_i.url AS cover_url
+                (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url,
+                NULL AS logo_thumb_url,
+                NULL AS cover_url
            FROM entities e
       LEFT JOIN entity_types et ON et.code = e.vendor_type
-      LEFT JOIN images logo_i ON logo_i.owner_id = e.id AND logo_i.is_main = 1
-             AND logo_i.image_type_id = (SELECT id FROM image_types WHERE code = 'entity_logo' LIMIT 1)
-      LEFT JOIN images cover_i ON cover_i.owner_id = e.id AND cover_i.is_main = 1
-             AND cover_i.image_type_id = (SELECT id FROM image_types WHERE code = 'entity_cover' LIMIT 1)
           WHERE e.id = ? AND e.status NOT IN ('suspended','rejected') LIMIT 1",
         [$entityId]
     );
@@ -697,10 +723,9 @@ if ($first === 'entities') {
     $total = $pdoCount("SELECT COUNT(*) FROM entities e $where", $params);
     $rows  = $pdoList(
         "SELECT e.id, e.store_name, e.slug, e.vendor_type, e.is_verified, e.tenant_id,
-                i.url AS logo_url, i.thumb_url AS logo_thumb_url
+                (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url,
+                NULL AS logo_thumb_url
            FROM entities e
-      LEFT JOIN images i ON i.owner_id = e.id AND i.is_main = 1
-             AND i.image_type_id = (SELECT id FROM image_types WHERE code = 'entity_logo' LIMIT 1)
           $where ORDER BY e.is_verified DESC, e.id DESC LIMIT ? OFFSET ?",
         array_merge($params, [$per, $offset])
     );
@@ -730,10 +755,8 @@ if ($first === 'tenants') {
         );
         $rows  = $pdoList(
             "SELECT e.id, e.store_name, e.slug, e.vendor_type, e.is_verified, e.phone,
-                    COALESCE(logo_i.url, logo_i.thumb_url) AS logo_url
+                    (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url
                FROM entities e
-          LEFT JOIN images logo_i ON logo_i.owner_id = e.id AND logo_i.is_main = 1
-                 AND logo_i.image_type_id = (SELECT id FROM image_types WHERE code = 'entity_logo' LIMIT 1)
               WHERE e.tenant_id = ? AND e.status = 'approved'
               ORDER BY e.id ASC LIMIT ? OFFSET ?",
             [(int)$id, $per, $offset]
@@ -1698,7 +1721,7 @@ if ($first === 'recent') {
                     p.stock_status, p.stock_quantity,
                     (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
                     (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
-                    (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_url,
+                    (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url,
                     rvp.viewed_at
                FROM recently_viewed_products rvp
                JOIN products p ON p.id = rvp.product_id
@@ -1767,7 +1790,7 @@ if ($first === 'compare') {
                     b.name AS brand_name,
                     (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
                     (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
-                    (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_url,
+                    (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url,
                     pc.created_at AS added_at
                FROM product_comparisons pc
                JOIN products p ON p.id = pc.product_id
@@ -1806,7 +1829,7 @@ if ($first === 'bundles') {
             $items = $pdoList(
                 "SELECT bi.id, bi.product_id, bi.quantity, bi.product_price,
                         COALESCE(pt.name, p.slug) AS product_name,
-                        (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_url
+                        (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url
                    FROM product_bundle_items bi
                    JOIN products p ON p.id = bi.product_id
               LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?

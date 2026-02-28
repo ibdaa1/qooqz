@@ -77,8 +77,7 @@ if (!$product && $pdo) {
                         b.name AS brand_name,
                         (SELECT i.url FROM images i WHERE i.owner_id = p.id
                            ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_url,
-                        (SELECT i.thumb_url FROM images i WHERE i.owner_id = p.id
-                           ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_thumb_url
+                        NULL AS image_thumb_url
                    FROM products p
               LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
               LEFT JOIN brands b ON b.id = p.brand_id
@@ -88,17 +87,34 @@ if (!$product && $pdo) {
             $product = $st->fetch() ?: null;
 
             if ($product) {
-                // Gallery images — wrapped in own try-catch so a missing column
-                // (e.g. sort_order not yet in images table) never nulls out $product.
+                // Gallery images — wrapped in own try-catch so missing columns
+                // (thumb_url, alt_text, is_main) never null out $product.
                 try {
                     $st = $pdo->prepare(
-                        "SELECT i.id, i.url, i.thumb_url, i.alt_text
+                        "SELECT i.id, i.url
                            FROM images i
                           WHERE i.owner_id = ?
-                          ORDER BY i.is_main DESC, i.id ASC LIMIT 10"
+                          ORDER BY i.id ASC LIMIT 10"
                     );
                     $st->execute([$productId]);
-                    $images = $st->fetchAll();
+                    $rawImgs = $st->fetchAll();
+                    // Try to enrich with optional columns (thumb_url, alt_text, is_main)
+                    $images = [];
+                    foreach ($rawImgs as $img) {
+                        $images[] = [
+                            'id'        => $img['id'],
+                            'url'       => $img['url'],
+                            'thumb_url' => $img['thumb_url'] ?? $img['url'],
+                            'alt_text'  => $img['alt_text'] ?? '',
+                        ];
+                    }
+                    // Also set image_url and image_thumb_url on product if not already set
+                    if (!empty($images) && empty($product['image_url'])) {
+                        $product['image_url']       = $images[0]['url'];
+                        $product['image_thumb_url'] = $images[0]['thumb_url'];
+                    } elseif (!empty($product['image_url']) && empty($product['image_thumb_url'])) {
+                        $product['image_thumb_url'] = $product['image_url'];
+                    }
                 } catch (Throwable $_) { $images = []; }
 
                 // Categories — own try-catch for same reason
