@@ -514,7 +514,45 @@ if (!function_exists('pub_load_theme')) {
 }
 
 /* -------------------------------------------------------
- * 7. Direct PDO helper — reuse the same DB connection as the API
+ * 7a. SEO meta helper — loads seo_meta + seo_meta_translations for any entity.
+ * Returns array with SEO fields or [] if no row / DB error.
+ * ----------------------------------------------------- */
+if (!function_exists('pub_get_seo_meta')) {
+    function pub_get_seo_meta(string $entityType, int $entityId, string $lang = 'en'): array {
+        if (!$entityId || !$entityType) return [];
+        $pdo = pub_get_pdo();
+        if (!$pdo) return [];
+        try {
+            $st = $pdo->prepare(
+                "SELECT sm.canonical_url, sm.robots, sm.schema_markup,
+                        smt.meta_title, smt.meta_description, smt.meta_keywords,
+                        smt.og_title, smt.og_description, smt.og_image
+                   FROM seo_meta sm
+              LEFT JOIN seo_meta_translations smt
+                     ON smt.seo_meta_id = sm.id AND smt.language_code = ?
+                  WHERE sm.entity_type = ? AND sm.entity_id = ?
+                  LIMIT 1"
+            );
+            $st->execute([$lang, $entityType, $entityId]);
+            $row = $st->fetch();
+            if (!$row) return [];
+            return [
+                'title'          => $row['meta_title']        ?? '',
+                'description'    => $row['meta_description']  ?? '',
+                'keywords'       => $row['meta_keywords']     ?? '',
+                'canonical_url'  => $row['canonical_url']     ?? '',
+                'robots'         => $row['robots']            ?? '',
+                'og_title'       => $row['og_title']          ?? '',
+                'og_description' => $row['og_description']    ?? '',
+                'og_image'       => $row['og_image']          ?? '',
+                'schema_markup'  => $row['schema_markup']     ?? '',
+            ];
+        } catch (Throwable $_) { return []; }
+    }
+}
+
+/* -------------------------------------------------------
+ * 7b. Direct PDO helper — reuse the same DB connection as the API
  *    Returns PDO instance or null on failure.
  *    Used by product.php and other pages to avoid HTTP loopback
  *    self-referencing requests that may fail on shared hosting.

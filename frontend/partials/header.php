@@ -50,8 +50,96 @@ $_fontUrl = $dir === 'rtl'
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="<?= e($theme['primary'] ?? '#FF0000') ?>">
 
+    <?php
+    // Merge PUB_SEO global (set by each page) with header-level SEO defaults
+    $_pubSeo  = $GLOBALS['PUB_SEO'] ?? [];
+    $_robots  = $_pubSeo['robots']       ?? 'index,follow';
+    $_keywords= $_pubSeo['keywords']     ?? '';
+    $_canonical = $_pubSeo['canonical_url'] ?? '';
+    $_ogTitle = $_pubSeo['og_title']     ?? $_pageTitle;
+    $_ogDesc  = $_pubSeo['og_description'] ?? $_pageDesc;
+    $_ogImage = $_pubSeo['og_image']     ?? ($theme['logo_url'] ?? '');
+    $_ogType  = $_pubSeo['og_type']      ?? 'website';
+    $_siteUrl = 'https://' . ($_SERVER['HTTP_HOST'] ?? 'hcsfcs.top');
+    $_curUrl  = $_siteUrl . ($_SERVER['REQUEST_URI'] ?? '/');
+    if (!$_canonical) $_canonical = $_curUrl;
+    ?>
     <title><?= e($_pageTitle) ?></title>
     <?php if ($_pageDesc): ?><meta name="description" content="<?= e($_pageDesc) ?>"><?php endif; ?>
+    <?php if ($_keywords): ?><meta name="keywords" content="<?= e($_keywords) ?>"><?php endif; ?>
+    <meta name="robots" content="<?= e($_robots) ?>">
+    <link rel="canonical" href="<?= e($_canonical) ?>">
+
+    <!-- Open Graph -->
+    <meta property="og:type"        content="<?= e($_ogType) ?>">
+    <meta property="og:title"       content="<?= e($_ogTitle ?: $_pageTitle) ?>">
+    <meta property="og:description" content="<?= e($_ogDesc ?: $_pageDesc) ?>">
+    <meta property="og:url"         content="<?= e($_curUrl) ?>">
+    <meta property="og:site_name"   content="<?= e($_appName) ?>">
+    <?php if ($_ogImage): ?><meta property="og:image" content="<?= e(strpos($_ogImage,'http')===0 ? $_ogImage : $_siteUrl.$_ogImage) ?>"><?php endif; ?>
+    <meta property="og:locale"      content="<?= e(str_replace('-','_',$lang)) ?>">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card"        content="summary_large_image">
+    <meta name="twitter:title"       content="<?= e($_ogTitle ?: $_pageTitle) ?>">
+    <meta name="twitter:description" content="<?= e($_ogDesc ?: $_pageDesc) ?>">
+    <?php if ($_ogImage): ?><meta name="twitter:image" content="<?= e(strpos($_ogImage,'http')===0 ? $_ogImage : $_siteUrl.$_ogImage) ?>"><?php endif; ?>
+
+    <?php
+    // JSON-LD Schema Markup — use admin-configured schema_markup if available,
+    // otherwise auto-generate from PUB_SEO data (Product, WebSite, etc.)
+    $_schemaMarkup = $_pubSeo['schema_markup'] ?? '';
+    if (!$_schemaMarkup && !empty($_pubSeo['schema_type'])) {
+        // Auto-generate Product schema
+        if ($_pubSeo['schema_type'] === 'Product') {
+            $__schema = [
+                '@context'    => 'https://schema.org',
+                '@type'       => 'Product',
+                'name'        => $_pubSeo['schema_name']  ?? $_pageTitle,
+                'description' => $_pubSeo['schema_description'] ?? '',
+                'sku'         => $_pubSeo['schema_sku'] ?? '',
+                'url'         => $_curUrl,
+            ];
+            if (!empty($_pubSeo['schema_image'])) $__schema['image'] = $_siteUrl . $_pubSeo['schema_image'];
+            if (!empty($_pubSeo['schema_price'])) {
+                $__schema['offers'] = [
+                    '@type'         => 'Offer',
+                    'price'         => (string)$_pubSeo['schema_price'],
+                    'priceCurrency' => $_pubSeo['schema_currency'] ?? 'USD',
+                    'availability'  => $_pubSeo['schema_availability'] ?? 'https://schema.org/InStock',
+                    'url'           => $_curUrl,
+                ];
+            }
+            if (!empty($_pubSeo['schema_rating'])) {
+                $__schema['aggregateRating'] = [
+                    '@type'       => 'AggregateRating',
+                    'ratingValue' => $_pubSeo['schema_rating']['ratingValue'],
+                    'reviewCount' => $_pubSeo['schema_rating']['reviewCount'],
+                    'bestRating'  => '5',
+                    'worstRating' => '1',
+                ];
+            }
+            $_schemaMarkup = json_encode($__schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG);
+        } elseif ($_pubSeo['schema_type'] === 'WebSite') {
+            $_schemaMarkup = json_encode([
+                '@context' => 'https://schema.org',
+                '@type'    => 'WebSite',
+                'name'     => $_appName,
+                'url'      => $_siteUrl,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG);
+        }
+    }
+    if (!$_schemaMarkup) {
+        // Default WebSite schema for all pages
+        $_schemaMarkup = json_encode([
+            '@context' => 'https://schema.org',
+            '@type'    => 'WebSite',
+            'name'     => $_appName,
+            'url'      => $_siteUrl,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG);
+    }
+    ?>
+    <script type="application/ld+json"><?= $_schemaMarkup ?></script>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">

@@ -1331,8 +1331,13 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   margin: 0;
   line-height: 1.25;
 }
-.pub-product-rating { display: flex; align-items: center; gap: 8px; }
-.pub-stars { color: var(--pub-accent); font-size: 1.05rem; letter-spacing: 1px; }
+.pub-product-rating { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pub-stars { display: inline-flex; gap: 1px; font-size: 1.15rem; line-height: 1; }
+.pub-star--full  { color: var(--pub-accent, #F59E0B); }
+.pub-star--half  { color: var(--pub-accent, #F59E0B); opacity: 0.6; }
+.pub-star--empty { color: var(--pub-muted, #888); }
+.pub-rating-score { font-size: 1rem; font-weight: 700; color: var(--pub-accent, #F59E0B); }
+.pub-rating-count { font-size: 0.85rem; color: var(--pub-muted, #888); }
 
 .pub-product-price-block { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .pub-product-detail-price {

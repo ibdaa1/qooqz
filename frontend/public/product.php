@@ -355,6 +355,34 @@ if (!$product) {
 $GLOBALS['PUB_PAGE_TITLE'] = e($productName) . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_DESC']  = strip_tags($productDesc ?: $productName);
 
+// Load SEO meta from seo_meta table (if admin has configured it for this product)
+$_seoMeta = pub_get_seo_meta('product', $productId, $lang);
+if (!empty($_seoMeta['title']))       $GLOBALS['PUB_PAGE_TITLE'] = e($_seoMeta['title']);
+if (!empty($_seoMeta['description'])) $GLOBALS['PUB_PAGE_DESC']  = e($_seoMeta['description']);
+$GLOBALS['PUB_SEO'] = [
+    'canonical_url'  => $_seoMeta['canonical_url']  ?? '',
+    'robots'         => $_seoMeta['robots']         ?? 'index,follow',
+    'keywords'       => $_seoMeta['keywords']       ?? implode(',', array_column($categories, 'name')),
+    'og_title'       => $_seoMeta['og_title']       ?? $productName,
+    'og_description' => $_seoMeta['og_description'] ?? strip_tags($productDesc ?: ''),
+    'og_image'       => $_seoMeta['og_image']       ?? $mainImage,
+    'og_type'        => 'product',
+    'schema_markup'  => $_seoMeta['schema_markup']  ?? '',
+    // Product-specific schema data (used by header.php for JSON-LD if schema_markup is empty)
+    'schema_type'    => 'Product',
+    'schema_name'    => $productName,
+    'schema_image'   => $mainImage ? pub_img($mainImage) : '',
+    'schema_description' => strip_tags($productDesc ?: ''),
+    'schema_sku'     => $product['sku'] ?? '',
+    'schema_price'   => $price,
+    'schema_currency'=> $currency,
+    'schema_availability' => $inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+    'schema_rating'  => !empty($product['rating_count']) ? [
+        'ratingValue' => number_format((float)($product['rating_average'] ?? 0), 1),
+        'reviewCount' => (int)($product['rating_count'] ?? 0),
+    ] : null,
+];
+
 include dirname(__DIR__) . '/partials/header.php';
 ?>
 
@@ -425,13 +453,26 @@ include dirname(__DIR__) . '/partials/header.php';
             <h1 class="pub-product-detail-title"><?= e($productName) ?></h1>
 
             <!-- Rating -->
-            <?php if (!empty($product['rating_count'])): ?>
+            <?php
+            $ratingAvg   = (float)($product['rating_average'] ?? 0);
+            $ratingCount = (int)($product['rating_count'] ?? 0);
+            if ($ratingCount > 0):
+                // Build 5 stars: filled (★), half (✦), empty (☆)
+                $starHtml = '';
+                for ($s = 1; $s <= 5; $s++) {
+                    if ($ratingAvg >= $s) {
+                        $starHtml .= '<span class="pub-star pub-star--full">★</span>';
+                    } elseif ($ratingAvg >= $s - 0.5) {
+                        $starHtml .= '<span class="pub-star pub-star--half">★</span>';
+                    } else {
+                        $starHtml .= '<span class="pub-star pub-star--empty">☆</span>';
+                    }
+                }
+            ?>
             <div class="pub-product-rating">
-                <span class="pub-stars">★★★★★</span>
-                <span style="font-size:0.85rem;color:var(--pub-muted);">
-                    <?= number_format((float)($product['rating_average'] ?? 0), 1) ?>
-                    (<?= (int)$product['rating_count'] ?> <?= e(t('products.reviews')) ?>)
-                </span>
+                <span class="pub-stars" aria-label="<?= number_format($ratingAvg, 1) ?> <?= e(t('products.out_of_5', ['default' => 'out of 5'])) ?>"><?= $starHtml ?></span>
+                <span class="pub-rating-score"><?= number_format($ratingAvg, 1) ?></span>
+                <span class="pub-rating-count">(<?= $ratingCount ?> <?= e(t('products.reviews')) ?>)</span>
             </div>
             <?php endif; ?>
 

@@ -94,7 +94,8 @@
     "upsell": "You May Also Like",
     "cross_sell": "Frequently Bought Together",
     "accessories": "Accessories",
-    "alternatives": "Alternatives"
+    "alternatives": "Alternatives",
+    "out_of_5": "out of 5"
   },
   "categories": {
     "page_title": "Categories",
