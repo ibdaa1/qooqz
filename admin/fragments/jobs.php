@@ -361,11 +361,11 @@ $apiBase = '/api';
                                 <?= __t('form.fields.salary_currency.label', 'Currency') ?>
                             </label>
                             <select id="salaryCurrency" name="salary_currency" class="form-control">
+                                <option value="SAR">SAR</option>
+                                <option value="AED">AED</option>
                                 <option value="USD">USD</option>
                                 <option value="EUR">EUR</option>
                                 <option value="GBP">GBP</option>
-                                <option value="SAR">SAR</option>
-                                <option value="AED">AED</option>
                             </select>
                         </div>
 
@@ -402,14 +402,18 @@ $apiBase = '/api';
                             <label for="countryId" data-i18n="form.fields.country_id.label">
                                 <?= __t('form.fields.country_id.label', 'Country') ?>
                             </label>
-                            <input type="number" id="countryId" name="country_id" class="form-control">
+                            <select id="countryId" name="country_id" class="form-control">
+                                <option value=""><?= __t('form.fields.country_id.placeholder', 'Select Country') ?></option>
+                            </select>
                         </div>
 
                         <div class="form-group">
                             <label for="cityId" data-i18n="form.fields.city_id.label">
                                 <?= __t('form.fields.city_id.label', 'City') ?>
                             </label>
-                            <input type="number" id="cityId" name="city_id" class="form-control">
+                            <select id="cityId" name="city_id" class="form-control">
+                                <option value=""><?= __t('form.fields.city_id.placeholder', 'Select City') ?></option>
+                            </select>
                         </div>
                     </div>
 
@@ -774,6 +778,9 @@ window.WORKSPACE_CONFIG = {
     languagesApi: '<?= $apiBase ?>/languages',
     categoriesApi: '<?= $apiBase ?>/job_categories',
     skillsApi: '<?= $apiBase ?>/job_skills',
+    countriesApi: '<?= $apiBase ?>/countries',
+    citiesApi: '<?= $apiBase ?>/cities',
+    currenciesApi: '<?= $apiBase ?>/currencies',
     lang: '<?= addslashes($lang) ?>',
     dir: '<?= addslashes($dir) ?>',
     csrfToken: '<?= addslashes($csrf) ?>',

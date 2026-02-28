@@ -16,7 +16,10 @@
         answers: CONFIG.answersApi || '/api/job_application_answers',
         skills: CONFIG.skillsApi || '/api/job_skills',
         languages: CONFIG.languagesApi || '/api/languages',
-        categories: CONFIG.categoriesApi || '/api/job_categories'
+        categories: CONFIG.categoriesApi || '/api/job_categories',
+        countries: CONFIG.countriesApi || '/api/countries',
+        cities: CONFIG.citiesApi || '/api/cities',
+        currencies: CONFIG.currenciesApi || '/api/currencies'
     };
 
     const state = {
@@ -252,6 +255,7 @@
         init() {
             this.cacheElements();
             this.attachEvents();
+            this.loadDropdownData();
         },
 
         cacheElements() {
@@ -323,6 +327,12 @@
                     });
                 });
             });
+            // Country → City cascade
+            if (this.el.countryId) {
+                this.el.countryId.addEventListener('change', () => {
+                    this.loadCitiesForCountry(this.el.countryId.value);
+                });
+            }
         },
 
         async load(page = 1) {
@@ -452,8 +462,16 @@
                 if (this.el.salaryCurrency) this.el.salaryCurrency.value = job.salary_currency || 'SAR';
                 if (this.el.salaryPeriod) this.el.salaryPeriod.value = job.salary_period || 'monthly';
                 if (this.el.salaryNegotiable) this.el.salaryNegotiable.checked = !!parseInt(job.salary_negotiable);
-                if (this.el.countryId) this.el.countryId.value = job.country_id || '';
-                if (this.el.cityId) this.el.cityId.value = job.city_id || '';
+                if (this.el.countryId) {
+                    this.el.countryId.value = job.country_id || '';
+                    // Load cities for the selected country, then set city
+                    if (job.country_id) {
+                        this.loadCitiesForCountry(job.country_id).then(() => {
+                            if (this.el.cityId) this.el.cityId.value = job.city_id || '';
+                        });
+                    }
+                }
+                if (!job.country_id && this.el.cityId) this.el.cityId.value = job.city_id || '';
                 if (this.el.workLocation) this.el.workLocation.value = job.work_location || 'onsite';
                 if (this.el.isRemote) this.el.isRemote.checked = !!parseInt(job.is_remote);
                 if (this.el.applicationFormType) this.el.applicationFormType.value = job.application_form_type || 'simple';
@@ -591,6 +609,107 @@
                 { field: 'status', label: 'Status' },
             ];
             exportToCSV(this.state.items, 'jobs_export.csv', columns);
+        },
+
+        async loadDropdownData() {
+            // Load categories
+            try {
+                const catResult = await apiCall(`${API.categories}?page=1&limit=5000&tenant_id=${state.tenantId}&lang=${state.language}&format=json`);
+                if (catResult.success) {
+                    const cats = catResult.data?.items || catResult.data || [];
+                    const catEl = this.el.jobCategory;
+                    const catFilter = document.getElementById('categoryFilter');
+                    [catEl, catFilter].forEach(sel => {
+                        if (!sel) return;
+                        const first = sel.options[0];
+                        sel.innerHTML = '';
+                        if (first) sel.appendChild(first.cloneNode(true));
+                        cats.forEach(c => {
+                            const o = document.createElement('option');
+                            o.value = c.id;
+                            o.textContent = c.name || c.category_name || c.id;
+                            sel.appendChild(o);
+                        });
+                    });
+                }
+            } catch (e) { console.warn('[Jobs] Failed to load categories', e); }
+
+            // Load currencies
+            try {
+                const curResult = await apiCall(`${API.currencies}?page=1&limit=500&format=json`);
+                if (curResult.success) {
+                    const curs = curResult.data?.items || curResult.data || [];
+                    const curEl = this.el.salaryCurrency;
+                    if (curEl && Array.isArray(curs) && curs.length > 0) {
+                        const savedVal = curEl.value;
+                        curEl.innerHTML = '';
+                        curs.forEach(c => {
+                            const o = document.createElement('option');
+                            o.value = c.code || c.id;
+                            o.textContent = `${c.code || c.id} – ${c.name || ''}`;
+                            curEl.appendChild(o);
+                        });
+                        curEl.value = savedVal || 'SAR';
+                    }
+                }
+            } catch (e) { console.warn('[Jobs] Failed to load currencies', e); }
+
+            // Load countries
+            try {
+                const cntResult = await apiCall(`${API.countries}?page=1&limit=500&lang=${state.language}&format=json`);
+                if (cntResult.success) {
+                    const countries = cntResult.data?.items || cntResult.data || [];
+                    const cntEl = this.el.countryId;
+                    if (cntEl) {
+                        const savedVal = cntEl.value;
+                        cntEl.innerHTML = `<option value="">${t('form.fields.country_id.placeholder', 'Select Country')}</option>`;
+                        countries.forEach(c => {
+                            const o = document.createElement('option');
+                            o.value = c.id;
+                            o.textContent = c.name || c.translations?.[state.language] || c.id;
+                            cntEl.appendChild(o);
+                        });
+                        if (savedVal) cntEl.value = savedVal;
+                    }
+                }
+            } catch (e) { console.warn('[Jobs] Failed to load countries', e); }
+
+            // Load languages for translation dropdown
+            try {
+                const langResult = await apiCall(`${API.languages}?page=1&limit=100&format=json`);
+                if (langResult.success) {
+                    const langs = langResult.data?.items || langResult.data || [];
+                    const langEl = document.getElementById('translationLanguage');
+                    if (langEl && Array.isArray(langs)) {
+                        langEl.innerHTML = `<option value="">${t('form.translations.choose_lang', 'Select Language')}</option>`;
+                        langs.forEach(l => {
+                            const o = document.createElement('option');
+                            o.value = l.code;
+                            o.textContent = l.name;
+                            langEl.appendChild(o);
+                        });
+                    }
+                }
+            } catch (e) { console.warn('[Jobs] Failed to load languages', e); }
+        },
+
+        async loadCitiesForCountry(countryId) {
+            const cityEl = this.el.cityId;
+            if (!cityEl) return;
+            cityEl.innerHTML = `<option value="">${t('form.fields.city_id.placeholder', 'Select City')}</option>`;
+            if (!countryId) return;
+            try {
+                const result = await apiCall(`${API.cities}?country_id=${countryId}&page=1&limit=2000&lang=${state.language}&format=json`);
+                if (result.success) {
+                    const cities = result.data?.items || result.data || [];
+                    cities.forEach(c => {
+                        const o = document.createElement('option');
+                        o.value = c.id;
+                        o.textContent = c.name || c.id;
+                        cityEl.appendChild(o);
+                    });
+                }
+            } catch (e) { console.warn('[Jobs] Failed to load cities', e); }
         }
     };
 
