@@ -34,6 +34,7 @@ $_navItems = [
     t('nav.jobs')       => $_basePath . '/jobs.php',
     t('nav.entities')   => $_basePath . '/entities.php',
     t('nav.tenants')    => $_basePath . '/tenants.php',
+    t('nav.auctions')  => $_basePath . '/auctions.php',
 ];
 $_cartUrl   = $_basePath . '/cart.php';
 $_cartLabel = e(t('nav.cart'));

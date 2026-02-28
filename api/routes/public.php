@@ -1974,4 +1974,193 @@ if ($first === 'products' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     }
 }
 
+// ==============================================================
+// AUCTIONS MODULE
+// GET  /api/public/auctions              — listing
+// GET  /api/public/auctions/{id}         — detail + bid history
+// GET  /api/public/auctions/{id}/status  — live poll (price, bids, countdown)
+// POST /api/public/auctions/{id}/bid     — place manual bid
+// POST /api/public/auctions/{id}/auto-bid — set/update auto-bid max
+// POST /api/public/auctions/{id}/watch   — watch toggle
+// POST /api/public/auctions/{id}/buy-now — buy now
+// ==============================================================
+if ($first === 'auctions') {
+    $auctionId = (isset($segments[1]) && ctype_digit((string)$segments[1])) ? (int)$segments[1] : 0;
+    $auctionSub = strtolower($segments[2] ?? '');
+    $auctionMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    $auctionUserId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
+    $auctionLang = $lang ?: 'ar';
+
+    // Helper: get auction translation
+    $getAuctionName = function(int $aid, string $lng) use ($pdo, $pdoOne): string {
+        $r = $pdoOne('SELECT title FROM auction_translations WHERE auction_id=? AND language_code=? LIMIT 1', [$aid, $lng]);
+        if (!$r) $r = $pdoOne('SELECT title FROM auction_translations WHERE auction_id=? LIMIT 1', [$aid]);
+        return $r['title'] ?? '';
+    };
+
+    // ---- GET listing ----
+    if (!$auctionId && $auctionMethod === 'GET') {
+        $aSt = in_array($_GET['status'] ?? '', ['active','scheduled','ended','all'], true) ? $_GET['status'] : 'active';
+        $aType = in_array($_GET['type'] ?? '', ['normal','reserve','buy_now','dutch','sealed_bid'], true) ? $_GET['type'] : '';
+        $aFeat = isset($_GET['featured']) ? 1 : null;
+        $aWhere = '1=1';
+        $aParams = [];
+        if ($aSt !== 'all') { $aWhere .= ' AND a.status = ?'; $aParams[] = $aSt; }
+        if ($aType)         { $aWhere .= ' AND a.auction_type = ?'; $aParams[] = $aType; }
+        if ($aFeat !== null){ $aWhere .= ' AND a.is_featured = 1'; }
+        if ($tenantId)      { $aWhere .= ' AND a.tenant_id = ?'; $aParams[] = $tenantId; }
+        $aRows = $pdoList(
+            "SELECT a.id, a.slug, a.auction_type, a.status, a.starting_price, a.current_price,
+                    a.buy_now_price, a.bid_increment, a.total_bids, a.total_bidders,
+                    a.start_date, a.end_date, a.is_featured, a.condition_type, a.quantity,
+                    a.currency_id, a.entity_id,
+                    (SELECT i.url FROM images i WHERE i.owner_id = a.product_id ORDER BY i.id ASC LIMIT 1) AS image_url,
+                    (SELECT at2.title FROM auction_translations at2 WHERE at2.auction_id = a.id AND at2.language_code = ? LIMIT 1) AS title
+             FROM auctions a
+             WHERE $aWhere
+             ORDER BY a.is_featured DESC, a.end_date ASC
+             LIMIT ? OFFSET ?",
+            array_merge([$auctionLang], $aParams, [$per, $offset])
+        );
+        ResponseFormatter::success(['ok' => true, 'auctions' => $aRows, 'page' => $page, 'per' => $per]);
+        exit;
+    }
+
+    // ---- GET detail ----
+    if ($auctionId && $auctionMethod === 'GET' && $auctionSub === '') {
+        $aRow = $pdoOne(
+            "SELECT a.*, 
+                    (SELECT at2.title FROM auction_translations at2 WHERE at2.auction_id=a.id AND at2.language_code=? LIMIT 1) AS title,
+                    (SELECT at2.description FROM auction_translations at2 WHERE at2.auction_id=a.id AND at2.language_code=? LIMIT 1) AS description,
+                    (SELECT at2.terms_conditions FROM auction_translations at2 WHERE at2.auction_id=a.id AND at2.language_code=? LIMIT 1) AS terms_conditions,
+                    (SELECT i.url FROM images i WHERE i.owner_id = a.product_id ORDER BY i.id ASC LIMIT 1) AS image_url
+             FROM auctions a WHERE a.id=?",
+            [$auctionLang, $auctionLang, $auctionLang, $auctionId]
+        );
+        if (!$aRow) { ResponseFormatter::notFound('Auction not found'); exit; }
+        // Bid history (last 20)
+        $aBids = $pdoList(
+            "SELECT ab.id, ab.bid_amount, ab.bid_type, ab.is_winning, ab.created_at,
+                    COALESCE(u.username, CONCAT('User#', ab.user_id)) AS bidder
+             FROM auction_bids ab LEFT JOIN users u ON u.id = ab.user_id
+             WHERE ab.auction_id=? ORDER BY ab.bid_amount DESC, ab.created_at DESC LIMIT 20",
+            [$auctionId]
+        );
+        // Is user watching?
+        $aIsWatching = false;
+        if ($auctionUserId) {
+            $aIsWatching = (bool)$pdoOne('SELECT id FROM auction_watchers WHERE auction_id=? AND user_id=? LIMIT 1', [$auctionId, $auctionUserId]);
+        }
+        // User's current max auto-bid
+        $aAutoBid = null;
+        if ($auctionUserId) {
+            $aAutoBid = $pdoOne('SELECT max_bid_amount, is_active FROM auto_bid_settings WHERE auction_id=? AND user_id=? AND is_active=1 LIMIT 1', [$auctionId, $auctionUserId]);
+        }
+        ResponseFormatter::success(['ok' => true, 'auction' => $aRow, 'bids' => $aBids, 'is_watching' => $aIsWatching, 'auto_bid' => $aAutoBid]);
+        exit;
+    }
+
+    // ---- GET status (live poll) ----
+    if ($auctionId && $auctionMethod === 'GET' && $auctionSub === 'status') {
+        $aSt = $pdoOne(
+            'SELECT current_price, total_bids, total_bidders, status, end_date,
+                    (SELECT ab.bid_amount FROM auction_bids ab WHERE ab.auction_id=a.id AND ab.is_winning=1 ORDER BY ab.bid_amount DESC LIMIT 1) AS top_bid
+             FROM auctions a WHERE a.id=?',
+            [$auctionId]
+        );
+        if (!$aSt) { ResponseFormatter::notFound('Auction not found'); exit; }
+        $aSt['server_time'] = date('c');
+        ResponseFormatter::success(['ok' => true, 'status' => $aSt]);
+        exit;
+    }
+
+    // ---- POST bid ----
+    if ($auctionId && $auctionMethod === 'POST' && $auctionSub === 'bid') {
+        if (!$auctionUserId) { ResponseFormatter::error('Login required', 401); exit; }
+        $bidAmount = (float)($_POST['bid_amount'] ?? 0);
+        if ($bidAmount <= 0) { ResponseFormatter::error('Invalid bid amount', 422); exit; }
+        if (!$pdo) { ResponseFormatter::error('DB unavailable', 503); exit; }
+        try {
+            $aRow = $pdoOne('SELECT current_price, bid_increment, status, end_date FROM auctions WHERE id=?', [$auctionId]);
+            if (!$aRow) { ResponseFormatter::notFound('Auction not found'); exit; }
+            if ($aRow['status'] !== 'active') { ResponseFormatter::error('Auction is not active', 422); exit; }
+            if (strtotime($aRow['end_date']) < time()) { ResponseFormatter::error('Auction has ended', 422); exit; }
+            $minBid = (float)$aRow['current_price'] + (float)$aRow['bid_increment'];
+            if ($bidAmount < $minBid) { ResponseFormatter::error("Minimum bid is $minBid", 422); exit; }
+            $pdo->beginTransaction();
+            // Mark previous winning bid as not winning
+            $pdo->prepare('UPDATE auction_bids SET is_winning=0 WHERE auction_id=?')->execute([$auctionId]);
+            // Insert new bid
+            $stB = $pdo->prepare('INSERT INTO auction_bids (auction_id, user_id, bid_amount, bid_type, is_winning, ip_address, created_at) VALUES (?,?,?,?,1,?,NOW())');
+            $stB->execute([$auctionId, $auctionUserId, $bidAmount, 'manual', $_SERVER['REMOTE_ADDR'] ?? null]);
+            $newBidId = (int)$pdo->lastInsertId();
+            // Update auction current price + bid count
+            $pdo->prepare('UPDATE auctions SET current_price=?, total_bids=total_bids+1, winner_user_id=?, winner_bid_id=? WHERE id=?')
+                ->execute([$bidAmount, $auctionUserId, $newBidId, $auctionId]);
+            $pdo->commit();
+            ResponseFormatter::success(['ok' => true, 'bid_id' => $newBidId, 'new_price' => $bidAmount], 'Bid placed', 201);
+        } catch (Throwable $ex) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            ResponseFormatter::error('Failed: ' . $ex->getMessage(), 500);
+        }
+        exit;
+    }
+
+    // ---- POST auto-bid ----
+    if ($auctionId && $auctionMethod === 'POST' && $auctionSub === 'auto-bid') {
+        if (!$auctionUserId) { ResponseFormatter::error('Login required', 401); exit; }
+        $maxBid = (float)($_POST['max_bid_amount'] ?? 0);
+        if ($maxBid <= 0) { ResponseFormatter::error('Invalid max bid', 422); exit; }
+        if (!$pdo) { ResponseFormatter::error('DB unavailable', 503); exit; }
+        try {
+            $stAB = $pdo->prepare('INSERT INTO auto_bid_settings (auction_id, user_id, max_bid_amount, is_active, created_at, updated_at) VALUES (?,?,?,1,NOW(),NOW()) ON DUPLICATE KEY UPDATE max_bid_amount=VALUES(max_bid_amount), is_active=1, updated_at=NOW()');
+            $stAB->execute([$auctionId, $auctionUserId, $maxBid]);
+            ResponseFormatter::success(['ok' => true, 'max_bid' => $maxBid], 'Auto-bid set');
+        } catch (Throwable $ex) { ResponseFormatter::error('Failed: ' . $ex->getMessage(), 500); }
+        exit;
+    }
+
+    // ---- POST watch / DELETE watch ----
+    if ($auctionId && in_array($auctionSub, ['watch'], true)) {
+        if (!$auctionUserId) { ResponseFormatter::error('Login required', 401); exit; }
+        if (!$pdo) { ResponseFormatter::error('DB unavailable', 503); exit; }
+        try {
+            $exists = $pdoOne('SELECT id FROM auction_watchers WHERE auction_id=? AND user_id=? LIMIT 1', [$auctionId, $auctionUserId]);
+            if ($exists) {
+                $pdo->prepare('DELETE FROM auction_watchers WHERE auction_id=? AND user_id=?')->execute([$auctionId, $auctionUserId]);
+                ResponseFormatter::success(['ok' => true, 'watching' => false], 'Unwatched');
+            } else {
+                $pdo->prepare('INSERT INTO auction_watchers (auction_id, user_id, created_at) VALUES (?,?,NOW())')->execute([$auctionId, $auctionUserId]);
+                ResponseFormatter::success(['ok' => true, 'watching' => true], 'Watching', 201);
+            }
+        } catch (Throwable $ex) { ResponseFormatter::error('Failed: ' . $ex->getMessage(), 500); }
+        exit;
+    }
+
+    // ---- POST buy-now ----
+    if ($auctionId && $auctionMethod === 'POST' && $auctionSub === 'buy-now') {
+        if (!$auctionUserId) { ResponseFormatter::error('Login required', 401); exit; }
+        if (!$pdo) { ResponseFormatter::error('DB unavailable', 503); exit; }
+        try {
+            $aRow = $pdoOne('SELECT buy_now_price, status, end_date FROM auctions WHERE id=?', [$auctionId]);
+            if (!$aRow) { ResponseFormatter::notFound('Auction not found'); exit; }
+            if ($aRow['status'] !== 'active') { ResponseFormatter::error('Auction not active', 422); exit; }
+            if (!$aRow['buy_now_price']) { ResponseFormatter::error('No buy-now price', 422); exit; }
+            $pdo->beginTransaction();
+            $pdo->prepare('UPDATE auction_bids SET is_winning=0 WHERE auction_id=?')->execute([$auctionId]);
+            $stBN = $pdo->prepare('INSERT INTO auction_bids (auction_id, user_id, bid_amount, bid_type, is_winning, created_at) VALUES (?,?,?,?,1,NOW())');
+            $stBN->execute([$auctionId, $auctionUserId, $aRow['buy_now_price'], 'buy_now']);
+            $bnId = (int)$pdo->lastInsertId();
+            $pdo->prepare("UPDATE auctions SET status='sold', current_price=?, winner_user_id=?, winner_bid_id=?, winning_amount=?, ended_at=NOW() WHERE id=?")
+                ->execute([$aRow['buy_now_price'], $auctionUserId, $bnId, $aRow['buy_now_price'], $auctionId]);
+            $pdo->commit();
+            ResponseFormatter::success(['ok' => true, 'bid_id' => $bnId, 'amount' => $aRow['buy_now_price']], 'Purchased!');
+        } catch (Throwable $ex) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            ResponseFormatter::error('Failed: ' . $ex->getMessage(), 500);
+        }
+        exit;
+    }
+}
+
 ResponseFormatter::notFound('Public route not found: /' . ($first ?: ''));
