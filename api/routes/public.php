@@ -1581,6 +1581,17 @@ if ($first === 'wishlist') {
         $entityId  = (int)($_POST['entity_id']  ?? 1);
         if (!$productId) { ResponseFormatter::error('product_id required', 422); exit; }
         try {
+            // Auto-resolve tenant_id from product's tenant if not provided
+            $wlItemTenantId = $tenantId;
+            if (!$wlItemTenantId) {
+                $ptRow = $pdo->prepare('SELECT tenant_id FROM products WHERE id = ? LIMIT 1');
+                $ptRow->execute([$productId]);
+                $ptFetch = $ptRow->fetch(PDO::FETCH_ASSOC);
+                $wlItemTenantId = $ptFetch ? (int)$ptFetch['tenant_id'] : 0;
+            }
+            if (!$wlItemTenantId) {
+                $wlItemTenantId = (int)($_SESSION['tenant_id'] ?? $_SESSION['pub_tenant_id'] ?? 1);
+            }
             $wlId = $getDefaultWishlist();
             // Check if already in wishlist (including soft-deleted → restore)
             $exist = $pdo->prepare('SELECT id, removed_at FROM wishlist_items WHERE wishlist_id = ? AND product_id = ? LIMIT 1');
@@ -1597,7 +1608,7 @@ if ($first === 'wishlist') {
                 $pdo->prepare(
                     'INSERT INTO wishlist_items (wishlist_id, product_id, entity_id, tenant_id, product_variant_id, priority, created_at, updated_at)
                      VALUES (?, ?, ?, ?, 0, 0, NOW(), NOW())'
-                )->execute([$wlId, $productId, $entityId, $tenantId]);
+                )->execute([$wlId, $productId, $entityId, $wlItemTenantId]);
             }
             $refreshWishlistCount($wlId);
             ResponseFormatter::success(['ok' => true, 'wishlist_id' => $wlId], 'Added to wishlist', 201);
