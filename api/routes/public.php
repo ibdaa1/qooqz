@@ -86,6 +86,7 @@ $pdoOne = function (string $sql, array $params = []) use ($pdo): ?array {
         $row = $st->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
     } catch (Throwable $e) {
+        error_log('[public.php pdoOne] ' . $e->getMessage() . ' | SQL: ' . substr($sql, 0, 200));
         return null;
     }
 };
@@ -290,13 +291,12 @@ if ($first === 'products') {
                     NULL AS compare_at_price,
                     (SELECT pp.currency_code FROM product_pricing pp
                        WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
-                    b.name AS brand_name,
+                    NULL AS brand_name,
                     (SELECT i.url FROM images i WHERE i.owner_id = p.id
                        ORDER BY i.id ASC LIMIT 1) AS image_url,
                     NULL AS image_thumb_url
                FROM products p
           LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
-          LEFT JOIN brands b ON b.id = p.brand_id
               WHERE p.id = ?" . $tidCond,
             $qParams
         );
@@ -331,7 +331,7 @@ if ($first === 'products') {
                         (SELECT pp2.currency_code FROM product_pricing pp2
                            WHERE pp2.product_id = p2.id ORDER BY pp2.id ASC LIMIT 1) AS currency_code,
                         (SELECT i2.url FROM images i2 WHERE i2.owner_id = p2.id
-                         ORDER BY i2.is_main DESC, i2.id ASC LIMIT 1) AS image_url
+                         ORDER BY i2.id ASC LIMIT 1) AS image_url
                    FROM products p2
              INNER JOIN product_categories pc2 ON pc2.product_id = p2.id AND pc2.category_id = ?
               LEFT JOIN product_translations pt2 ON pt2.product_id = p2.id AND pt2.language_code = ?
@@ -1787,7 +1787,7 @@ if ($first === 'compare') {
                     p.stock_status, p.stock_quantity, p.rating_average, p.rating_count,
                     p.is_featured, p.is_new, p.is_bestseller,
                     pt.description, pt.specifications,
-                    b.name AS brand_name,
+                    NULL AS brand_name,
                     (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
                     (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
                     (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url,
@@ -1795,7 +1795,6 @@ if ($first === 'compare') {
                FROM product_comparisons pc
                JOIN products p ON p.id = pc.product_id
           LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
-          LEFT JOIN brands b ON b.id = p.brand_id
               WHERE pc.user_id = ?
               ORDER BY pc.created_at ASC",
             [$lang, $userId]

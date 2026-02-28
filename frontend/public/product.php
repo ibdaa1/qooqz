@@ -74,13 +74,12 @@ if (!$product && $pdo) {
                         NULL AS compare_at_price,
                         (SELECT pp.currency_code FROM product_pricing pp
                            WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
-                        b.name AS brand_name,
+                        NULL AS brand_name,
                         (SELECT i.url FROM images i WHERE i.owner_id = p.id
-                           ORDER BY i.is_main DESC, i.id ASC LIMIT 1) AS image_url,
+                           ORDER BY i.id ASC LIMIT 1) AS image_url,
                         NULL AS image_thumb_url
                    FROM products p
               LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
-              LEFT JOIN brands b ON b.id = p.brand_id
                   WHERE p.id = ?"
             );
             $st->execute($qParams);
@@ -159,7 +158,7 @@ if (!$product && $pdo) {
                                     (SELECT pp2.currency_code FROM product_pricing pp2
                                        WHERE pp2.product_id = p2.id ORDER BY pp2.id ASC LIMIT 1) AS currency_code,
                                     (SELECT i2.url FROM images i2 WHERE i2.owner_id = p2.id
-                                       ORDER BY i2.is_main DESC, i2.id ASC LIMIT 1) AS image_url
+                                       ORDER BY i2.id ASC LIMIT 1) AS image_url
                                FROM products p2
                          INNER JOIN product_categories pc2 ON pc2.product_id = p2.id AND pc2.category_id = ?
                           LEFT JOIN product_translations pt2 ON pt2.product_id = p2.id AND pt2.language_code = ?
@@ -241,7 +240,7 @@ if (!$product && $pdo) {
                                 p2.id, COALESCE(pt2.name, p2.slug) AS name, p2.slug, p2.stock_status,
                                 (SELECT pp2.price FROM product_pricing pp2 WHERE pp2.product_id = p2.id ORDER BY pp2.id ASC LIMIT 1) AS price,
                                 (SELECT pp2.currency_code FROM product_pricing pp2 WHERE pp2.product_id = p2.id ORDER BY pp2.id ASC LIMIT 1) AS currency_code,
-                                (SELECT i2.url FROM images i2 WHERE i2.owner_id = p2.id ORDER BY i2.is_main DESC, i2.id ASC LIMIT 1) AS image_url
+                                (SELECT i2.url FROM images i2 WHERE i2.owner_id = p2.id ORDER BY i2.id ASC LIMIT 1) AS image_url
                            FROM product_relations pr
                       INNER JOIN products p2 ON p2.id = pr.related_product_id AND p2.is_active = 1
                        LEFT JOIN product_translations pt2 ON pt2.product_id = p2.id AND pt2.language_code = ?
@@ -253,7 +252,8 @@ if (!$product && $pdo) {
                 } catch (Throwable $_) { $relations = []; }
             }
         }
-    } catch (Throwable $_) {
+    } catch (Throwable $e) {
+        error_log('[product.php] PDO product load failed: ' . $e->getMessage());
         $product = null;
     }
 }
