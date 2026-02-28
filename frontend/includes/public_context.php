@@ -275,26 +275,13 @@ if (!function_exists('pub_load_theme')) {
         // Session cache is checked after theme_id lookup (inside PDO block below)
         // to ensure cache key includes theme_id and stale entries are not returned.
 
-        // Try direct PDO connection (same DB as API)
-        $dbConf = null;
-        $dbFile = FRONTEND_BASE . '/../api/shared/config/db.php';
-        if (is_readable($dbFile)) {
-            $dbConf = require $dbFile;
-        }
+        // Reuse the shared PDO connection (avoids opening a second connection per request).
+        // pub_get_pdo() is defined later in this file (line ~538) but will already be
+        // registered by the time pub_load_theme() is *called* at line ~695.
+        $pdo = pub_get_pdo();
 
-        if ($dbConf && is_array($dbConf)) {
+        if ($pdo instanceof PDO) {
             try {
-                $dsn = sprintf(
-                    'mysql:host=%s;port=%d;dbname=%s;charset=%s',
-                    $dbConf['host'] ?? 'localhost',
-                    (int)($dbConf['port'] ?? 3306),
-                    $dbConf['name'],
-                    $dbConf['charset'] ?? 'utf8mb4'
-                );
-                $pdo = new PDO($dsn, $dbConf['user'], $dbConf['pass'], [
-                    PDO::ATTR_TIMEOUT => 3,
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                ]);
 
                 $colors  = [];
                 $fonts   = [];
@@ -721,4 +708,12 @@ $GLOBALS['PUB_CONTEXT'] = [
     'app'       => $appConfig,
     'user'      => $_pubUser,
 ];
+
+// Export user and login state as global PHP variables so any PHP page can use
+// them BEFORE including partials/header.php (which also sets these from PUB_CONTEXT).
+// Without this, pages like wishlist.php that check $_isLoggedIn before header.php
+// is included would always see the variable as undefined (= null = not logged in).
+$_user       = $_pubUser;
+$_isLoggedIn = !empty($_pubUser['id']);
+
 unset($_pubUser);

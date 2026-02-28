@@ -84,13 +84,12 @@ if ($pdo) {
             $product = $st->fetch() ?: null;
 
             if ($product) {
-                // Gallery images
+                // Gallery images — no image_type filter to avoid INNER JOIN failures
+                // when image_types table is empty or has different code values.
                 $st = $pdo->prepare(
                     "SELECT i.id, i.url, i.thumb_url, i.alt_text, i.sort_order
                        FROM images i
-                  LEFT JOIN image_types it ON it.id = i.image_type_id
                       WHERE i.owner_id = ?
-                        AND (it.code IS NULL OR it.code IN ('product','product_thumb'))
                       ORDER BY i.is_main DESC, i.sort_order ASC, i.id ASC LIMIT 10"
                 );
                 $st->execute([$productId]);

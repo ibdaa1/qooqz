@@ -27,7 +27,7 @@ if ($pdo) {
                 "SELECT wi.id, wi.product_id, wi.priority, wi.notes, wi.created_at,
                         COALESCE(pt.name, p.slug) AS product_name,
                         (SELECT i2.url FROM images i2 WHERE i2.owner_id = p.id
-                         AND i2.owner_type = 'product' ORDER BY i2.id ASC LIMIT 1) AS image_url,
+                         ORDER BY i2.is_main DESC, i2.id ASC LIMIT 1) AS image_url,
                         (SELECT pp2.price FROM product_pricing pp2 WHERE pp2.product_id = p.id LIMIT 1) AS price,
                         (SELECT pp2.currency_code FROM product_pricing pp2 WHERE pp2.product_id = p.id LIMIT 1) AS currency_code,
                         p.stock_status
