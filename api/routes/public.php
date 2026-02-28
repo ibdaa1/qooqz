@@ -377,7 +377,7 @@ if ($first === 'products') {
     $total = $pdoCount("SELECT COUNT(*) FROM products p $where", $whereParams);
     $rows  = $pdoList(
         "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.sku, p.slug, p.is_featured, p.tenant_id,
-                p.stock_quantity, p.stock_status,
+                p.stock_quantity, p.stock_status, p.rating_average, p.rating_count,
                 (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
                 (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
                 (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url,
@@ -595,7 +595,7 @@ if ($first === 'entity') {
         $total = $pdoCount("SELECT COUNT(*) FROM products p $where", $params);
         $rows  = $pdoList(
             "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.sku, p.slug,
-                    p.is_featured, p.stock_quantity, p.stock_status,
+                    p.is_featured, p.stock_quantity, p.stock_status, p.rating_average, p.rating_count,
                     (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
                     (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
                     (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url,
@@ -1901,38 +1901,36 @@ if ($first === 'products' && $method === 'POST') {
 
     if ($reviewPid && $reviewAction === 'reviews') {
         $revUserId = $_SESSION['user_id'] ?? $_SESSION['user']['id'] ?? null;
-        if (!$revUserId) ResponseFormatter::error('Login required', 401);
+        if (!$revUserId) { ResponseFormatter::error('Login required', 401); exit; }
         $rating  = (int)($_POST['rating'] ?? 0);
         $title   = trim($_POST['title'] ?? '');
         $comment = trim($_POST['comment'] ?? '');
-        if ($rating < 1 || $rating > 5) ResponseFormatter::error('Rating must be 1-5', 422);
+        if ($rating < 1 || $rating > 5) { ResponseFormatter::error('Rating must be 1-5', 422); exit; }
+        if (!$pdo) { ResponseFormatter::error('DB unavailable', 503); exit; }
         try {
-            $pdoR = $GLOBALS['pdo'] ?? null;
-            if (!$pdoR) ResponseFormatter::error('DB unavailable', 503);
-            $st = $pdoR->prepare(
+            $st = $pdo->prepare(
                 'INSERT INTO product_reviews (product_id, user_id, rating, title, comment, is_approved, created_at, updated_at)
                  VALUES (?, ?, ?, ?, ?, 0, NOW(), NOW())'
             );
             $st->execute([$reviewPid, $revUserId, $rating, $title ?: null, $comment ?: null]);
-            ResponseFormatter::success(['ok' => true, 'id' => (int)$pdoR->lastInsertId()], 'Review submitted pending approval', 201);
+            ResponseFormatter::success(['ok' => true, 'id' => (int)$pdo->lastInsertId()], 'Review submitted pending approval', 201);
         } catch (Throwable $ex) { ResponseFormatter::error('Failed: ' . $ex->getMessage(), 500); }
         exit;
     }
 
     if ($reviewPid && $reviewAction === 'questions') {
         $qaUserId = $_SESSION['user_id'] ?? $_SESSION['user']['id'] ?? null;
-        if (!$qaUserId) ResponseFormatter::error('Login required', 401);
+        if (!$qaUserId) { ResponseFormatter::error('Login required', 401); exit; }
         $question = trim($_POST['question'] ?? '');
-        if (strlen($question) < 5) ResponseFormatter::error('Question too short', 422);
+        if (strlen($question) < 5) { ResponseFormatter::error('Question too short', 422); exit; }
+        if (!$pdo) { ResponseFormatter::error('DB unavailable', 503); exit; }
         try {
-            $pdoQ = $GLOBALS['pdo'] ?? null;
-            if (!$pdoQ) ResponseFormatter::error('DB unavailable', 503);
-            $st = $pdoQ->prepare(
+            $st = $pdo->prepare(
                 'INSERT INTO product_questions (product_id, user_id, question, is_approved, created_at, updated_at)
                  VALUES (?, ?, ?, 0, NOW(), NOW())'
             );
             $st->execute([$reviewPid, $qaUserId, $question]);
-            ResponseFormatter::success(['ok' => true, 'id' => (int)$pdoQ->lastInsertId()], 'Question submitted pending review', 201);
+            ResponseFormatter::success(['ok' => true, 'id' => (int)$pdo->lastInsertId()], 'Question submitted pending review', 201);
         } catch (Throwable $ex) { ResponseFormatter::error('Failed: ' . $ex->getMessage(), 500); }
         exit;
     }
