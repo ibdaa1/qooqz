@@ -1850,4 +1850,51 @@ if ($first === 'bundles') {
     exit;
 }
 
+// ==============================================================
+// POST /api/public/products/{id}/reviews — submit product review
+// POST /api/public/products/{id}/questions — submit question
+// ==============================================================
+if ($first === 'products' && $method === 'POST') {
+    $reviewPid = (int)($segments[1] ?? 0);
+    $reviewAction = $segments[2] ?? '';
+
+    if ($reviewPid && $reviewAction === 'reviews') {
+        $revUserId = $_SESSION['user_id'] ?? $_SESSION['user']['id'] ?? null;
+        if (!$revUserId) ResponseFormatter::error('Login required', 401);
+        $rating  = (int)($_POST['rating'] ?? 0);
+        $title   = trim($_POST['title'] ?? '');
+        $comment = trim($_POST['comment'] ?? '');
+        if ($rating < 1 || $rating > 5) ResponseFormatter::error('Rating must be 1-5', 422);
+        try {
+            $pdoR = $GLOBALS['pdo'] ?? null;
+            if (!$pdoR) ResponseFormatter::error('DB unavailable', 503);
+            $st = $pdoR->prepare(
+                'INSERT INTO product_reviews (product_id, user_id, rating, title, comment, is_approved, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, 0, NOW(), NOW())'
+            );
+            $st->execute([$reviewPid, $revUserId, $rating, $title ?: null, $comment ?: null]);
+            ResponseFormatter::success(['ok' => true, 'id' => (int)$pdoR->lastInsertId()], 'Review submitted pending approval', 201);
+        } catch (Throwable $ex) { ResponseFormatter::error('Failed: ' . $ex->getMessage(), 500); }
+        exit;
+    }
+
+    if ($reviewPid && $reviewAction === 'questions') {
+        $qaUserId = $_SESSION['user_id'] ?? $_SESSION['user']['id'] ?? null;
+        if (!$qaUserId) ResponseFormatter::error('Login required', 401);
+        $question = trim($_POST['question'] ?? '');
+        if (strlen($question) < 5) ResponseFormatter::error('Question too short', 422);
+        try {
+            $pdoQ = $GLOBALS['pdo'] ?? null;
+            if (!$pdoQ) ResponseFormatter::error('DB unavailable', 503);
+            $st = $pdoQ->prepare(
+                'INSERT INTO product_questions (product_id, user_id, question, is_approved, created_at, updated_at)
+                 VALUES (?, ?, ?, 0, NOW(), NOW())'
+            );
+            $st->execute([$reviewPid, $qaUserId, $question]);
+            ResponseFormatter::success(['ok' => true, 'id' => (int)$pdoQ->lastInsertId()], 'Question submitted pending review', 201);
+        } catch (Throwable $ex) { ResponseFormatter::error('Failed: ' . $ex->getMessage(), 500); }
+        exit;
+    }
+}
+
 ResponseFormatter::notFound('Public route not found: /' . ($first ?: ''));

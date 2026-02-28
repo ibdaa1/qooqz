@@ -79,7 +79,22 @@
     "compare_clear_confirm": "إزالة جميع المنتجات من المقارنة؟",
     "compare_empty": "لم يتم إضافة منتجات للمقارنة. تصفح المنتجات وانقر ⚖️ مقارنة.",
     "not_found_title": "المنتج غير موجود",
-    "not_found_msg": "هذا المنتج غير متاح أو غير موجود."
+    "not_found_msg": "هذا المنتج غير متاح أو غير موجود.",
+    "no_reviews": "لا توجد تقييمات بعد. كن أول من يقيّم!",
+    "write_review": "اكتب تقييماً",
+    "your_rating": "تقييمك",
+    "review_title": "عنوان التقييم (اختياري)",
+    "review_comment": "شاركنا تجربتك...",
+    "submit_review": "إرسال التقييم",
+    "verified_purchase": "شراء موثق",
+    "no_questions": "لا توجد أسئلة بعد. اطرح أول سؤال!",
+    "ask_question": "اطرح سؤالاً",
+    "question_placeholder": "ماذا تريد أن تعرف؟",
+    "submit_question": "إرسال السؤال",
+    "upsell": "قد يعجبك أيضاً",
+    "cross_sell": "يُشترى معه غالباً",
+    "accessories": "الإكسسوارات",
+    "alternatives": "بدائل"
   },
   "categories": {
     "page_title": "التصنيفات",

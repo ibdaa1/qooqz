@@ -30,6 +30,12 @@ $apiConfig = is_readable($apiConfigFile) ? (require $apiConfigFile) : [];
  * 2. Session — mirrors admin/includes/admin_context.php exactly.
  *    DOCUMENT_ROOT is the primary path (same as admin uses).
  * ----------------------------------------------------- */
+// If PHP session.auto_start=1 (common on shared hosting) started a session with the
+// wrong name/settings before our code runs, close it so we can restart correctly.
+if (php_sapi_name() !== 'cli' && session_status() === PHP_SESSION_ACTIVE && session_name() !== 'APP_SESSID') {
+    session_write_close();
+}
+
 if (php_sapi_name() !== 'cli' && session_status() === PHP_SESSION_NONE) {
     // Primary: DOCUMENT_ROOT (same as admin_context.php line 28)
     // Fallback: dirname(FRONTEND_BASE) for CLI / non-standard webroot setups

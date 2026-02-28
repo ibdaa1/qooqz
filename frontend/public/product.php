@@ -32,6 +32,9 @@ $images     = [];
 $categories = [];
 $related    = [];
 $variants   = [];
+$reviews    = [];
+$questions  = [];
+$relations  = [];
 
 $pdo = pub_get_pdo();
 if ($pdo) {
@@ -165,6 +168,66 @@ if ($pdo) {
                         )->execute([$rvUid2, session_id() ?: null, $productId]);
                     } catch (Throwable $__) { /* non-fatal */ }
                 }
+
+                // Reviews — approved only
+                try {
+                    $st = $pdo->prepare(
+                        "SELECT r.id, r.rating, r.title, r.comment, r.is_verified_purchase,
+                                r.helpful_count, r.created_at,
+                                COALESCE(u.name, u.username, 'User') AS author
+                           FROM product_reviews r
+                      LEFT JOIN users u ON u.id = r.user_id
+                          WHERE r.product_id = ? AND r.is_approved = 1
+                          ORDER BY r.helpful_count DESC, r.created_at DESC LIMIT 30"
+                    );
+                    $st->execute([$productId]);
+                    $reviews = $st->fetchAll();
+                } catch (Throwable $_) { $reviews = []; }
+
+                // Q&A — approved questions + approved answers
+                try {
+                    $st = $pdo->prepare(
+                        "SELECT q.id, q.question, q.helpful_count, q.created_at,
+                                COALESCE(uq.name, uq.username, 'User') AS asker
+                           FROM product_questions q
+                      LEFT JOIN users uq ON uq.id = q.user_id
+                          WHERE q.product_id = ? AND q.is_approved = 1
+                          ORDER BY q.helpful_count DESC, q.created_at DESC LIMIT 20"
+                    );
+                    $st->execute([$productId]);
+                    $questions = $st->fetchAll();
+                    foreach ($questions as &$qRow) {
+                        $sta = $pdo->prepare(
+                            "SELECT a.id, a.answer, a.is_staff_answer, a.helpful_count, a.created_at,
+                                    COALESCE(ua.name, ua.username, 'User') AS answerer
+                               FROM product_answers a
+                          LEFT JOIN users ua ON ua.id = a.user_id
+                              WHERE a.question_id = ? AND a.is_approved = 1
+                              ORDER BY a.is_staff_answer DESC, a.helpful_count DESC LIMIT 5"
+                        );
+                        $sta->execute([(int)$qRow['id']]);
+                        $qRow['answers'] = $sta->fetchAll();
+                    }
+                    unset($qRow);
+                } catch (Throwable $_) { $questions = []; }
+
+                // Product relations (upsell/cross_sell/accessory/alternative)
+                try {
+                    $st = $pdo->prepare(
+                        "SELECT pr.relation_type,
+                                p2.id, COALESCE(pt2.name, p2.slug) AS name, p2.slug, p2.stock_status,
+                                (SELECT pp2.price FROM product_pricing pp2 WHERE pp2.product_id = p2.id ORDER BY pp2.id ASC LIMIT 1) AS price,
+                                (SELECT pp2.currency_code FROM product_pricing pp2 WHERE pp2.product_id = p2.id ORDER BY pp2.id ASC LIMIT 1) AS currency_code,
+                                (SELECT i2.url FROM images i2 WHERE i2.owner_id = p2.id ORDER BY i2.is_main DESC, i2.id ASC LIMIT 1) AS image_url
+                           FROM product_relations pr
+                      INNER JOIN products p2 ON p2.id = pr.related_product_id AND p2.is_active = 1
+                       LEFT JOIN product_translations pt2 ON pt2.product_id = p2.id AND pt2.language_code = ?
+                          WHERE pr.product_id = ?
+                          ORDER BY pr.sort_order ASC, p2.id ASC LIMIT 20"
+                    );
+                    $st->execute([$lang, $productId]);
+                    $relations = $st->fetchAll();
+                } catch (Throwable $_) { $relations = []; }
             }
         }
     } catch (Throwable $_) {
@@ -441,7 +504,6 @@ include dirname(__DIR__) . '/partials/header.php';
     <!-- =============================================
          DESCRIPTION / SPECS TABS
     ============================================= -->
-    <?php if ($productDesc || $specs): ?>
     <div class="pub-section" style="padding:28px 0 0;">
         <div class="pub-tabs" id="pubDetailTabs">
             <?php if ($productDesc): ?>
@@ -455,6 +517,15 @@ include dirname(__DIR__) . '/partials/header.php';
                 <?= e(t('products.specifications')) ?>
             </button>
             <?php endif; ?>
+            <button class="pub-tab<?= (!$productDesc && !$specs) ? ' active' : '' ?>"
+                    onclick="pubTabSwitch(this,'pubReviewsPanel')" type="button">
+                <?= e(t('products.reviews')) ?>
+                <?php if (!empty($reviews)): ?><span class="pub-tab-count"><?= count($reviews) ?></span><?php endif; ?>
+            </button>
+            <button class="pub-tab" onclick="pubTabSwitch(this,'pubQaPanel')" type="button">
+                Q&amp;A
+                <?php if (!empty($questions)): ?><span class="pub-tab-count"><?= count($questions) ?></span><?php endif; ?>
+            </button>
         </div>
 
         <?php if ($productDesc): ?>
@@ -468,8 +539,136 @@ include dirname(__DIR__) . '/partials/header.php';
             <?= nl2br(e($specs)) ?>
         </div>
         <?php endif; ?>
+
+        <!-- Reviews panel -->
+        <div id="pubReviewsPanel" class="pub-tab-panel" style="<?= ($productDesc || $specs) ? 'display:none; ' : '' ?>padding:18px 0;">
+            <?php if (!empty($reviews)): ?>
+            <?php foreach ($reviews as $rv): ?>
+            <div style="border-bottom:1px solid var(--pub-border,#333);padding:14px 0;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                    <span style="color:#f59e0b;font-size:1.1em;"><?= str_repeat('★', (int)($rv['rating'] ?? 0)) ?><?= str_repeat('☆', 5 - (int)($rv['rating'] ?? 0)) ?></span>
+                    <strong style="font-size:.9em;"><?= e($rv['author'] ?? '') ?></strong>
+                    <?php if (!empty($rv['is_verified_purchase'])): ?>
+                    <span style="font-size:.75em;background:var(--pub-success,#10b981);color:#fff;padding:1px 6px;border-radius:4px;">✓ <?= e(t('products.verified_purchase')) ?></span>
+                    <?php endif; ?>
+                    <span style="font-size:.75em;color:var(--pub-muted,#999);margin-left:auto;"><?= e(substr($rv['created_at'] ?? '', 0, 10)) ?></span>
+                </div>
+                <?php if (!empty($rv['title'])): ?><p style="font-weight:600;margin:0 0 4px;"><?= e($rv['title']) ?></p><?php endif; ?>
+                <?php if (!empty($rv['comment'])): ?><p style="margin:0;color:var(--pub-muted,#aaa);font-size:.93em;"><?= e($rv['comment']) ?></p><?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+            <?php else: ?>
+            <p style="color:var(--pub-muted,#999);text-align:center;padding:28px 0;"><?= e(t('products.no_reviews')) ?></p>
+            <?php endif; ?>
+            <!-- Write a review (login-gated) -->
+            <?php if ($_isLoggedIn): ?>
+            <div style="margin-top:20px;padding:16px;background:var(--pub-surface,#1a1a2e);border-radius:8px;">
+                <h4 style="margin:0 0 12px;"><?= e(t('products.write_review')) ?></h4>
+                <div style="margin-bottom:8px;">
+                    <label style="display:block;font-size:.85em;margin-bottom:4px;"><?= e(t('products.your_rating')) ?></label>
+                    <div id="pubStarPicker" style="font-size:1.6em;cursor:pointer;color:#f59e0b;">
+                        <?php for ($i = 1; $i <= 5; $i++): ?><span data-val="<?= $i ?>" onclick="pubPickStar(<?= $i ?>)">☆</span><?php endfor; ?>
+                    </div>
+                    <input type="hidden" id="pubReviewRating" value="0">
+                </div>
+                <input type="text" id="pubReviewTitle" placeholder="<?= e(t('products.review_title')) ?>"
+                       style="width:100%;padding:8px;margin-bottom:8px;background:var(--pub-bg,#0d0d0d);color:var(--pub-text,#fff);border:1px solid var(--pub-border,#333);border-radius:6px;box-sizing:border-box;">
+                <textarea id="pubReviewComment" rows="3" placeholder="<?= e(t('products.review_comment')) ?>"
+                          style="width:100%;padding:8px;margin-bottom:8px;background:var(--pub-bg,#0d0d0d);color:var(--pub-text,#fff);border:1px solid var(--pub-border,#333);border-radius:6px;box-sizing:border-box;resize:vertical;"></textarea>
+                <button onclick="pubSubmitReview(<?= (int)$productId ?>)" class="pub-btn pub-btn--primary" style="padding:8px 18px;"><?= e(t('products.submit_review')) ?></button>
+                <span id="pubReviewMsg" style="margin-left:10px;font-size:.85em;"></span>
+            </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Q&A panel -->
+        <div id="pubQaPanel" class="pub-tab-panel" style="display:none;padding:18px 0;">
+            <?php if (!empty($questions)): ?>
+            <?php foreach ($questions as $q): ?>
+            <div style="border-bottom:1px solid var(--pub-border,#333);padding:14px 0;">
+                <div style="display:flex;gap:8px;margin-bottom:6px;">
+                    <span style="font-size:1.2em;">❓</span>
+                    <div>
+                        <p style="margin:0 0 4px;font-weight:600;"><?= e($q['question'] ?? '') ?></p>
+                        <span style="font-size:.75em;color:var(--pub-muted,#999);"><?= e($q['asker'] ?? '') ?> · <?= e(substr($q['created_at'] ?? '', 0, 10)) ?></span>
+                    </div>
+                </div>
+                <?php foreach ((array)($q['answers'] ?? []) as $ans): ?>
+                <div style="margin-left:28px;margin-top:8px;padding:8px 10px;background:var(--pub-surface,#1a1a2e);border-radius:6px;">
+                    <p style="margin:0 0 4px;font-size:.93em;"><?= e($ans['answer'] ?? '') ?></p>
+                    <span style="font-size:.75em;color:var(--pub-muted,#999);"><?= e($ans['answerer'] ?? '') ?><?= !empty($ans['is_staff_answer']) ? ' 🏷️ Staff' : '' ?></span>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <?php endforeach; ?>
+            <?php else: ?>
+            <p style="color:var(--pub-muted,#999);text-align:center;padding:28px 0;"><?= e(t('products.no_questions')) ?></p>
+            <?php endif; ?>
+            <!-- Ask a question (login-gated) -->
+            <?php if ($_isLoggedIn): ?>
+            <div style="margin-top:20px;padding:16px;background:var(--pub-surface,#1a1a2e);border-radius:8px;">
+                <h4 style="margin:0 0 12px;"><?= e(t('products.ask_question')) ?></h4>
+                <textarea id="pubQuestionText" rows="2" placeholder="<?= e(t('products.question_placeholder')) ?>"
+                          style="width:100%;padding:8px;margin-bottom:8px;background:var(--pub-bg,#0d0d0d);color:var(--pub-text,#fff);border:1px solid var(--pub-border,#333);border-radius:6px;box-sizing:border-box;resize:vertical;"></textarea>
+                <button onclick="pubSubmitQuestion(<?= (int)$productId ?>)" class="pub-btn pub-btn--primary" style="padding:8px 18px;"><?= e(t('products.submit_question')) ?></button>
+                <span id="pubQaMsg" style="margin-left:10px;font-size:.85em;"></span>
+            </div>
+            <?php endif; ?>
+        </div>
     </div>
-    <?php endif; ?>
+
+    <!-- =============================================
+         PRODUCT RELATIONS (upsell, cross-sell, etc.)
+    ============================================= -->
+    <?php
+    $relGroups = [];
+    foreach ($relations as $r) {
+        $relGroups[$r['relation_type']][] = $r;
+    }
+    $relTitles = [
+        'upsell'      => t('products.upsell'),
+        'cross_sell'  => t('products.cross_sell'),
+        'accessory'   => t('products.accessories'),
+        'alternative' => t('products.alternatives'),
+    ];
+    foreach ($relGroups as $rtype => $rItems): ?>
+    <section class="pub-section" style="margin-top:8px;">
+        <div class="pub-section-head">
+            <h2 class="pub-section-title"><?= e($relTitles[$rtype] ?? ucwords(str_replace('_', ' ', $rtype))) ?></h2>
+        </div>
+        <div class="pub-grid">
+            <?php foreach ($rItems as $p): ?>
+            <div class="pub-product-card">
+                <a href="/frontend/public/product.php?id=<?= (int)($p['id'] ?? 0) ?>" style="text-decoration:none;">
+                    <div class="pub-cat-img-wrap" style="aspect-ratio:1;">
+                        <?php if (!empty($p['image_url'])): ?>
+                        <img src="<?= e(pub_img($p['image_url'], 'product')) ?>" alt="<?= e($p['name'] ?? '') ?>" class="pub-cat-img" loading="lazy"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                        <span class="pub-img-placeholder" style="display:none;" aria-hidden="true">🖼️</span>
+                        <?php else: ?><span class="pub-img-placeholder" aria-hidden="true">🖼️</span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="pub-product-card-body">
+                        <p class="pub-product-name"><?= e($p['name'] ?? '') ?></p>
+                        <?php if (!empty($p['price'])): ?>
+                        <p class="pub-product-price"><?= number_format((float)$p['price'], 2) ?> <?= e($p['currency_code'] ?? '') ?></p>
+                        <?php endif; ?>
+                    </div>
+                </a>
+                <button class="pub-cart-btn" onclick="pubAddToCart(this)"
+                    data-product-id="<?= (int)($p['id'] ?? 0) ?>"
+                    data-product-name="<?= e($p['name'] ?? '') ?>"
+                    data-product-price="<?= e($p['price'] ?? '0') ?>"
+                    data-product-image="<?= e($p['image_url'] ?? '') ?>"
+                    data-product-sku="<?= e($p['sku'] ?? '') ?>"
+                    data-currency="<?= e($p['currency_code'] ?? '') ?>">
+                    <?= e(t('cart.add')) ?>
+                </button>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </section>
+    <?php endforeach; ?>
 
     <!-- =============================================
          RELATED PRODUCTS
@@ -588,6 +787,61 @@ document.addEventListener('DOMContentLoaded', function() {
         if (inList.indexOf(pid) >= 0) btn.textContent = '✅ In Compare';
     }
 });
+
+/* Star picker for review form */
+function pubPickStar(val) {
+    var stars = document.querySelectorAll('#pubStarPicker span');
+    stars.forEach(function(s, i) { s.textContent = i < val ? '★' : '☆'; });
+    document.getElementById('pubReviewRating').value = val;
+}
+
+/* Submit review */
+function pubSubmitReview(productId) {
+    var rating  = parseInt(document.getElementById('pubReviewRating').value || '0', 10);
+    var title   = (document.getElementById('pubReviewTitle').value || '').trim();
+    var comment = (document.getElementById('pubReviewComment').value || '').trim();
+    var msg     = document.getElementById('pubReviewMsg');
+    if (rating < 1 || rating > 5) { msg.textContent = '⚠️ Please select a rating.'; msg.style.color = '#ef4444'; return; }
+    msg.textContent = '…'; msg.style.color = '';
+    fetch('/api/public/products/' + productId + '/reviews', {
+        method: 'POST', credentials: 'include',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'rating=' + rating + '&title=' + encodeURIComponent(title) + '&comment=' + encodeURIComponent(comment)
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.success) {
+            msg.textContent = '✅ Review submitted — awaiting approval.';
+            msg.style.color = '#10b981';
+            document.getElementById('pubReviewTitle').value = '';
+            document.getElementById('pubReviewComment').value = '';
+            pubPickStar(0);
+        } else {
+            msg.textContent = '❌ ' + (d.message || 'Error');
+            msg.style.color = '#ef4444';
+        }
+    }).catch(function() { msg.textContent = '❌ Network error.'; msg.style.color = '#ef4444'; });
+}
+
+/* Submit question */
+function pubSubmitQuestion(productId) {
+    var question = (document.getElementById('pubQuestionText').value || '').trim();
+    var msg      = document.getElementById('pubQaMsg');
+    if (!question) { msg.textContent = '⚠️ Please enter your question.'; msg.style.color = '#ef4444'; return; }
+    msg.textContent = '…'; msg.style.color = '';
+    fetch('/api/public/products/' + productId + '/questions', {
+        method: 'POST', credentials: 'include',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'question=' + encodeURIComponent(question)
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.success) {
+            msg.textContent = '✅ Question submitted — awaiting review.';
+            msg.style.color = '#10b981';
+            document.getElementById('pubQuestionText').value = '';
+        } else {
+            msg.textContent = '❌ ' + (d.message || 'Error');
+            msg.style.color = '#ef4444';
+        }
+    }).catch(function() { msg.textContent = '❌ Network error.'; msg.style.color = '#ef4444'; });
+}
 </script>
 
 <?php include dirname(__DIR__) . '/partials/footer.php'; ?>
