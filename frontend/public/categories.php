@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 /**
  * frontend/public/categories.php
  * QOOQZ — Public Categories Listing Page

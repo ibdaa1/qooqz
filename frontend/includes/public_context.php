@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 /**
  * frontend/includes/public_context.php
  *

@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 /**
  * frontend/public/jobs.php
  * QOOQZ — Public Jobs Listing Page

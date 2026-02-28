@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 /**
  * frontend/profile.php
  * QOOQZ — Public User Profile + Address Management Page

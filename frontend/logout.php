@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 /**
  * frontend/logout.php
  * Handles logout for public frontend users.

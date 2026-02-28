@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 /**
  * frontend/public/entities.php
  * QOOQZ — Public Entities Listing Page

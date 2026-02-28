@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 /**
  * frontend/public/compare.php
  * Product Comparison page — side-by-side table of up to 4 products.

@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 /**
  * frontend/public/bundles.php
  * Product Bundles page — list of bundle deals.

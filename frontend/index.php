@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 session_start();
 
 // 1. إعدادات اللغة (بناءً على طلبك السابق)

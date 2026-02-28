@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 /**
  * frontend/public/slider.php
  * QOOQZ — Banners / Promotions Slider Page

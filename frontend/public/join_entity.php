@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 /**
  * frontend/public/join_entity.php
  * QOOQZ — Register as a Vendor / Entity (public registration form)

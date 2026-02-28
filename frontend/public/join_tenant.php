@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 /**
  * frontend/public/join_tenant.php
  * QOOQZ — Create a new Tenant workspace

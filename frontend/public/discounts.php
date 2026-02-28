@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 /**
  * frontend/public/discounts.php
  * QOOQZ — Public Discounts & Offers Page
