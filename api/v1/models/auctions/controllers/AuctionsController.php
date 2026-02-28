@@ -1,48 +1,47 @@
 <?php
 declare(strict_types=1);
 
-final class Product_categoriesController
+final class AuctionsController
 {
-    private Product_categoriesService $service;
+    private AuctionsService $service;
 
-    public function __construct(Product_categoriesService $service)
+    public function __construct(AuctionsService $service)
     {
         $this->service = $service;
     }
 
-    public function list(?int $limit = null, ?int $offset = null, array $filters = [], string $orderBy = 'id', string $orderDir = 'DESC'): array
-    {
-        return $this->service->list($limit, $offset, $filters, $orderBy, $orderDir);
+    public function list(
+        int $tenantId,
+        ?int $limit = null,
+        ?int $offset = null,
+        array $filters = [],
+        string $orderBy = 'id',
+        string $orderDir = 'DESC',
+        string $lang = 'ar'
+    ): array {
+        $items = $this->service->list($tenantId, $limit, $offset, $filters, $orderBy, $orderDir, $lang);
+        $total = $this->service->count($tenantId, $filters);
+        return ['items' => $items, 'total' => $total];
     }
 
-    public function count(array $filters = []): int
+    public function get(int $tenantId, int $id, string $lang = 'ar'): array
     {
-        return $this->service->count($filters);
+        return $this->service->get($tenantId, $id, $lang);
     }
 
-    public function get(int $id): array
+    public function create(int $tenantId, array $data): int
     {
-        return $this->service->get($id);
+        return $this->service->create($tenantId, $data);
     }
 
-    public function create(array $data): array
+    public function update(int $tenantId, array $data): int
     {
-        return $this->service->save($data);
+        return $this->service->update($tenantId, $data);
     }
 
-    public function update(array $data): array
+    public function delete(int $tenantId, int $id): bool
     {
-        if (empty($data['id'])) {
-            throw new InvalidArgumentException('ID is required for update');
-        }
-        return $this->service->save($data);
-    }
-
-    public function delete(array $data): void
-    {
-        if (empty($data['id'])) {
-            throw new InvalidArgumentException('ID is required for delete');
-        }
-        $this->service->delete((int)$data['id']);
+        return $this->service->delete($tenantId, $id);
     }
 }
+

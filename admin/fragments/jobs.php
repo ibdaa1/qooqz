@@ -222,11 +222,13 @@ $apiBase = '/api';
                             </label>
                             <select id="jobType" name="job_type" class="form-control" required>
                                 <option value="" data-i18n="form.fields.job_type.select">Select Job Type</option>
-                                <option value="full-time" data-i18n="form.fields.job_type.full_time">Full-Time</option>
-                                <option value="part-time" data-i18n="form.fields.job_type.part_time">Part-Time</option>
+                                <option value="full_time" data-i18n="form.fields.job_type.full_time">Full-Time</option>
+                                <option value="part_time" data-i18n="form.fields.job_type.part_time">Part-Time</option>
                                 <option value="contract" data-i18n="form.fields.job_type.contract">Contract</option>
                                 <option value="temporary" data-i18n="form.fields.job_type.temporary">Temporary</option>
                                 <option value="internship" data-i18n="form.fields.job_type.internship">Internship</option>
+                                <option value="freelance" data-i18n="form.fields.job_type.freelance">Freelance</option>
+                                <option value="remote" data-i18n="form.fields.job_type.remote">Remote</option>
                             </select>
                         </div>
 
@@ -235,9 +237,9 @@ $apiBase = '/api';
                                 <?= __t('form.fields.employment_type.label', 'Employment Type') ?>
                             </label>
                             <select id="employmentType" name="employment_type" class="form-control">
-                                <option value="employee" data-i18n="form.fields.employment_type.employee">Employee</option>
-                                <option value="freelance" data-i18n="form.fields.employment_type.freelance">Freelance</option>
-                                <option value="volunteer" data-i18n="form.fields.employment_type.volunteer">Volunteer</option>
+                                <option value="permanent" data-i18n="form.fields.employment_type.permanent">Permanent</option>
+                                <option value="temporary" data-i18n="form.fields.employment_type.temporary">Temporary</option>
+                                <option value="seasonal" data-i18n="form.fields.employment_type.seasonal">Seasonal</option>
                             </select>
                         </div>
                     </div>
@@ -249,10 +251,11 @@ $apiBase = '/api';
                             </label>
                             <select id="experienceLevel" name="experience_level" class="form-control">
                                 <option value="entry" data-i18n="form.fields.experience_level.entry">Entry Level</option>
+                                <option value="junior" data-i18n="form.fields.experience_level.junior">Junior</option>
                                 <option value="mid" data-i18n="form.fields.experience_level.mid">Mid Level</option>
                                 <option value="senior" data-i18n="form.fields.experience_level.senior">Senior</option>
-                                <option value="lead" data-i18n="form.fields.experience_level.lead">Lead</option>
                                 <option value="executive" data-i18n="form.fields.experience_level.executive">Executive</option>
+                                <option value="director" data-i18n="form.fields.experience_level.director">Director</option>
                             </select>
                         </div>
 
@@ -358,11 +361,11 @@ $apiBase = '/api';
                                 <?= __t('form.fields.salary_currency.label', 'Currency') ?>
                             </label>
                             <select id="salaryCurrency" name="salary_currency" class="form-control">
+                                <option value="SAR">SAR</option>
+                                <option value="AED">AED</option>
                                 <option value="USD">USD</option>
                                 <option value="EUR">EUR</option>
                                 <option value="GBP">GBP</option>
-                                <option value="SAR">SAR</option>
-                                <option value="AED">AED</option>
                             </select>
                         </div>
 
@@ -371,11 +374,11 @@ $apiBase = '/api';
                                 <?= __t('form.fields.salary_period.label', 'Salary Period') ?>
                             </label>
                             <select id="salaryPeriod" name="salary_period" class="form-control">
-                                <option value="hour" data-i18n="form.fields.salary_period.hour">Per Hour</option>
-                                <option value="day" data-i18n="form.fields.salary_period.day">Per Day</option>
-                                <option value="week" data-i18n="form.fields.salary_period.week">Per Week</option>
-                                <option value="month" data-i18n="form.fields.salary_period.month">Per Month</option>
-                                <option value="year" data-i18n="form.fields.salary_period.year">Per Year</option>
+                                <option value="hourly" data-i18n="form.fields.salary_period.hourly">Per Hour</option>
+                                <option value="daily" data-i18n="form.fields.salary_period.daily">Per Day</option>
+                                <option value="weekly" data-i18n="form.fields.salary_period.weekly">Per Week</option>
+                                <option value="monthly" data-i18n="form.fields.salary_period.monthly">Per Month</option>
+                                <option value="yearly" data-i18n="form.fields.salary_period.yearly">Per Year</option>
                             </select>
                         </div>
                     </div>
@@ -399,14 +402,18 @@ $apiBase = '/api';
                             <label for="countryId" data-i18n="form.fields.country_id.label">
                                 <?= __t('form.fields.country_id.label', 'Country') ?>
                             </label>
-                            <input type="number" id="countryId" name="country_id" class="form-control">
+                            <select id="countryId" name="country_id" class="form-control">
+                                <option value=""><?= __t('form.fields.country_id.placeholder', 'Select Country') ?></option>
+                            </select>
                         </div>
 
                         <div class="form-group">
                             <label for="cityId" data-i18n="form.fields.city_id.label">
                                 <?= __t('form.fields.city_id.label', 'City') ?>
                             </label>
-                            <input type="number" id="cityId" name="city_id" class="form-control">
+                            <select id="cityId" name="city_id" class="form-control">
+                                <option value=""><?= __t('form.fields.city_id.placeholder', 'Select City') ?></option>
+                            </select>
                         </div>
                     </div>
 
@@ -441,9 +448,9 @@ $apiBase = '/api';
                                 <?= __t('form.fields.application_form_type.label', 'Application Form Type') ?>
                             </label>
                             <select id="applicationFormType" name="application_form_type" class="form-control">
-                                <option value="internal" data-i18n="form.fields.application_form_type.internal">Internal Form</option>
+                                <option value="simple" data-i18n="form.fields.application_form_type.simple">Simple Form</option>
+                                <option value="custom" data-i18n="form.fields.application_form_type.custom">Custom Form</option>
                                 <option value="external" data-i18n="form.fields.application_form_type.external">External URL</option>
-                                <option value="email" data-i18n="form.fields.application_form_type.email">Email</option>
                             </select>
                         </div>
 
@@ -621,11 +628,13 @@ $apiBase = '/api';
                     <label for="jobTypeFilter" data-i18n="filters.job_type">Job Type</label>
                     <select id="jobTypeFilter" class="form-control">
                         <option value="">All Types</option>
-                        <option value="full-time">Full-Time</option>
-                        <option value="part-time">Part-Time</option>
+                        <option value="full_time">Full-Time</option>
+                        <option value="part_time">Part-Time</option>
                         <option value="contract">Contract</option>
                         <option value="temporary">Temporary</option>
                         <option value="internship">Internship</option>
+                        <option value="freelance">Freelance</option>
+                        <option value="remote">Remote</option>
                     </select>
                 </div>
 
@@ -634,10 +643,11 @@ $apiBase = '/api';
                     <select id="experienceLevelFilter" class="form-control">
                         <option value="">All Levels</option>
                         <option value="entry">Entry Level</option>
+                        <option value="junior">Junior</option>
                         <option value="mid">Mid Level</option>
                         <option value="senior">Senior</option>
-                        <option value="lead">Lead</option>
                         <option value="executive">Executive</option>
+                        <option value="director">Director</option>
                     </select>
                 </div>
 
@@ -758,16 +768,26 @@ window.PAGE_PERMISSIONS = <?= json_encode([
 </script>
 
 <script type="text/javascript">
-window.JOBS_CONFIG = {
-    apiUrl: '<?= $apiBase ?>/jobs',
+window.WORKSPACE_CONFIG = {
+    jobsApi: '<?= $apiBase ?>/jobs',
+    applicationsApi: '<?= $apiBase ?>/job_applications',
+    interviewsApi: '<?= $apiBase ?>/job_interviews',
+    alertsApi: '<?= $apiBase ?>/job_alerts',
+    questionsApi: '<?= $apiBase ?>/job_application_questions',
+    answersApi: '<?= $apiBase ?>/job_application_answers',
     languagesApi: '<?= $apiBase ?>/languages',
     categoriesApi: '<?= $apiBase ?>/job_categories',
     skillsApi: '<?= $apiBase ?>/job_skills',
+    countriesApi: '<?= $apiBase ?>/countries',
+    citiesApi: '<?= $apiBase ?>/cities',
+    currenciesApi: '<?= $apiBase ?>/currencies',
     lang: '<?= addslashes($lang) ?>',
     dir: '<?= addslashes($dir) ?>',
     csrfToken: '<?= addslashes($csrf) ?>',
     itemsPerPage: 25
 };
+window.JOBS_CONFIG = window.WORKSPACE_CONFIG;
+window.JOBS_CONFIG.apiUrl = window.WORKSPACE_CONFIG.jobsApi;
 </script>
 
 <!-- Load JS -->
