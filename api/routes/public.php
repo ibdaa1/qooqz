@@ -1895,7 +1895,7 @@ if ($first === 'bundles') {
 // POST /api/public/products/{id}/reviews — submit product review
 // POST /api/public/products/{id}/questions — submit question
 // ==============================================================
-if ($first === 'products' && $method === 'POST') {
+if ($first === 'products' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $reviewPid = (int)($segments[1] ?? 0);
     $reviewAction = $segments[2] ?? '';
 
