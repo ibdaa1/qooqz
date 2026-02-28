@@ -30,6 +30,7 @@
         auctions:       [],
         languages:      [],
         currencies:     [],
+        currencyMap:    {}, // keyed by code for fast lookup
         products:       [],
         filters:        {},
         currentAuction: null,
@@ -163,25 +164,22 @@
     }
 
     async function loadDropdownData() {
-        // Currencies
+        // Currencies – uses code, name, symbol, symbol_position, decimal_places
         try {
             const res = await apiCall(`${API.currencies}?format=json`);
             if (res.success) {
                 const data = Array.isArray(res.data) ? res.data : (res.data?.items || res.data?.data || []);
-                state.currencies = data;
-                populateDropdown(el.auctionCurrency, data, 'code', 'name', t('form.fields.currency_code.select', 'Select currency'));
+                applyCurrencies(data);
             }
         } catch (e) {
             console.warn('[Auctions] Failed to load currencies:', e);
-            // Fallback
-            const fallback = [
-                { code: 'SAR', name: 'SAR - Saudi Riyal' },
-                { code: 'USD', name: 'USD - US Dollar' },
-                { code: 'EUR', name: 'EUR - Euro' },
-                { code: 'AED', name: 'AED - UAE Dirham' }
-            ];
-            state.currencies = fallback;
-            populateDropdown(el.auctionCurrency, fallback, 'code', 'name', t('form.fields.currency_code.select', 'Select currency'));
+            // Minimal fallback keeps the page usable without the API
+            applyCurrencies([
+                { code: 'SAR', name: 'Saudi Riyal',  symbol: '﷼',  symbol_position: 'after',  decimal_places: 2 },
+                { code: 'USD', name: 'US Dollar',     symbol: '$',   symbol_position: 'before', decimal_places: 2 },
+                { code: 'EUR', name: 'Euro',           symbol: '€',   symbol_position: 'before', decimal_places: 2 },
+                { code: 'AED', name: 'UAE Dirham',    symbol: 'د.إ', symbol_position: 'after',  decimal_places: 2 }
+            ]);
         }
 
         // Languages
@@ -211,6 +209,13 @@
         }
     }
 
+    /** Store currencies in state and refresh the currency dropdown. */
+    function applyCurrencies(data) {
+        state.currencies = data;
+        state.currencyMap = Object.fromEntries(data.map(c => [c.code, c]));
+        populateCurrencyDropdown(el.auctionCurrency, data, t('form.fields.currency_code.select', 'Select currency'));
+    }
+
     function populateDropdown(selectEl, data, valueKey, textKey, placeholder = '') {
         if (!selectEl) return;
         selectEl.innerHTML = '';
@@ -228,6 +233,28 @@
         });
     }
 
+    /**
+     * Populate the currency <select> showing code + name + symbol,
+     * e.g. "SAR – Saudi Riyal (﷼)" so admins can identify the currency at a glance.
+     */
+    function populateCurrencyDropdown(selectEl, currencies, placeholder = '') {
+        if (!selectEl) return;
+        selectEl.innerHTML = '';
+        if (placeholder) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = placeholder;
+            selectEl.appendChild(opt);
+        }
+        currencies.forEach(cur => {
+            const opt = document.createElement('option');
+            opt.value = cur.code;
+            const symPart = cur.symbol ? ` (${cur.symbol})` : '';
+            opt.textContent = `${cur.code} – ${cur.name}${symPart}`;
+            selectEl.appendChild(opt);
+        });
+    }
+
     // ════════════════════════════════════════════════════════════
     // RENDERING
     // ════════════════════════════════════════════════════════════
@@ -240,7 +267,7 @@
         el.tbody.innerHTML = items.map(a => {
             const statusBadge    = `<span class="badge badge-${esc(a.status)}">${esc(a.status)}</span>`;
             const typeBadge      = `<span class="badge badge-${esc(a.auction_type)}">${esc(a.auction_type)}</span>`;
-            const currentPrice   = a.current_price  ? `${Number(a.current_price).toFixed(2)} ${esc(a.currency_code||'')}` : '—';
+            const currentPrice   = a.current_price  ? formatPrice(a.current_price, a.currency_code) : '—';
             const totalBids      = a.total_bids      || 0;
             const endDate        = a.end_date ? new Date(a.end_date).toLocaleString() : '—';
             const title          = a.translated_title || a.title || `Auction #${a.id}`;
@@ -523,8 +550,8 @@
                     const statusLabel = isWinning
                         ? '<span class="winner-badge"><i class="fas fa-trophy"></i> Winning</span>'
                         : (bid.is_auto_outbid == 1 ? '<span class="badge badge-ended">Outbid</span>' : '—');
-                    const amount   = `<strong>${Number(bid.bid_amount).toFixed(2)}</strong>`;
-                    const maxAuto  = bid.max_auto_bid ? ` / max: ${Number(bid.max_auto_bid).toFixed(2)}` : '';
+                    const amount   = `<strong>${formatPrice(bid.bid_amount, state.currentAuction?.currency_code)}</strong>`;
+                    const maxAuto  = bid.max_auto_bid ? ` / max: ${formatPrice(bid.max_auto_bid, state.currentAuction?.currency_code)}` : '';
                     const created  = bid.created_at ? new Date(bid.created_at).toLocaleString() : '—';
                     return `
                         <tr class="${isWinning ? 'winner-row' : ''}">
@@ -548,8 +575,8 @@
     function updateBidStats(auction) {
         if (el.statTotalBids)     el.statTotalBids.textContent    = auction.total_bids    || 0;
         if (el.statTotalBidders)  el.statTotalBidders.textContent  = auction.total_bidders || 0;
-        if (el.statCurrentPrice)  el.statCurrentPrice.textContent  = auction.current_price  ? `${Number(auction.current_price).toFixed(2)} ${auction.currency_code || ''}` : '—';
-        if (el.statWinningAmount) el.statWinningAmount.textContent = auction.winning_amount ? `${Number(auction.winning_amount).toFixed(2)} ${auction.currency_code || ''}` : '—';
+        if (el.statCurrentPrice)  el.statCurrentPrice.textContent  = auction.current_price  ? formatPrice(auction.current_price,  auction.currency_code) : '—';
+        if (el.statWinningAmount) el.statWinningAmount.textContent = auction.winning_amount ? formatPrice(auction.winning_amount, auction.currency_code) : '—';
     }
 
     // ════════════════════════════════════════════════════════════
@@ -788,6 +815,24 @@
         const div = document.createElement('div');
         div.textContent = String(text);
         return div.innerHTML;
+    }
+
+    /**
+     * Format a monetary amount using the currency's symbol, position, and
+     * decimal_places as returned by the /api/currencies endpoint.
+     * Falls back to plain "{amount} {code}" if the currency is not in the map.
+     */
+    function formatPrice(amount, currencyCode) {
+        if (amount === null || amount === undefined || amount === '') return '—';
+        const cur = state.currencyMap[currencyCode] || null;
+        const decimals = cur ? (parseInt(cur.decimal_places, 10) || 2) : 2;
+        const num = Number(amount).toFixed(decimals);
+        if (!cur) return `${num} ${currencyCode || ''}`.trim();
+        const sym = cur.symbol || currencyCode;
+        // symbol_position 'before' → no space (e.g. "$100"), 'after' → space (e.g. "100 ﷼")
+        return cur.symbol_position === 'after'
+            ? `${num} ${sym}`
+            : `${sym}${num}`;
     }
 
     // ════════════════════════════════════════════════════════════
