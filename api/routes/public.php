@@ -1749,16 +1749,25 @@ if ($first === 'compare') {
     if (!$cmpUserId) { ResponseFormatter::error('Login required', 401); exit; }
     $cmpSub = $segments[1] ?? '';
 
+    // Helper: get or create the user's active comparison row
+    $getCmpId = function () use ($pdo, $pdoOne, $cmpUserId): int {
+        $row = $pdoOne('SELECT id FROM product_comparisons WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', [$cmpUserId]);
+        if ($row) return (int)$row['id'];
+        $pdo->prepare('INSERT INTO product_comparisons (user_id, created_at) VALUES (?, NOW())')->execute([$cmpUserId]);
+        return (int)$pdo->lastInsertId();
+    };
+
     if ($cmpSub === 'add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $cmpPid = (int)($_POST['product_id'] ?? 0);
         if (!$cmpPid) { ResponseFormatter::error('product_id required', 422); exit; }
         try {
+            $cmpId = $getCmpId();
             // Max 4 products in comparison
-            $cmpCount = (int)($pdoOne('SELECT COUNT(*) AS c FROM product_comparisons WHERE user_id = ?', [$cmpUserId])['c'] ?? 0);
+            $cmpCount = (int)($pdoOne('SELECT COUNT(*) AS c FROM product_comparison_items WHERE comparison_id = ?', [$cmpId])['c'] ?? 0);
             if ($cmpCount >= 4) { ResponseFormatter::error('Max 4 products in comparison', 400); exit; }
-            $pdo->prepare('INSERT IGNORE INTO product_comparisons (user_id, product_id, created_at) VALUES (?, ?, NOW())')
-                ->execute([$cmpUserId, $cmpPid]);
-            ResponseFormatter::success(['ok' => true]);
+            $pdo->prepare('INSERT IGNORE INTO product_comparison_items (comparison_id, product_id, added_at) VALUES (?, ?, NOW())')
+                ->execute([$cmpId, $cmpPid]);
+            ResponseFormatter::success(['ok' => true, 'comparison_id' => $cmpId]);
         } catch (Throwable $ex) { ResponseFormatter::error($ex->getMessage(), 500); }
         exit;
     }
@@ -1766,8 +1775,11 @@ if ($first === 'compare') {
     if ($cmpSub === 'remove' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $cmpPid = (int)($_POST['product_id'] ?? 0);
         try {
-            $pdo->prepare('DELETE FROM product_comparisons WHERE user_id = ? AND product_id = ?')
-                ->execute([$cmpUserId, $cmpPid]);
+            $row = $pdoOne('SELECT id FROM product_comparisons WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', [$cmpUserId]);
+            if ($row) {
+                $pdo->prepare('DELETE FROM product_comparison_items WHERE comparison_id = ? AND product_id = ?')
+                    ->execute([(int)$row['id'], $cmpPid]);
+            }
             ResponseFormatter::success(['ok' => true]);
         } catch (Throwable $ex) { ResponseFormatter::error($ex->getMessage(), 500); }
         exit;
@@ -1775,7 +1787,10 @@ if ($first === 'compare') {
 
     if ($cmpSub === 'clear' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
-            $pdo->prepare('DELETE FROM product_comparisons WHERE user_id = ?')->execute([$cmpUserId]);
+            $row = $pdoOne('SELECT id FROM product_comparisons WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', [$cmpUserId]);
+            if ($row) {
+                $pdo->prepare('DELETE FROM product_comparison_items WHERE comparison_id = ?')->execute([(int)$row['id']]);
+            }
             ResponseFormatter::success(['ok' => true]);
         } catch (Throwable $ex) { ResponseFormatter::error($ex->getMessage(), 500); }
         exit;
@@ -1783,23 +1798,27 @@ if ($first === 'compare') {
 
     // GET — list products in comparison with full details
     try {
-        $rows = $pdoList(
-            "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.slug, p.sku,
-                    p.stock_status, p.stock_quantity, p.rating_average, p.rating_count,
-                    p.is_featured, p.is_new, p.is_bestseller,
-                    pt.description, pt.specifications,
-                    NULL AS brand_name,
-                    (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
-                    (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
-                    (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url,
-                    pc.created_at AS added_at
-               FROM product_comparisons pc
-               JOIN products p ON p.id = pc.product_id
-          LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
-              WHERE pc.user_id = ?
-              ORDER BY pc.created_at ASC",
-            [$lang, $cmpUserId]
-        );
+        $cmpRow = $pdoOne('SELECT id FROM product_comparisons WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', [$cmpUserId]);
+        $rows = [];
+        if ($cmpRow) {
+            $rows = $pdoList(
+                "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.slug, p.sku,
+                        p.stock_status, p.stock_quantity, p.rating_average, p.rating_count,
+                        p.is_featured, p.is_new, p.is_bestseller,
+                        pt.description, pt.specifications,
+                        NULL AS brand_name,
+                        (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
+                        (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
+                        (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url,
+                        pci.added_at
+                   FROM product_comparison_items pci
+                   JOIN products p ON p.id = pci.product_id
+              LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
+                  WHERE pci.comparison_id = ?
+                  ORDER BY pci.added_at ASC",
+                [$lang, (int)$cmpRow['id']]
+            );
+        }
         ResponseFormatter::success(['ok' => true, 'data' => $rows]);
     } catch (Throwable $ex) { ResponseFormatter::error($ex->getMessage(), 500); }
     exit;
