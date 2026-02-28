@@ -113,12 +113,31 @@ function escHtml(s) {
 }
 
 function loadCompare() {
-    var ids = (localStorage.getItem('pub_compare') || '').split(',').filter(Boolean);
-    if (ids.length === 0) { renderTable([]); return; }
+    // Always fetch from DB (authoritative) — localStorage may be empty on a different
+    // device/session even when the server has items. Sync localStorage from API response.
     fetch('/api/public/compare?lang='+PUB_LANG, {credentials:'include'})
         .then(function(r){ return r.json(); })
-        .then(function(d){ renderTable(d.data || []); })
-        .catch(function(){ renderTable([]); });
+        .then(function(d){
+            var products = d.data || [];
+            // Sync localStorage so cart badges etc. stay accurate
+            if (products.length) {
+                localStorage.setItem('pub_compare', products.map(function(p){ return p.id; }).join(','));
+            } else {
+                // No server items — fall back to localStorage for offline/guest use
+                var ids = (localStorage.getItem('pub_compare') || '').split(',').filter(Boolean);
+                if (ids.length === 0) { renderTable([]); return; }
+                // Guest: show empty-state (can't load product details without API data)
+                renderTable([]);
+                return;
+            }
+            renderTable(products);
+        })
+        .catch(function(){
+            // API failed — try localStorage as offline fallback
+            var ids = (localStorage.getItem('pub_compare') || '').split(',').filter(Boolean);
+            if (ids.length === 0) renderTable([]);
+            else renderTable([]); // no product details available offline
+        });
 }
 
 document.addEventListener('DOMContentLoaded', loadCompare);
