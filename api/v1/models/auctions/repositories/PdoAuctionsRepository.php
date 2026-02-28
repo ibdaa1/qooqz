@@ -1,156 +1,221 @@
 <?php
 declare(strict_types=1);
 
-final class PdoProduct_categoriesRepository
+final class PdoAuctionsRepository implements AuctionsRepositoryInterface
 {
     private PDO $pdo;
-    private const TABLE = 'product_categories';
-    private const ALLOWED_ORDER_BY = ['id', 'product_id', 'category_id', 'is_primary', 'sort_order'];
+    private const TABLE = 'auctions';
+    private const ALLOWED_ORDER_BY = [
+        'id', 'title', 'status', 'auction_type', 'starting_price',
+        'current_price', 'start_date', 'end_date', 'total_bids',
+        'is_featured', 'created_at', 'updated_at'
+    ];
+    private const FILTERABLE_COLUMNS = [
+        'status', 'auction_type', 'product_id', 'is_featured',
+        'condition_type', 'currency_code'
+    ];
 
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
     }
 
-    /* =====================================================
-     * List + Filters + Pagination
-     * ===================================================== */
     public function all(
+        int $tenantId,
         ?int $limit = null,
         ?int $offset = null,
         array $filters = [],
         string $orderBy = 'id',
-        string $orderDir = 'DESC'
+        string $orderDir = 'DESC',
+        string $lang = 'ar'
     ): array {
-        $params = [];
-        $sql = 'SELECT * FROM ' . self::TABLE . ' WHERE 1=1';
+        $sql = "
+            SELECT a.*,
+                   COALESCE(at.title, a.title) AS translated_title,
+                   at.description,
+                   at.terms_conditions
+            FROM " . self::TABLE . " a
+            LEFT JOIN auction_translations at
+                ON at.auction_id = a.id AND at.language_code = :lang
+            WHERE a.tenant_id = :tenant_id
+        ";
+        $params = [':tenant_id' => $tenantId, ':lang' => $lang];
 
-        if (!empty($filters['product_id'])) {
-            $sql .= ' AND product_id = :product_id';
-            $params['product_id'] = (int)$filters['product_id'];
+        foreach (self::FILTERABLE_COLUMNS as $col) {
+            if (isset($filters[$col]) && $filters[$col] !== '') {
+                $sql .= " AND a.{$col} = :{$col}";
+                $params[":{$col}"] = $filters[$col];
+            }
         }
 
-        if (!empty($filters['category_id'])) {
-            $sql .= ' AND category_id = :category_id';
-            $params['category_id'] = (int)$filters['category_id'];
+        if (!empty($filters['search'])) {
+            $sql .= " AND (a.title LIKE :search OR at.title LIKE :search2)";
+            $params[':search']  = '%' . $filters['search'] . '%';
+            $params[':search2'] = '%' . $filters['search'] . '%';
         }
 
-        if (isset($filters['is_primary'])) {
-            $sql .= ' AND is_primary = :is_primary';
-            $params['is_primary'] = (int)$filters['is_primary'];
-        }
-
-        // ORDER BY safe
-        if (!in_array($orderBy, self::ALLOWED_ORDER_BY, true)) {
-            $orderBy = 'id';
-        }
+        $orderBy  = in_array($orderBy, self::ALLOWED_ORDER_BY, true) ? $orderBy : 'id';
         $orderDir = strtoupper($orderDir) === 'ASC' ? 'ASC' : 'DESC';
-        $sql .= " ORDER BY {$orderBy} {$orderDir}";
+        $sql .= " ORDER BY a.{$orderBy} {$orderDir}";
 
         if ($limit !== null) {
-            $sql .= ' LIMIT :limit OFFSET :offset';
+            $sql .= " LIMIT :limit OFFSET :offset";
         }
 
         $stmt = $this->pdo->prepare($sql);
-
         foreach ($params as $key => $value) {
-            $stmt->bindValue(':' . $key, $value, PDO::PARAM_INT);
+            $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
         }
-
         if ($limit !== null) {
             $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
             $stmt->bindValue(':offset', $offset ?? 0, PDO::PARAM_INT);
         }
-
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    /* =====================================================
-     * Count
-     * ===================================================== */
-    public function count(array $filters = []): int
+    public function count(int $tenantId, array $filters = []): int
     {
-        $params = [];
-        $sql = 'SELECT COUNT(*) FROM ' . self::TABLE . ' WHERE 1=1';
+        $sql    = "SELECT COUNT(*) FROM " . self::TABLE . " WHERE tenant_id = :tenant_id";
+        $params = [':tenant_id' => $tenantId];
 
-        if (!empty($filters['product_id'])) {
-            $sql .= ' AND product_id = :product_id';
-            $params['product_id'] = (int)$filters['product_id'];
-        }
-
-        if (!empty($filters['category_id'])) {
-            $sql .= ' AND category_id = :category_id';
-            $params['category_id'] = (int)$filters['category_id'];
-        }
-
-        if (isset($filters['is_primary'])) {
-            $sql .= ' AND is_primary = :is_primary';
-            $params['is_primary'] = (int)$filters['is_primary'];
+        foreach (self::FILTERABLE_COLUMNS as $col) {
+            if (isset($filters[$col]) && $filters[$col] !== '') {
+                $sql .= " AND {$col} = :{$col}";
+                $params[":{$col}"] = $filters[$col];
+            }
         }
 
         $stmt = $this->pdo->prepare($sql);
-        foreach ($params as $key => $value) {
-            $stmt->bindValue(':' . $key, $value, PDO::PARAM_INT);
-        }
-
-        $stmt->execute();
+        $stmt->execute($params);
         return (int)$stmt->fetchColumn();
     }
 
-    /* =====================================================
-     * Find by ID
-     * ===================================================== */
-    public function find(int $id): ?array
+    public function find(int $tenantId, int $id, string $lang = 'ar'): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM ' . self::TABLE . ' WHERE id = :id LIMIT 1');
-        $stmt->execute(['id' => $id]);
-        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        $stmt = $this->pdo->prepare("
+            SELECT a.*,
+                   COALESCE(at.title, a.title) AS translated_title,
+                   at.description,
+                   at.terms_conditions
+            FROM " . self::TABLE . " a
+            LEFT JOIN auction_translations at
+                ON at.auction_id = a.id AND at.language_code = :lang
+            WHERE a.tenant_id = :tenant_id AND a.id = :id
+            LIMIT 1
+        ");
+        $stmt->execute([':tenant_id' => $tenantId, ':id' => $id, ':lang' => $lang]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
     }
 
-    /* =====================================================
-     * Save (Insert / Update)
-     * ===================================================== */
-    public function save(array $data): int
+    public function save(int $tenantId, array $data): int
     {
         $isUpdate = !empty($data['id']);
 
+        // Auto-generate slug if missing
+        if (empty($data['slug'])) {
+            $base = preg_replace('/[^a-z0-9\-]+/', '-', strtolower(trim($data['title'] ?? 'auction')));
+            $data['slug'] = trim($base, '-') . '-' . mt_rand(1000, 9999);
+        }
+
         if ($isUpdate) {
             $stmt = $this->pdo->prepare("
-                UPDATE " . self::TABLE . "
-                SET product_id = :product_id, category_id = :category_id, is_primary = :is_primary, sort_order = :sort_order
-                WHERE id = :id
+                UPDATE " . self::TABLE . " SET
+                    entity_id             = :entity_id,
+                    product_id            = :product_id,
+                    title                 = :title,
+                    slug                  = :slug,
+                    auction_type          = :auction_type,
+                    status                = :status,
+                    starting_price        = :starting_price,
+                    reserve_price         = :reserve_price,
+                    current_price         = :current_price,
+                    buy_now_price         = :buy_now_price,
+                    bid_increment         = :bid_increment,
+                    currency_code         = :currency_code,
+                    auto_bid_enabled      = :auto_bid_enabled,
+                    start_date            = :start_date,
+                    end_date              = :end_date,
+                    auto_extend           = :auto_extend,
+                    extend_minutes        = :extend_minutes,
+                    min_extend_bid_time   = :min_extend_bid_time,
+                    is_featured           = :is_featured,
+                    condition_type        = :condition_type,
+                    quantity              = :quantity,
+                    shipping_cost         = :shipping_cost,
+                    payment_deadline_hours= :payment_deadline_hours,
+                    notes                 = :notes
+                WHERE tenant_id = :tenant_id AND id = :id
             ");
-            $stmt->execute([
-                'product_id'  => (int)$data['product_id'],
-                'category_id' => (int)$data['category_id'],
-                'is_primary'  => (int)($data['is_primary'] ?? 0),
-                'sort_order'  => (int)($data['sort_order'] ?? 0),
-                'id'          => (int)$data['id'],
-            ]);
+            $stmt->execute($this->buildParams($tenantId, $data, true));
             return (int)$data['id'];
         }
 
         $stmt = $this->pdo->prepare("
-            INSERT INTO " . self::TABLE . " (product_id, category_id, is_primary, sort_order)
-            VALUES (:product_id, :category_id, :is_primary, :sort_order)
+            INSERT INTO " . self::TABLE . " (
+                tenant_id, entity_id, product_id, title, slug,
+                auction_type, status, starting_price, reserve_price, current_price,
+                buy_now_price, bid_increment, currency_code, auto_bid_enabled,
+                start_date, end_date, auto_extend, extend_minutes, min_extend_bid_time,
+                is_featured, condition_type, quantity, shipping_cost,
+                payment_deadline_hours, notes, created_by
+            ) VALUES (
+                :tenant_id, :entity_id, :product_id, :title, :slug,
+                :auction_type, :status, :starting_price, :reserve_price, :current_price,
+                :buy_now_price, :bid_increment, :currency_code, :auto_bid_enabled,
+                :start_date, :end_date, :auto_extend, :extend_minutes, :min_extend_bid_time,
+                :is_featured, :condition_type, :quantity, :shipping_cost,
+                :payment_deadline_hours, :notes, :created_by
+            )
         ");
-        $stmt->execute([
-            'product_id'  => (int)$data['product_id'],
-            'category_id' => (int)$data['category_id'],
-            'is_primary'  => (int)($data['is_primary'] ?? 0),
-            'sort_order'  => (int)($data['sort_order'] ?? 0),
-        ]);
-
+        $params                = $this->buildParams($tenantId, $data, false);
+        $params[':created_by'] = $data['created_by'] ?? null;
+        $stmt->execute($params);
         return (int)$this->pdo->lastInsertId();
     }
 
-    /* =====================================================
-     * Delete
-     * ===================================================== */
-    public function delete(int $id): bool
+    public function delete(int $tenantId, int $id): bool
     {
-        $stmt = $this->pdo->prepare('DELETE FROM ' . self::TABLE . ' WHERE id = :id');
-        return $stmt->execute(['id' => $id]);
+        $stmt = $this->pdo->prepare(
+            "DELETE FROM " . self::TABLE . " WHERE tenant_id = :tenant_id AND id = :id"
+        );
+        return $stmt->execute([':tenant_id' => $tenantId, ':id' => $id]);
+    }
+
+    private function buildParams(int $tenantId, array $data, bool $isUpdate): array
+    {
+        $params = [
+            ':tenant_id'             => $tenantId,
+            ':entity_id'             => $data['entity_id'] ?? null,
+            ':product_id'            => isset($data['product_id']) ? (int)$data['product_id'] : null,
+            ':title'                 => $data['title'],
+            ':slug'                  => $data['slug'],
+            ':auction_type'          => $data['auction_type'] ?? 'normal',
+            ':status'                => $data['status'] ?? 'draft',
+            ':starting_price'        => $data['starting_price'],
+            ':reserve_price'         => $data['reserve_price'] ?? null,
+            ':current_price'         => $data['current_price'] ?? $data['starting_price'],
+            ':buy_now_price'         => $data['buy_now_price'] ?? null,
+            ':bid_increment'         => $data['bid_increment'] ?? 5.00,
+            ':currency_code'         => $data['currency_code'],
+            ':auto_bid_enabled'      => isset($data['auto_bid_enabled']) ? (int)$data['auto_bid_enabled'] : 1,
+            ':start_date'            => $data['start_date'],
+            ':end_date'              => $data['end_date'],
+            ':auto_extend'           => isset($data['auto_extend']) ? (int)$data['auto_extend'] : 1,
+            ':extend_minutes'        => isset($data['extend_minutes']) ? (int)$data['extend_minutes'] : 5,
+            ':min_extend_bid_time'   => isset($data['min_extend_bid_time']) ? (int)$data['min_extend_bid_time'] : 5,
+            ':is_featured'           => isset($data['is_featured']) ? (int)$data['is_featured'] : 0,
+            ':condition_type'        => $data['condition_type'] ?? 'new',
+            ':quantity'              => isset($data['quantity']) ? (int)$data['quantity'] : 1,
+            ':shipping_cost'         => $data['shipping_cost'] ?? 0.00,
+            ':payment_deadline_hours'=> isset($data['payment_deadline_hours']) ? (int)$data['payment_deadline_hours'] : 48,
+            ':notes'                 => $data['notes'] ?? null,
+        ];
+        if ($isUpdate) {
+            $params[':id'] = (int)$data['id'];
+        }
+        return $params;
     }
 }
+
