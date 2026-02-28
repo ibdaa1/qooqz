@@ -84,27 +84,31 @@ if ($pdo) {
             $product = $st->fetch() ?: null;
 
             if ($product) {
-                // Gallery images — no image_type filter to avoid INNER JOIN failures
-                // when image_types table is empty or has different code values.
-                $st = $pdo->prepare(
-                    "SELECT i.id, i.url, i.thumb_url, i.alt_text, i.sort_order
-                       FROM images i
-                      WHERE i.owner_id = ?
-                      ORDER BY i.is_main DESC, i.sort_order ASC, i.id ASC LIMIT 10"
-                );
-                $st->execute([$productId]);
-                $images = $st->fetchAll();
+                // Gallery images — wrapped in own try-catch so a missing column
+                // (e.g. sort_order not yet in images table) never nulls out $product.
+                try {
+                    $st = $pdo->prepare(
+                        "SELECT i.id, i.url, i.thumb_url, i.alt_text
+                           FROM images i
+                          WHERE i.owner_id = ?
+                          ORDER BY i.is_main DESC, i.id ASC LIMIT 10"
+                    );
+                    $st->execute([$productId]);
+                    $images = $st->fetchAll();
+                } catch (Throwable $_) { $images = []; }
 
-                // Categories
-                $st = $pdo->prepare(
-                    "SELECT c.id, COALESCE(ct.name, c.slug) AS name, c.slug
-                       FROM categories c
-                 INNER JOIN product_categories pc ON pc.category_id = c.id AND pc.product_id = ?
-                  LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
-                      LIMIT 5"
-                );
-                $st->execute([$productId, $lang]);
-                $categories = $st->fetchAll();
+                // Categories — own try-catch for same reason
+                try {
+                    $st = $pdo->prepare(
+                        "SELECT c.id, COALESCE(ct.name, c.slug) AS name, c.slug
+                           FROM categories c
+                     INNER JOIN product_categories pc ON pc.category_id = c.id AND pc.product_id = ?
+                      LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
+                          LIMIT 5"
+                    );
+                    $st->execute([$productId, $lang]);
+                    $categories = $st->fetchAll();
+                } catch (Throwable $_) { $categories = []; }
 
                 // Variants — load active variants with their pricing
                 try {

@@ -541,6 +541,19 @@ if (!function_exists('pub_get_pdo')) {
                 $dbConf = null;
             }
         }
+        // Fallback: use already-defined DB_HOST constants (set by API bootstrap or db.php
+        // loaded in the same request). This covers shared hosting where path resolution
+        // fails but the constants are already in scope from admin/session bootstrap.
+        if (!$dbConf && defined('DB_HOST') && defined('DB_NAME')) {
+            $dbConf = [
+                'host'    => DB_HOST,
+                'user'    => defined('DB_USER')    ? DB_USER    : '',
+                'pass'    => defined('DB_PASS')    ? DB_PASS    : '',
+                'name'    => DB_NAME,
+                'charset' => defined('DB_CHARSET') ? DB_CHARSET : 'utf8mb4',
+                'port'    => defined('DB_PORT')    ? (int)DB_PORT : 3306,
+            ];
+        }
         if (!$dbConf) { $__pdo = null; return null; }
 
         try {
