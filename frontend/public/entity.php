@@ -211,7 +211,7 @@ if ($pdo) {
     try {
         $rStmt = $pdo->prepare(
             "SELECT er.id, er.rating, er.review, er.created_at,
-                    COALESCE(u.name, u.username, 'Anonymous') AS reviewer_name
+                    COALESCE(u.username, 'Anonymous') AS reviewer_name
                FROM entity_ratings er
           LEFT JOIN users u ON u.id = er.user_id
               WHERE er.entity_id = ? AND er.is_active = 1

@@ -196,7 +196,7 @@ if (!$product && $pdo) {
                     $st = $pdo->prepare(
                         "SELECT r.id, r.rating, r.title, r.comment, r.is_verified_purchase,
                                 r.helpful_count, r.created_at,
-                                COALESCE(u.name, u.username, 'User') AS author
+                                COALESCE(u.username, 'User') AS author
                            FROM product_reviews r
                       LEFT JOIN users u ON u.id = r.user_id
                           WHERE r.product_id = ? AND r.is_approved = 1
@@ -210,7 +210,7 @@ if (!$product && $pdo) {
                 try {
                     $st = $pdo->prepare(
                         "SELECT q.id, q.question, q.helpful_count, q.created_at,
-                                COALESCE(uq.name, uq.username, 'User') AS asker
+                                COALESCE(uq.username, 'User') AS asker
                            FROM product_questions q
                       LEFT JOIN users uq ON uq.id = q.user_id
                           WHERE q.product_id = ? AND q.is_approved = 1
@@ -300,7 +300,7 @@ if ($product && $pdo && $productId) {
             $st = $pdo->prepare(
                 "SELECT r.id, r.rating, r.title, r.comment, r.is_verified_purchase,
                         r.helpful_count, r.created_at,
-                        COALESCE(u.name, u.username, 'User') AS author
+                        COALESCE(u.username, 'User') AS author
                    FROM product_reviews r
               LEFT JOIN users u ON u.id = r.user_id
                   WHERE r.product_id = ? AND r.is_approved = 1
