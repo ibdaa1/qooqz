@@ -155,14 +155,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $pdo) {
             // 1. Insert order
             $oSt = $pdo->prepare(
                 "INSERT INTO orders
-                   (tenant_id, entity_id, order_number, user_id, status, payment_status,
+                   (tenant_id, entity_id, order_number, user_id, cart_id, status, payment_status,
                     subtotal, tax_amount, shipping_cost, discount_amount,
                     total_amount, grand_total, currency_code, customer_notes, ip_address)
-                 VALUES (?, ?, ?, ?, 'pending', 'pending',
+                 VALUES (?, ?, ?, ?, ?, 'pending', 'pending',
                          ?, 0, 0, 0, ?, ?, 'SAR', ?, ?)"
             );
             $oSt->execute([
                 $tenantId, $entityId, $orderNumber, $userId,
+                $cartId ?: null,
                 $cartTotal, $cartTotal, $cartTotal,
                 $notes,
                 $_SERVER['REMOTE_ADDR'] ?? null,

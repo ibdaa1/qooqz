@@ -461,7 +461,13 @@ function aucBuyNow() {
     .then(function(d) {
       if (d.success) {
         aucShowMsg('🎉 <?= addslashes(t('auctions.purchased')) ?>', 'success');
-        setTimeout(function(){ location.reload(); }, 1500);
+        setTimeout(function(){
+          if (d.data && d.data.order_id) {
+            window.location.href = '/frontend/public/orders.php?view=' + d.data.order_id;
+          } else {
+            location.reload();
+          }
+        }, 1500);
       } else {
         aucShowMsg('❌ ' + (d.message || ''), 'error');
       }

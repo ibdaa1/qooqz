@@ -2163,19 +2163,56 @@ if ($first === 'auctions') {
         if (!$auctionUserId) { ResponseFormatter::error('Login required', 401); exit; }
         if (!$pdo) { ResponseFormatter::error('DB unavailable', 503); exit; }
         try {
-            $aRow = $pdoOne('SELECT buy_now_price, status, end_date FROM auctions WHERE id=?', [$auctionId]);
+            $aRow = $pdoOne('SELECT buy_now_price, status, end_date, tenant_id, entity_id, product_id FROM auctions WHERE id=?', [$auctionId]);
             if (!$aRow) { ResponseFormatter::notFound('Auction not found'); exit; }
             if ($aRow['status'] !== 'active') { ResponseFormatter::error('Auction not active', 422); exit; }
             if (!$aRow['buy_now_price']) { ResponseFormatter::error('No buy-now price', 422); exit; }
+            $aTenantId  = (int)$aRow['tenant_id'];
+            $aEntityId  = (int)$aRow['entity_id'];
+            $aProductId = (int)($aRow['product_id'] ?? 0);
+            $aBuyPrice  = (float)$aRow['buy_now_price'];
             $pdo->beginTransaction();
             $pdo->prepare('UPDATE auction_bids SET is_winning=0 WHERE auction_id=?')->execute([$auctionId]);
             $stBN = $pdo->prepare('INSERT INTO auction_bids (auction_id, user_id, bid_amount, bid_type, is_winning, created_at) VALUES (?,?,?,?,1,NOW())');
-            $stBN->execute([$auctionId, $auctionUserId, $aRow['buy_now_price'], 'buy_now']);
+            $stBN->execute([$auctionId, $auctionUserId, $aBuyPrice, 'buy_now']);
             $bnId = (int)$pdo->lastInsertId();
             $pdo->prepare("UPDATE auctions SET status='sold', current_price=?, winner_user_id=?, winner_bid_id=?, winning_amount=?, ended_at=NOW() WHERE id=?")
-                ->execute([$aRow['buy_now_price'], $auctionUserId, $bnId, $aRow['buy_now_price'], $auctionId]);
+                ->execute([$aBuyPrice, $auctionUserId, $bnId, $aBuyPrice, $auctionId]);
+
+            // Create order (auction_id set, cart_id NULL)
+            $bnOrderNum = 'AUC-' . $aTenantId . '-' . $auctionId . '-' . time();
+            $prdName = 'Auction Item'; $prdSku = 'AUC-' . $auctionId;
+            if ($aProductId) {
+                $prdRow = $pdoOne(
+                    'SELECT p.sku, (SELECT pt2.name FROM product_translations pt2 WHERE pt2.product_id=p.id ORDER BY pt2.id ASC LIMIT 1) AS pname FROM products p WHERE p.id=? LIMIT 1',
+                    [$aProductId]
+                );
+                if ($prdRow) {
+                    $prdName = $prdRow['pname'] ?: $prdName;
+                    $prdSku  = $prdRow['sku']   ?: $prdSku;
+                }
+            }
+            $pdo->prepare(
+                "INSERT INTO orders (tenant_id, entity_id, order_number, user_id, cart_id, auction_id,
+                    order_type, status, payment_status, subtotal, total_amount, grand_total,
+                    currency_code, ip_address)
+                 VALUES (?,?,?,?,NULL,?,'online','pending','pending',?,?,?,'SAR',?)"
+            )->execute([
+                $aTenantId, $aEntityId, $bnOrderNum, $auctionUserId, $auctionId,
+                $aBuyPrice, $aBuyPrice, $aBuyPrice,
+                $_SERVER['REMOTE_ADDR'] ?? null,
+            ]);
+            $bnOrderId = (int)$pdo->lastInsertId();
+            if ($aProductId && $bnOrderId) {
+                try {
+                    $pdo->prepare(
+                        "INSERT INTO order_items (tenant_id, order_id, entity_id, product_id, product_name, sku, quantity, unit_price, subtotal, total)
+                         VALUES (?,?,?,?,?,?,1,?,?,?)"
+                    )->execute([$aTenantId, $bnOrderId, $aEntityId, $aProductId, $prdName, $prdSku, $aBuyPrice, $aBuyPrice, $aBuyPrice]);
+                } catch (Throwable) {}
+            }
             $pdo->commit();
-            ResponseFormatter::success(['ok' => true, 'bid_id' => $bnId, 'amount' => $aRow['buy_now_price']], 'Purchased!');
+            ResponseFormatter::success(['ok' => true, 'bid_id' => $bnId, 'amount' => $aBuyPrice, 'order_id' => $bnOrderId, 'order_number' => $bnOrderNum], 'Purchased!');
         } catch (Throwable $ex) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             ResponseFormatter::error('Failed: ' . $ex->getMessage(), 500);

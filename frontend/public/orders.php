@@ -42,6 +42,7 @@ if ($pdo && $userId) {
         $stOrders = $pdo->prepare(
             "SELECT o.id, o.order_number, o.status, o.payment_status, o.grand_total,
                     o.currency_code, o.created_at, o.estimated_delivery_date, o.delivered_at,
+                    o.auction_id,
                     COUNT(oi.id) AS item_count
              FROM orders o
              LEFT JOIN order_items oi ON oi.order_id = o.id
@@ -69,7 +70,7 @@ if ($viewId && $pdo && $userId) {
                     o.subtotal, o.tax_amount, o.shipping_cost, o.discount_amount,
                     o.grand_total, o.currency_code, o.coupon_code, o.customer_notes,
                     o.created_at, o.confirmed_at, o.shipped_at, o.delivered_at,
-                    o.estimated_delivery_date, o.cancellation_reason
+                    o.estimated_delivery_date, o.cancellation_reason, o.auction_id
              FROM orders o
              WHERE o.id = ? AND o.user_id = ?
              LIMIT 1"
@@ -186,6 +187,9 @@ $passedStatuses = $viewOrder ? array_map(fn($h) => $h['status'], $statusHistory)
     <div class="pub-order-detail">
         <h2>
             <?= e(t('orders.order_number')) ?>: <?= e($viewOrder['order_number']) ?>
+            <?php if (!empty($viewOrder['auction_id'])): ?>
+                <span style="background:#f59e0b;color:#000;font-size:0.7rem;padding:2px 8px;border-radius:4px;margin-inline-start:8px">🔨 <?= e(t('nav.auctions')) ?> #<?= (int)$viewOrder['auction_id'] ?></span>
+            <?php endif; ?>
             <span class="pub-order-badge <?= orderStatusClass($viewOrder['status']) ?>" style="margin-inline-start:10px">
                 <?= e(t('orders.status_' . $viewOrder['status'])) ?>
             </span>
@@ -355,7 +359,12 @@ $passedStatuses = $viewOrder ? array_map(fn($h) => $h['status'], $statusHistory)
         <?php foreach ($orders as $ord): ?>
         <a href="?view=<?= (int)$ord['id'] ?><?= $filter ? '&status='.e($filter) : '' ?>" style="display:block;text-decoration:none;color:inherit" class="pub-order-row">
             <div>
-                <div class="pub-order-num"><?= e($ord['order_number']) ?></div>
+                <div class="pub-order-num">
+                    <?= e($ord['order_number']) ?>
+                    <?php if (!empty($ord['auction_id'])): ?>
+                        <span style="background:#f59e0b;color:#000;font-size:0.65rem;padding:1px 6px;border-radius:4px;margin-inline-start:6px">🔨 <?= e(t('nav.auctions')) ?></span>
+                    <?php endif; ?>
+                </div>
                 <div class="pub-order-date">
                     <?= date('Y-m-d H:i', strtotime($ord['created_at'])) ?>
                     &nbsp;·&nbsp; <?= (int)$ord['item_count'] ?> <?= e(t('orders.items')) ?>
