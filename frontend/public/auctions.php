@@ -39,6 +39,7 @@ if ($pdo) {
                     a.buy_now_price, a.bid_increment, a.total_bids, a.total_bidders,
                     a.start_date, a.end_date, a.is_featured, a.condition_type, a.quantity,
                     a.entity_id,
+                    (SELECT c.code FROM currencies c WHERE c.id = a.currency_id LIMIT 1) AS currency_code,
                     (SELECT i.url FROM images i WHERE i.owner_id = a.product_id ORDER BY i.id ASC LIMIT 1) AS image_url,
                     (SELECT at2.title FROM auction_translations at2
                      WHERE at2.auction_id = a.id AND at2.language_code = ? LIMIT 1) AS title
@@ -125,8 +126,9 @@ include dirname(__DIR__) . '/partials/header.php';
         $aSlug   = $a['slug'] ?? '';
         $aTitle  = $a['title'] ?? $aSlug;
         $aImg    = $a['image_url'] ?? '';
-        $aPrice  = number_format((float)($a['current_price'] ?? 0), 2);
-        $aBuyNow = $a['buy_now_price'] ? number_format((float)$a['buy_now_price'], 2) : '';
+        $aCurr   = $a['currency_code'] ?? '';
+        $aPrice  = number_format((float)($a['current_price'] ?? 0), 2) . ($aCurr ? ' ' . $aCurr : '');
+        $aBuyNow = $a['buy_now_price'] ? number_format((float)$a['buy_now_price'], 2) . ($aCurr ? ' ' . $aCurr : '') : '';
         $aEnd    = $a['end_date'] ?? '';
         $aBids   = (int)($a['total_bids'] ?? 0);
         $aStatus = $a['status'] ?? '';

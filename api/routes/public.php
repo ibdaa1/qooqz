@@ -2013,7 +2013,8 @@ if ($first === 'auctions') {
             "SELECT a.id, a.slug, a.auction_type, a.status, a.starting_price, a.current_price,
                     a.buy_now_price, a.bid_increment, a.total_bids, a.total_bidders,
                     a.start_date, a.end_date, a.is_featured, a.condition_type, a.quantity,
-                    a.currency_id, a.entity_id,
+                    (SELECT c.code FROM currencies c WHERE c.id = a.currency_id LIMIT 1) AS currency_code,
+                    a.entity_id,
                     (SELECT i.url FROM images i WHERE i.owner_id = a.product_id ORDER BY i.id ASC LIMIT 1) AS image_url,
                     (SELECT at2.title FROM auction_translations at2 WHERE at2.auction_id = a.id AND at2.language_code = ? LIMIT 1) AS title
              FROM auctions a
@@ -2212,6 +2213,15 @@ if ($first === 'auctions') {
                 } catch (Throwable) {}
             }
             $pdo->commit();
+            // Insert payment record (non-fatal)
+            try {
+                $bnPmNum = 'PAY-AUC-' . $auctionId . '-' . time();
+                $pdo->prepare(
+                    "INSERT INTO payments (entity_id, payment_number, order_id, user_id, payment_method,
+                        amount, currency_code, status, payment_type, ip_address, created_at, updated_at)
+                     VALUES (?,?,?,?,'buy_now',?,'SAR','pending','order',?,NOW(),NOW())"
+                )->execute([$aEntityId, $bnPmNum, $bnOrderId, $auctionUserId, $aBuyPrice, $_SERVER['REMOTE_ADDR'] ?? null]);
+            } catch (Throwable) {}
             ResponseFormatter::success(['ok' => true, 'bid_id' => $bnId, 'amount' => $aBuyPrice, 'order_id' => $bnOrderId, 'order_number' => $bnOrderNum], 'Purchased!');
         } catch (Throwable $ex) {
             if ($pdo->inTransaction()) $pdo->rollBack();

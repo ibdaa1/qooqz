@@ -220,6 +220,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $pdo) {
             $pdo->commit();
             $checkoutSuccess = true;
 
+            // 3. Insert payment record (pending — user hasn't paid yet)
+            try {
+                $pmNum = 'PAY-' . $tenantId . '-' . $orderId . '-' . time();
+                $pdo->prepare(
+                    "INSERT INTO payments
+                       (entity_id, payment_number, order_id, user_id, payment_method,
+                        amount, currency_code, status, payment_type, ip_address, created_at, updated_at)
+                     VALUES (?, ?, ?, ?, ?, ?, 'SAR', 'pending', 'order', ?, NOW(), NOW())"
+                )->execute([
+                    $entityId, $pmNum, $orderId, $userId,
+                    $pmCode ?: 'cod',
+                    $cartTotal,
+                    $_SERVER['REMOTE_ADDR'] ?? null,
+                ]);
+            } catch (Throwable) {} // Non-fatal — order already committed
+
         } catch (Throwable $ex) {
             try { $pdo->rollBack(); } catch (Throwable) {}
             $checkoutError = t('common.error') . ': ' . $ex->getMessage();

@@ -32,6 +32,7 @@ if ($pdo) {
     try {
         $st = $pdo->prepare(
             "SELECT a.*,
+                    COALESCE((SELECT c.code FROM currencies c WHERE c.id = a.currency_id LIMIT 1), 'SAR') AS currency_code,
                     (SELECT at2.title FROM auction_translations at2 WHERE at2.auction_id=a.id AND at2.language_code=? LIMIT 1) AS title,
                     (SELECT at2.description FROM auction_translations at2 WHERE at2.auction_id=a.id AND at2.language_code=? LIMIT 1) AS description,
                     (SELECT at2.terms_conditions FROM auction_translations at2 WHERE at2.auction_id=a.id AND at2.language_code=? LIMIT 1) AS terms_conditions,
@@ -293,7 +294,7 @@ include dirname(__DIR__) . '/partials/header.php';
         <div class="pub-auc-price-label"><?= e(t('auctions.current_bid')) ?></div>
         <div class="pub-auc-price-val" id="aucCurrentPrice">
           <?= number_format($aCurrent, 2) ?>
-          <span class="pub-auc-price-currency"><?= e($auction['currency_id'] ?? '') ?></span>
+          <span class="pub-auc-price-currency"><?= e($auction['currency_code'] ?? 'SAR') ?></span>
         </div>
       </div>
 
@@ -417,6 +418,24 @@ function aucPollStatus() {
       }
     }).catch(function(){});
 }
+
+// Reload bid history via API (called after placing a bid)
+function aucRefreshBidHistory() {
+  fetch('/api/public/auctions/' + AUC_ID, {credentials:'include'})
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.success || !d.data || !d.data.auction || !Array.isArray(d.data.bids)) return;
+      var tbody = document.getElementById('aucBidTableBody');
+      if (!tbody) return;
+      var rows = '';
+      d.data.bids.forEach(function(b) {
+        rows += '<tr><td>' + (b.bidder || '') + (b.is_winning ? '<span class="pub-auc-winner-badge">🏆</span>' : '') + '</td>'
+              + '<td>' + parseFloat(b.bid_amount || 0).toFixed(2) + '</td>'
+              + '<td>' + (b.created_at ? b.created_at.substr(0,16).replace('T',' ') : '') + '</td></tr>';
+      });
+      if (rows) tbody.innerHTML = rows;
+    }).catch(function(){});
+}
 if (AUC_ACTIVE) { setInterval(aucPollStatus, 8000); }
 
 // ---- Place bid ----
@@ -433,6 +452,7 @@ function aucPlaceBid(e) {
       if (d.success) {
         aucShowMsg('✅ <?= addslashes(t('auctions.bid_placed')) ?>', 'success');
         aucPollStatus();
+        aucRefreshBidHistory();
       } else {
         aucShowMsg('❌ ' + (d.message || '<?= addslashes(t('auctions.bid_failed')) ?>'), 'error');
       }
