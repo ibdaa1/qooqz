@@ -198,7 +198,7 @@ $passedStatuses = $viewOrder ? array_map(fn($h) => $h['status'], $statusHistory)
                 <?= e(t('orders.status_' . $viewOrder['status'])) ?>
             </span>
             <?php if (in_array($viewOrder['payment_status'], ['pending','failed']) && !in_array($viewOrder['status'], ['cancelled','refunded','failed'])): ?>
-                <a href="/frontend/public/checkout.php?order_id=<?= (int)$viewOrder['id'] ?>"
+                <a href="/frontend/public/pay.php?order_id=<?= (int)$viewOrder['id'] ?>"
                    style="background:var(--pub-primary,#10B981);color:#000;font-size:0.78rem;padding:5px 14px;border-radius:20px;text-decoration:none;font-weight:700;margin-inline-start:10px;display:inline-block">
                     💳 <?= e(t('orders.pay_now')) ?>
                 </a>
@@ -389,7 +389,7 @@ $passedStatuses = $viewOrder ? array_map(fn($h) => $h['status'], $statusHistory)
                 <?php endif; ?>
                 <div class="pub-order-total"><?= number_format((float)$ord['grand_total'], 2) ?> <?= e($ord['currency_code']) ?></div>
                 <?php if (in_array($ord['payment_status'], ['pending','failed']) && !in_array($ord['status'], ['cancelled','refunded','failed'])): ?>
-                    <span onclick="event.preventDefault(); window.location.href='/frontend/public/checkout.php?order_id=<?= (int)$ord['id'] ?>'" class="pub-order-badge" style="background:var(--pub-primary,#10B981);color:#000;cursor:pointer">
+                    <span onclick="event.preventDefault(); window.location.href='/frontend/public/pay.php?order_id=<?= (int)$ord['id'] ?>'" class="pub-order-badge" style="background:var(--pub-primary,#10B981);color:#000;cursor:pointer">
                         💳 <?= e(t('orders.pay_now')) ?>
                     </span>
                 <?php endif; ?>
