@@ -22,22 +22,87 @@ $brandId = (int)($_GET['brand_id'] ?? 0);
 $catId   = (int)($_GET['category_id'] ?? 0);
 $sort    = in_array($_GET['sort'] ?? '', ['price_asc','price_desc','newest'], true) ? ($_GET['sort'] ?? 'newest') : 'newest';
 
-/* Fetch */
-$qs = http_build_query(array_filter([
-    'lang'        => $lang,
-    'page'        => $page,
-    'limit'       => $limit,
-    'tenant_id'   => $tenantId,
-    'brand_id'    => $brandId ?: null,
-    'category_id' => $catId ?: null,
-    'search'      => $search ?: null,
-]));
+/* Fetch — PDO-first (ADMIN_DB is null on LiteSpeed; direct PDO always works) */
+$products = [];
+$total    = 0;
+$pdo = pub_get_pdo();
+if ($pdo) {
+    try {
+        $where  = ['1=1'];
+        $params = [];
 
-$resp     = pub_fetch(pub_api_url('public/products') . '?' . $qs);
-$products = $resp['data']['data'] ?? ($resp['data']['items'] ?? []);
-$meta     = $resp['data']['meta']  ?? [];
-$total    = (int)($meta['total'] ?? count($products));
-$totalPg  = (int)($meta['total_pages'] ?? (($limit > 0 && $total > 0) ? (int)ceil($total / $limit) : 1));
+        // Tenant filter
+        if ($tenantId) { $where[] = 'p.tenant_id = ?'; $params[] = $tenantId; }
+
+        // Search
+        if ($search !== '') {
+            $like = '%' . addcslashes($search, '%_\\') . '%';
+            $where[] = '(pt.name LIKE ? OR p.sku LIKE ?)';
+            $params[] = $like; $params[] = $like;
+        }
+
+        // Brand
+        if ($brandId) { $where[] = 'p.brand_id = ?'; $params[] = $brandId; }
+
+        // Category
+        if ($catId) {
+            $where[] = 'EXISTS (SELECT 1 FROM product_categories pc WHERE pc.product_id = p.id AND pc.category_id = ?)';
+            $params[] = $catId;
+        }
+
+        // Active only
+        $where[] = 'p.is_active = 1';
+
+        $whereClause = implode(' AND ', $where);
+
+        // Count
+        $cStmt = $pdo->prepare("SELECT COUNT(*) FROM products p
+            LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
+            WHERE $whereClause");
+        $cStmt->execute(array_merge([$lang], $params));
+        $total = (int)$cStmt->fetchColumn();
+
+        // Sort
+        $orderBy = match($sort) {
+            'price_asc'  => '(SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) ASC',
+            'price_desc' => '(SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) DESC',
+            default      => 'p.created_at DESC',
+        };
+
+        $offset = ($page - 1) * $limit;
+        $stmt = $pdo->prepare(
+            "SELECT p.id, p.sku, p.slug, p.is_featured, p.stock_quantity, p.stock_status,
+                    p.rating_average, p.rating_count, p.tenant_id,
+                    COALESCE(pt.name, p.slug) AS name,
+                    (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
+                    (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
+                    (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url,
+                    NULL AS image_thumb_url,
+                    (SELECT oi.entity_id FROM order_items oi WHERE oi.product_id = p.id LIMIT 1) AS entity_id
+             FROM products p
+             LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
+             WHERE $whereClause
+             ORDER BY $orderBy
+             LIMIT $limit OFFSET $offset"
+        );
+        $stmt->execute(array_merge([$lang], $params));
+        $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[products.php] PDO error: ' . $e->getMessage());
+    }
+}
+// HTTP fallback if PDO unavailable
+if (!$products && !$pdo) {
+    $qs = http_build_query(array_filter([
+        'lang' => $lang, 'page' => $page, 'limit' => $limit,
+        'tenant_id' => $tenantId, 'brand_id' => $brandId ?: null,
+        'category_id' => $catId ?: null, 'search' => $search ?: null,
+    ]));
+    $resp     = pub_fetch(pub_api_url('public/products') . '?' . $qs);
+    $products = $resp['data']['data'] ?? ($resp['data']['items'] ?? []);
+    $total    = (int)(($resp['data']['meta']['total'] ?? count($products)));
+}
+$totalPg = ($limit > 0 && $total > 0) ? (int)ceil($total / $limit) : 1;
 
 include dirname(__DIR__) . '/partials/header.php';
 ?>
@@ -61,7 +126,7 @@ include dirname(__DIR__) . '/partials/header.php';
 
     <!-- Filter bar -->
     <form method="get" class="pub-filter-bar">
-        <input type="search" name="q" class="pub-search-input" style="max-width:260px;"
+        <input type="search" name="q" class="pub-search-input"
                placeholder="<?= e(t('products.search_placeholder')) ?>"
                value="<?= e($search) ?>">
 

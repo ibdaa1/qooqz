@@ -20,30 +20,66 @@ $limit  = 18;
 $search = trim($_GET['q'] ?? '');
 $vType  = trim($_GET['vendor_type'] ?? '');
 
-/* Fetch from public entities endpoint */
-$qs = http_build_query(array_filter([
-    'lang'        => $lang,
-    'page'        => $page,
-    'limit'       => $limit,
-    'tenant_id'   => $tenantId,
-    'vendor_type' => $vType ?: null,
-    'q'           => $search ?: null,
-]));
-$resp     = pub_fetch(pub_api_url('public/entities') . '?' . $qs);
-$entities = $resp['data']['data'] ?? ($resp['data']['items'] ?? []);
-$meta     = $resp['data']['meta']  ?? [];
-$total    = (int)($meta['total'] ?? count($entities));
-$totalPg  = (int)($meta['total_pages'] ?? (($limit > 0 && $total > 0) ? (int)ceil($total / $limit) : 1));
+/* Fetch — PDO-first */
+$entities = [];
+$total    = 0;
+$pdo = pub_get_pdo();
+if ($pdo) {
+    try {
+        $where  = ["e.status NOT IN ('suspended','rejected')"];
+        $params = [];
 
-/* Fetch entity types from API for the filter dropdown */
-$etResp      = pub_fetch(pub_api_url('public/entity_types'));
-$etRows      = $etResp['data']['data'] ?? ($etResp['data'] ?? []);
-$vendorTypes = ['' => t('entities.type_all')];
-foreach ($etRows as $et) {
-    if (!empty($et['code'])) {
-        $vendorTypes[$et['code']] = $et['name'] ?? $et['code'];
+        if ($tenantId) { $where[] = 'e.tenant_id = ?'; $params[] = $tenantId; }
+
+        if ($search !== '') {
+            $like = '%' . addcslashes($search, '%_\\') . '%';
+            $where[] = '(e.store_name LIKE ? OR e.email LIKE ?)';
+            $params[] = $like; $params[] = $like;
+        }
+
+        if ($vType !== '') { $where[] = 'e.vendor_type = ?'; $params[] = $vType; }
+
+        $whereClause = implode(' AND ', $where);
+
+        $cStmt = $pdo->prepare("SELECT COUNT(*) FROM entities e WHERE $whereClause");
+        $cStmt->execute($params);
+        $total = (int)$cStmt->fetchColumn();
+
+        $offset = ($page - 1) * $limit;
+        $stmt = $pdo->prepare(
+            "SELECT e.id, e.store_name, e.slug, e.vendor_type, e.is_verified,
+                    (SELECT et2.description FROM entity_translations et2
+                     WHERE et2.entity_id = e.id AND et2.language_code = ? LIMIT 1) AS description,
+                    (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url
+             FROM entities e
+             WHERE $whereClause
+             ORDER BY e.is_verified DESC, e.id DESC
+             LIMIT $limit OFFSET $offset"
+        );
+        $stmt->execute(array_merge([$lang], $params));
+        $entities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[entities.php] PDO error: ' . $e->getMessage());
     }
 }
+if (!$entities && !$pdo) {
+    $qs = http_build_query(array_filter([
+        'lang' => $lang, 'page' => $page, 'limit' => $limit,
+        'tenant_id' => $tenantId, 'vendor_type' => $vType ?: null, 'q' => $search ?: null,
+    ]));
+    $resp     = pub_fetch(pub_api_url('public/entities') . '?' . $qs);
+    $entities = $resp['data']['data'] ?? ($resp['data']['items'] ?? []);
+    $total    = (int)(($resp['data']['meta']['total'] ?? count($entities)));
+}
+$totalPg = ($limit > 0 && $total > 0) ? (int)ceil($total / $limit) : 1;
+
+/* Vendor type labels (static map — no API call needed) */
+$vendorTypes = [
+    ''                => t('entities.type_all'),
+    'product_seller'  => t('entities.type_product'),
+    'service_provider'=> t('entities.type_service'),
+    'both'            => t('entities.type_both'),
+];
 
 include dirname(__DIR__) . '/partials/header.php';
 ?>
@@ -75,7 +111,7 @@ include dirname(__DIR__) . '/partials/header.php';
 
     <!-- Filters -->
     <form method="get" class="pub-filter-bar">
-        <input type="search" name="q" class="pub-search-input" style="max-width:240px;"
+        <input type="search" name="q" class="pub-search-input"
                placeholder="<?= e(t('entities.search_placeholder')) ?>"
                value="<?= e($search) ?>">
         <select name="vendor_type" class="pub-filter-select" data-auto-submit>

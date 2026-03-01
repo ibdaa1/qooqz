@@ -925,12 +925,31 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   background: var(--pub-surface);
   border: 1px solid var(--pub-border);
   border-radius: var(--pub-radius);
-  padding: 14px 16px;
+  padding: 12px 14px;
   margin-bottom: 24px;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
+}
+/* Search input inside filter bar takes flexible width */
+.pub-filter-bar .pub-search-input {
+  flex: 1 1 180px;
+  min-width: 140px;
+  max-width: 100%;
+}
+/* Selects don't shrink below their label */
+.pub-filter-bar .pub-filter-select {
+  flex: 0 1 auto;
+}
+/* Submit / clear buttons */
+.pub-filter-bar .pub-btn {
+  flex-shrink: 0;
+}
+/* On very small screens, search fills full width */
+@media (max-width: 480px) {
+  .pub-filter-bar .pub-search-input { flex: 1 1 100%; }
+  .pub-filter-bar { gap: 6px; }
 }
 .pub-filter-select {
   padding: 7px 12px;
