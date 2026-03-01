@@ -618,6 +618,49 @@ if ($first === 'entity') {
         exit;
     }
 
+    // Sub-route: entity ratings — GET list or POST submit
+    if ($sub === 'ratings') {
+        $isPost = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST';
+        if ($isPost) {
+            // Submit a rating
+            $rateUserId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
+            if (!$rateUserId) { ResponseFormatter::error('Login required', 401); exit; }
+            $ratingVal  = (float)($_POST['rating'] ?? 0);
+            $reviewText = trim($_POST['review'] ?? '');
+            if ($ratingVal < 1 || $ratingVal > 5) { ResponseFormatter::error('Rating must be between 1 and 5'); exit; }
+            try {
+                // Upsert: one rating per user per entity (INSERT or UPDATE if exists)
+                $existing = $pdoOne('SELECT id FROM entity_ratings WHERE entity_id = ? AND user_id = ? LIMIT 1', [$entityId, $rateUserId]);
+                if ($existing) {
+                    $pdo->prepare('UPDATE entity_ratings SET rating = ?, review = ?, is_active = 1, updated_at = NOW() WHERE id = ?')
+                        ->execute([$ratingVal, $reviewText ?: null, (int)$existing['id']]);
+                    $msg = 'Rating updated';
+                } else {
+                    $pdo->prepare('INSERT INTO entity_ratings (entity_id, user_id, rating, review, is_active, created_at) VALUES (?, ?, ?, ?, 1, NOW())')
+                        ->execute([$entityId, $rateUserId, $ratingVal, $reviewText ?: null]);
+                    $msg = 'Rating submitted';
+                }
+                ResponseFormatter::success(['ok' => true, 'message' => $msg], 201);
+            } catch (Throwable $ex) {
+                ResponseFormatter::error('Failed to save rating: ' . $ex->getMessage());
+            }
+            exit;
+        }
+        // GET: last 5 active ratings
+        $rows = $pdoList(
+            "SELECT er.id, er.rating, er.review, er.created_at,
+                    COALESCE(u.name, u.username, 'Anonymous') AS reviewer_name
+               FROM entity_ratings er
+          LEFT JOIN users u ON u.id = er.user_id
+              WHERE er.entity_id = ? AND er.is_active = 1
+              ORDER BY er.created_at DESC LIMIT 5",
+            [$entityId]
+        );
+        $avg = $pdoOne('SELECT ROUND(AVG(rating),2) AS avg_rating, COUNT(*) AS total FROM entity_ratings WHERE entity_id = ? AND is_active = 1', [$entityId]);
+        ResponseFormatter::success(['ok' => true, 'ratings' => $rows, 'average' => $avg['avg_rating'] ?? null, 'total' => (int)($avg['total'] ?? 0)]);
+        exit;
+    }
+
     // Sub-route: entity products
     // Products have no entity_id column; use entity's tenant_id to scope products
     if ($sub === 'products') {

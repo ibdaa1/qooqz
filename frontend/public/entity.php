@@ -70,8 +70,32 @@ $discounts = $discResp['data']['data'] ?? [];
 $GLOBALS['PUB_PAGE_TITLE'] = e($entity['store_name'] ?? '') . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_DESC']  = e($entity['description'] ?? '');
 
-// SEO meta — load from seo_meta table, fallback to entity_translations fields
+// Entity ratings — last 5 + average
 $pdo = pub_get_pdo();
+$entityRatings    = [];
+$entityRatingAvg  = null;
+$entityRatingTotal = 0;
+if ($pdo) {
+    try {
+        $rStmt = $pdo->prepare(
+            "SELECT er.id, er.rating, er.review, er.created_at,
+                    COALESCE(u.name, u.username, 'Anonymous') AS reviewer_name
+               FROM entity_ratings er
+          LEFT JOIN users u ON u.id = er.user_id
+              WHERE er.entity_id = ? AND er.is_active = 1
+              ORDER BY er.created_at DESC LIMIT 5"
+        );
+        $rStmt->execute([$entity['id'] ?? $entityId]);
+        $entityRatings = $rStmt->fetchAll(PDO::FETCH_ASSOC);
+        $rAvgStmt = $pdo->prepare('SELECT ROUND(AVG(rating),2) AS avg_rating, COUNT(*) AS total FROM entity_ratings WHERE entity_id = ? AND is_active = 1');
+        $rAvgStmt->execute([$entity['id'] ?? $entityId]);
+        $rAvg = $rAvgStmt->fetch(PDO::FETCH_ASSOC);
+        $entityRatingAvg   = $rAvg['avg_rating'] ?? null;
+        $entityRatingTotal = (int)($rAvg['total'] ?? 0);
+    } catch (Throwable $_) {}
+}
+
+// SEO meta — load from seo_meta table, fallback to entity_translations fields
 $seoMeta = function_exists('pub_get_seo_meta') ? pub_get_seo_meta('entity', $entity['id'] ?? $entityId, $lang) : [];
 $GLOBALS['PUB_SEO'] = [
     'title'       => $seoMeta['meta_title']       ?? ($entity['meta_title']       ?? $entity['store_name'] ?? ''),
@@ -175,7 +199,13 @@ include dirname(__DIR__) . '/partials/header.php';
         <div class="pub-entity-profile-info">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                 <h1 class="pub-entity-profile-name"><?= e($entity['store_name'] ?? '') ?></h1>
-                <?php if (!empty($entity['is_verified'])): ?>
+                    <?php if ($entityRatingAvg !== null): ?>
+                        <span class="pub-entity-rating-avg" title="<?= (int)$entityRatingTotal ?> reviews">
+                            ⭐ <?= number_format((float)$entityRatingAvg, 1) ?>
+                            <span style="font-size:0.78rem;opacity:0.7;">(<?= $entityRatingTotal ?>)</span>
+                        </span>
+                    <?php endif; ?>
+                    <?php if (!empty($entity['is_verified'])): ?>
                     <span class="pub-entity-verified">✅ <?= e(t('entities.verified')) ?></span>
                 <?php endif; ?>
                 <?php if ($entityIsOpen !== null): ?>
@@ -281,6 +311,11 @@ include dirname(__DIR__) . '/partials/header.php';
             <span class="pub-tab-count"><?= count($discounts) ?></span>
         </button>
         <?php endif; ?>
+        <button class="pub-tab" data-tab="ratings" role="tab"
+                aria-selected="false" aria-controls="tabRatings">
+            ⭐ <?= e(t('entity.ratings_tab')) ?>
+            <?php if ($entityRatingTotal > 0): ?><span class="pub-tab-count"><?= $entityRatingTotal ?></span><?php endif; ?>
+        </button>
     </div>
 
     <!-- TAB: Products -->
@@ -521,6 +556,94 @@ include dirname(__DIR__) . '/partials/header.php';
         <?php endif; ?>
     </div>
 
+    <!-- TAB: Ratings -->
+    <div class="pub-tab-panel" id="tabRatings" style="display:none;">
+        <div style="margin-top:20px;">
+            <?php if ($entityRatingAvg !== null): ?>
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+                <div style="font-size:2.8rem;font-weight:900;color:var(--pub-accent,#F59E0B);">
+                    <?= number_format((float)$entityRatingAvg, 1) ?>
+                </div>
+                <div>
+                    <div style="font-size:1.3rem;letter-spacing:2px;">
+                        <?php for ($si=1; $si<=5; $si++): ?>
+                            <?php if ($si <= $entityRatingAvg): ?>
+                                <span style="color:#F59E0B;">★</span>
+                            <?php elseif ($si - 0.5 <= $entityRatingAvg): ?>
+                                <span style="color:#F59E0B;opacity:0.6;">★</span>
+                            <?php else: ?>
+                                <span style="color:var(--pub-border);">☆</span>
+                            <?php endif; ?>
+                        <?php endfor; ?>
+                    </div>
+                    <div style="font-size:0.82rem;color:var(--pub-muted);"><?= $entityRatingTotal ?> <?= e(t('entity.ratings_count')) ?></div>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if (!empty($entityRatings)): ?>
+            <div style="display:grid;gap:12px;">
+                <?php foreach ($entityRatings as $r): ?>
+                <div style="background:var(--pub-surface);border:1px solid var(--pub-border);border-radius:var(--pub-radius);padding:14px 16px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+                        <span style="font-weight:700;font-size:0.9rem;"><?= e($r['reviewer_name']) ?></span>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span style="color:#F59E0B;font-size:1rem;">
+                                <?php for ($si=1; $si<=5; $si++): ?>
+                                    <?= $si <= (float)$r['rating'] ? '★' : '☆' ?>
+                                <?php endfor; ?>
+                            </span>
+                            <span style="font-size:0.75rem;color:var(--pub-muted);"><?= e(substr($r['created_at'] ?? '', 0, 10)) ?></span>
+                        </div>
+                    </div>
+                    <?php if (!empty($r['review'])): ?>
+                        <p style="margin:0;font-size:0.88rem;color:var(--pub-text);"><?= e($r['review']) ?></p>
+                    <?php endif; ?>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <?php else: ?>
+            <div class="pub-empty" style="padding:40px 0;">
+                <div class="pub-empty-icon">⭐</div>
+                <p class="pub-empty-msg"><?= e(t('entity.no_ratings')) ?></p>
+            </div>
+            <?php endif; ?>
+
+            <!-- Rate this entity (login-gated) -->
+            <?php if ($_isLoggedIn): ?>
+            <div style="margin-top:24px;background:var(--pub-surface);border:1px solid var(--pub-border);border-radius:var(--pub-radius);padding:20px;">
+                <h3 style="margin:0 0 14px;font-size:1rem;font-weight:700;"><?= e(t('entity.rate_title')) ?></h3>
+                <form id="pubEntityRateForm" onsubmit="pubSubmitEntityRating(event)">
+                    <div style="margin-bottom:12px;">
+                        <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:6px;"><?= e(t('entity.your_rating')) ?></label>
+                        <div id="pubEntityStarPicker" style="display:flex;gap:6px;font-size:1.8rem;cursor:pointer;" role="group" aria-label="<?= e(t('entity.your_rating')) ?>">
+                            <?php for ($si=1; $si<=5; $si++): ?>
+                                <span class="pub-star-pick" data-val="<?= $si ?>" onclick="pubPickEntityStar(<?= $si ?>)"
+                                      style="color:var(--pub-border);transition:color 0.15s;user-select:none;">★</span>
+                            <?php endfor; ?>
+                        </div>
+                        <input type="hidden" id="pubEntityRating" name="rating" value="0">
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <textarea id="pubEntityReview" name="review" rows="3"
+                                  placeholder="<?= e(t('entity.write_review')) ?>"
+                                  class="pub-input" style="width:100%;padding:8px 12px;border-radius:var(--pub-radius);border:1px solid var(--pub-border);background:var(--pub-bg);color:var(--pub-text);font-size:0.88rem;resize:vertical;"></textarea>
+                    </div>
+                    <button type="submit" class="pub-btn pub-btn--primary">
+                        ⭐ <?= e(t('entity.submit_rating')) ?>
+                    </button>
+                    <p id="pubEntityRateMsg" style="margin:8px 0 0;font-size:0.85rem;display:none;"></p>
+                </form>
+            </div>
+            <?php else: ?>
+            <p style="text-align:center;margin-top:20px;font-size:0.88rem;color:var(--pub-muted);">
+                <a href="/frontend/login.php?redirect=<?= urlencode($_SERVER['REQUEST_URI'] ?? '') ?>" class="pub-link"><?= e(t('common.login')) ?></a>
+                <?= e(t('entity.login_to_rate')) ?>
+            </p>
+            <?php endif; ?>
+        </div>
+    </div>
+
 </div><!-- /.pub-container discounts -->
 
 <script>
@@ -591,6 +714,38 @@ function pubCopyDiscount(code, btn) {
         btn.textContent = '✅';
         setTimeout(function() { btn.textContent = orig; }, 1800);
     }
+function pubPickEntityStar(val) {
+    document.getElementById('pubEntityRating').value = val;
+    document.querySelectorAll('.pub-star-pick').forEach(function(s) {
+        s.style.color = parseInt(s.dataset.val) <= val ? '#F59E0B' : 'var(--pub-border)';
+    });
+}
+
+function pubSubmitEntityRating(e) {
+    e.preventDefault();
+    var rating = parseInt(document.getElementById('pubEntityRating').value);
+    if (!rating || rating < 1) { alert('<?= addslashes(t('entity.pick_rating')) ?>'); return; }
+    var review = (document.getElementById('pubEntityReview') || {}).value || '';
+    var msg = document.getElementById('pubEntityRateMsg');
+    fetch('<?= e(pub_api_url('public/entity/' . ($entity['id'] ?? $entityId) . '/ratings')) ?>', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'rating=' + rating + '&review=' + encodeURIComponent(review)
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (msg) {
+            msg.style.display = 'block';
+            msg.style.color = d.success ? 'var(--pub-primary)' : '#dc2626';
+            msg.textContent = d.success ? '✅ <?= addslashes(t('entity.rating_submitted')) ?>' : (d.message || '<?= addslashes(t('common.error')) ?>');
+        }
+        if (d.success) {
+            // Reset form
+            document.getElementById('pubEntityRating').value = '0';
+            document.querySelectorAll('.pub-star-pick').forEach(function(s) { s.style.color = 'var(--pub-border)'; });
+            if (document.getElementById('pubEntityReview')) document.getElementById('pubEntityReview').value = '';
+        }
+    }).catch(function() {
+        if (msg) { msg.style.display='block'; msg.style.color='#dc2626'; msg.textContent='<?= addslashes(t('common.error')) ?>'; }
+    });
 }
 </script>
 
@@ -666,6 +821,10 @@ echo '<style>
 .pub-discount-terms { padding:8px 16px 12px; border-top:1px solid var(--pub-border); }
 .pub-discount-terms summary { font-size:0.82rem; color:var(--pub-muted); cursor:pointer; }
 .pub-discount-terms p { font-size:0.82rem; color:var(--pub-muted); margin:6px 0 0; }
+/* Entity rating average badge */
+.pub-entity-rating-avg { display:inline-flex; align-items:center; gap:4px; padding:3px 10px;
+  border-radius:20px; font-size:0.82rem; font-weight:700;
+  background:#fef3c7; color:#92400e; }
 /* Mobile entity profile */
 @media(max-width:600px){
   .pub-entity-profile-header { flex-direction:column; align-items:center; text-align:center; gap:10px; margin-top:-36px; }

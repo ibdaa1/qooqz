@@ -259,7 +259,17 @@
     "copy_link": "Copy Link",
     "all_categories": "All",
     "open_now": "Open Now",
-    "discounts_tab": "Offers & Discounts"
+    "discounts_tab": "Offers & Discounts",
+    "ratings_tab": "Reviews",
+    "ratings_count": "reviews",
+    "no_ratings": "No reviews yet. Be the first to review!",
+    "rate_title": "Write a Review",
+    "your_rating": "Your Rating",
+    "write_review": "Share your experience...",
+    "submit_rating": "Submit Review",
+    "pick_rating": "Please select a star rating",
+    "rating_submitted": "Review submitted — awaiting moderation.",
+    "login_to_rate": "to write a review"
   },
   "deals": {
     "title": "🔥 Hot Deals",
