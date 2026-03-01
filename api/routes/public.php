@@ -640,7 +640,7 @@ if ($first === 'entity') {
                         ->execute([$entityId, $rateUserId, $ratingVal, $reviewText ?: null]);
                     $msg = 'Rating submitted';
                 }
-                ResponseFormatter::success(['ok' => true, 'message' => $msg], 201);
+                ResponseFormatter::success(['ok' => true, 'message' => $msg]);
             } catch (Throwable $ex) {
                 ResponseFormatter::error('Failed to save rating: ' . $ex->getMessage());
             }
