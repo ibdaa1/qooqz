@@ -1497,3 +1497,375 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .pub-auction-detail-meta { font-size: 13px; }
 .pub-auction-detail-label { font-weight: 600; }
 @media (max-width: 480px) { .pub-auction-grid { --grid-min: 160px; } }
+
+/* -------------------------------------------------------
+   30. Global responsive improvements (mobile-first)
+   ----------------------------------------------------- */
+
+/* Minimum touch target size for all interactive elements */
+button, .pub-btn, a.pub-btn, input[type="submit"], input[type="button"] {
+  min-height: 40px;
+}
+
+/* ---- Page wrapper main content padding ---- */
+.pub-main {
+  padding-top: 20px;
+  padding-bottom: 48px;
+}
+@media (min-width: 768px) {
+  .pub-main { padding-top: 32px; padding-bottom: 64px; }
+}
+
+/* ---- Responsive nav badges ---- */
+#pubWishlistCount, #pubWishlistCountMobile,
+#pubCompareCount,  #pubCompareCountMobile {
+  display: inline-flex;
+}
+
+/* ---- Entity / Vendor page responsive ---- */
+.pub-entity-banner {
+  height: 180px;
+}
+@media (min-width: 600px)  { .pub-entity-banner { height: 240px; } }
+@media (min-width: 900px)  { .pub-entity-banner { height: 320px; } }
+
+/* Entity profile header — responsive stacking */
+.pub-entity-profile-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 16px;
+}
+@media (min-width: 600px) {
+  .pub-entity-profile-header {
+    flex-direction: row;
+    align-items: flex-start;
+    text-align: start;
+    padding: 24px 0;
+  }
+}
+
+/* Entity logo — properly sized at each breakpoint */
+.pub-entity-profile-logo {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  overflow: hidden;
+  background: var(--pub-surface);
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  margin-top: -30px;
+}
+@media (min-width: 600px) {
+  .pub-entity-profile-logo {
+    width: 96px;
+    height: 96px;
+    margin-top: -40px;
+  }
+}
+@media (min-width: 900px) {
+  .pub-entity-profile-logo {
+    width: 112px;
+    height: 112px;
+    margin-top: -48px;
+  }
+}
+
+/* Entity profile info */
+.pub-entity-profile-info {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Entity tabs — scrollable on small screens */
+.pub-entity-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid var(--pub-border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 0;
+  flex-wrap: nowrap;
+}
+.pub-entity-tabs::-webkit-scrollbar { display: none; }
+.pub-entity-tab {
+  padding: 9px 14px;
+  white-space: nowrap;
+  border-radius: var(--pub-radius-sm) var(--pub-radius-sm) 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: var(--pub-muted);
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: color var(--pub-transition), border-color var(--pub-transition);
+  flex-shrink: 0;
+}
+.pub-entity-tab:hover  { color: var(--pub-text); }
+.pub-entity-tab.active { color: var(--pub-primary); border-bottom-color: var(--pub-primary); }
+@media (min-width: 600px) {
+  .pub-entity-tab { padding: 10px 18px; font-size: 0.92rem; }
+}
+
+/* ---- Product listing cards — touch friendly ---- */
+.pub-card-body {
+  padding: 10px;
+}
+@media (min-width: 600px) {
+  .pub-card-body { padding: 14px; }
+}
+
+/* Product detail add-to-cart row */
+.pub-product-cart-row {
+  flex-wrap: wrap;
+}
+@media (max-width: 480px) {
+  .pub-add-to-cart { width: 100%; }
+  .pub-qty-wrap    { width: 100%; justify-content: center; }
+}
+
+/* ---- Cart layout — responsive ---- */
+.pub-cart-layout {
+  display: grid;
+  gap: 20px;
+}
+@media (min-width: 900px) {
+  .pub-cart-layout {
+    grid-template-columns: 1fr 340px;
+    align-items: start;
+  }
+}
+
+/* ---- Checkout / Pay layout ---- */
+.pub-checkout-layout {
+  display: grid;
+  gap: 20px;
+}
+@media (min-width: 860px) {
+  .pub-checkout-layout {
+    grid-template-columns: 1fr 360px;
+    align-items: start;
+  }
+}
+
+/* ---- Orders page ---- */
+/* Tracking timeline — stack vertically on very narrow screens */
+@media (max-width: 480px) {
+  .pub-track-wrap {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .pub-track-wrap::before { display: none; }
+  .pub-track-step {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    flex: none;
+    width: 100%;
+  }
+  .pub-track-dot { width: 36px; height: 36px; flex-shrink: 0; }
+  .pub-track-lbl {
+    white-space: normal;
+    max-width: none;
+    font-size: 0.78rem;
+    text-align: start;
+  }
+  .pub-track-line { display: none; }
+}
+
+/* Items table — scrollable on small screens */
+.pub-items-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 20px;
+}
+.pub-items-table {
+  min-width: 480px;
+}
+
+/* Orders summary grid — 3 cols on very small, 5 on desktop */
+@media (max-width: 400px) {
+  .pub-orders-summary {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+/* ---- Auction page responsive ---- */
+.pub-auc-layout {
+  display: grid;
+  gap: 24px;
+}
+@media (min-width: 900px) {
+  .pub-auc-layout {
+    grid-template-columns: 1fr 380px;
+    align-items: start;
+  }
+}
+
+/* Auction bid form stack on mobile */
+@media (max-width: 480px) {
+  .pub-auc-bid-row {
+    flex-direction: column;
+  }
+  .pub-auc-bid-row input,
+  .pub-auc-bid-row button {
+    width: 100%;
+  }
+}
+
+/* ---- Compare page ---- */
+.pub-compare-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ---- Discounts page ---- */
+.pub-discounts-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+@media (min-width: 600px) {
+  .pub-discounts-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 900px) {
+  .pub-discounts-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ---- Wishlist page ---- */
+.pub-wishlist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 14px;
+}
+@media (min-width: 600px) {
+  .pub-wishlist-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+}
+@media (min-width: 900px) {
+  .pub-wishlist-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+}
+
+/* ---- Pay page ---- */
+.pub-pay-layout {
+  display: grid;
+  gap: 24px;
+  max-width: 860px;
+  margin-inline: auto;
+}
+@media (min-width: 720px) {
+  .pub-pay-layout {
+    grid-template-columns: 1fr 320px;
+    align-items: start;
+  }
+}
+
+/* ---- Entity listing cards (entities.php) ---- */
+.pub-entity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+@media (max-width: 480px) {
+  .pub-entity-grid { grid-template-columns: 1fr; }
+}
+
+/* ---- Global form fields ---- */
+.pub-form-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+@media (min-width: 600px) {
+  .pub-form-row { grid-template-columns: 1fr 1fr; }
+}
+
+/* ---- Breadcrumb ---- */
+.pub-breadcrumb {
+  font-size: 0.84rem;
+  color: var(--pub-muted);
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.pub-breadcrumb a { color: var(--pub-muted); }
+.pub-breadcrumb a:hover { color: var(--pub-primary); }
+
+/* ---- Open/Closed badge ---- */
+.pub-open-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.pub-open-badge--open   { background: rgba(39,174,96,0.15);  color: #27ae60; }
+.pub-open-badge--closed { background: rgba(231,76,60,0.12);  color: #e74c3c; }
+
+/* ---- Verified badge ---- */
+.pub-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(45,140,240,0.12);
+  color: var(--pub-primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+/* ---- Empty state ---- */
+.pub-empty {
+  text-align: center;
+  padding: 48px 24px;
+}
+.pub-empty-icon {
+  font-size: 3.5rem;
+  display: block;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+.pub-empty-msg {
+  color: var(--pub-muted);
+  font-size: 1rem;
+  margin: 0 0 20px;
+}
+
+/* ---- Responsive page headers ---- */
+.pub-page-hero {
+  padding: 28px 0 20px;
+  margin-bottom: 24px;
+}
+.pub-page-hero h1 {
+  font-size: clamp(1.3rem, 4vw, 1.9rem);
+  font-weight: 800;
+  margin: 0 0 6px;
+}
+.pub-page-hero p {
+  color: var(--pub-muted);
+  margin: 0;
+  font-size: 0.9rem;
+}
+@media (min-width: 768px) {
+  .pub-page-hero { padding: 36px 0 28px; margin-bottom: 32px; }
+}
+
+/* ---- Dark/light mode card background adjustment ---- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pub-bg:      #0f172a;
+    --pub-surface: #1e293b;
+    --pub-text:    #f1f5f9;
+    --pub-muted:   #94a3b8;
+    --pub-border:  rgba(255,255,255,0.1);
+  }
+}

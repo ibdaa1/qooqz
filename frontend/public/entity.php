@@ -42,7 +42,7 @@ if ($pdo) {
                     e.is_verified, e.phone, e.mobile, e.email, e.website_url AS website,
                     e.status, e.tenant_id, e.created_at,
                     (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url,
-                    NULL AS cover_url
+                    (SELECT i2.url FROM images i2 WHERE i2.owner_id = e.id ORDER BY i2.id ASC LIMIT 1 OFFSET 1) AS cover_url
                FROM entities e
               WHERE e.id = ? AND e.status NOT IN ('suspended','rejected') LIMIT 1"
         );

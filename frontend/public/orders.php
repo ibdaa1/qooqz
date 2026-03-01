@@ -252,6 +252,7 @@ $passedStatuses = $viewOrder ? array_map(fn($h) => $h['status'], $statusHistory)
 
         <!-- Order Items -->
         <?php if ($orderItems): ?>
+        <div class="pub-items-table-wrap">
         <table class="pub-items-table">
             <thead>
                 <tr>
@@ -283,6 +284,7 @@ $passedStatuses = $viewOrder ? array_map(fn($h) => $h['status'], $statusHistory)
             <?php endforeach; ?>
             </tbody>
         </table>
+        </div>
         <?php endif; ?>
 
         <!-- Totals -->

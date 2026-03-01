@@ -702,7 +702,7 @@ if ($first === 'entity') {
                 et.name AS type_name,
                 (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url,
                 NULL AS logo_thumb_url,
-                NULL AS cover_url
+                (SELECT i2.url FROM images i2 WHERE i2.owner_id = e.id ORDER BY i2.id ASC LIMIT 1 OFFSET 1) AS cover_url
            FROM entities e
       LEFT JOIN entity_types et ON et.code = e.vendor_type
           WHERE e.id = ? AND e.status NOT IN ('suspended','rejected') LIMIT 1",
