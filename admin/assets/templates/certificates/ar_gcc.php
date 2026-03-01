@@ -1,92 +1,162 @@
 <?php
 /**
- * Template: Arabic GCC Certificate
- * Version: ar_gcc
+ * Template: Arabic GCC Certificate  (ar_gcc)
+ * Supports both browser print and dompdf PDF generation.
  */
+$isPdfMode = defined('CERT_PDF_MODE') && CERT_PDF_MODE;
+
+// Labels (bilingual)
+$L = $labels ?? [];
+if (empty($L) && class_exists('CertificatePdfHelper', false)) {
+    $L = CertificatePdfHelper::labels('ar');
+}
+$fontFamily = htmlspecialchars($template['font_family'] ?? 'DejaVu Sans');
+$fontSize   = htmlspecialchars($template['font_size']   ?? '11');
+$lang       = $lang ?? 'ar';
+$dir        = 'rtl';
+// In PDF mode (dompdf): use Amiri (registered via registerFont API) with DejaVu Sans as
+// fallback — both support Arabic.  Arial (from certificates_templates.font_family) does
+// not exist in dompdf so it is excluded from the PDF font stack.
+// In browser mode: include the DB font_family for better screen appearance.
+$cssFontFamily = $isPdfMode
+    ? '"Amiri", "DejaVu Sans", sans-serif'
+    : '"Amiri", "' . $fontFamily . '", "DejaVu Sans", sans-serif';
+
+// Background image
+$bgSrc = '';
+if (!empty($template['background_image_data_uri'])) {
+    $bgSrc = $template['background_image_data_uri'];
+} elseif (!empty($template['background_image'])) {
+    $bgSrc = '/' . htmlspecialchars($template['background_image']);
+}
+
+// Items table params
+$rowHeight = (float)($template['table_row_height'] ?? 8);
+$maxRows   = (int)($template['table_max_rows'] ?? 12);
+
+// Official info
+$officialName     = htmlspecialchars($officialName ?? '');
+$officialPosition = htmlspecialchars($officialPosition ?? '');
+$certNumber       = htmlspecialchars($data['certificate_number'] ?? '');
+$issuedAt         = htmlspecialchars($data['issued_at'] ?? '');
+$exporterName     = htmlspecialchars($data['exporter_name'] ?? '');
+$importerName     = htmlspecialchars($data['importer_name'] ?? '');
+$importerCountry  = htmlspecialchars($data['importer_country'] ?? '');
+
+$lbl = function(string $key, string $fallback = '') use ($L): string {
+    return htmlspecialchars($L[$key] ?? $fallback);
+};
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <style>
-    body {
-        margin:0;
-        padding:0;
-        font-family: <?= $template['font_family'] ?>;
-        font-size: <?= $template['font_size'] ?>pt;
-    }
-
-    .page {
-        position: relative;
-        width: 210mm;
-        height: 297mm;
-    }
-
-    .field {
-        position: absolute;
-    }
-
-    table {
-        border-collapse: collapse;
-        width: 100%;
-        font-size: 11pt;
-    }
-
-    th, td {
-        border: 1px solid #000;
-        padding: 4px;
-        text-align: center;
-    }
+@page { size: A4 portrait; margin: 0; }
+* { box-sizing: border-box; }
+body {
+    margin: 0; padding: 0;
+    font-family: <?= $cssFontFamily ?>;
+    font-size: <?= $fontSize ?>pt;
+    direction: rtl;
+    text-align: right;
+}
+.page {
+    width: 210mm;
+    min-height: 297mm;
+    position: relative;
+    background: #fff;
+    padding: 10mm 12mm;
+}
+.bg-img {
+    position: absolute;
+    top: 0; left: 0;
+    width: 210mm; height: 297mm;
+    z-index: 0;
+}
+.content { position: relative; z-index: 1; }
+.cert-header { text-align: center; margin-bottom: 6mm; border-bottom: 2px solid #333; padding-bottom: 3mm; }
+.cert-header h1 { font-size: 16pt; margin: 0; }
+.cert-header h2 { font-size: 12pt; margin: 2mm 0 0; color: #555; }
+.info-row { margin: 2mm 0; }
+.info-row span { display: inline-block; min-width: 35mm; font-weight: bold; }
+.products-title { font-weight: bold; margin: 4mm 0 2mm; border-bottom: 1px solid #666; }
+table.products { width: 100%; border-collapse: collapse; font-size: <?= (float)$fontSize - 1 ?>pt; }
+table.products th { background: #f0f0f0; border: 1px solid #333; padding: 2mm; text-align: center; }
+table.products td { border: 1px solid #999; padding: 1.5mm 2mm; text-align: center; vertical-align: middle; }
+.footer-section { margin-top: 8mm; width: 100%; }
+.footer-row { width: 100%; }
+.footer-box { display: inline-block; vertical-align: top; text-align: center; }
+.footer-label { font-size: <?= (float)$fontSize - 1 ?>pt; color: #555; margin-bottom: 1mm; }
+.footer-value { font-size: <?= $fontSize ?>pt; font-weight: bold; }
+.official-img { max-width: 100%; max-height: 20mm; }
+.qr-img { width: 35mm; height: 35mm; }
+.no-print { display: <?= $isPdfMode ? 'none' : 'block' ?>; }
+@media print { .no-print { display: none !important; } }
 </style>
 </head>
 <body>
+<?php if (!$isPdfMode): ?>
+<div class="no-print" style="padding:6px;background:#f0f0f0;text-align:center;">
+    <button onclick="window.print()" style="padding:8px 20px;font-size:14px;cursor:pointer;">
+        &#128438; <?= $lbl('print_pdf', 'طباعة / تصدير PDF') ?>
+    </button>
+</div>
+<?php endif; ?>
 
 <div class="page">
+    <?php if ($bgSrc !== ''): ?>
+    <img class="bg-img" src="<?= $bgSrc ?>">
+    <?php endif; ?>
 
-    <!-- الخلفية -->
-    <img src="<?= $_SERVER['DOCUMENT_ROOT'].'/'.$template['background_image'] ?>"
-         style="position:absolute; top:0; left:0; width:210mm; height:297mm;">
+    <div class="content">
+        <!-- Header -->
+        <div class="cert-header">
+            <h1><?= $lbl('certificate_of_origin', 'شهادة منشأ') ?></h1>
+            <h2><?= $lbl('gcc', 'دول مجلس التعاون الخليجي') ?></h2>
+        </div>
 
-    <!-- رقم الشهادة -->
-    <div class="field"
-         style="top:40mm; right:30mm;">
-        <?= htmlspecialchars($data['certificate_number']) ?>
-    </div>
+        <!-- Certificate info -->
+        <div class="info-row">
+            <span><?= $lbl('certificate_number', 'رقم الشهادة') ?>:</span>
+            <?= $certNumber ?>
+        </div>
+        <div class="info-row">
+            <span><?= $lbl('issue_date', 'تاريخ الإصدار') ?>:</span>
+            <?= $issuedAt ?>
+        </div>
+        <div class="info-row">
+            <span><?= $lbl('exporter', 'المصدّر') ?>:</span>
+            <?= $exporterName ?>
+        </div>
+        <div class="info-row">
+            <span><?= $lbl('importer', 'المستورد') ?>:</span>
+            <?= $importerName ?>
+        </div>
+        <div class="info-row">
+            <span><?= $lbl('destination_country', 'بلد الوجهة') ?>:</span>
+            <?= $importerCountry ?>
+        </div>
 
-    <!-- تاريخ الإصدار -->
-    <div class="field"
-         style="top:48mm; right:30mm;">
-        <?= htmlspecialchars($data['issued_at']) ?>
-    </div>
-
-    <!-- جدول المنتجات -->
-    <div class="field"
-         style="top:<?= $template['table_start_y'] ?>mm;
-                right:<?= $template['table_start_x'] ?>mm;
-                width:170mm;">
-
-        <table>
+        <!-- Products table -->
+        <div class="products-title"><?= $lbl('products_table', 'بيانات البضائع') ?></div>
+        <table class="products">
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th>المنتج</th>
-                    <th>الكمية</th>
-                    <th>الوزن</th>
-                    <th>بلد المنشأ</th>
-                    <th>الإنتاج</th>
-                    <th>الانتهاء</th>
+                    <th><?= $lbl('col_no', 'م') ?></th>
+                    <th><?= $lbl('col_product', 'المنتج') ?></th>
+                    <th><?= $lbl('col_quantity', 'الكمية') ?></th>
+                    <th><?= $lbl('col_net_weight', 'الوزن الصافي') ?></th>
+                    <th><?= $lbl('col_origin', 'بلد المنشأ') ?></th>
+                    <th><?= $lbl('col_production_date', 'الإنتاج') ?></th>
+                    <th><?= $lbl('col_expiry_date', 'الانتهاء') ?></th>
                 </tr>
             </thead>
             <tbody>
-            <?php
-            $rowHeight = $template['table_row_height'];
-            $maxRows   = $template['table_max_rows'];
-
-            for($i=0; $i<$maxRows; $i++):
-                $item = $items[$i] ?? null;
-            ?>
+            <?php for ($i = 0; $i < $maxRows; $i++):
+                $item = $items[$i] ?? null; ?>
                 <tr style="height:<?= $rowHeight ?>mm;">
-                    <td><?= $i+1 ?></td>
+                    <td><?= $i + 1 ?></td>
                     <td><?= htmlspecialchars($item['name'] ?? '') ?></td>
                     <td><?= htmlspecialchars($item['quantity'] ?? '') ?></td>
                     <td><?= htmlspecialchars($item['net_weight'] ?? '') ?></td>
@@ -97,33 +167,52 @@
             <?php endfor; ?>
             </tbody>
         </table>
+
+        <!-- Footer: Official + Stamp + Signature + QR -->
+        <div class="footer-section">
+            <table style="width:100%;border:none;margin-top:6mm;">
+                <tr>
+                    <!-- QR code -->
+                    <td style="width:40mm;text-align:center;vertical-align:bottom;border:none;">
+                        <?php if (!empty($qrPath)): ?>
+                        <div class="footer-label"><?= $lbl('scan_to_verify', 'امسح للتحقق') ?></div>
+                        <img class="qr-img" src="<?= htmlspecialchars($qrPath) ?>">
+                        <?php endif; ?>
+                    </td>
+                    <!-- Stamp -->
+                    <td style="width:45mm;text-align:center;vertical-align:bottom;border:none;">
+                        <?php if (!empty($stampPath)): ?>
+                        <div class="footer-label"><?= $lbl('official_stamp', 'الختم الرسمي') ?></div>
+                        <img class="official-img" src="<?= htmlspecialchars($stampPath) ?>">
+                        <?php endif; ?>
+                    </td>
+                    <!-- Official name & signature -->
+                    <td style="text-align:center;vertical-align:bottom;border:none;">
+                        <?php if ($officialName !== ''): ?>
+                        <div class="footer-label"><?= $lbl('official_name', 'الاسم') ?></div>
+                        <div class="footer-value"><?= $officialName ?></div>
+                        <?php if ($officialPosition !== ''): ?>
+                        <div class="footer-label" style="margin-top:1mm;"><?= $lbl('official_position', 'المسمى الوظيفي') ?></div>
+                        <div class="footer-value"><?= $officialPosition ?></div>
+                        <?php endif; ?>
+                        <?php endif; ?>
+                        <?php if (!empty($signaturePath)): ?>
+                        <div class="footer-label" style="margin-top:2mm;"><?= $lbl('authorized_signature', 'التوقيع المعتمد') ?></div>
+                        <img class="official-img" src="<?= htmlspecialchars($signaturePath) ?>">
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Verification code text -->
+        <?php if (!empty($data['verification_code'])): ?>
+        <div style="margin-top:3mm;font-size:8pt;color:#888;text-align:center;">
+            <?= $lbl('verification_code', 'رمز التحقق') ?>:
+            <?= htmlspecialchars($data['verification_code']) ?>
+        </div>
+        <?php endif; ?>
     </div>
-
-    <!-- QR -->
-    <img src="<?= $qrPath ?>"
-         style="position:absolute;
-                left:<?= $template['qr_x'] ?>mm;
-                top:<?= $template['qr_y'] ?>mm;
-                width:<?= $template['qr_width'] ?>mm;
-                height:<?= $template['qr_height'] ?>mm;">
-
-    <!-- التوقيع -->
-    <img src="<?= $signaturePath ?>"
-         style="position:absolute;
-                left:<?= $template['signature_x'] ?>mm;
-                top:<?= $template['signature_y'] ?>mm;
-                width:<?= $template['signature_width'] ?>mm;
-                height:<?= $template['signature_height'] ?>mm;">
-
-    <!-- الختم -->
-    <img src="<?= $stampPath ?>"
-         style="position:absolute;
-                left:<?= $template['stamp_x'] ?>mm;
-                top:<?= $template['stamp_y'] ?>mm;
-                width:<?= $template['stamp_width'] ?>mm;
-                height:<?= $template['stamp_height'] ?>mm;">
-
 </div>
-
 </body>
 </html>

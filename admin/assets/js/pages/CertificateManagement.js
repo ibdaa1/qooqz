@@ -1693,16 +1693,26 @@ ${S.perms.canAudit && (req.status==='under_review'||req.status==='draft') ? `
         const expiry = new Date(); expiry.setFullYear(now.getFullYear()+1);
         const certNo = `CERT-${reqId}-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${Math.floor(1000+Math.random()*9000)}`;
         const vCode  = `VC-${Math.random().toString(36).substring(2,10).toUpperCase()}${Math.random().toString(36).substring(2,10).toUpperCase()}`;
+        const lang   = S.lang || 'ar';
         const iRes = await apiPost(API_ISSUED, {
             version_id:vId, certificate_number:certNo,
             issued_at:now.toISOString().slice(0,19).replace('T',' '),
             printable_until:expiry.toISOString().slice(0,19).replace('T',' '),
             verification_code:vCode, issued_by:userId,
-            language_code:S.lang||'ar',
-            pdf_path:`/uploads/certificates/cert_${reqId}.pdf`
+            language_code:lang,
+            pdf_path:`/api/print_certificate?id=${reqId}&lang=${encodeURIComponent(lang)}`
         });
         CACHE.invalidate(API_ISSUED);
-        return iRes?.data?.id||iRes?.data||iRes?.id||iRes;
+        const issuedId = iRes?.data?.id||iRes?.data||iRes?.id||iRes;
+        // Generate QR + PDF files server-side (fire-and-forget; Chromium may take a few seconds)
+        if (issuedId) {
+            fetch('/api/generate_certificate_files', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ issued_id: issuedId, request_id: reqId, lang })
+            }).catch(() => {});
+        }
+        return issuedId;
     }
 
     async function issueCertificate(id) {
@@ -1727,6 +1737,7 @@ ${S.perms.canAudit && (req.status==='under_review'||req.status==='draft') ? `
     /* ── Modals ──────────────────────────────────────────────────────── */
     function openModal(id) { const m=q(id); if(m) m.style.display='flex'; }
     function closeModal(id){ const m=q(id); if(m) m.style.display='none'; }
+
 
     function tabState(tab, state) {
         const prefix = { requests:'req', audits:'audit', payments:'pay', issued:'issued', logs:'log', allocations:'alloc' }[tab];
