@@ -46,5 +46,16 @@ final class EntitiesValidator
         if (isset($data['mobile']) && !empty($data['mobile']) && !preg_match('/^[0-9+\-\s]{5,20}$/', $data['mobile'])) {
             throw new InvalidArgumentException("Field 'mobile' has invalid format");
         }
+
+        // التحقق من parent_id
+        if (isset($data['parent_id']) && $data['parent_id'] !== null && $data['parent_id'] !== '') {
+            if (!is_numeric($data['parent_id']) || (int)$data['parent_id'] <= 0) {
+                throw new InvalidArgumentException("Field 'parent_id' must be a positive integer or null");
+            }
+            // لا يمكن أن يكون الكيان أبًا لنفسه
+            if (isset($data['id']) && (int)$data['parent_id'] === (int)$data['id']) {
+                throw new InvalidArgumentException("Entity cannot be its own parent");
+            }
+        }
     }
 }
