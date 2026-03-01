@@ -30,11 +30,86 @@ $GLOBALS['PUB_APP_NAME']  = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH'] = '/frontend/public';
 
 /* -------------------------------------------------------
- * Fetch entity data from real API
+ * Fetch entity data — PDO-first, HTTP fallback
  * ----------------------------------------------------- */
 $qs   = 'lang=' . urlencode($lang) . '&tenant_id=' . $tenantId;
-$resp = pub_fetch(pub_api_url('public/entity/' . $entityId) . '?' . $qs);
-$entity = $resp['data']['data'] ?? [];
+$entity = [];
+$pdo = pub_get_pdo();
+if ($pdo) {
+    try {
+        $eStmt = $pdo->prepare(
+            "SELECT e.id, e.store_name, e.slug, e.vendor_type, e.store_type,
+                    e.is_verified, e.phone, e.mobile, e.email, e.website_url AS website,
+                    e.status, e.tenant_id, e.created_at,
+                    (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url,
+                    NULL AS cover_url
+               FROM entities e
+              WHERE e.id = ? AND e.status NOT IN ('suspended','rejected') LIMIT 1"
+        );
+        $eStmt->execute([$entityId]);
+        $entity = $eStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        if ($entity) {
+            // Translation override
+            $trStmt = $pdo->prepare(
+                "SELECT store_name, description FROM entity_translations
+                  WHERE entity_id = ? AND language_code = ? LIMIT 1"
+            );
+            $trStmt->execute([$entityId, $lang]);
+            $tr = $trStmt->fetch(PDO::FETCH_ASSOC);
+            if ($tr) {
+                if (!empty($tr['store_name'])) $entity['store_name'] = $tr['store_name'];
+                if (!empty($tr['description'])) $entity['description'] = $tr['description'];
+            }
+            // Working hours
+            $whStmt = $pdo->prepare(
+                "SELECT day_of_week, open_time, close_time, is_open FROM entities_working_hours
+                  WHERE entity_id = ? ORDER BY day_of_week ASC"
+            );
+            $whStmt->execute([$entityId]);
+            $entity['working_hours'] = $whStmt->fetchAll(PDO::FETCH_ASSOC);
+            // Addresses
+            try {
+                $adStmt = $pdo->prepare(
+                    "SELECT id, address_line1, address_line2, latitude, longitude, is_primary
+                       FROM addresses WHERE owner_type='entity' AND owner_id=? ORDER BY is_primary DESC, id ASC LIMIT 5"
+                );
+                $adStmt->execute([$entityId]);
+                $entity['addresses'] = $adStmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (Throwable $_) { $entity['addresses'] = []; }
+            // Payment methods
+            try {
+                $pmStmt = $pdo->prepare(
+                    "SELECT pm.id, pm.method_name AS name, pm.method_key AS code, pm.icon_url AS icon
+                       FROM entity_payment_methods epm
+                  LEFT JOIN payment_methods pm ON pm.id = epm.payment_method_id
+                      WHERE epm.entity_id = ? AND epm.is_active = 1"
+                );
+                $pmStmt->execute([$entityId]);
+                $entity['payment_methods'] = $pmStmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (Throwable $_) { $entity['payment_methods'] = []; }
+            // Attributes
+            try {
+                $atStmt = $pdo->prepare(
+                    "SELECT COALESCE(eat.name, ea.slug) AS attribute_name, eav.value
+                       FROM entities_attribute_values eav
+                  LEFT JOIN entities_attributes ea ON ea.id = eav.attribute_id
+                  LEFT JOIN entities_attribute_translations eat ON eat.attribute_id = ea.id AND eat.language_code = ?
+                      WHERE eav.entity_id = ? AND eav.value IS NOT NULL AND eav.value != '' LIMIT 20"
+                );
+                $atStmt->execute([$lang, $entityId]);
+                $entity['attributes'] = $atStmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (Throwable $_) { $entity['attributes'] = []; }
+        }
+    } catch (Throwable $e) {
+        error_log('[entity.php] PDO entity load failed: ' . $e->getMessage());
+        $entity = [];
+    }
+}
+// HTTP fallback
+if (empty($entity)) {
+    $resp = pub_fetch(pub_api_url('public/entity/' . $entityId) . '?' . $qs);
+    $entity = $resp['data']['data'] ?? $resp['data'] ?? [];
+}
 
 if (empty($entity)) {
     $GLOBALS['PUB_PAGE_TITLE'] = t('entity.not_found') . ' — QOOQZ';
@@ -50,28 +125,85 @@ if (empty($entity)) {
 $productPage  = max(1, (int)($_GET['page'] ?? 1));
 $productLimit = 12;
 $selectedCat  = (int)($_GET['cat'] ?? 0);  // category filter
+$products     = [];
+$productMeta  = ['total' => 0, 'total_pages' => 1];
+$entityTenantId = (int)($entity['tenant_id'] ?? $tenantId);
 
-$rp = pub_fetch(
-    pub_api_url('public/entity/' . ($entity['id'] ?? $entityId) . '/products')
-    . '?' . $qs . '&per=' . $productLimit . '&page=' . $productPage
-    . ($selectedCat ? '&category_id=' . $selectedCat : '')
-);
-$products    = $rp['data']['data'] ?? ($rp['data']['items'] ?? []);
-$productMeta = $rp['data']['meta'] ?? ['total' => count($products), 'total_pages' => 1];
+if ($pdo) {
+    try {
+        $pWhere  = 'WHERE p.is_active = 1 AND p.tenant_id = ?';
+        $pParams = [$entityTenantId];
+        if ($selectedCat) {
+            $pWhere .= ' AND EXISTS (SELECT 1 FROM product_categories pc2 WHERE pc2.product_id = p.id AND pc2.category_id = ?)';
+            $pParams[] = $selectedCat;
+        }
+        $pOffset = ($productPage - 1) * $productLimit;
+        $pCntStmt = $pdo->prepare("SELECT COUNT(*) FROM products p $pWhere");
+        $pCntStmt->execute($pParams);
+        $pTotal = (int)$pCntStmt->fetchColumn();
+        $pStmt = $pdo->prepare(
+            "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.sku, p.slug,
+                    p.is_featured, p.stock_quantity, p.stock_status, p.rating_average, p.rating_count,
+                    (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
+                    (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
+                    (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url
+               FROM products p
+          LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
+              $pWhere ORDER BY p.is_featured DESC, p.id DESC
+              LIMIT $productLimit OFFSET $pOffset"
+        );
+        $pStmt->execute(array_merge([$lang], $pParams));
+        $products = $pStmt->fetchAll(PDO::FETCH_ASSOC);
+        $productMeta = ['total' => $pTotal, 'total_pages' => max(1, (int)ceil($pTotal / $productLimit))];
+    } catch (Throwable $_) {}
+}
+if (empty($products) && !$selectedCat) {
+    $rp = pub_fetch(
+        pub_api_url('public/entity/' . ($entity['id'] ?? $entityId) . '/products')
+        . '?' . $qs . '&per=' . $productLimit . '&page=' . $productPage
+    );
+    $products    = $rp['data']['data'] ?? ($rp['data']['items'] ?? []);
+    $productMeta = $rp['data']['meta'] ?? ['total' => count($products), 'total_pages' => 1];
+}
 
 /* Fetch categories for this entity */
-$catResp   = pub_fetch(pub_api_url('public/entity/' . ($entity['id'] ?? $entityId) . '/categories') . '?' . $qs);
-$categories = $catResp['data']['data'] ?? [];
+$categories = [];
+if ($pdo) {
+    try {
+        $catStmt = $pdo->prepare(
+            "SELECT DISTINCT c.id, COALESCE(ct.name, c.name) AS name, c.slug
+               FROM product_categories pc
+               JOIN categories c ON c.id = pc.category_id AND c.is_active = 1
+          LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
+               JOIN products p ON p.id = pc.product_id AND p.tenant_id = ? AND p.is_active = 1
+              ORDER BY c.sort_order ASC, c.id ASC LIMIT 50"
+        );
+        $catStmt->execute([$lang, $entityTenantId]);
+        $categories = $catStmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $_) {}
+}
 
 /* Fetch discounts for this entity */
-$discResp  = pub_fetch(pub_api_url('public/entity/' . ($entity['id'] ?? $entityId) . '/discounts') . '?' . $qs);
-$discounts = $discResp['data']['data'] ?? [];
+$discounts = [];
+if ($pdo) {
+    try {
+        $dStmt = $pdo->prepare(
+            "SELECT d.id, d.code, d.type, d.status, d.ends_at, d.currency_code,
+                    COALESCE(dt.name, d.code) AS title, dt.description, dt.marketing_badge, dt.terms_conditions
+               FROM discounts d
+          LEFT JOIN discount_translations dt ON dt.discount_id = d.id AND dt.language_code = ?
+             WHERE d.entity_id = ? AND d.status NOT IN ('cancelled','deleted')
+             ORDER BY d.status ASC, d.priority DESC, d.id DESC LIMIT 30"
+        );
+        $dStmt->execute([$lang, $entityId]);
+        $discounts = $dStmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $_) {}
+}
 
 $GLOBALS['PUB_PAGE_TITLE'] = e($entity['store_name'] ?? '') . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_DESC']  = e($entity['description'] ?? '');
 
-// Entity ratings — last 5 + average
-$pdo = pub_get_pdo();
+// Entity ratings — last 5 + average (reuse $pdo already set above)
 $entityRatings    = [];
 $entityRatingAvg  = null;
 $entityRatingTotal = 0;
@@ -714,6 +846,7 @@ function pubCopyDiscount(code, btn) {
         btn.textContent = '✅';
         setTimeout(function() { btn.textContent = orig; }, 1800);
     }
+}
 function pubPickEntityStar(val) {
     document.getElementById('pubEntityRating').value = val;
     document.querySelectorAll('.pub-star-pick').forEach(function(s) {
