@@ -1,0 +1,22 @@
+# PHP sessions
+api/storage/sessions/
+frontend/storage/sessions/
+
+# Logs
+api/logs/
+api/error_debug_index.log
+frontend/storage/frontend_log.txt
+
+# Composer dependencies
+vendor/
+
+# Node modules
+node_modules/
+
+# Environment / config secrets
+.env
+*.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
