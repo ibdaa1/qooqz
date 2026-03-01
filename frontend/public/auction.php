@@ -108,6 +108,8 @@ $aWinner    = (int)($auction['winner_user_id'] ?? 0);
 $aIsActive  = $aStatus === 'active';
 $aIsEnded   = in_array($aStatus, ['ended', 'sold', 'cancelled']);
 $aMinNextBid = $aCurrent + $aIncrement;
+$aCreatedBy  = (int)($auction['created_by'] ?? 0);
+$aIsOwner    = $_isLoggedIn && $aCreatedBy > 0 && $aCreatedBy === (int)($_user['id'] ?? 0);
 
 $GLOBALS['PUB_PAGE_TITLE'] = e($aTitle) . ' — ' . e(t('auctions.page_title')) . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_DESC']  = substr($auction['description'] ?? '', 0, 160);
@@ -308,7 +310,12 @@ include dirname(__DIR__) . '/partials/header.php';
       </div>
 
       <?php if ($aIsActive): ?>
-        <?php if ($_isLoggedIn): ?>
+        <?php if ($aIsOwner): ?>
+        <!-- Auction owner — cannot bid -->
+        <div style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:14px;text-align:center;font-size:0.9rem;color:#f59e0b;margin-bottom:12px">
+          🔒 <?= e(t('auctions.owner_cannot_bid')) ?>
+        </div>
+        <?php elseif ($_isLoggedIn): ?>
 
         <!-- Manual Bid Form -->
         <form class="pub-auc-bid-form" onsubmit="aucPlaceBid(event)" id="aucBidForm">
@@ -356,8 +363,8 @@ include dirname(__DIR__) . '/partials/header.php';
         <a href="/frontend/login.php?redirect=<?= urlencode('/frontend/public/auction.php?id=' . $auctionId) ?>" class="pub-btn pub-btn--primary" style="width:100%;text-align:center;display:block;padding:14px">
           🔑 <?= e(t('auctions.login_to_bid')) ?>
         </a>
-        <?php endif; ?>
-      <?php endif; ?>
+        <?php endif; // elseif logged in / owner check ?>
+      <?php endif; // aIsActive ?>
     </div>
   </div>
 </div>
@@ -416,6 +423,8 @@ function aucPollStatus() {
         bidInput.min = newMin;
         if (parseFloat(bidInput.value) < newMin) bidInput.value = newMin.toFixed(2);
       }
+      // Also refresh bid history on every poll
+      aucRefreshBidHistory();
     }).catch(function(){});
 }
 

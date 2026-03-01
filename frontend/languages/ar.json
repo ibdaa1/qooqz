@@ -425,6 +425,7 @@
     "purchased": "تم الشراء بنجاح!",
     "confirm_buynow": "اشتر الآن بـ",
     "login_to_bid": "سجّل دخولك للمزايدة",
+    "owner_cannot_bid": "لا يمكنك المزايدة على مزادك الخاص",
     "watching": "يُراقَب",
     "watch": "راقب هذا المزاد",
     "condition": "الحالة",
@@ -480,6 +481,7 @@
     "payment_paid": "مدفوع",
     "payment_partial": "جزئي",
     "payment_failed": "فشل الدفع",
-    "payment_refunded": "مسترد"
+    "payment_refunded": "مسترد",
+    "pay_now": "ادفع الآن"
   }
 }

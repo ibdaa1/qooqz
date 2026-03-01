@@ -37,7 +37,11 @@ if ($pdo && $userId) {
         // Order list
         $where  = 'WHERE o.user_id = ?';
         $params = [$userId];
-        if ($filter) { $where .= ' AND o.status = ?'; $params[] = $filter; }
+        if ($filter === 'processing') {
+            $where .= " AND o.status IN ('confirmed','processing','shipped','out_for_delivery')";
+        } elseif ($filter) {
+            $where .= ' AND o.status = ?'; $params[] = $filter;
+        }
 
         $stOrders = $pdo->prepare(
             "SELECT o.id, o.order_number, o.status, o.payment_status, o.grand_total,
@@ -193,6 +197,12 @@ $passedStatuses = $viewOrder ? array_map(fn($h) => $h['status'], $statusHistory)
             <span class="pub-order-badge <?= orderStatusClass($viewOrder['status']) ?>" style="margin-inline-start:10px">
                 <?= e(t('orders.status_' . $viewOrder['status'])) ?>
             </span>
+            <?php if (in_array($viewOrder['payment_status'], ['pending','failed']) && !in_array($viewOrder['status'], ['cancelled','refunded','failed'])): ?>
+                <a href="/frontend/public/checkout.php?order_id=<?= (int)$viewOrder['id'] ?>"
+                   style="background:var(--pub-primary,#10B981);color:#000;font-size:0.78rem;padding:5px 14px;border-radius:20px;text-decoration:none;font-weight:700;margin-inline-start:10px;display:inline-block">
+                    💳 <?= e(t('orders.pay_now')) ?>
+                </a>
+            <?php endif; ?>
         </h2>
         <div style="font-size:0.85rem;color:var(--pub-muted,#94a3b8);margin-bottom:20px">
             <?= e(t('orders.placed_on')) ?>: <?= date('Y-m-d H:i', strtotime($viewOrder['created_at'])) ?>
@@ -344,7 +354,7 @@ $passedStatuses = $viewOrder ? array_map(fn($h) => $h['status'], $statusHistory)
     <div class="pub-filter-btns">
         <a href="?" class="pub-filter-btn <?= !$filter ? 'active' : '' ?>"><?= e(t('orders.filter_all')) ?></a>
         <?php foreach (['pending','processing','shipped','delivered','cancelled'] as $fs): ?>
-            <a href="?status=<?= $fs === 'processing' ? 'confirmed' : $fs ?>" class="pub-filter-btn <?= $filter === ($fs === 'processing' ? 'confirmed' : $fs) ? 'active' : '' ?>"><?= e(t('orders.status_' . $fs)) ?></a>
+            <a href="?status=<?= $fs ?>" class="pub-filter-btn <?= $filter === $fs ? 'active' : '' ?>"><?= e(t('orders.status_' . $fs)) ?></a>
         <?php endforeach; ?>
     </div>
 
@@ -370,7 +380,7 @@ $passedStatuses = $viewOrder ? array_map(fn($h) => $h['status'], $statusHistory)
                     &nbsp;·&nbsp; <?= (int)$ord['item_count'] ?> <?= e(t('orders.items')) ?>
                 </div>
             </div>
-            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
                 <span class="pub-order-badge <?= orderStatusClass($ord['status']) ?>">
                     <?= e(t('orders.status_' . $ord['status'])) ?>
                 </span>
@@ -378,6 +388,11 @@ $passedStatuses = $viewOrder ? array_map(fn($h) => $h['status'], $statusHistory)
                     <span class="pub-order-badge status-pending" style="font-size:0.7rem"><?= e(t('orders.payment_' . $ord['payment_status'])) ?></span>
                 <?php endif; ?>
                 <div class="pub-order-total"><?= number_format((float)$ord['grand_total'], 2) ?> <?= e($ord['currency_code']) ?></div>
+                <?php if (in_array($ord['payment_status'], ['pending','failed']) && !in_array($ord['status'], ['cancelled','refunded','failed'])): ?>
+                    <span onclick="event.preventDefault(); window.location.href='/frontend/public/checkout.php?order_id=<?= (int)$ord['id'] ?>'" class="pub-order-badge" style="background:var(--pub-primary,#10B981);color:#000;cursor:pointer">
+                        💳 <?= e(t('orders.pay_now')) ?>
+                    </span>
+                <?php endif; ?>
             </div>
         </a>
         <?php endforeach; ?>

@@ -2082,8 +2082,9 @@ if ($first === 'auctions') {
         if ($bidAmount <= 0) { ResponseFormatter::error('Invalid bid amount', 422); exit; }
         if (!$pdo) { ResponseFormatter::error('DB unavailable', 503); exit; }
         try {
-            $aRow = $pdoOne('SELECT current_price, bid_increment, status, end_date FROM auctions WHERE id=?', [$auctionId]);
+            $aRow = $pdoOne('SELECT current_price, bid_increment, status, end_date, created_by FROM auctions WHERE id=?', [$auctionId]);
             if (!$aRow) { ResponseFormatter::notFound('Auction not found'); exit; }
+            if ((int)($aRow['created_by'] ?? 0) === $auctionUserId) { ResponseFormatter::error('You cannot bid on your own auction', 403); exit; }
             if ($aRow['status'] !== 'active') { ResponseFormatter::error('Auction is not active', 422); exit; }
             if (strtotime($aRow['end_date']) < time()) { ResponseFormatter::error('Auction has ended', 422); exit; }
             $minBid = (float)$aRow['current_price'] + (float)$aRow['bid_increment'];
@@ -2223,6 +2224,52 @@ if ($first === 'auctions') {
                 )->execute([$aEntityId, $bnPmNum, $bnOrderId, $auctionUserId, $aBuyPrice, $_SERVER['REMOTE_ADDR'] ?? null]);
             } catch (Throwable) {}
             ResponseFormatter::success(['ok' => true, 'bid_id' => $bnId, 'amount' => $aBuyPrice, 'order_id' => $bnOrderId, 'order_number' => $bnOrderNum], 'Purchased!');
+        } catch (Throwable $ex) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            ResponseFormatter::error('Failed: ' . $ex->getMessage(), 500);
+        }
+        exit;
+    }
+    // ---- POST expire (payment deadline fallback — transfer to 2nd bidder) ----
+    if ($auctionId && $auctionMethod === 'POST' && $auctionSub === 'expire') {
+        if (!$auctionUserId) { ResponseFormatter::error('Login required', 401); exit; }
+        if (!$pdo) { ResponseFormatter::error('DB unavailable', 503); exit; }
+        try {
+            $aExp = $pdoOne('SELECT id, status, winner_user_id, winning_amount, payment_deadline_hours, tenant_id, entity_id FROM auctions WHERE id=? LIMIT 1', [$auctionId]);
+            if (!$aExp) { ResponseFormatter::notFound('Auction not found'); exit; }
+            if (!in_array($aExp['status'], ['sold','ended'])) { ResponseFormatter::error('Auction not in sold/ended state', 422); exit; }
+            $winnerUserId = (int)($aExp['winner_user_id'] ?? 0);
+            // Find winner's order and check payment status
+            $winnerOrder = $pdoOne('SELECT id, payment_status, created_at FROM orders WHERE auction_id=? AND user_id=? ORDER BY id DESC LIMIT 1', [$auctionId, $winnerUserId]);
+            if (!$winnerOrder) { ResponseFormatter::error('No winner order found', 404); exit; }
+            if ($winnerOrder['payment_status'] === 'paid') { ResponseFormatter::error('Winner has already paid', 409); exit; }
+            $deadlineHours = max(1, (int)($aExp['payment_deadline_hours'] ?? 48));
+            $orderCreated = strtotime($winnerOrder['created_at'] ?? 'now');
+            if ((time() - $orderCreated) < $deadlineHours * 3600) {
+                ResponseFormatter::error('Payment deadline has not passed yet', 409); exit;
+            }
+            // Find 2nd highest bidder (different from current winner)
+            $secondBid = $pdoOne(
+                'SELECT user_id, bid_amount FROM auction_bids WHERE auction_id=? AND user_id != ? AND bid_type != "buy_now" ORDER BY bid_amount DESC, created_at DESC LIMIT 1',
+                [$auctionId, $winnerUserId]
+            );
+            $pdo->beginTransaction();
+            // Cancel winner's order
+            $pdo->prepare("UPDATE orders SET status='cancelled', cancellation_reason='Payment deadline expired', cancelled_at=NOW() WHERE id=?")->execute([$winnerOrder['id']]);
+            if ($secondBid) {
+                $newWinnerId = (int)$secondBid['user_id'];
+                $newAmount   = (float)$secondBid['bid_amount'];
+                $expOrderNum = 'AUC-EXP-' . $auctionId . '-' . time();
+                $pdo->prepare("UPDATE auctions SET winner_user_id=?, winning_amount=? WHERE id=?")->execute([$newWinnerId, $newAmount, $auctionId]);
+                $pdo->prepare("INSERT INTO orders (tenant_id, entity_id, order_number, user_id, auction_id, order_type, status, payment_status, subtotal, total_amount, grand_total, currency_code, ip_address) VALUES (?,?,?,?,NULL,'online','pending','pending',?,?,?,'SAR',?)")
+                    ->execute([(int)$aExp['tenant_id'], (int)$aExp['entity_id'], $expOrderNum, $newWinnerId, $newAmount, $newAmount, $newAmount, $_SERVER['REMOTE_ADDR'] ?? null]);
+                $pdo->commit();
+                ResponseFormatter::success(['ok' => true, 'transferred_to' => $newWinnerId, 'order_number' => $expOrderNum], 'Transferred to second bidder');
+            } else {
+                $pdo->prepare("UPDATE auctions SET winner_user_id=NULL, winning_amount=NULL, status='ended' WHERE id=?")->execute([$auctionId]);
+                $pdo->commit();
+                ResponseFormatter::success(['ok' => true, 'transferred_to' => null], 'No second bidder — auction marked as ended without winner');
+            }
         } catch (Throwable $ex) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             ResponseFormatter::error('Failed: ' . $ex->getMessage(), 500);

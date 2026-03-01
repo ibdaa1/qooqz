@@ -425,6 +425,7 @@
     "purchased": "Purchased successfully!",
     "confirm_buynow": "Buy now for",
     "login_to_bid": "Login to place a bid",
+    "owner_cannot_bid": "You cannot bid on your own auction",
     "watching": "Watching",
     "watch": "Watch this auction",
     "condition": "Condition",
@@ -480,6 +481,7 @@
     "payment_paid": "Paid",
     "payment_partial": "Partial",
     "payment_failed": "Payment Failed",
-    "payment_refunded": "Refunded"
+    "payment_refunded": "Refunded",
+    "pay_now": "Pay Now"
   }
 }
