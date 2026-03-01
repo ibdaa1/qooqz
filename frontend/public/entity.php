@@ -125,6 +125,7 @@ if (empty($entity)) {
 $productPage  = max(1, (int)($_GET['page'] ?? 1));
 $productLimit = 12;
 $selectedCat  = (int)($_GET['cat'] ?? 0);  // category filter
+$productSearch = trim($_GET['q'] ?? '');    // product search within entity
 $products     = [];
 $productMeta  = ['total' => 0, 'total_pages' => 1];
 $entityTenantId = (int)($entity['tenant_id'] ?? $tenantId);
@@ -136,6 +137,11 @@ if ($pdo) {
         if ($selectedCat) {
             $pWhere .= ' AND EXISTS (SELECT 1 FROM product_categories pc2 WHERE pc2.product_id = p.id AND pc2.category_id = ?)';
             $pParams[] = $selectedCat;
+        }
+        if ($productSearch !== '') {
+            $like = '%' . addcslashes($productSearch, '%_\\') . '%';
+            $pWhere .= ' AND (pt.name LIKE ? OR p.sku LIKE ?)';
+            $pParams[] = $like; $pParams[] = $like;
         }
         $pOffset = ($productPage - 1) * $productLimit;
         $pCntStmt = $pdo->prepare("SELECT COUNT(*) FROM products p $pWhere");
@@ -452,21 +458,35 @@ include dirname(__DIR__) . '/partials/header.php';
 
     <!-- TAB: Products -->
     <div class="pub-tab-panel active" id="tabProducts">
-        <!-- Category filter tabs -->
+        <!-- Category filter tabs + search -->
         <?php if (!empty($categories)): ?>
         <div class="pub-cat-tabs" style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;overflow-x:auto;padding-bottom:4px;">
-            <a href="?id=<?= $entityId ?>"
+            <a href="?id=<?= $entityId ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
                class="pub-cat-tab-btn <?= !$selectedCat ? 'active' : '' ?>">
                 <?= e(t('entity.all_categories')) ?>
             </a>
             <?php foreach ($categories as $cat): ?>
-            <a href="?id=<?= $entityId ?>&cat=<?= (int)($cat['id'] ?? 0) ?>"
+            <a href="?id=<?= $entityId ?>&cat=<?= (int)($cat['id'] ?? 0) ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
                class="pub-cat-tab-btn <?= $selectedCat === (int)($cat['id'] ?? 0) ? 'active' : '' ?>">
                 <?= e($cat['name'] ?? '') ?>
             </a>
             <?php endforeach; ?>
         </div>
         <?php endif; ?>
+        <!-- Product search within entity -->
+        <form method="get" style="margin-top:12px;display:flex;gap:8px;align-items:center;">
+            <input type="hidden" name="id" value="<?= $entityId ?>">
+            <?php if ($selectedCat): ?><input type="hidden" name="cat" value="<?= $selectedCat ?>"><?php endif; ?>
+            <input type="search" name="q" class="pub-search-input"
+                   style="max-width:320px;"
+                   placeholder="🔍 <?= e(t('products.search_placeholder')) ?>"
+                   value="<?= e($productSearch) ?>">
+            <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm"><?= e(t('products.filter')) ?></button>
+            <?php if ($productSearch): ?>
+                <a href="?id=<?= $entityId ?><?= $selectedCat ? '&cat=' . $selectedCat : '' ?>"
+                   class="pub-btn pub-btn--ghost pub-btn--sm"><?= e(t('products.clear')) ?></a>
+            <?php endif; ?>
+        </form>
 
         <?php if (!empty($products)): ?>
         <div class="pub-grid" style="margin-top:20px;">

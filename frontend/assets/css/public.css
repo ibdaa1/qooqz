@@ -399,7 +399,8 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   font-size: 0.95rem;
   outline: none;
   transition: border-color var(--pub-transition), box-shadow var(--pub-transition);
-  background: #fff;
+  background: var(--pub-surface);
+  color: var(--pub-text);
 }
 .pub-search-input:focus {
   border-color: var(--pub-primary);
@@ -764,7 +765,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   justify-content: center;
   border: 1px solid var(--pub-border);
   border-radius: var(--pub-radius-sm);
-  background: #fff;
+  background: var(--pub-surface);
   color: var(--pub-text);
   font-size: 0.88rem;
   text-decoration: none;
@@ -956,7 +957,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   border: 1px solid var(--pub-border);
   border-radius: var(--pub-radius-sm);
   font-size: 0.88rem;
-  background: #fff;
+  background: var(--pub-surface);
   color: var(--pub-text);
   outline: none;
   cursor: pointer;
@@ -1598,6 +1599,53 @@ button, .pub-btn, a.pub-btn, input[type="submit"], input[type="button"] {
   flex: 1;
   min-width: 0;
 }
+
+/* Contact & social icon strips — horizontal scrollable pill rows */
+.pub-entity-contacts,
+.pub-entity-social {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 8px 0 6px;
+  align-items: center;
+}
+.pub-entity-contacts::-webkit-scrollbar,
+.pub-entity-social::-webkit-scrollbar { display: none; }
+
+.pub-contact-item,
+.pub-social-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 6px 13px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid var(--pub-border);
+  background: var(--pub-surface);
+  color: var(--pub-text);
+  cursor: pointer;
+  transition: background var(--pub-transition), border-color var(--pub-transition), transform 0.1s;
+}
+.pub-contact-item:hover,
+.pub-social-btn:hover {
+  background: var(--pub-primary);
+  color: #fff;
+  border-color: var(--pub-primary);
+  transform: translateY(-1px);
+}
+.pub-social-btn--whatsapp:hover  { background: #25d366; border-color: #25d366; }
+.pub-social-btn--facebook:hover  { background: #1877f2; border-color: #1877f2; }
+.pub-social-btn--instagram:hover { background: #e1306c; border-color: #e1306c; }
+.pub-social-btn--twitter:hover   { background: #1da1f2; border-color: #1da1f2; }
+.pub-social-btn--snapchat:hover  { background: #fffc00; border-color: #fffc00; color: #000; }
 
 /* Entity tabs — scrollable on small screens */
 .pub-entity-tabs {
