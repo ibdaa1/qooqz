@@ -1100,25 +1100,63 @@
 
         [zonesMod, providersMod, ordersMod, locationsMod, trackingMod, pzonesMod].forEach(function(m) { m.bindEvents(); });
 
-        if (typeof L !== 'undefined') {
-            initZonesMap();
-            // Force size recalculation at multiple intervals to handle slow CDN CSS loading
-            [300, 700, 1500, 3000].forEach(function(ms) {
-                setTimeout(function() { if (zonesMap) zonesMap.invalidateSize(); }, ms);
+        // Ensure Leaflet CSS is in <head> (not just a body-div link) before the map initialises.
+        // When delivery.php is injected as an AJAX fragment, <link> tags inside the target div
+        // may not apply before Leaflet renders, causing tiles to lose absolute positioning.
+        var leafletCssUrls = [
+            'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+            'https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css'
+        ];
+        function ensureLeafletCss(cb) {
+            var pending = 0;
+            var done = false;
+            function finish() { if (!done) { done = true; cb(); } }
+            leafletCssUrls.forEach(function(href) {
+                // Remove any link that ended up inside the content div (not in <head>)
+                document.querySelectorAll('link[rel="stylesheet"]').forEach(function(el) {
+                    if (el.href === href && el.closest('head') === null) {
+                        el.parentNode.removeChild(el);
+                    }
+                });
+                var inHead = false;
+                document.querySelectorAll('head link[rel="stylesheet"]').forEach(function(el) {
+                    if (el.href === href) { inHead = true; }
+                });
+                if (!inHead) {
+                    pending++;
+                    var l = document.createElement('link');
+                    l.rel = 'stylesheet';
+                    l.href = href;
+                    l.onload = l.onerror = function() { if (--pending === 0) finish(); };
+                    document.head.appendChild(l);
+                }
             });
-        } else {
-            // Leaflet scripts should load synchronously; this is a safety fallback
-            var attempts = 0;
-            var iv = setInterval(function() {
-                if (typeof L !== 'undefined') {
-                    clearInterval(iv);
-                    initZonesMap();
-                    [300, 700, 1500].forEach(function(ms) {
-                        setTimeout(function() { if (zonesMap) zonesMap.invalidateSize(); }, ms);
-                    });
-                } else if (++attempts > 30) { clearInterval(iv); console.warn('[Delivery] Leaflet failed to load after 3s'); }
-            }, 100);
+            if (pending === 0) finish();
         }
+
+        function initMapWithCss() {
+            if (typeof L !== 'undefined') {
+                initZonesMap();
+                // Force size recalculation at multiple intervals to handle layout reflow
+                [100, 300, 700, 1500, 3000].forEach(function(ms) {
+                    setTimeout(function() { if (zonesMap) zonesMap.invalidateSize(); }, ms);
+                });
+            } else {
+                // Leaflet scripts should load synchronously; this is a safety fallback
+                var attempts = 0;
+                var iv = setInterval(function() {
+                    if (typeof L !== 'undefined') {
+                        clearInterval(iv);
+                        initZonesMap();
+                        [300, 700, 1500].forEach(function(ms) {
+                            setTimeout(function() { if (zonesMap) zonesMap.invalidateSize(); }, ms);
+                        });
+                    } else if (++attempts > 30) { clearInterval(iv); console.warn('[Delivery] Leaflet failed to load after 3s'); }
+                }, 100);
+            }
+        }
+
+        ensureLeafletCss(initMapWithCss);
 
         await loadDrops();
         await zonesMod.load(1);

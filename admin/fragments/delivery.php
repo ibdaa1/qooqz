@@ -41,13 +41,26 @@ if (!$canView && !is_super_admin()) {
 if (!function_exists('__t')) {
     function __t(string $key, string $fallback = ''): string {
         if (function_exists('i18n_get')) { $v = i18n_get($key); return $v ?? ($fallback ?: $key); }
-        return $fallback ?: $key;
+        static $trans = null;
+        if ($trans === null) {
+            $langCode = function_exists('admin_lang') ? admin_lang() : 'ar';
+            $file = __DIR__ . '/../../languages/Delivery/' . $langCode . '.json';
+            if (!is_readable($file)) {
+                $file = __DIR__ . '/../../languages/Delivery/ar.json';
+            }
+            $raw   = is_readable($file) ? file_get_contents($file) : false;
+            $trans = $raw !== false ? (json_decode($raw, true) ?? []) : [];
+        }
+        $parts = explode('.', $key);
+        $val   = $trans;
+        foreach ($parts as $part) {
+            $val = (is_array($val) && array_key_exists($part, $val)) ? $val[$part] : null;
+            if ($val === null) { break; }
+        }
+        return is_string($val) ? $val : ($fallback ?: $key);
     }
 }
 ?>
-<!-- Leaflet map assets -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" crossorigin="">
 <?php if ($isFragment): ?>
 <link rel="stylesheet" href="/admin/assets/css/pages/delivery.css?v=<?= time() ?>">
 <?php endif; ?>

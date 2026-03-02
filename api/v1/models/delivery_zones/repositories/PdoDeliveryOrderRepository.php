@@ -97,26 +97,25 @@ final class PdoDeliveryOrderRepository implements DeliveryOrderRepositoryInterfa
     {
         $stmt = $this->pdo->prepare("
             INSERT INTO delivery_orders (
-                tenant_id, order_id, provider_id, pickup_address_id, dropoff_address_id, 
-                delivery_zone_id, delivery_status, delivery_fee, calculated_fee, provider_payout, rejection_count
+                tenant_id, order_id, provider_id, pickup_address_id, dropoff_address_id,
+                delivery_zone_id, delivery_status, delivery_fee, calculated_fee, provider_payout
             ) VALUES (
-                :tenant_id, :order_id, :provider_id, :pickup_address_id, :dropoff_address_id, 
-                :delivery_zone_id, :delivery_status, :delivery_fee, :calculated_fee, :provider_payout, :rejection_count
+                :tenant_id, :order_id, :provider_id, :pickup_address_id, :dropoff_address_id,
+                :delivery_zone_id, :delivery_status, :delivery_fee, :calculated_fee, :provider_payout
             )
         ");
 
         $stmt->execute([
-            ':tenant_id'         => $tenantId,
-            ':order_id'          => $data['order_id'],
-            ':provider_id'       => $data['provider_id'] ?? null,
-            ':pickup_address_id' => $data['pickup_address_id'],
-            ':dropoff_address_id'=> $data['dropoff_address_id'],
-            ':delivery_zone_id'  => $data['delivery_zone_id'] ?? null,
-            ':delivery_status'   => $data['delivery_status'] ?? 'pending',
-            ':delivery_fee'      => $data['delivery_fee'] ?? 0.00,
-            ':calculated_fee'    => $data['calculated_fee'] ?? 0.00,
-            ':provider_payout'   => $data['provider_payout'] ?? 0.00,
-            ':rejection_count'   => $data['rejection_count'] ?? 0,
+            ':tenant_id'          => $tenantId,
+            ':order_id'           => $data['order_id'],
+            ':provider_id'        => isset($data['provider_id']) && $data['provider_id'] !== '' ? (int)$data['provider_id'] : null,
+            ':pickup_address_id'  => $data['pickup_address_id'] ?? null,
+            ':dropoff_address_id' => $data['dropoff_address_id'] ?? null,
+            ':delivery_zone_id'   => isset($data['delivery_zone_id']) && $data['delivery_zone_id'] !== '' ? (int)$data['delivery_zone_id'] : null,
+            ':delivery_status'    => $data['delivery_status'] ?? 'pending',
+            ':delivery_fee'       => $data['delivery_fee'] ?? 0.00,
+            ':calculated_fee'     => $data['calculated_fee'] ?? 0.00,
+            ':provider_payout'    => $data['provider_payout'] ?? 0.00,
         ]);
 
         return (int) $this->pdo->lastInsertId();
