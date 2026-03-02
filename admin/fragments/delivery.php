@@ -104,9 +104,10 @@ if (!function_exists('__t')) {
                     </div>
                     <div class="form-group col-3">
                         <label><?= __t('delivery.zone.provider','Provider') ?></label>
-                        <select id="zoneProviderId" name="provider_id" class="form-control">
-                            <option value="">-- <?= __t('common.none','None') ?> --</option>
-                        </select>
+                        <div class="provider-lookup">
+                            <input type="number" id="zoneProviderId" name="provider_id" class="form-control" placeholder="<?= __t('delivery.provider.type_id','Type provider ID') ?>..." min="1">
+                            <span id="zoneProviderName" class="provider-name-badge"></span>
+                        </div>
                     </div>
                 </div>
 
@@ -266,15 +267,17 @@ if (!function_exists('__t')) {
                 <div class="form-row">
                     <div class="form-group col-6">
                         <label><?= __t('delivery.provider.tenant_user','Tenant User') ?></label>
-                        <select id="providerTenantUserId" name="tenant_user_id" class="form-control">
-                            <option value="">-- <?= __t('common.select','Select') ?> --</option>
-                        </select>
+                        <div class="provider-lookup">
+                            <input type="number" id="providerTenantUserId" name="tenant_user_id" class="form-control" placeholder="<?= __t('delivery.provider.type_id','Type user ID') ?>..." min="1">
+                            <span id="providerTenantUserName" class="provider-name-badge"></span>
+                        </div>
                     </div>
                     <div class="form-group col-6">
                         <label><?= __t('delivery.provider.entity','Entity') ?></label>
-                        <select id="providerEntityId" name="entity_id" class="form-control">
-                            <option value="">-- <?= __t('common.none','None') ?> --</option>
-                        </select>
+                        <div class="provider-lookup">
+                            <input type="number" id="providerEntityId" name="entity_id" class="form-control" placeholder="<?= __t('delivery.provider.type_id','Type entity ID') ?>..." min="1">
+                            <span id="providerEntityName" class="provider-name-badge"></span>
+                        </div>
                     </div>
                 </div>
                 <div class="form-row">
@@ -674,9 +677,10 @@ if (!function_exists('__t')) {
                 <div class="form-row">
                     <div class="form-group col-6">
                         <label class="required"><?= __t('delivery.pzone.provider','Provider') ?></label>
-                        <select id="pzoneProviderId" name="provider_id" class="form-control" required>
-                            <option value="">-- <?= __t('common.select','Select') ?> --</option>
-                        </select>
+                        <div class="provider-lookup">
+                            <input type="number" id="pzoneProviderId" name="provider_id" class="form-control" required placeholder="<?= __t('delivery.provider.type_id','Type provider ID') ?>..." min="1">
+                            <span id="pzoneProviderName" class="provider-name-badge"></span>
+                        </div>
                     </div>
                     <div class="form-group col-6">
                         <label class="required"><?= __t('delivery.pzone.zone','Zone') ?></label>

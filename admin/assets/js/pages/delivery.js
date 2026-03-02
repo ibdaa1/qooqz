@@ -101,8 +101,37 @@
         });
     }
 
+    // ─── API response data extractor ─────────────────────────────────
+    // Handles: { success, data: { items, meta } }  (providers, tenant_users)
+    //          { success, data: { data, meta } }   (countries, cities, entities)
+    //          { success, data: [] }               (direct array)
+    //          { items: [] }  /  []                (legacy)
+    function extractItems(r) {
+        var d = r && r.data;
+        if (d) {
+            if (Array.isArray(d)) return d;
+            if (d.items && Array.isArray(d.items)) return d.items;
+            if (d.data  && Array.isArray(d.data))  return d.data;
+        }
+        if (r && Array.isArray(r.items)) return r.items;
+        if (Array.isArray(r)) return r;
+        return [];
+    }
+    function extractMeta(r) {
+        var d = r && r.data;
+        if (d && d.meta) return d.meta;
+        if (r && r.meta) return r.meta;
+        return null;
+    }
+    // Unwrap a single-item response: { success, data: { id, ... } }
+    function extractItem(r) {
+        if (r && r.data && typeof r.data === 'object' && !Array.isArray(r.data)) return r.data;
+        return r;
+    }
+
     // ─── Provider ID → Name Lookup ────────────────────────────────────
-    function bindProviderLookup(inputId, nameSpanId) {
+    // ─── Generic ID → Label Lookup ────────────────────────────────────
+    function bindIdLookup(inputId, nameSpanId, fetchUrl, labelFn) {
         var input = $(inputId), span = $(nameSpanId);
         if (!input || !span) return;
         var timer;
@@ -114,10 +143,10 @@
             span.className = 'provider-name-badge loading';
             timer = setTimeout(async function() {
                 try {
-                    var r = await api(CFG.urls.providers + '/' + val + '?tenant_id=' + state.tenant);
-                    var p = (r.data !== undefined ? r.data : r);
-                    if (p && p.id) {
-                        span.textContent = '#' + p.id + ' – ' + (p.provider_type || '') + (p.vehicle_type ? ' / ' + p.vehicle_type : '');
+                    var r = await api(fetchUrl(val));
+                    var item = extractItem(r);
+                    if (item && item.id) {
+                        span.textContent = labelFn(item);
                         span.className = 'provider-name-badge found';
                     } else {
                         span.textContent = 'Not found';
@@ -131,12 +160,30 @@
         });
     }
 
+    function bindProviderLookup(inputId, nameSpanId) {
+        bindIdLookup(inputId, nameSpanId,
+            function(id) { return CFG.urls.providers + '/' + id + '?tenant_id=' + state.tenant; },
+            function(p)  { return '#' + p.id + ' – ' + (p.provider_type || '') + (p.vehicle_type ? ' / ' + p.vehicle_type : ''); }
+        );
+    }
+    function bindEntityLookup(inputId, nameSpanId) {
+        bindIdLookup(inputId, nameSpanId,
+            function(id) { return CFG.urls.entities + '/' + id + '?tenant_id=' + state.tenant; },
+            function(e)  { return '#' + e.id + ' – ' + (e.store_name || e.name || ''); }
+        );
+    }
+    function bindTenantUserLookup(inputId, nameSpanId) {
+        bindIdLookup(inputId, nameSpanId,
+            function(id) { return CFG.urls.tenant_users + '/' + id + '?tenant_id=' + state.tenant; },
+            function(u)  { return '#' + u.id + ' – ' + (u.username || u.email || ''); }
+        );
+    }
+
     // ─── Country → City Cascade ───────────────────────────────────────
     async function loadCountries() {
         try {
             var r = await api(CFG.urls.countries + '?limit=300&lang=' + state.lang);
-            var items = (r.data !== undefined ? r.data : null) || r.items || r || [];
-            if (!Array.isArray(items)) items = [];
+            var items = extractItems(r);
             var html = '<option value="">–</option>' +
                 items.map(function(c) { return '<option value="' + esc(c.id) + '">' + esc(c.name || c.iso2) + '</option>'; }).join('');
             var el = $('zoneCountryId');
@@ -153,8 +200,7 @@
                 ? CFG.urls.cities + '?country_id=' + encodeURIComponent(countryId) + '&limit=500&language=' + state.lang
                 : CFG.urls.cities + '?limit=500&language=' + state.lang;
             var r = await api(url);
-            var items = (r.data !== undefined ? r.data : null) || r.items || r || [];
-            if (!Array.isArray(items)) items = [];
+            var items = extractItems(r);
             el.innerHTML = '<option value="">–</option>' +
                 items.map(function(c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>'; }).join('');
         } catch(e) {
@@ -272,8 +318,9 @@
                 try {
                     var p = new URLSearchParams(Object.assign({ page: page, limit: LIMIT, tenant_id: state.tenant, lang: state.lang }, s.filters));
                     var r = await api(url + '?' + p.toString());
-                    var items = (r.data !== undefined ? r.data : null) || r.items || [];
-                    var total = (r.meta && r.meta.total !== undefined ? r.meta.total : null) || r.total || items.length;
+                    var items = extractItems(r);
+                    var meta  = extractMeta(r);
+                    var total = (meta && meta.total !== undefined ? meta.total : null) || r.total || items.length;
                     s.items = items; s.total = total;
                     if (cfg.loading) { var lel2 = $(cfg.loading); if (lel2) lel2.style.display = 'none'; }
                     if (!items.length) {
@@ -494,6 +541,12 @@
                 if ($('zoneFreeDelivery')) $('zoneFreeDelivery').value = z.free_delivery_over || '';
                 if ($('zoneGeoJson'))      $('zoneGeoJson').value      = z.zone_value      || '';
                 if ($('zoneCityId') && z.city_id) $('zoneCityId').value = z.city_id;
+                // provider_id – number input + badge
+                if ($('zoneProviderId'))  $('zoneProviderId').value  = z.provider_id || '';
+                if ($('zoneProviderName') && z.provider_id) {
+                    $('zoneProviderName').textContent = '#' + z.provider_id;
+                    $('zoneProviderName').className = 'provider-name-badge found';
+                } else if ($('zoneProviderName')) { $('zoneProviderName').textContent = ''; $('zoneProviderName').className = 'provider-name-badge'; }
                 toggleRadiusFields();
                 if (drawnItems) drawnItems.clearLayers();
                 if (z.zone_value) { try { drawGeoOnMap(JSON.parse(z.zone_value)); } catch(_) {} }
@@ -524,7 +577,7 @@
             edit: async function(id) {
                 try {
                     var r = await api(CFG.urls.zones + '/' + id + '?tenant_id=' + state.tenant);
-                    zonesMod.showForm(r.data || r);
+                    zonesMod.showForm(extractItem(r));
                 } catch(e) { notify(e.message, 'error'); }
             }
         }
@@ -542,8 +595,9 @@
         try {
             var p = new URLSearchParams(Object.assign({ page: page, limit: LIMIT, tenant_id: state.tenant, lang: state.lang }, s.filters));
             var r = await api(CFG.urls.zones + '?' + p.toString());
-            var items = (r.data !== undefined ? r.data : null) || r.items || [];
-            var total = (r.meta && r.meta.total !== undefined ? r.meta.total : null) || r.total || items.length;
+            var items = extractItems(r);
+            var meta  = extractMeta(r);
+            var total = (meta && meta.total !== undefined ? meta.total : null) || r.total || items.length;
             s.items = items; s.total = total;
             if (loadingEl) loadingEl.style.display = 'none';
             if (!items.length) { if (emptyEl) emptyEl.style.display = ''; return; }
@@ -612,8 +666,18 @@
                 if ($('providerLicense'))      $('providerLicense').value      = p.license_number || '';
                 if ($('providerOnline'))       $('providerOnline').checked     = !!+p.is_online;
                 if ($('providerActive'))       $('providerActive').checked     = !!+p.is_active;
+                // entity_id – number input + badge
                 if ($('providerEntityId'))     $('providerEntityId').value     = p.entity_id      || '';
+                if ($('providerEntityName') && p.entity_id) {
+                    $('providerEntityName').textContent = '#' + p.entity_id;
+                    $('providerEntityName').className = 'provider-name-badge found';
+                } else if ($('providerEntityName')) { $('providerEntityName').textContent = ''; $('providerEntityName').className = 'provider-name-badge'; }
+                // tenant_user_id – number input + badge
                 if ($('providerTenantUserId')) $('providerTenantUserId').value = p.tenant_user_id || '';
+                if ($('providerTenantUserName') && p.tenant_user_id) {
+                    $('providerTenantUserName').textContent = '#' + p.tenant_user_id;
+                    $('providerTenantUserName').className = 'provider-name-badge found';
+                } else if ($('providerTenantUserName')) { $('providerTenantUserName').textContent = ''; $('providerTenantUserName').className = 'provider-name-badge'; }
             },
             getFormData: function() {
                 return {
@@ -645,7 +709,7 @@
         {
             edit: async function(id) {
                 var r = await api(CFG.urls.providers + '/' + id + '?tenant_id=' + state.tenant);
-                providersMod.showForm(r.data || r);
+                providersMod.showForm(extractItem(r));
             }
         }
     );
@@ -724,7 +788,7 @@
         {
             edit: async function(id) {
                 var r = await api(CFG.urls.orders + '/' + id + '?tenant_id=' + state.tenant);
-                ordersMod.showForm(r.data || r);
+                ordersMod.showForm(extractItem(r));
             }
         }
     );
@@ -780,7 +844,7 @@
         {
             edit: async function(id) {
                 var r = await api(CFG.urls.locations + '/' + id + '?tenant_id=' + state.tenant);
-                locationsMod.showForm(r.data || r);
+                locationsMod.showForm(extractItem(r));
             }
         }
     );
@@ -861,7 +925,11 @@
                     .forEach(function(id) { var el = $(id); if (el) el.value = ''; });
             },
             setForm: function(pz) {
-                if ($('pzoneProviderId')) $('pzoneProviderId').value = pz.provider_id || '';
+                if ($('pzoneProviderId'))  $('pzoneProviderId').value  = pz.provider_id || '';
+                if ($('pzoneProviderName') && pz.provider_id) {
+                    $('pzoneProviderName').textContent = '#' + pz.provider_id;
+                    $('pzoneProviderName').className = 'provider-name-badge found';
+                } else if ($('pzoneProviderName')) { $('pzoneProviderName').textContent = ''; $('pzoneProviderName').className = 'provider-name-badge'; }
                 if ($('pzoneZoneId'))     $('pzoneZoneId').value     = pz.zone_id     || '';
                 if ($('pzoneActive'))     $('pzoneActive').checked   = !!+pz.is_active;
             },
@@ -903,10 +971,10 @@
 
     // ─── Dropdown Loaders ─────────────────────────────────────────────
     async function loadDrops() {
-        // Zones
+        // Zones dropdown (for pzone form and filter bars)
         try {
             var rz = await api(CFG.urls.zones + '?limit=500&tenant_id=' + state.tenant);
-            var zitems = (rz.data !== undefined ? rz.data : null) || rz.items || [];
+            var zitems = extractItems(rz);
             var zhtml = '<option value="">–</option>' + zitems.map(function(z) {
                 return '<option value="' + esc(z.id) + '">' + esc(z.zone_name) + '</option>';
             }).join('');
@@ -915,44 +983,24 @@
             });
         } catch(e) { console.warn('[Delivery] zones dropdown:', e.message); }
 
-        // Countries + Cities
+        // Countries + Cities cascade
         await loadCountries();
         await loadCitiesForCountry('');
 
-        // Delivery orders for tracking
+        // Delivery orders for tracking dropdown
         try {
             var ro = await api(CFG.urls.orders + '?limit=500&tenant_id=' + state.tenant);
-            var oitems = (ro.data !== undefined ? ro.data : null) || ro.items || [];
+            var oitems = extractItems(ro);
             var ohtml = '<option value="">–</option>' + oitems.map(function(o) {
                 return '<option value="' + esc(o.id) + '">#' + esc(o.id) + ' (order:' + esc(o.order_id) + ')</option>';
             }).join('');
             ['trackingOrderId','trackingOrderFilter'].forEach(function(id) { var el = $(id); if (el) el.innerHTML = ohtml; });
         } catch(e) { console.warn('[Delivery] orders dropdown:', e.message); }
 
-        // Entities
-        try {
-            var re = await api(CFG.urls.entities + '?limit=500&tenant_id=' + state.tenant);
-            var eitems = (re.data !== undefined ? re.data : null) || re.items || [];
-            var ehtml = '<option value="">–</option>' + eitems.map(function(e) {
-                return '<option value="' + esc(e.id) + '">' + esc(e.store_name || e.name) + '</option>';
-            }).join('');
-            var eel = $('providerEntityId'); if (eel) eel.innerHTML = ehtml;
-        } catch(e) { console.warn('[Delivery] entities dropdown:', e.message); }
-
-        // Tenant Users
-        try {
-            var ru = await api(CFG.urls.tenant_users + '?limit=500&tenant_id=' + state.tenant);
-            var uitems = (ru.data !== undefined ? ru.data : null) || ru.items || [];
-            var uhtml = '<option value="">–</option>' + uitems.map(function(u) {
-                return '<option value="' + esc(u.id) + '">#' + esc(u.id) + ' (' + esc(u.username || u.user_id) + ')</option>';
-            }).join('');
-            var uel = $('providerTenantUserId'); if (uel) uel.innerHTML = uhtml;
-        } catch(e) { console.warn('[Delivery] tenant_users dropdown:', e.message); }
-
-        // Provider filter dropdowns (not form inputs - those use ID lookup)
+        // Provider filter dropdowns (filter bars only — form fields use ID lookup)
         try {
             var rp = await api(CFG.urls.providers + '?limit=500&tenant_id=' + state.tenant);
-            var pitems = (rp.data !== undefined ? rp.data : null) || rp.items || [];
+            var pitems = extractItems(rp);
             var phtml = '<option value="">–</option>' + pitems.map(function(p) {
                 return '<option value="' + esc(p.id) + '">#' + esc(p.id) + ' ' + esc(p.provider_type) + '</option>';
             }).join('');
@@ -1002,9 +1050,13 @@
         bindCascade();
         initCoordPicker();
 
-        bindProviderLookup('orderProviderId',    'orderProviderName');
-        bindProviderLookup('locationProviderId', 'locationProviderName');
-        bindProviderLookup('trackingProviderId', 'trackingProviderName');
+        bindProviderLookup('orderProviderId',      'orderProviderName');
+        bindProviderLookup('locationProviderId',   'locationProviderName');
+        bindProviderLookup('trackingProviderId',   'trackingProviderName');
+        bindProviderLookup('zoneProviderId',       'zoneProviderName');
+        bindProviderLookup('pzoneProviderId',      'pzoneProviderName');
+        bindEntityLookup('providerEntityId',       'providerEntityName');
+        bindTenantUserLookup('providerTenantUserId','providerTenantUserName');
 
         [zonesMod, providersMod, ordersMod, locationsMod, trackingMod, pzonesMod].forEach(function(m) { m.bindEvents(); });
 
