@@ -15,12 +15,13 @@
         tenant: window.APP_CONFIG?.TENANT_ID || CFG.tenantId || 1,
         csrf:   window.APP_CONFIG?.CSRF_TOKEN  || CFG.csrfToken || '',
         perms:  window.PAGE_PERMISSIONS || {},
-        zones:          { page: 1, items: [], filters: {}, loaded: false, total: 0 },
-        providers:      { page: 1, items: [], filters: {}, loaded: false, total: 0 },
-        orders:         { page: 1, items: [], filters: {}, loaded: false, total: 0 },
-        locations:      { page: 1, items: [], filters: {}, loaded: false, total: 0 },
-        tracking:       { page: 1, items: [], filters: {}, loaded: false, total: 0 },
-        provider_zones: { page: 1, items: [], filters: {}, loaded: false, total: 0 }
+        initialized: false,
+        zones:          { page: 1, items: [], filters: {}, loaded: false, total: 0, saving: false },
+        providers:      { page: 1, items: [], filters: {}, loaded: false, total: 0, saving: false },
+        orders:         { page: 1, items: [], filters: {}, loaded: false, total: 0, saving: false },
+        locations:      { page: 1, items: [], filters: {}, loaded: false, total: 0, saving: false },
+        tracking:       { page: 1, items: [], filters: {}, loaded: false, total: 0, saving: false },
+        provider_zones: { page: 1, items: [], filters: {}, loaded: false, total: 0, saving: false }
     };
     const LIMIT = 20;
 
@@ -349,8 +350,10 @@
             hideForm: function() { var fc = $(cfg.formContainer); if (fc) fc.style.display = 'none'; },
             save: async function(e) {
                 e.preventDefault();
+                if (s.saving) return;
+                s.saving = true;
                 var body = cfg.getFormData ? cfg.getFormData() : null;
-                if (!body) return;
+                if (!body) { s.saving = false; return; }
                 var id = cfg.getId ? cfg.getId() : null;
                 try {
                     await api(id ? url + '/' + id : url, { method: id ? 'PUT' : 'POST', json: body });
@@ -358,6 +361,7 @@
                     mod.hideForm();
                     mod.load(s.page);
                 } catch(err) { notify(err.message, 'error'); }
+                finally { s.saving = false; }
             },
             del: async function(id) {
                 if (!confirm('Delete this item?')) return;
@@ -958,13 +962,17 @@
         {
             save: async function(e) {
                 e.preventDefault();
+                var ps = state.provider_zones;
+                if (ps.saving) return;
+                ps.saving = true;
                 var body = pzonesMod.cfg.getFormData();
                 try {
                     await api(CFG.urls.provider_zones, { method: 'POST', json: body });
                     notify('Saved successfully', 'success');
                     pzonesMod.hideForm();
-                    pzonesMod.load(state.provider_zones.page);
+                    pzonesMod.load(ps.page);
                 } catch(err) { notify(err.message, 'error'); }
+                finally { ps.saving = false; }
             }
         }
     );
@@ -1045,6 +1053,9 @@
 
     // ─── Init ─────────────────────────────────────────────────────────
     async function init() {
+        if (state.initialized) return;
+        state.initialized = true;
+
         initTabs();
         bindZoneTypeChange();
         bindCascade();
