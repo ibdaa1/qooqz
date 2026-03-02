@@ -461,6 +461,18 @@
 .leaflet-tile-pane {
     isolation: isolate;
 }
+/* Prevent dark-mode CSS filters from inverting or hiding map tiles */
+.leaflet-tile,
+.leaflet-tile-container img {
+    filter: none !important;
+    mix-blend-mode: normal !important;
+    opacity: 1;
+}
+/* Leaflet controls need proper z-index in our layout */
+.leaflet-control-container .leaflet-top,
+.leaflet-control-container .leaflet-bottom {
+    z-index: 800;
+}
 /* Ensure map attribution link is readable */
 .leaflet-control-attribution {
     background: rgba(255,255,255,0.85) !important;

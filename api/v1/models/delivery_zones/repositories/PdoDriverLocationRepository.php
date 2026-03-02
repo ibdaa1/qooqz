@@ -5,6 +5,9 @@ final class PdoDriverLocationRepository implements DriverLocationRepositoryInter
 {
     private PDO $pdo;
 
+    /** Columns returned by SELECT – excludes the binary GEOMETRY 'location' column */
+    private const SELECT_COLS = 'dl.id, dl.provider_id, dl.latitude, dl.longitude, dl.updated_at';
+
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
@@ -20,8 +23,9 @@ final class PdoDriverLocationRepository implements DriverLocationRepositoryInter
         string $lang = 'ar'
     ): array {
         // Join with delivery_providers to ensure tenant scope
+        // Exclude binary GEOMETRY column 'location' to avoid JSON encoding issues
         $sql = "
-            SELECT dl.*, dp.provider_type
+            SELECT " . self::SELECT_COLS . ", dp.provider_type
             FROM driver_locations dl
             INNER JOIN delivery_providers dp ON dl.provider_id = dp.id
             WHERE dp.tenant_id = :tenant_id
@@ -74,7 +78,7 @@ final class PdoDriverLocationRepository implements DriverLocationRepositoryInter
     public function find(int $tenantId, int $id, string $lang = 'ar'): ?array
     {
         $sql = "
-            SELECT dl.*
+            SELECT " . self::SELECT_COLS . "
             FROM driver_locations dl
             INNER JOIN delivery_providers dp ON dl.provider_id = dp.id
             WHERE dp.tenant_id = :tenant_id AND dl.id = :id
@@ -89,7 +93,7 @@ final class PdoDriverLocationRepository implements DriverLocationRepositoryInter
     public function findByProviderId(int $tenantId, int $providerId): ?array
     {
         $sql = "
-            SELECT dl.*
+            SELECT " . self::SELECT_COLS . "
             FROM driver_locations dl
             INNER JOIN delivery_providers dp ON dl.provider_id = dp.id
             WHERE dp.tenant_id = :tenant_id AND dl.provider_id = :provider_id
@@ -103,10 +107,10 @@ final class PdoDriverLocationRepository implements DriverLocationRepositoryInter
 
     public function create(int $tenantId, array $data): int
     {
-        // Using ST_PointFromText for location column compatibility
+        // Use ST_GeomFromText without SRID for broad MySQL/MariaDB compatibility
         $sql = "
             INSERT INTO driver_locations (provider_id, latitude, longitude, location)
-            VALUES (:provider_id, :latitude, :longitude, ST_PointFromText(:point_wkt, 4326))
+            VALUES (:provider_id, :latitude, :longitude, ST_GeomFromText(:point_wkt))
         ";
 
         $wkt = "POINT({$data['longitude']} {$data['latitude']})";
@@ -138,7 +142,7 @@ final class PdoDriverLocationRepository implements DriverLocationRepositoryInter
             UPDATE driver_locations 
             SET latitude = :latitude, 
                 longitude = :longitude, 
-                location = ST_PointFromText(:point_wkt, 4326)
+                location = ST_GeomFromText(:point_wkt)
             WHERE id = :id
         ";
 
