@@ -223,7 +223,7 @@ if (!function_exists('__t')) {
         </aside>
 
         <div class="zones-map-panel">
-            <div id="zonesMap" class="delivery-map"></div>
+            <div id="zonesMap" class="delivery-map" style="height:540px;width:100%"></div>
         </div>
     </div>
 </div>

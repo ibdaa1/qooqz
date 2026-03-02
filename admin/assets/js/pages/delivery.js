@@ -1053,7 +1053,11 @@
                 var tab = btn.dataset.tab;
                 var panel = document.getElementById(tab + 'Tab');
                 if (panel) panel.style.display = '';
-                if (tab === 'zones' && zonesMap) setTimeout(function() { zonesMap.invalidateSize(); }, 100);
+                if (tab === 'zones' && zonesMap) {
+                    [100, 400].forEach(function(ms) {
+                        setTimeout(function() { if (zonesMap) zonesMap.invalidateSize(); }, ms);
+                    });
+                }
                 var modMap = {
                     zones: zonesMod, providers: providersMod, orders: ordersMod,
                     locations: locationsMod, tracking: trackingMod, provider_zones: pzonesMod
@@ -1098,8 +1102,10 @@
 
         if (typeof L !== 'undefined') {
             initZonesMap();
-            // Force a size recalculation once the browser has finished layout
-            setTimeout(function() { if (zonesMap) zonesMap.invalidateSize(); }, 300);
+            // Force size recalculation at multiple intervals to handle slow CDN CSS loading
+            [300, 700, 1500, 3000].forEach(function(ms) {
+                setTimeout(function() { if (zonesMap) zonesMap.invalidateSize(); }, ms);
+            });
         } else {
             // Leaflet scripts should load synchronously; this is a safety fallback
             var attempts = 0;
@@ -1107,7 +1113,9 @@
                 if (typeof L !== 'undefined') {
                     clearInterval(iv);
                     initZonesMap();
-                    setTimeout(function() { if (zonesMap) zonesMap.invalidateSize(); }, 300);
+                    [300, 700, 1500].forEach(function(ms) {
+                        setTimeout(function() { if (zonesMap) zonesMap.invalidateSize(); }, ms);
+                    });
                 } else if (++attempts > 30) { clearInterval(iv); console.warn('[Delivery] Leaflet failed to load after 3s'); }
             }, 100);
         }

@@ -27,7 +27,7 @@ interface DeliveryOrderRepositoryInterface
         ?int $limit = null,
         ?int $offset = null,
         array $filters = [],
-        string $orderBy = 'do.id',
+        string $orderBy = 'dord.id',
         string $orderDir = 'DESC',
         string $lang = 'ar'
     ): array;

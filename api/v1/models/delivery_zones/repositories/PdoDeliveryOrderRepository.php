@@ -13,7 +13,7 @@ final class PdoDeliveryOrderRepository implements DeliveryOrderRepositoryInterfa
     private PDO $pdo;
 
     private const ALLOWED_ORDER_BY = [
-        'do.id', 'do.order_id', 'do.delivery_status', 'do.created_at', 'do.delivery_fee'
+        'dord.id', 'dord.order_id', 'dord.delivery_status', 'dord.created_at', 'dord.delivery_fee'
     ];
 
     private const FILTERABLE_COLUMNS = [
@@ -30,21 +30,21 @@ final class PdoDeliveryOrderRepository implements DeliveryOrderRepositoryInterfa
         ?int $limit = null,
         ?int $offset = null,
         array $filters = [],
-        string $orderBy = 'do.id',
+        string $orderBy = 'dord.id',
         string $orderDir = 'DESC',
         string $lang = 'ar'
     ): array {
         $sql = "
-            SELECT do.* 
-            FROM delivery_orders do
-            WHERE do.tenant_id = :tenant_id
+            SELECT dord.* 
+            FROM delivery_orders dord
+            WHERE dord.tenant_id = :tenant_id
         ";
 
         $params = [':tenant_id' => $tenantId];
 
         [$sql, $params] = $this->applyFilters($sql, $params, $filters);
 
-        $orderBy  = in_array($orderBy, self::ALLOWED_ORDER_BY, true) ? $orderBy : 'do.id';
+        $orderBy  = in_array($orderBy, self::ALLOWED_ORDER_BY, true) ? $orderBy : 'dord.id';
         $orderDir = strtoupper($orderDir) === 'ASC' ? 'ASC' : 'DESC';
         $sql .= " ORDER BY {$orderBy} {$orderDir}";
 
@@ -62,7 +62,7 @@ final class PdoDeliveryOrderRepository implements DeliveryOrderRepositoryInterfa
 
     public function count(int $tenantId, array $filters = []): int
     {
-        $sql = "SELECT COUNT(*) FROM delivery_orders do WHERE do.tenant_id = :tenant_id";
+        $sql = "SELECT COUNT(*) FROM delivery_orders dord WHERE dord.tenant_id = :tenant_id";
         $params = [':tenant_id' => $tenantId];
 
         [$sql, $params] = $this->applyFilters($sql, $params, $filters);
@@ -75,10 +75,10 @@ final class PdoDeliveryOrderRepository implements DeliveryOrderRepositoryInterfa
     public function find(int $tenantId, int $id, string $lang = 'ar'): ?array
     {
         $sql = "
-            SELECT do.*
-            FROM delivery_orders do
-            WHERE do.tenant_id = :tenant_id
-              AND do.id = :id
+            SELECT dord.*
+            FROM delivery_orders dord
+            WHERE dord.tenant_id = :tenant_id
+              AND dord.id = :id
             LIMIT 1
         ";
 
@@ -180,7 +180,7 @@ final class PdoDeliveryOrderRepository implements DeliveryOrderRepositoryInterfa
     {
         foreach (self::FILTERABLE_COLUMNS as $col) {
             if (isset($filters[$col]) && $filters[$col] !== '') {
-                $sql .= " AND do.{$col} = :{$col}";
+                $sql .= " AND dord.{$col} = :{$col}";
                 $params[":{$col}"] = $filters[$col];
             }
         }
