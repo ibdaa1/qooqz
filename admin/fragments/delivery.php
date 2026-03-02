@@ -514,6 +514,7 @@ if (!function_exists('__t')) {
                         <div class="coord-input-wrap">
                             <input type="text" id="locationLat" name="latitude" class="form-control" required placeholder="24.7136">
                             <button type="button" class="btn btn-sm btn-outline btn-pick-map" data-lat="locationLat" data-lng="locationLng" title="<?= __t('delivery.location.pick_map','Pick on map') ?>" aria-label="<?= __t('delivery.location.pick_map','Pick on map') ?>"><i class="fas fa-map-pin" aria-hidden="true"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline btn-use-gps" data-lat="locationLat" data-lng="locationLng" title="<?= __t('delivery.location.use_gps','Use my location') ?>" aria-label="<?= __t('delivery.location.use_gps','Use my location') ?>"><i class="fas fa-crosshairs" aria-hidden="true"></i></button>
                         </div>
                     </div>
                     <div class="form-group col-3">
@@ -601,6 +602,7 @@ if (!function_exists('__t')) {
                         <div class="coord-input-wrap">
                             <input type="text" id="trackingLat" name="latitude" class="form-control" required placeholder="24.7136">
                             <button type="button" class="btn btn-sm btn-outline btn-pick-map" data-lat="trackingLat" data-lng="trackingLng" title="<?= __t('delivery.location.pick_map','Pick on map') ?>" aria-label="<?= __t('delivery.location.pick_map','Pick on map') ?>"><i class="fas fa-map-pin" aria-hidden="true"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline btn-use-gps" data-lat="trackingLat" data-lng="trackingLng" title="<?= __t('delivery.location.use_gps','Use my location') ?>" aria-label="<?= __t('delivery.location.use_gps','Use my location') ?>"><i class="fas fa-crosshairs" aria-hidden="true"></i></button>
                         </div>
                     </div>
                     <div class="form-group col-6">

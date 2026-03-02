@@ -217,6 +217,11 @@
                 openCoordPicker(this.dataset.lat, this.dataset.lng);
             });
         });
+        document.querySelectorAll('.btn-use-gps').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                useGpsLocation(this.dataset.lat, this.dataset.lng);
+            });
+        });
         var closeBtn = $('coordModalClose');
         if (closeBtn) closeBtn.addEventListener('click', closeCoordPicker);
         var modal = $('coordPickerModal');
@@ -236,6 +241,26 @@
         if (searchInput) searchInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') { e.preventDefault(); searchCoordPlace(); }
         });
+    }
+
+    function useGpsLocation(latId, lngId) {
+        if (!navigator.geolocation) { notify('Geolocation is not supported by your browser', 'error'); return; }
+        notify('Getting your location…', 'info');
+        navigator.geolocation.getCurrentPosition(
+            function(pos) {
+                var latEl = $(latId), lngEl = $(lngId);
+                if (latEl) latEl.value = pos.coords.latitude.toFixed(7);
+                if (lngEl) lngEl.value = pos.coords.longitude.toFixed(7);
+                notify('Location acquired', 'success');
+            },
+            function(err) {
+                var msg = err.code === 1 ? 'Location access denied' :
+                          err.code === 2 ? 'Location unavailable' :
+                          'Location request timed out';
+                notify(msg, 'error');
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
     }
 
     function openCoordPicker(latId, lngId) {
@@ -1073,12 +1098,17 @@
 
         if (typeof L !== 'undefined') {
             initZonesMap();
+            // Force a size recalculation once the browser has finished layout
+            setTimeout(function() { if (zonesMap) zonesMap.invalidateSize(); }, 300);
         } else {
             // Leaflet scripts should load synchronously; this is a safety fallback
             var attempts = 0;
             var iv = setInterval(function() {
-                if (typeof L !== 'undefined') { clearInterval(iv); initZonesMap(); }
-                else if (++attempts > 30) { clearInterval(iv); console.warn('[Delivery] Leaflet failed to load after 3s'); }
+                if (typeof L !== 'undefined') {
+                    clearInterval(iv);
+                    initZonesMap();
+                    setTimeout(function() { if (zonesMap) zonesMap.invalidateSize(); }, 300);
+                } else if (++attempts > 30) { clearInterval(iv); console.warn('[Delivery] Leaflet failed to load after 3s'); }
             }, 100);
         }
 

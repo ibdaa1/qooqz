@@ -386,6 +386,15 @@
     border-color: var(--primary-color, #3b82f6);
 }
 .btn-pick-map:hover { background: rgba(59,130,246,0.15); }
+.btn-use-gps {
+    flex-shrink: 0;
+    padding: 0.3rem 0.55rem;
+    white-space: nowrap;
+    color: #16a34a;
+    border-color: #16a34a;
+}
+.btn-use-gps:hover { background: rgba(22,163,74,0.15); }
+.btn-use-gps.loading { opacity: 0.6; pointer-events: none; }
 
 /* ── Coordinate Picker Modal ─────────────────────────────── */
 .coord-modal {
