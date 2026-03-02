@@ -112,6 +112,12 @@ if (!function_exists('__t')) {
 
                 <div class="form-row">
                     <div class="form-group col-4">
+                        <label><?= __t('delivery.zone.country','Country') ?></label>
+                        <select id="zoneCountryId" name="_country_id" class="form-control">
+                            <option value="">-- <?= __t('delivery.zone.select_country','Select Country') ?> --</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-4">
                         <label><?= __t('delivery.zone.city','City') ?></label>
                         <select id="zoneCityId" name="city_id" class="form-control">
                             <option value="">-- <?= __t('delivery.zone.select_city','Select City') ?> --</option>
@@ -131,7 +137,10 @@ if (!function_exists('__t')) {
                 <div id="radiusFields" class="form-row" style="display:none">
                     <div class="form-group col-4">
                         <label><?= __t('delivery.zone.center_lat','Center Lat') ?></label>
-                        <input type="text" id="zoneLat" name="center_lat" class="form-control">
+                        <div class="coord-input-wrap">
+                            <input type="text" id="zoneLat" name="center_lat" class="form-control">
+                            <button type="button" class="btn btn-sm btn-outline btn-pick-map" data-lat="zoneLat" data-lng="zoneLng" title="<?= __t('delivery.location.pick_map','Pick on map') ?>" aria-label="<?= __t('delivery.location.pick_map','Pick on map') ?>"><i class="fas fa-map-pin" aria-hidden="true"></i></button>
+                        </div>
                     </div>
                     <div class="form-group col-4">
                         <label><?= __t('delivery.zone.center_lng','Center Lng') ?></label>
@@ -362,7 +371,10 @@ if (!function_exists('__t')) {
                     </div>
                     <div class="form-group col-4">
                         <label><?= __t('delivery.order.provider','Provider') ?></label>
-                        <select id="orderProviderId" name="provider_id" class="form-control"><option value="">-- <?= __t('common.select','Select') ?> --</option></select>
+                        <div class="provider-lookup">
+                            <input type="number" id="orderProviderId" name="provider_id" class="form-control" placeholder="<?= __t('delivery.provider.type_id','Type provider ID') ?>..." min="1">
+                            <span id="orderProviderName" class="provider-name-badge"></span>
+                        </div>
                     </div>
                     <div class="form-group col-4">
                         <label><?= __t('delivery.order.status','Status') ?></label>
@@ -489,13 +501,17 @@ if (!function_exists('__t')) {
                 <div class="form-row">
                     <div class="form-group col-6">
                         <label class="required"><?= __t('delivery.location.provider','Provider') ?></label>
-                        <select id="locationProviderId" name="provider_id" class="form-control" required>
-                            <option value="">-- <?= __t('common.select','Select') ?> --</option>
-                        </select>
+                        <div class="provider-lookup">
+                            <input type="number" id="locationProviderId" name="provider_id" class="form-control" required placeholder="<?= __t('delivery.provider.type_id','Type provider ID') ?>..." min="1">
+                            <span id="locationProviderName" class="provider-name-badge"></span>
+                        </div>
                     </div>
                     <div class="form-group col-3">
                         <label class="required"><?= __t('delivery.location.lat','Latitude') ?></label>
-                        <input type="text" id="locationLat" name="latitude" class="form-control" required placeholder="24.7136">
+                        <div class="coord-input-wrap">
+                            <input type="text" id="locationLat" name="latitude" class="form-control" required placeholder="24.7136">
+                            <button type="button" class="btn btn-sm btn-outline btn-pick-map" data-lat="locationLat" data-lng="locationLng" title="<?= __t('delivery.location.pick_map','Pick on map') ?>" aria-label="<?= __t('delivery.location.pick_map','Pick on map') ?>"><i class="fas fa-map-pin" aria-hidden="true"></i></button>
+                        </div>
                     </div>
                     <div class="form-group col-3">
                         <label class="required"><?= __t('delivery.location.lng','Longitude') ?></label>
@@ -570,15 +586,19 @@ if (!function_exists('__t')) {
                     </div>
                     <div class="form-group col-6">
                         <label><?= __t('delivery.tracking.provider','Provider') ?></label>
-                        <select id="trackingProviderId" name="provider_id" class="form-control">
-                            <option value="">-- <?= __t('common.none','None') ?> --</option>
-                        </select>
+                        <div class="provider-lookup">
+                            <input type="number" id="trackingProviderId" name="provider_id" class="form-control" placeholder="<?= __t('delivery.provider.type_id','Type provider ID') ?>..." min="1">
+                            <span id="trackingProviderName" class="provider-name-badge"></span>
+                        </div>
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group col-6">
                         <label class="required"><?= __t('delivery.tracking.lat','Latitude') ?></label>
-                        <input type="text" id="trackingLat" name="latitude" class="form-control" required placeholder="24.7136">
+                        <div class="coord-input-wrap">
+                            <input type="text" id="trackingLat" name="latitude" class="form-control" required placeholder="24.7136">
+                            <button type="button" class="btn btn-sm btn-outline btn-pick-map" data-lat="trackingLat" data-lng="trackingLng" title="<?= __t('delivery.location.pick_map','Pick on map') ?>" aria-label="<?= __t('delivery.location.pick_map','Pick on map') ?>"><i class="fas fa-map-pin" aria-hidden="true"></i></button>
+                        </div>
                     </div>
                     <div class="form-group col-6">
                         <label class="required"><?= __t('delivery.tracking.lng','Longitude') ?></label>
@@ -727,6 +747,31 @@ if (!function_exists('__t')) {
     </div>
 </div>
 
+<!-- ══════════════════════════════════════════
+     COORDINATE PICKER MODAL
+══════════════════════════════════════════ -->
+<div id="coordPickerModal" class="coord-modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="coordPickerModalTitle">
+    <div class="coord-modal-inner">
+        <div class="coord-modal-header">
+            <h3 id="coordPickerModalTitle"><?= __t('delivery.map.pick_coords','Pick Location on Map') ?></h3>
+            <button type="button" id="coordModalClose" class="btn btn-sm btn-outline"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="coord-modal-search">
+            <input type="text" id="coordSearchInput" class="form-control" placeholder="<?= __t('delivery.map.search_place','Search place...') ?>">
+            <button type="button" id="coordSearchBtn" class="btn btn-secondary btn-sm"><i class="fas fa-search"></i></button>
+        </div>
+        <div id="coordPickerMap" style="height:400px;width:100%;"></div>
+        <div class="coord-modal-footer">
+            <span><?= __t('delivery.map.click_to_select','Click on the map to select a location') ?></span>
+            <span id="coordDisplay" class="coord-display"></span>
+            <button type="button" id="coordConfirmBtn" class="btn btn-primary" disabled><?= __t('delivery.map.confirm','Confirm') ?></button>
+        </div>
+    </div>
+</div>
+
+<!-- Error Toast -->
+<div id="deliveryToast" class="delivery-toast" style="display:none"></div>
+
 </div><!-- /page-container -->
 
 <script type="text/javascript">
@@ -743,6 +788,7 @@ window.DELIVERY_CONFIG = {
     userId: <?= (int)$userId ?>,
     mapCenter: [24.7136, 46.6753],
     mapZoom: 5,
+    canCreate: <?= $canCreate ? 'true' : 'false' ?>,
     canEdit: <?= $canEdit ? 'true' : 'false' ?>,
     canDelete: <?= $canDelete ? 'true' : 'false' ?>,
     urls: {
@@ -764,9 +810,9 @@ window.DELIVERY_CONFIG = {
 window.PAGE_PERMISSIONS = <?= json_encode(['canCreate'=>$canCreate, 'canEdit'=>$canEdit, 'canDelete'=>$canDelete], JSON_UNESCAPED_UNICODE) ?>;
 </script>
 
-<!-- Leaflet JS (defer, loaded before delivery.js) -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js" crossorigin="" defer></script>
+<!-- Leaflet JS (sync load before delivery.js) -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js" crossorigin=""></script>
 
 <?php if ($isFragment): ?>
 <script src="/admin/assets/js/admin_framework.js?v=<?= time() ?>"></script>

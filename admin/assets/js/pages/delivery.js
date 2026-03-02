@@ -1,7 +1,7 @@
 /**
  * /admin/assets/js/pages/delivery.js
  * Delivery Management — Full Workspace Logic
- * Includes Leaflet map integration for Zone management
+ * Includes: Leaflet map, zone drawing, provider ID lookup, country/city cascade, coordinate picker
  */
 (function () {
     'use strict';
@@ -11,10 +11,10 @@
 
     // ─── State ───────────────────────────────────────────────────────
     const state = {
-        lang:  window.USER_LANGUAGE || CFG.lang || 'ar',
+        lang:   window.USER_LANGUAGE || CFG.lang || 'ar',
         tenant: window.APP_CONFIG?.TENANT_ID || CFG.tenantId || 1,
-        csrf:  window.APP_CONFIG?.CSRF_TOKEN  || CFG.csrfToken || '',
-        perms: window.PAGE_PERMISSIONS || {},
+        csrf:   window.APP_CONFIG?.CSRF_TOKEN  || CFG.csrfToken || '',
+        perms:  window.PAGE_PERMISSIONS || {},
         zones:          { page: 1, items: [], filters: {}, loaded: false, total: 0 },
         providers:      { page: 1, items: [], filters: {}, loaded: false, total: 0 },
         orders:         { page: 1, items: [], filters: {}, loaded: false, total: 0 },
@@ -25,121 +25,309 @@
     const LIMIT = 20;
 
     // ─── Leaflet Map state ───────────────────────────────────────────
-    let zonesMap      = null;
-    let drawnItems    = null;
-    let zoneLayerMap  = new Map(); // zoneId -> layer
-    let drawControl   = null;
+    let zonesMap       = null;
+    let drawnItems     = null;
+    let zoneLayerMap   = new Map();
+    let coordPickerMap    = null;
+    let coordPickerMarker = null;
+    let coordPickerTarget = null; // { latId, lngId }
 
     // ─── Helpers ─────────────────────────────────────────────────────
     function $(id) { return document.getElementById(id); }
     function esc(v) {
         if (v == null) return '';
         return String(v).replace(/[&<>"']/g, m =>
-            ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
+            ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]);
     }
+
     function notify(msg, type) {
-        if (AF) type === 'error' ? AF.error(msg) : AF.success(msg);
-        else console.log('[Delivery]', type, msg);
+        type = type || 'info';
+        if (AF && typeof AF.error === 'function') {
+            type === 'error' ? AF.error(msg) : AF.success(msg);
+            return;
+        }
+        var t = $('deliveryToast');
+        if (!t) { console.log('[Delivery]', type, msg); return; }
+        t.textContent = msg;
+        t.className = 'delivery-toast delivery-toast--' + type;
+        t.style.display = '';
+        clearTimeout(t._tmr);
+        t._tmr = setTimeout(function() { t.style.display = 'none'; }, 4000);
     }
 
-    async function api(url, opts = {}) {
-        const headers = { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': state.csrf };
-        if (opts.json) { headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(opts.json); delete opts.json; }
-        const res = await fetch(url, { ...opts, headers, credentials: 'same-origin' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
+    function showTableError(tbodyId, msg) {
+        var el = $(tbodyId);
+        if (el) el.innerHTML = '<tr><td colspan="20" class="table-error-row"><i class="fas fa-exclamation-triangle"></i> ' + esc(msg) + '</td></tr>';
     }
 
-    function badge(text, map = {}) {
-        const cls = map[text] || 'secondary';
-        return `<span class="badge badge-${cls}">${esc(text)}</span>`;
+    async function api(url, opts) {
+        opts = opts || {};
+        var headers = { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': state.csrf };
+        if (opts.json) {
+            headers['Content-Type'] = 'application/json';
+            opts.body = JSON.stringify(opts.json);
+            delete opts.json;
+        }
+        var res = await fetch(url, Object.assign({}, opts, { headers: headers, credentials: 'same-origin' }));
+        if (!res.ok) {
+            var errMsg = 'HTTP ' + res.status;
+            try { var j2 = await res.json(); errMsg = j2.message || j2.error || errMsg; } catch(_) {}
+            throw new Error(errMsg);
+        }
+        var j = await res.json();
+        if (j && ('success' in j) && j.success === false) throw new Error(j.message || j.error || 'API error');
+        return j;
+    }
+
+    function badge(text, map) {
+        map = map || {};
+        var cls = map[text] || 'secondary';
+        return '<span class="badge badge-' + cls + '">' + esc(text) + '</span>';
     }
 
     function pagination(container, info, total, page, cb) {
-        const pages = Math.ceil(total / LIMIT) || 1;
-        if (info) info.textContent = total ? `${(page - 1) * LIMIT + 1}–${Math.min(page * LIMIT, total)} / ${total}` : '0';
+        var pages = Math.ceil(total / LIMIT) || 1;
+        if (info) info.textContent = total ? ((page-1)*LIMIT+1) + '–' + Math.min(page*LIMIT,total) + ' / ' + total : '0';
         if (!container) return;
-        let h = '<ul>';
-        if (page > 1)  h += `<li><a href="#" data-p="${page - 1}">&laquo;</a></li>`;
-        for (let i = Math.max(1, page - 2); i <= Math.min(pages, page + 2); i++) {
-            h += i === page ? `<li class="active"><span>${i}</span></li>` : `<li><a href="#" data-p="${i}">${i}</a></li>`;
+        var h = '<ul>';
+        if (page > 1) h += '<li><a href="#" data-p="' + (page-1) + '">&laquo;</a></li>';
+        for (var i = Math.max(1,page-2); i <= Math.min(pages,page+2); i++) {
+            h += i === page ? '<li class="active"><span>' + i + '</span></li>' : '<li><a href="#" data-p="' + i + '">' + i + '</a></li>';
         }
-        if (page < pages) h += `<li><a href="#" data-p="${page + 1}">&raquo;</a></li>`;
+        if (page < pages) h += '<li><a href="#" data-p="' + (page+1) + '">&raquo;</a></li>';
         container.innerHTML = h + '</ul>';
-        container.querySelectorAll('a[data-p]').forEach(a => a.onclick = e => { e.preventDefault(); cb(parseInt(a.dataset.p)); });
+        container.querySelectorAll('a[data-p]').forEach(function(a) {
+            a.onclick = function(e) { e.preventDefault(); cb(parseInt(a.dataset.p)); };
+        });
+    }
+
+    // ─── Provider ID → Name Lookup ────────────────────────────────────
+    function bindProviderLookup(inputId, nameSpanId) {
+        var input = $(inputId), span = $(nameSpanId);
+        if (!input || !span) return;
+        var timer;
+        input.addEventListener('input', function() {
+            clearTimeout(timer);
+            var val = this.value.trim();
+            if (!val || isNaN(val) || +val < 1) { span.textContent = ''; span.className = 'provider-name-badge'; return; }
+            span.textContent = '...';
+            span.className = 'provider-name-badge loading';
+            timer = setTimeout(async function() {
+                try {
+                    var r = await api(CFG.urls.providers + '/' + val + '?tenant_id=' + state.tenant);
+                    var p = (r.data !== undefined ? r.data : r);
+                    if (p && p.id) {
+                        span.textContent = '#' + p.id + ' – ' + (p.provider_type || '') + (p.vehicle_type ? ' / ' + p.vehicle_type : '');
+                        span.className = 'provider-name-badge found';
+                    } else {
+                        span.textContent = 'Not found';
+                        span.className = 'provider-name-badge not-found';
+                    }
+                } catch(_) {
+                    span.textContent = 'Not found';
+                    span.className = 'provider-name-badge not-found';
+                }
+            }, 400);
+        });
+    }
+
+    // ─── Country → City Cascade ───────────────────────────────────────
+    async function loadCountries() {
+        try {
+            var r = await api(CFG.urls.countries + '?limit=300&lang=' + state.lang);
+            var items = (r.data !== undefined ? r.data : null) || r.items || r || [];
+            if (!Array.isArray(items)) items = [];
+            var html = '<option value="">–</option>' +
+                items.map(function(c) { return '<option value="' + esc(c.id) + '">' + esc(c.name || c.iso2) + '</option>'; }).join('');
+            var el = $('zoneCountryId');
+            if (el) el.innerHTML = html;
+        } catch(e) { console.warn('[Delivery] loadCountries:', e.message); }
+    }
+
+    async function loadCitiesForCountry(countryId) {
+        var el = $('zoneCityId');
+        if (!el) return;
+        el.innerHTML = '<option value="">Loading...</option>';
+        try {
+            var url = countryId
+                ? CFG.urls.cities + '?country_id=' + encodeURIComponent(countryId) + '&limit=500&language=' + state.lang
+                : CFG.urls.cities + '?limit=500&language=' + state.lang;
+            var r = await api(url);
+            var items = (r.data !== undefined ? r.data : null) || r.items || r || [];
+            if (!Array.isArray(items)) items = [];
+            el.innerHTML = '<option value="">–</option>' +
+                items.map(function(c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>'; }).join('');
+        } catch(e) {
+            el.innerHTML = '<option value="">Error loading cities</option>';
+            console.warn('[Delivery] loadCitiesForCountry:', e.message);
+        }
+    }
+
+    // ─── Coordinate Picker Modal ──────────────────────────────────────
+    function initCoordPicker() {
+        document.querySelectorAll('.btn-pick-map').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                openCoordPicker(this.dataset.lat, this.dataset.lng);
+            });
+        });
+        var closeBtn = $('coordModalClose');
+        if (closeBtn) closeBtn.addEventListener('click', closeCoordPicker);
+        var modal = $('coordPickerModal');
+        if (modal) modal.addEventListener('click', function(e) { if (e.target === this) closeCoordPicker(); });
+        var confirmBtn = $('coordConfirmBtn');
+        if (confirmBtn) confirmBtn.addEventListener('click', function() {
+            if (!coordPickerMarker || !coordPickerTarget) return;
+            var ll = coordPickerMarker.getLatLng();
+            var latEl = $(coordPickerTarget.latId), lngEl = $(coordPickerTarget.lngId);
+            if (latEl) latEl.value = ll.lat.toFixed(7);
+            if (lngEl) lngEl.value = ll.lng.toFixed(7);
+            closeCoordPicker();
+        });
+        var searchBtn = $('coordSearchBtn');
+        if (searchBtn) searchBtn.addEventListener('click', searchCoordPlace);
+        var searchInput = $('coordSearchInput');
+        if (searchInput) searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); searchCoordPlace(); }
+        });
+    }
+
+    function openCoordPicker(latId, lngId) {
+        coordPickerTarget = { latId: latId, lngId: lngId };
+        var modal = $('coordPickerModal');
+        if (!modal) return;
+        modal.style.display = '';
+        if (!coordPickerMap) {
+            coordPickerMap = L.map('coordPickerMap').setView(CFG.mapCenter || [24.7136, 46.6753], CFG.mapZoom || 7);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(coordPickerMap);
+            coordPickerMap.on('click', function(e) { placePickerMarker(e.latlng.lat, e.latlng.lng); });
+        }
+        setTimeout(function() { coordPickerMap.invalidateSize(); }, 150);
+        var latVal = parseFloat($(latId) && $(latId).value || '');
+        var lngVal = parseFloat($(lngId) && $(lngId).value || '');
+        if (!isNaN(latVal) && !isNaN(lngVal)) {
+            placePickerMarker(latVal, lngVal);
+            coordPickerMap.setView([latVal, lngVal], 12);
+        } else {
+            coordPickerMap.setView(CFG.mapCenter || [24.7136, 46.6753], 7);
+            var cb = $('coordConfirmBtn'); if (cb) cb.disabled = true;
+        }
+        var si = $('coordSearchInput'); if (si) si.value = '';
+    }
+
+    function placePickerMarker(lat, lng) {
+        if (!coordPickerMap) return;
+        if (coordPickerMarker) {
+            coordPickerMarker.setLatLng([lat, lng]);
+        } else {
+            coordPickerMarker = L.marker([lat, lng], { draggable: true }).addTo(coordPickerMap);
+            coordPickerMarker.on('dragend', function() {
+                var p = coordPickerMarker.getLatLng();
+                updateCoordDisplay(p.lat, p.lng);
+            });
+        }
+        updateCoordDisplay(lat, lng);
+        var cb = $('coordConfirmBtn'); if (cb) cb.disabled = false;
+    }
+
+    function updateCoordDisplay(lat, lng) {
+        var disp = $('coordDisplay');
+        if (disp) disp.textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
+    }
+
+    function closeCoordPicker() {
+        var modal = $('coordPickerModal');
+        if (modal) modal.style.display = 'none';
+        coordPickerTarget = null;
+    }
+
+    async function searchCoordPlace() {
+        var q = $('coordSearchInput') && $('coordSearchInput').value.trim();
+        if (!q) return;
+        try {
+            var url = 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q) + '&format=json&limit=1';
+            var res = await fetch(url, { headers: { 'Accept-Language': state.lang } });
+            var data = await res.json();
+            if (data && data.length > 0) {
+                var lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon);
+                placePickerMarker(lat, lng);
+                coordPickerMap.setView([lat, lng], 13);
+            } else { notify('Place not found', 'error'); }
+        } catch(e) { notify('Search failed: ' + e.message, 'error'); }
     }
 
     // ─── Generic Module Factory ───────────────────────────────────────
     function createModule(name, url, cfg) {
-        const s = state[name];
-        const mod = {
-            cfg,
-            async load(page = 1) {
+        var s = state[name];
+        var mod = {
+            cfg: cfg,
+            load: async function(page) {
+                page = page || 1;
                 s.page = page; s.loaded = true;
-                if (cfg.loading)   { const el = $(cfg.loading);   if (el) el.style.display = ''; }
-                if (cfg.container) { const el = $(cfg.container);  if (el) el.style.display = 'none'; }
-                if (cfg.empty)     { const el = $(cfg.empty);      if (el) el.style.display = 'none'; }
+                if (cfg.loading)   { var lel = $(cfg.loading);   if (lel) lel.style.display = ''; }
+                if (cfg.container) { var cel = $(cfg.container);  if (cel) cel.style.display = 'none'; }
+                if (cfg.empty)     { var eel = $(cfg.empty);      if (eel) eel.style.display = 'none'; }
                 try {
-                    const p = new URLSearchParams({ page, limit: LIMIT, tenant_id: state.tenant, lang: state.lang, ...s.filters });
-                    const r = await api(`${url}?${p}`);
-                    const items = r.data || r.items || [];
-                    const total = r.meta?.total ?? r.total ?? items.length;
+                    var p = new URLSearchParams(Object.assign({ page: page, limit: LIMIT, tenant_id: state.tenant, lang: state.lang }, s.filters));
+                    var r = await api(url + '?' + p.toString());
+                    var items = (r.data !== undefined ? r.data : null) || r.items || [];
+                    var total = (r.meta && r.meta.total !== undefined ? r.meta.total : null) || r.total || items.length;
                     s.items = items; s.total = total;
-
-                    if (cfg.loading)   { const el = $(cfg.loading);  if (el) el.style.display = 'none'; }
+                    if (cfg.loading) { var lel2 = $(cfg.loading); if (lel2) lel2.style.display = 'none'; }
                     if (!items.length) {
-                        if (cfg.empty) { const el = $(cfg.empty); if (el) el.style.display = ''; }
+                        if (cfg.empty) { var eel2 = $(cfg.empty); if (eel2) eel2.style.display = ''; }
                         return;
                     }
-                    if (cfg.container) { const el = $(cfg.container); if (el) el.style.display = ''; }
-                    if (cfg.tbody)     { const el = $(cfg.tbody);     if (el) el.innerHTML = items.map(cfg.row).join(''); }
-                    pagination($(cfg.pagination), $(cfg.info), total, page, n => this.load(n));
-
+                    if (cfg.container) { var cel2 = $(cfg.container); if (cel2) cel2.style.display = ''; }
+                    if (cfg.tbody) { var tbel = $(cfg.tbody); if (tbel) tbel.innerHTML = items.map(cfg.row).join(''); }
+                    pagination($(cfg.pagination), $(cfg.info), total, page, function(n) { mod.load(n); });
                     if (cfg.afterLoad) cfg.afterLoad(items);
-                } catch (e) {
-                    if (cfg.loading) { const el = $(cfg.loading); if (el) el.style.display = 'none'; }
+                } catch(e) {
+                    if (cfg.loading) { var lel3 = $(cfg.loading); if (lel3) lel3.style.display = 'none'; }
+                    if (cfg.container) { var cel3 = $(cfg.container); if (cel3) cel3.style.display = ''; }
+                    if (cfg.tbody) showTableError(cfg.tbody, e.message);
                     notify(e.message, 'error');
                 }
             },
-            applyFilters() { s.filters = cfg.getFilters(); this.load(1); },
-            resetFilters()  { if (cfg.reset) cfg.reset(); s.filters = {}; this.load(1); },
-            showForm(item = {}) {
-                const fc = $(cfg.formContainer);
-                if (!fc) return;
+            applyFilters: function() { s.filters = cfg.getFilters(); mod.load(1); },
+            resetFilters: function() { if (cfg.reset) cfg.reset(); s.filters = {}; mod.load(1); },
+            showForm: function(item) {
+                item = item || {};
+                var fc = $(cfg.formContainer); if (!fc) return;
                 fc.style.display = '';
                 if (cfg.setForm) cfg.setForm(item);
             },
-            hideForm() { const fc = $(cfg.formContainer); if (fc) fc.style.display = 'none'; },
-            async save(e) {
+            hideForm: function() { var fc = $(cfg.formContainer); if (fc) fc.style.display = 'none'; },
+            save: async function(e) {
                 e.preventDefault();
-                const body = cfg.getFormData ? cfg.getFormData() : null;
+                var body = cfg.getFormData ? cfg.getFormData() : null;
                 if (!body) return;
-                const id = cfg.getId ? cfg.getId() : null;
+                var id = cfg.getId ? cfg.getId() : null;
                 try {
-                    const r = await api(id ? `${url}/${id}` : url, { method: id ? 'PUT' : 'POST', json: body });
-                    if (r.success === false) throw new Error(r.error || r.message || 'Save failed');
+                    await api(id ? url + '/' + id : url, { method: id ? 'PUT' : 'POST', json: body });
                     notify('Saved successfully', 'success');
-                    this.hideForm();
-                    this.load(s.page);
-                } catch (err) { notify(err.message, 'error'); }
+                    mod.hideForm();
+                    mod.load(s.page);
+                } catch(err) { notify(err.message, 'error'); }
             },
-            async del(id) {
+            del: async function(id) {
                 if (!confirm('Delete this item?')) return;
                 try {
-                    const delUrl = cfg.delUrl ? cfg.delUrl(id) : `${url}/${id}`;
-                    const r = await api(delUrl, { method: 'DELETE' });
-                    if (r.success === false) throw new Error(r.error || 'Delete failed');
+                    var delUrl = cfg.delUrl ? cfg.delUrl(id) : url + '/' + id;
+                    await api(delUrl, { method: 'DELETE' });
                     notify('Deleted successfully', 'success');
-                    this.load(s.page);
-                } catch (e) { notify(e.message, 'error'); }
+                    mod.load(s.page);
+                } catch(e) { notify(e.message, 'error'); }
             },
-            bindEvents() {
-                $(cfg.addBtn)?.addEventListener('click', () => this.showForm());
-                $(cfg.closeBtn)?.addEventListener('click', () => this.hideForm());
-                $(cfg.cancelBtn)?.addEventListener('click', () => this.hideForm());
-                $(cfg.form)?.addEventListener('submit', e => this.save(e));
-                $(cfg.applyBtn)?.addEventListener('click', () => this.applyFilters());
-                $(cfg.resetBtn)?.addEventListener('click', () => this.resetFilters());
+            bindEvents: function() {
+                if ($(cfg.addBtn))    $(cfg.addBtn).addEventListener('click', function() { mod.showForm(); });
+                if ($(cfg.closeBtn))  $(cfg.closeBtn).addEventListener('click', function() { mod.hideForm(); });
+                if ($(cfg.cancelBtn)) $(cfg.cancelBtn).addEventListener('click', function() { mod.hideForm(); });
+                if ($(cfg.form))      $(cfg.form).addEventListener('submit', function(e) { mod.save(e); });
+                if ($(cfg.applyBtn))  $(cfg.applyBtn).addEventListener('click', function() { mod.applyFilters(); });
+                if ($(cfg.resetBtn))  $(cfg.resetBtn).addEventListener('click', function() { mod.resetFilters(); });
             }
         };
         return mod;
@@ -147,8 +335,8 @@
 
     // ─── Leaflet Map for Zones ────────────────────────────────────────
     function initZonesMap() {
-        const mapEl = $('zonesMap');
-        if (!mapEl || typeof L === 'undefined') return;
+        var mapEl = $('zonesMap');
+        if (!mapEl || typeof L === 'undefined' || zonesMap) return;
 
         zonesMap = L.map('zonesMap').setView(CFG.mapCenter || [24.7136, 46.6753], CFG.mapZoom || 5);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -158,276 +346,238 @@
 
         drawnItems = L.featureGroup().addTo(zonesMap);
 
-        if (typeof L.Control !== 'undefined' && L.Control.Draw) {
-            drawControl = new L.Control.Draw({
+        if (L.Control && L.Control.Draw) {
+            new L.Control.Draw({
                 position: 'topright',
                 draw: {
                     polygon:  { allowIntersection: false, showArea: true, shapeOptions: { color: '#2563eb', fillOpacity: 0.15 } },
                     rectangle: { shapeOptions: { color: '#2563eb', fillOpacity: 0.15 } },
                     circle:   { shapeOptions: { color: '#2563eb', fillOpacity: 0.15 } },
-                    marker:   false,
-                    polyline: false,
-                    circlemarker: false
+                    marker: false, polyline: false, circlemarker: false
                 },
                 edit: { featureGroup: drawnItems, remove: true }
-            });
-            drawControl.addTo(zonesMap);
+            }).addTo(zonesMap);
         }
 
-        // When shape drawn → populate zone_value textarea + auto-fill center/radius
-        zonesMap.on(L.Draw.Event.CREATED, function (e) {
+        zonesMap.on(L.Draw.Event.CREATED, function(e) {
             drawnItems.clearLayers();
             drawnItems.addLayer(e.layer);
             populateZoneGeoFromLayer(e.layer);
         });
-
-        zonesMap.on(L.Draw.Event.EDITED, function (e) {
-            e.layers.eachLayer(layer => populateZoneGeoFromLayer(layer));
+        zonesMap.on(L.Draw.Event.EDITED, function(e) {
+            e.layers.eachLayer(function(layer) { populateZoneGeoFromLayer(layer); });
+        });
+        zonesMap.on(L.Draw.Event.DELETED, function() {
+            if (drawnItems.getLayers().length === 0) { var gf = $('zoneGeoJson'); if (gf) gf.value = ''; }
         });
 
-        zonesMap.on(L.Draw.Event.DELETED, function () {
-            if (drawnItems.getLayers().length === 0) {
-                const gf = $('zoneGeoJson');
-                if (gf) gf.value = '';
-            }
-        });
-
-        // Manual edit of zone_value → re-draw
-        $('zoneGeoJson')?.addEventListener('input', function () {
-            const txt = this.value.trim();
+        var geoInput = $('zoneGeoJson');
+        if (geoInput) geoInput.addEventListener('input', function() {
+            var txt = this.value.trim();
             drawnItems.clearLayers();
             if (!txt) return;
-            try { drawGeoOnMap(JSON.parse(txt)); } catch (e) { /* silent */ }
+            try { drawGeoOnMap(JSON.parse(txt)); } catch(_) {}
         });
     }
 
     function populateZoneGeoFromLayer(layer) {
-        const gf    = $('zoneGeoJson');
-        const latEl = $('zoneLat');
-        const lngEl = $('zoneLng');
-        const radEl = $('zoneRadius');
-        let geo  = null;
-        let type = null;
-
+        var gf = $('zoneGeoJson'), latEl = $('zoneLat'), lngEl = $('zoneLng'), radEl = $('zoneRadius');
+        var geo = null, type = null;
         if (layer instanceof L.Circle) {
-            const c = layer.getLatLng();
-            const r = layer.getRadius();
+            var c = layer.getLatLng(), r = layer.getRadius();
             geo  = { type: 'Circle', center: [c.lat, c.lng], radius: Math.round(r) };
             type = 'radius';
             if (latEl) latEl.value = c.lat.toFixed(7);
             if (lngEl) lngEl.value = c.lng.toFixed(7);
-            if (radEl) radEl.value = (r / 1000).toFixed(2);
+            if (radEl) radEl.value = (r/1000).toFixed(2);
         } else if (layer instanceof L.Rectangle) {
-            const b = layer.getBounds();
-            geo  = { type: 'Rectangle', bounds: [[b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]] };
+            var b = layer.getBounds();
+            geo  = { type: 'Rectangle', bounds: [[b.getSouth(),b.getWest()],[b.getNorth(),b.getEast()]] };
             type = 'polygon';
         } else if (layer instanceof L.Polygon) {
-            const latlngs = layer.getLatLngs()[0].map(ll => [ll.lng, ll.lat]);
-            latlngs.push(latlngs[0]); // close ring
+            var latlngs = layer.getLatLngs()[0].map(function(ll) { return [ll.lng, ll.lat]; });
+            latlngs.push(latlngs[0]);
             geo  = { type: 'Polygon', coordinates: [latlngs] };
             type = 'polygon';
         }
-
         if (gf && geo) gf.value = JSON.stringify(geo, null, 2);
-        if (type) { const zt = $('zoneType'); if (zt) zt.value = type; }
+        if (type) { var zt = $('zoneType'); if (zt) zt.value = type; }
         toggleRadiusFields();
     }
 
     function drawGeoOnMap(parsed) {
         if (!parsed || !parsed.type || !zonesMap) return;
-        const t = (parsed.type || '').toLowerCase();
-        let layer = null;
-
+        var t = (parsed.type || '').toLowerCase(), layer = null;
         if (t === 'polygon') {
-            const coords = parsed.coordinates?.[0] || [];
-            const latlngs = coords.map(pt => [pt[1], pt[0]]);
-            layer = L.polygon(latlngs, { color: '#2563eb', fillOpacity: 0.15 });
+            var ll = (parsed.coordinates && parsed.coordinates[0] || []).map(function(pt) { return [pt[1], pt[0]]; });
+            layer = L.polygon(ll, { color: '#2563eb', fillOpacity: 0.15 });
         } else if (t === 'rectangle') {
-            const b = parsed.bounds;
-            if (b && b.length >= 2)
-                layer = L.rectangle([[b[0][0], b[0][1]], [b[1][0], b[1][1]]], { color: '#2563eb', fillOpacity: 0.15 });
+            var b = parsed.bounds;
+            if (b && b.length >= 2) layer = L.rectangle([[b[0][0],b[0][1]],[b[1][0],b[1][1]]], { color: '#2563eb', fillOpacity: 0.15 });
         } else if (t === 'circle' || t === 'radius') {
-            if (parsed.center && parsed.radius)
-                layer = L.circle([parsed.center[0], parsed.center[1]], { radius: parsed.radius, color: '#2563eb', fillOpacity: 0.15 });
+            if (parsed.center && parsed.radius) layer = L.circle([parsed.center[0],parsed.center[1]], { radius: parsed.radius, color: '#2563eb', fillOpacity: 0.15 });
         }
-
         if (layer) {
             drawnItems.addLayer(layer);
-            try { zonesMap.fitBounds(layer.getBounds(), { padding: [20, 20] }); } catch (e) { /* silent */ }
+            try { zonesMap.fitBounds(layer.getBounds(), { padding: [20,20] }); } catch(_) {}
         }
     }
 
     function renderZonesOnMap(zones) {
         if (!zonesMap || !drawnItems) return;
-        // Keep drawn (new) layers but remove old zone markers
-        zoneLayerMap.forEach(l => drawnItems.removeLayer(l));
+        zoneLayerMap.forEach(function(l) { drawnItems.removeLayer(l); });
         zoneLayerMap.clear();
-
-        zones.forEach(z => {
+        zones.forEach(function(z) {
             if (!z.zone_value) return;
-            let parsed;
-            try { parsed = JSON.parse(z.zone_value); } catch (e) { return; }
-
-            let layer = null;
-            const t = (parsed.type || '').toLowerCase();
-
+            var parsed; try { parsed = JSON.parse(z.zone_value); } catch(_) { return; }
+            var layer = null, t = (parsed.type || '').toLowerCase();
             if (t === 'polygon') {
-                const latlngs = (parsed.coordinates?.[0] || []).map(pt => [pt[1], pt[0]]);
-                layer = L.polygon(latlngs, { color: '#10b981', fillOpacity: 0.1 });
+                var ll = (parsed.coordinates && parsed.coordinates[0] || []).map(function(pt) { return [pt[1],pt[0]]; });
+                layer = L.polygon(ll, { color: '#10b981', fillOpacity: 0.1 });
             } else if (t === 'rectangle') {
-                const b = parsed.bounds;
-                if (b) layer = L.rectangle([[b[0][0], b[0][1]], [b[1][0], b[1][1]]], { color: '#10b981', fillOpacity: 0.1 });
+                var b = parsed.bounds;
+                if (b) layer = L.rectangle([[b[0][0],b[0][1]],[b[1][0],b[1][1]]], { color: '#10b981', fillOpacity: 0.1 });
             } else if (t === 'circle' || t === 'radius') {
-                if (parsed.center && parsed.radius)
-                    layer = L.circle([parsed.center[0], parsed.center[1]], { radius: parsed.radius, color: '#10b981', fillOpacity: 0.1 });
+                if (parsed.center && parsed.radius) layer = L.circle([parsed.center[0],parsed.center[1]], { radius: parsed.radius, color: '#10b981', fillOpacity: 0.1 });
             }
-
             if (layer) {
                 drawnItems.addLayer(layer);
-                layer.bindPopup(`<strong>${esc(z.zone_name)}</strong><br>Type: ${esc(z.zone_type)}<br>Fee: ${esc(z.delivery_fee)}`);
-                layer.on('click', () => zonesMod.edit(z.id));
+                layer.bindPopup('<strong>' + esc(z.zone_name) + '</strong><br>Type: ' + esc(z.zone_type) + '<br>Fee: ' + esc(z.delivery_fee));
+                layer.on('click', (function(zid) { return function() { zonesMod.edit(zid); }; })(z.id));
                 zoneLayerMap.set(String(z.id), layer);
             }
         });
-
         if (drawnItems.getLayers().length > 0) {
-            try { zonesMap.fitBounds(drawnItems.getBounds(), { padding: [30, 30], maxZoom: 14 }); } catch (e) { /* silent */ }
+            try { zonesMap.fitBounds(drawnItems.getBounds(), { padding:[30,30], maxZoom:14 }); } catch(_) {}
         }
-        setTimeout(() => { if (zonesMap) zonesMap.invalidateSize(); }, 200);
+        setTimeout(function() { if (zonesMap) zonesMap.invalidateSize(); }, 200);
     }
 
     function toggleRadiusFields() {
-        const zt  = $('zoneType');
-        const rf  = $('radiusFields');
+        var zt = $('zoneType'), rf = $('radiusFields');
         if (!zt || !rf) return;
         rf.style.display = zt.value === 'radius' ? '' : 'none';
     }
 
     // ─── Zones Module ─────────────────────────────────────────────────
-    const zonesMod = Object.assign(
+    var zonesMod = Object.assign(
         createModule('zones', CFG.urls.zones, {
-            loading: null, container: null, empty: null, // handled by sidebar
+            loading: null, container: null, empty: null,
             pagination: 'zonesPagination', info: 'zonesPaginationInfo',
-            formContainer: 'zoneFormContainer',
-            form:      'zoneForm',
-            addBtn:    'zonesAddBtn',
-            closeBtn:  'zoneCloseForm',
-            cancelBtn: 'zoneCancelBtn',
-            applyBtn:  'zonesApplyFilter',
-            resetBtn:  'zonesResetFilter',
-            getId:  () => $('zoneId')?.value || null,
-            getFilters: () => ({
-                search:    $('zonesSearch')?.value     || '',
-                zone_type: $('zonesTypeFilter')?.value || '',
-                is_active: $('zonesActiveFilter')?.value ?? ''
-            }),
-            reset: () => {
-                if ($('zonesSearch'))      $('zonesSearch').value      = '';
-                if ($('zonesTypeFilter'))  $('zonesTypeFilter').value  = '';
-                if ($('zonesActiveFilter')) $('zonesActiveFilter').value = '';
+            formContainer: 'zoneFormContainer', form: 'zoneForm',
+            addBtn: 'zonesAddBtn', closeBtn: 'zoneCloseForm', cancelBtn: 'zoneCancelBtn',
+            applyBtn: 'zonesApplyFilter', resetBtn: 'zonesResetFilter',
+            getId: function() { return $('zoneId') && $('zoneId').value || null; },
+            getFilters: function() {
+                return {
+                    search:    $('zonesSearch') && $('zonesSearch').value || '',
+                    zone_type: $('zonesTypeFilter') && $('zonesTypeFilter').value || '',
+                    is_active: $('zonesActiveFilter') ? $('zonesActiveFilter').value : ''
+                };
             },
-            setForm: z => {
-                if ($('zoneId'))          $('zoneId').value          = z.id       || '';
-                if ($('zoneName'))        $('zoneName').value        = z.zone_name || '';
-                if ($('zoneType'))        $('zoneType').value        = z.zone_type || 'city';
-                if ($('zoneFee'))         $('zoneFee').value         = z.delivery_fee || '0.00';
-                if ($('zoneTime'))        $('zoneTime').value        = z.estimated_minutes ?? 45;
-                if ($('zoneActive'))      $('zoneActive').checked    = !!+z.is_active;
-                if ($('zoneLat'))         $('zoneLat').value         = z.center_lat || '';
-                if ($('zoneLng'))         $('zoneLng').value         = z.center_lng || '';
-                if ($('zoneRadius'))      $('zoneRadius').value      = z.radius_km  || '';
-                if ($('zoneMinOrder'))    $('zoneMinOrder').value    = z.min_order_value || '';
+            reset: function() {
+                ['zonesSearch','zonesTypeFilter','zonesActiveFilter'].forEach(function(id) {
+                    var el = $(id); if (el) el.value = '';
+                });
+            },
+            setForm: function(z) {
+                if ($('zoneId'))           $('zoneId').value           = z.id              || '';
+                if ($('zoneName'))         $('zoneName').value         = z.zone_name       || '';
+                if ($('zoneType'))         $('zoneType').value         = z.zone_type       || 'city';
+                if ($('zoneFee'))          $('zoneFee').value          = z.delivery_fee    || '0.00';
+                if ($('zoneTime'))         $('zoneTime').value         = z.estimated_minutes != null ? z.estimated_minutes : 45;
+                if ($('zoneActive'))       $('zoneActive').checked     = !!+z.is_active;
+                if ($('zoneLat'))          $('zoneLat').value          = z.center_lat      || '';
+                if ($('zoneLng'))          $('zoneLng').value          = z.center_lng      || '';
+                if ($('zoneRadius'))       $('zoneRadius').value       = z.radius_km       || '';
+                if ($('zoneMinOrder'))     $('zoneMinOrder').value     = z.min_order_value || '';
                 if ($('zoneFreeDelivery')) $('zoneFreeDelivery').value = z.free_delivery_over || '';
-                if ($('zoneGeoJson'))     $('zoneGeoJson').value     = z.zone_value || '';
+                if ($('zoneGeoJson'))      $('zoneGeoJson').value      = z.zone_value      || '';
+                if ($('zoneCityId') && z.city_id) $('zoneCityId').value = z.city_id;
                 toggleRadiusFields();
-
-                // Redraw geometry on map
-                if (drawnItems) { drawnItems.clearLayers(); }
-                if (z.zone_value) { try { drawGeoOnMap(JSON.parse(z.zone_value)); } catch (e) { /* silent */ } }
+                if (drawnItems) drawnItems.clearLayers();
+                if (z.zone_value) { try { drawGeoOnMap(JSON.parse(z.zone_value)); } catch(_) {} }
             },
-            getFormData: () => ({
-                id:                $('zoneId')?.value        || null,
-                zone_name:         $('zoneName')?.value      || '',
-                zone_type:         $('zoneType')?.value      || 'city',
-                city_id:           $('zoneCityId')?.value    || null,
-                provider_id:       $('zoneProviderId')?.value || null,
-                delivery_fee:      $('zoneFee')?.value       || '0.00',
-                estimated_minutes: $('zoneTime')?.value      || 45,
-                center_lat:        $('zoneLat')?.value       || null,
-                center_lng:        $('zoneLng')?.value       || null,
-                radius_km:         $('zoneRadius')?.value    || null,
-                min_order_value:   $('zoneMinOrder')?.value  || null,
-                free_delivery_over: $('zoneFreeDelivery')?.value || null,
-                zone_value:        $('zoneGeoJson')?.value   || null,
-                is_active:         $('zoneActive')?.checked  ? 1 : 0,
-                tenant_id:         state.tenant
-            }),
-            afterLoad: items => renderZonesListSidebar(items),
-            row: () => '' // we use sidebar, not table
+            getFormData: function() {
+                return {
+                    id:                 $('zoneId') && $('zoneId').value || null,
+                    zone_name:          $('zoneName') && $('zoneName').value || '',
+                    zone_type:          $('zoneType') && $('zoneType').value || 'city',
+                    city_id:            $('zoneCityId') && $('zoneCityId').value || null,
+                    provider_id:        $('zoneProviderId') && $('zoneProviderId').value || null,
+                    delivery_fee:       $('zoneFee') && $('zoneFee').value || '0.00',
+                    estimated_minutes:  $('zoneTime') && $('zoneTime').value || 45,
+                    center_lat:         $('zoneLat') && $('zoneLat').value || null,
+                    center_lng:         $('zoneLng') && $('zoneLng').value || null,
+                    radius_km:          $('zoneRadius') && $('zoneRadius').value || null,
+                    min_order_value:    $('zoneMinOrder') && $('zoneMinOrder').value || null,
+                    free_delivery_over: $('zoneFreeDelivery') && $('zoneFreeDelivery').value || null,
+                    zone_value:         $('zoneGeoJson') && $('zoneGeoJson').value || null,
+                    is_active:          $('zoneActive') ? ($('zoneActive').checked ? 1 : 0) : 1,
+                    tenant_id:          state.tenant
+                };
+            },
+            afterLoad: function(items) { renderZonesListSidebar(items); },
+            row: function() { return ''; }
         }),
         {
-            async edit(id) {
+            edit: async function(id) {
                 try {
-                    const r = await api(`${CFG.urls.zones}/${id}?tenant_id=${state.tenant}`);
-                    this.showForm(r.data || r);
-                } catch (e) { notify(e.message, 'error'); }
+                    var r = await api(CFG.urls.zones + '/' + id + '?tenant_id=' + state.tenant);
+                    zonesMod.showForm(r.data || r);
+                } catch(e) { notify(e.message, 'error'); }
             }
         }
     );
 
-    // Override load to use sidebar elements
-    const _zonesBaseLoad = zonesMod.load.bind(zonesMod);
-    zonesMod.load = async function (page = 1) {
-        const s = state.zones;
+    // Override load to use sidebar
+    zonesMod.load = async function(page) {
+        page = page || 1;
+        var s = state.zones;
         s.page = page; s.loaded = true;
-        const loadingEl = $('zonesListLoading');
-        const itemsEl   = $('zonesListItems');
-        const emptyEl   = $('zonesListEmpty');
+        var loadingEl = $('zonesListLoading'), itemsEl = $('zonesListItems'), emptyEl = $('zonesListEmpty');
         if (loadingEl) loadingEl.style.display = '';
         if (itemsEl)   itemsEl.innerHTML = '';
         if (emptyEl)   emptyEl.style.display = 'none';
         try {
-            const p = new URLSearchParams({ page, limit: LIMIT, tenant_id: state.tenant, lang: state.lang, ...s.filters });
-            const r = await api(`${CFG.urls.zones}?${p}`);
-            const items = r.data || r.items || [];
-            const total = r.meta?.total ?? r.total ?? items.length;
+            var p = new URLSearchParams(Object.assign({ page: page, limit: LIMIT, tenant_id: state.tenant, lang: state.lang }, s.filters));
+            var r = await api(CFG.urls.zones + '?' + p.toString());
+            var items = (r.data !== undefined ? r.data : null) || r.items || [];
+            var total = (r.meta && r.meta.total !== undefined ? r.meta.total : null) || r.total || items.length;
             s.items = items; s.total = total;
-
             if (loadingEl) loadingEl.style.display = 'none';
             if (!items.length) { if (emptyEl) emptyEl.style.display = ''; return; }
-
             renderZonesListSidebar(items);
             renderZonesOnMap(items);
-            pagination($('zonesPagination'), $('zonesPaginationInfo'), total, page, n => this.load(n));
-        } catch (e) {
+            pagination($('zonesPagination'), $('zonesPaginationInfo'), total, page, function(n) { zonesMod.load(n); });
+        } catch(e) {
             if (loadingEl) loadingEl.style.display = 'none';
+            if (itemsEl) itemsEl.innerHTML = '<p class="table-error-row"><i class="fas fa-exclamation-triangle"></i> ' + esc(e.message) + '</p>';
             notify(e.message, 'error');
         }
     };
 
     function renderZonesListSidebar(items) {
-        const el = $('zonesListItems');
+        var el = $('zonesListItems');
         if (!el) return;
-        el.innerHTML = items.map(z => `
-            <div class="zone-list-item${+z.is_active ? '' : ' inactive'}" data-id="${esc(z.id)}">
-                <div class="zone-item-info">
-                    <strong>${esc(z.zone_name)}</strong>
-                    <span class="zone-item-meta">${esc(z.zone_type)} · ${esc(z.delivery_fee)} · ${esc(z.estimated_minutes)} min</span>
-                </div>
-                <div class="zone-item-actions">
-                    ${CFG.canEdit ? `<button class="btn btn-sm btn-icon" onclick="Delivery.editZone(${z.id})" title="Edit"><i class="fas fa-edit"></i></button>` : ''}
-                    ${CFG.canDelete ? `<button class="btn btn-sm btn-icon btn-danger" onclick="Delivery.delZone(${z.id})" title="Delete"><i class="fas fa-trash"></i></button>` : ''}
-                </div>
-            </div>`).join('');
-
-        // Highlight zone on map when clicking list item
-        el.querySelectorAll('.zone-list-item').forEach(item => {
-            item.addEventListener('click', e => {
+        el.innerHTML = items.map(function(z) {
+            return '<div class="zone-list-item' + (+z.is_active ? '' : ' inactive') + '" data-id="' + esc(z.id) + '">' +
+                '<div class="zone-item-info">' +
+                '<strong>' + esc(z.zone_name) + '</strong>' +
+                '<span class="zone-item-meta">' + esc(z.zone_type) + ' · ' + esc(z.delivery_fee) + ' · ' + esc(z.estimated_minutes) + ' min</span>' +
+                '</div>' +
+                '<div class="zone-item-actions">' +
+                (CFG.canEdit   ? '<button class="btn btn-sm btn-icon" onclick="Delivery.editZone(' + z.id + ')" title="Edit"><i class="fas fa-edit"></i></button>' : '') +
+                (CFG.canDelete ? '<button class="btn btn-sm btn-icon btn-danger" onclick="Delivery.delZone(' + z.id + ')" title="Delete"><i class="fas fa-trash"></i></button>' : '') +
+                '</div></div>';
+        }).join('');
+        el.querySelectorAll('.zone-list-item').forEach(function(item) {
+            item.addEventListener('click', function(e) {
                 if (e.target.closest('button')) return;
-                const id = item.dataset.id;
-                const layer = zoneLayerMap.get(String(id));
+                var id = item.dataset.id;
+                var layer = zoneLayerMap.get(String(id));
                 if (layer && zonesMap) {
-                    try { zonesMap.fitBounds(layer.getBounds(), { padding: [30, 30], maxZoom: 14 }); } catch (e) { /* silent */ }
+                    try { zonesMap.fitBounds(layer.getBounds(), { padding:[30,30], maxZoom:14 }); } catch(_) {}
                     layer.openPopup();
                 }
             });
@@ -435,403 +585,456 @@
     }
 
     // ─── Providers Module ─────────────────────────────────────────────
-    const providersMod = Object.assign(
+    var providersMod = Object.assign(
         createModule('providers', CFG.urls.providers, {
             loading: 'providersTableLoading', container: 'providersTableContainer', empty: 'providersEmptyState',
             tbody: 'providersTableBody', pagination: 'providersPagination', info: 'providersPaginationInfo',
             formContainer: 'providerFormContainer', form: 'providerForm',
             addBtn: 'providersAddBtn', closeBtn: 'providerCloseForm', cancelBtn: 'providerCancelBtn',
             applyBtn: 'providersApplyFilter', resetBtn: 'providersResetFilter',
-            getId: () => $('providerId')?.value || null,
-            getFilters: () => ({
-                search:        $('providersSearch')?.value        || '',
-                provider_type: $('providersTypeFilter')?.value    || '',
-                vehicle_type:  $('providersVehicleFilter')?.value || '',
-                is_active:     $('providersActiveFilter')?.value  ?? ''
-            }),
-            reset: () => {
-                ['providersSearch','providersTypeFilter','providersVehicleFilter','providersActiveFilter']
-                    .forEach(id => { const el = $(id); if (el) el.value = ''; });
+            getId: function() { return $('providerId') && $('providerId').value || null; },
+            getFilters: function() {
+                return {
+                    search:        $('providersSearch') && $('providersSearch').value || '',
+                    provider_type: $('providersTypeFilter') && $('providersTypeFilter').value || '',
+                    vehicle_type:  $('providersVehicleFilter') && $('providersVehicleFilter').value || '',
+                    is_active:     $('providersActiveFilter') ? $('providersActiveFilter').value : ''
+                };
             },
-            setForm: p => {
-                if ($('providerId'))         $('providerId').value         = p.id            || '';
-                if ($('providerType'))       $('providerType').value       = p.provider_type || 'company';
-                if ($('providerVehicle'))    $('providerVehicle').value    = p.vehicle_type  || 'bike';
-                if ($('providerLicense'))    $('providerLicense').value    = p.license_number || '';
-                if ($('providerOnline'))     $('providerOnline').checked   = !!+p.is_online;
-                if ($('providerActive'))     $('providerActive').checked   = !!+p.is_active;
-                if ($('providerEntityId'))   $('providerEntityId').value   = p.entity_id     || '';
+            reset: function() {
+                ['providersSearch','providersTypeFilter','providersVehicleFilter','providersActiveFilter']
+                    .forEach(function(id) { var el = $(id); if (el) el.value = ''; });
+            },
+            setForm: function(p) {
+                if ($('providerId'))           $('providerId').value           = p.id             || '';
+                if ($('providerType'))         $('providerType').value         = p.provider_type  || 'company';
+                if ($('providerVehicle'))      $('providerVehicle').value      = p.vehicle_type   || 'bike';
+                if ($('providerLicense'))      $('providerLicense').value      = p.license_number || '';
+                if ($('providerOnline'))       $('providerOnline').checked     = !!+p.is_online;
+                if ($('providerActive'))       $('providerActive').checked     = !!+p.is_active;
+                if ($('providerEntityId'))     $('providerEntityId').value     = p.entity_id      || '';
                 if ($('providerTenantUserId')) $('providerTenantUserId').value = p.tenant_user_id || '';
             },
-            getFormData: () => ({
-                id:             $('providerId')?.value          || null,
-                provider_type:  $('providerType')?.value        || 'company',
-                vehicle_type:   $('providerVehicle')?.value     || 'bike',
-                license_number: $('providerLicense')?.value     || null,
-                is_online:      $('providerOnline')?.checked    ? 1 : 0,
-                is_active:      $('providerActive')?.checked    ? 1 : 0,
-                entity_id:      $('providerEntityId')?.value    || null,
-                tenant_user_id: $('providerTenantUserId')?.value || null,
-                tenant_id:      state.tenant
-            }),
-            row: p => `<tr>
-                <td>${esc(p.id)}</td>
-                <td>${esc(p.provider_type)}</td>
-                <td>${esc(p.vehicle_type)}</td>
-                <td>${badge(p.is_online ? 'Online' : 'Offline', { Online: 'success', Offline: 'secondary' })}</td>
-                <td>${esc(p.rating ?? '0.00')}</td>
-                <td>${esc(p.total_deliveries ?? 0)}</td>
-                <td class="actions">
-                    ${CFG.canEdit   ? `<button class="btn btn-sm btn-primary"  onclick="Delivery.editProvider(${p.id})"><i class="fas fa-edit"></i></button>` : ''}
-                    ${CFG.canDelete ? `<button class="btn btn-sm btn-danger"   onclick="Delivery.delProvider(${p.id})"><i class="fas fa-trash"></i></button>` : ''}
-                </td></tr>`
+            getFormData: function() {
+                return {
+                    id:             $('providerId') && $('providerId').value          || null,
+                    provider_type:  $('providerType') && $('providerType').value      || 'company',
+                    vehicle_type:   $('providerVehicle') && $('providerVehicle').value || 'bike',
+                    license_number: $('providerLicense') && $('providerLicense').value || null,
+                    is_online:      $('providerOnline') ? ($('providerOnline').checked ? 1 : 0) : 0,
+                    is_active:      $('providerActive') ? ($('providerActive').checked ? 1 : 0) : 1,
+                    entity_id:      $('providerEntityId') && $('providerEntityId').value || null,
+                    tenant_user_id: $('providerTenantUserId') && $('providerTenantUserId').value || null,
+                    tenant_id:      state.tenant
+                };
+            },
+            row: function(p) {
+                return '<tr>' +
+                    '<td>' + esc(p.id) + '</td>' +
+                    '<td>' + esc(p.provider_type) + '</td>' +
+                    '<td>' + esc(p.vehicle_type) + '</td>' +
+                    '<td>' + badge(p.is_online ? 'Online' : 'Offline', { Online:'success', Offline:'secondary' }) + '</td>' +
+                    '<td>' + esc(p.rating != null ? p.rating : '–') + '</td>' +
+                    '<td>' + esc(p.total_deliveries || 0) + '</td>' +
+                    '<td class="actions">' +
+                    (CFG.canEdit   ? '<button class="btn btn-sm btn-primary" onclick="Delivery.editProvider(' + p.id + ')"><i class="fas fa-edit"></i></button>' : '') +
+                    (CFG.canDelete ? '<button class="btn btn-sm btn-danger" onclick="Delivery.delProvider(' + p.id + ')"><i class="fas fa-trash"></i></button>' : '') +
+                    '</td></tr>';
+            }
         }),
-        { async edit(id) { const r = await api(`${CFG.urls.providers}/${id}?tenant_id=${state.tenant}`); this.showForm(r.data || r); } }
+        {
+            edit: async function(id) {
+                var r = await api(CFG.urls.providers + '/' + id + '?tenant_id=' + state.tenant);
+                providersMod.showForm(r.data || r);
+            }
+        }
     );
 
     // ─── Orders Module ────────────────────────────────────────────────
-    const ordersMod = Object.assign(
+    var ordersMod = Object.assign(
         createModule('orders', CFG.urls.orders, {
             loading: 'ordersTableLoading', container: 'ordersTableContainer', empty: 'ordersEmptyState',
             tbody: 'ordersTableBody', pagination: 'ordersPagination', info: 'ordersPaginationInfo',
             formContainer: 'orderFormContainer', form: 'orderForm',
             addBtn: 'ordersAddBtn', closeBtn: 'orderCloseForm', cancelBtn: 'orderCancelBtn',
             applyBtn: 'ordersApplyFilter', resetBtn: 'ordersResetFilter',
-            getId: () => $('orderId')?.value || null,
-            getFilters: () => ({
-                delivery_status: $('ordersStatusFilter')?.value   || '',
-                provider_id:     $('ordersProviderFilter')?.value || '',
-                delivery_zone_id: $('ordersZoneFilter')?.value    || ''
-            }),
-            reset: () => {
+            getId: function() { return $('orderId') && $('orderId').value || null; },
+            getFilters: function() {
+                return {
+                    delivery_status:  $('ordersStatusFilter') && $('ordersStatusFilter').value || '',
+                    provider_id:      $('ordersProviderFilter') && $('ordersProviderFilter').value || '',
+                    delivery_zone_id: $('ordersZoneFilter') && $('ordersZoneFilter').value || ''
+                };
+            },
+            reset: function() {
                 ['ordersStatusFilter','ordersProviderFilter','ordersZoneFilter']
-                    .forEach(id => { const el = $(id); if (el) el.value = ''; });
+                    .forEach(function(id) { var el = $(id); if (el) el.value = ''; });
             },
-            setForm: o => {
-                if ($('orderId'))          $('orderId').value          = o.id              || '';
-                if ($('orderOrderId'))     $('orderOrderId').value     = o.order_id        || '';
-                if ($('orderProviderId'))  $('orderProviderId').value  = o.provider_id     || '';
-                if ($('orderStatus'))      $('orderStatus').value      = o.delivery_status || 'pending';
-                if ($('orderPickup'))      $('orderPickup').value      = o.pickup_address_id  || '';
-                if ($('orderDropoff'))     $('orderDropoff').value     = o.dropoff_address_id || '';
-                if ($('orderFee'))         $('orderFee').value         = o.delivery_fee    || '0.00';
-                if ($('orderCalcFee'))     $('orderCalcFee').value     = o.calculated_fee  || '0.00';
-                if ($('orderPayout'))      $('orderPayout').value      = o.provider_payout || '0.00';
-                if ($('orderZoneId'))      $('orderZoneId').value      = o.delivery_zone_id || '';
-                if ($('orderCancelledBy')) $('orderCancelledBy').value = o.cancelled_by   || '';
-                if ($('orderCancelReason')) $('orderCancelReason').value = o.cancellation_reason || '';
-                // Show cancel fields if status is cancelled
-                const cf = $('cancelFields');
-                if (cf) cf.style.display = (o.delivery_status === 'cancelled') ? '' : 'none';
+            setForm: function(o) {
+                if ($('orderId'))            $('orderId').value            = o.id                  || '';
+                if ($('orderOrderId'))       $('orderOrderId').value       = o.order_id            || '';
+                if ($('orderProviderId'))    $('orderProviderId').value    = o.provider_id         || '';
+                if ($('orderProviderName') && o.provider_id) {
+                    $('orderProviderName').textContent = '#' + o.provider_id;
+                    $('orderProviderName').className = 'provider-name-badge found';
+                }
+                if ($('orderStatus'))        $('orderStatus').value        = o.delivery_status     || 'pending';
+                if ($('orderPickup'))        $('orderPickup').value        = o.pickup_address_id   || '';
+                if ($('orderDropoff'))       $('orderDropoff').value       = o.dropoff_address_id  || '';
+                if ($('orderFee'))           $('orderFee').value           = o.delivery_fee        || '0.00';
+                if ($('orderCalcFee'))       $('orderCalcFee').value       = o.calculated_fee      || '0.00';
+                if ($('orderPayout'))        $('orderPayout').value        = o.provider_payout     || '0.00';
+                if ($('orderZoneId'))        $('orderZoneId').value        = o.delivery_zone_id    || '';
+                if ($('orderCancelledBy'))   $('orderCancelledBy').value   = o.cancelled_by        || '';
+                if ($('orderCancelReason'))  $('orderCancelReason').value  = o.cancellation_reason || '';
+                var cf = $('cancelFields');
+                if (cf) cf.style.display = o.delivery_status === 'cancelled' ? '' : 'none';
             },
-            getFormData: () => ({
-                id:                $('orderId')?.value          || null,
-                order_id:          $('orderOrderId')?.value     || '',
-                provider_id:       $('orderProviderId')?.value  || null,
-                delivery_status:   $('orderStatus')?.value      || 'pending',
-                pickup_address_id: $('orderPickup')?.value      || '',
-                dropoff_address_id: $('orderDropoff')?.value    || '',
-                delivery_fee:      $('orderFee')?.value         || '0.00',
-                calculated_fee:    $('orderCalcFee')?.value     || '0.00',
-                provider_payout:   $('orderPayout')?.value      || '0.00',
-                delivery_zone_id:  $('orderZoneId')?.value      || null,
-                cancelled_by:      $('orderCancelledBy')?.value  || null,
-                cancellation_reason: $('orderCancelReason')?.value || null,
-                tenant_id:         state.tenant
-            }),
-            row: o => `<tr>
-                <td>${esc(o.id)}</td>
-                <td>${esc(o.order_id)}</td>
-                <td>${esc(o.provider_id || '–')}</td>
-                <td>${badge(o.delivery_status, { pending: 'secondary', assigned: 'primary', accepted: 'primary', picked_up: 'warning', on_the_way: 'warning', delivered: 'success', cancelled: 'danger' })}</td>
-                <td>${esc(o.delivery_fee)}</td>
-                <td>${esc(o.delivery_zone_id || '–')}</td>
-                <td>${esc(o.created_at || '')}</td>
-                <td class="actions">
-                    ${CFG.canEdit   ? `<button class="btn btn-sm btn-primary" onclick="Delivery.editOrder(${o.id})"><i class="fas fa-edit"></i></button>` : ''}
-                </td></tr>`
+            getFormData: function() {
+                return {
+                    id:                  $('orderId') && $('orderId').value            || null,
+                    order_id:            $('orderOrderId') && $('orderOrderId').value  || '',
+                    provider_id:         $('orderProviderId') && $('orderProviderId').value || null,
+                    delivery_status:     $('orderStatus') && $('orderStatus').value    || 'pending',
+                    pickup_address_id:   $('orderPickup') && $('orderPickup').value    || '',
+                    dropoff_address_id:  $('orderDropoff') && $('orderDropoff').value  || '',
+                    delivery_fee:        $('orderFee') && $('orderFee').value          || '0.00',
+                    calculated_fee:      $('orderCalcFee') && $('orderCalcFee').value  || '0.00',
+                    provider_payout:     $('orderPayout') && $('orderPayout').value    || '0.00',
+                    delivery_zone_id:    $('orderZoneId') && $('orderZoneId').value    || null,
+                    cancelled_by:        $('orderCancelledBy') && $('orderCancelledBy').value || null,
+                    cancellation_reason: $('orderCancelReason') && $('orderCancelReason').value || null,
+                    tenant_id:           state.tenant
+                };
+            },
+            row: function(o) {
+                return '<tr>' +
+                    '<td>' + esc(o.id) + '</td>' +
+                    '<td>' + esc(o.order_id) + '</td>' +
+                    '<td>' + esc(o.provider_id || '–') + '</td>' +
+                    '<td>' + badge(o.delivery_status, { pending:'secondary', assigned:'primary', accepted:'primary', picked_up:'warning', on_the_way:'warning', delivered:'success', cancelled:'danger' }) + '</td>' +
+                    '<td>' + esc(o.delivery_fee) + '</td>' +
+                    '<td>' + esc(o.delivery_zone_id || '–') + '</td>' +
+                    '<td>' + esc(o.created_at || '') + '</td>' +
+                    '<td class="actions">' +
+                    (CFG.canEdit ? '<button class="btn btn-sm btn-primary" onclick="Delivery.editOrder(' + o.id + ')"><i class="fas fa-edit"></i></button>' : '') +
+                    '</td></tr>';
+            }
         }),
-        { async edit(id) { const r = await api(`${CFG.urls.orders}/${id}?tenant_id=${state.tenant}`); this.showForm(r.data || r); } }
+        {
+            edit: async function(id) {
+                var r = await api(CFG.urls.orders + '/' + id + '?tenant_id=' + state.tenant);
+                ordersMod.showForm(r.data || r);
+            }
+        }
     );
 
-    // Toggle cancel fields on status change
-    $('orderStatus')?.addEventListener('change', function () {
-        const cf = $('cancelFields');
+    var orderStatusEl = $('orderStatus');
+    if (orderStatusEl) orderStatusEl.addEventListener('change', function() {
+        var cf = $('cancelFields');
         if (cf) cf.style.display = this.value === 'cancelled' ? '' : 'none';
     });
 
     // ─── Locations Module ─────────────────────────────────────────────
-    const locationsMod = Object.assign(
+    var locationsMod = Object.assign(
         createModule('locations', CFG.urls.locations, {
             loading: 'locationsTableLoading', container: 'locationsTableContainer', empty: 'locationsEmptyState',
             tbody: 'locationsTableBody', pagination: 'locationsPagination', info: 'locationsPaginationInfo',
             formContainer: 'locationFormContainer', form: 'locationForm',
             addBtn: 'locationsAddBtn', closeBtn: 'locationCloseForm', cancelBtn: 'locationCancelBtn',
             applyBtn: 'locationsApplyFilter', resetBtn: 'locationsResetFilter',
-            getId: () => $('locationId')?.value || null,
-            getFilters: () => ({ provider_id: $('locationsProviderFilter')?.value || '' }),
-            reset: () => { const el = $('locationsProviderFilter'); if (el) el.value = ''; },
-            setForm: l => {
+            getId: function() { return $('locationId') && $('locationId').value || null; },
+            getFilters: function() { return { provider_id: $('locationsProviderFilter') && $('locationsProviderFilter').value || '' }; },
+            reset: function() { var el = $('locationsProviderFilter'); if (el) el.value = ''; },
+            setForm: function(l) {
                 if ($('locationId'))         $('locationId').value         = l.id          || '';
                 if ($('locationProviderId')) $('locationProviderId').value = l.provider_id || '';
+                if ($('locationProviderName') && l.provider_id) {
+                    $('locationProviderName').textContent = '#' + l.provider_id;
+                    $('locationProviderName').className = 'provider-name-badge found';
+                }
                 if ($('locationLat'))        $('locationLat').value        = l.latitude    || '';
                 if ($('locationLng'))        $('locationLng').value        = l.longitude   || '';
             },
-            getFormData: () => ({
-                id:          $('locationId')?.value          || null,
-                provider_id: $('locationProviderId')?.value  || '',
-                latitude:    $('locationLat')?.value         || '',
-                longitude:   $('locationLng')?.value         || ''
-            }),
-            row: l => `<tr>
-                <td>${esc(l.id)}</td>
-                <td>${esc(l.provider_id)}</td>
-                <td>${esc(l.latitude)}</td>
-                <td>${esc(l.longitude)}</td>
-                <td>${esc(l.updated_at || '')}</td>
-                <td class="actions">
-                    ${CFG.canEdit   ? `<button class="btn btn-sm btn-primary" onclick="Delivery.editLocation(${l.id})"><i class="fas fa-edit"></i></button>` : ''}
-                    ${CFG.canDelete ? `<button class="btn btn-sm btn-danger"  onclick="Delivery.delLocation(${l.id})"><i class="fas fa-trash"></i></button>` : ''}
-                </td></tr>`
+            getFormData: function() {
+                return {
+                    id:          $('locationId') && $('locationId').value           || null,
+                    provider_id: $('locationProviderId') && $('locationProviderId').value || '',
+                    latitude:    $('locationLat') && $('locationLat').value         || '',
+                    longitude:   $('locationLng') && $('locationLng').value         || ''
+                };
+            },
+            row: function(l) {
+                return '<tr>' +
+                    '<td>' + esc(l.id) + '</td>' +
+                    '<td>' + esc(l.provider_id) + '</td>' +
+                    '<td>' + esc(l.latitude) + '</td>' +
+                    '<td>' + esc(l.longitude) + '</td>' +
+                    '<td>' + esc(l.updated_at || '') + '</td>' +
+                    '<td class="actions">' +
+                    (CFG.canEdit   ? '<button class="btn btn-sm btn-primary" onclick="Delivery.editLocation(' + l.id + ')"><i class="fas fa-edit"></i></button>' : '') +
+                    (CFG.canDelete ? '<button class="btn btn-sm btn-danger"  onclick="Delivery.delLocation(' + l.id + ')"><i class="fas fa-trash"></i></button>' : '') +
+                    '</td></tr>';
+            }
         }),
-        { async edit(id) { const r = await api(`${CFG.urls.locations}/${id}?tenant_id=${state.tenant}`); this.showForm(r.data || r); } }
+        {
+            edit: async function(id) {
+                var r = await api(CFG.urls.locations + '/' + id + '?tenant_id=' + state.tenant);
+                locationsMod.showForm(r.data || r);
+            }
+        }
     );
 
     // ─── Tracking Module ──────────────────────────────────────────────
-    const trackingMod = createModule('tracking', CFG.urls.tracking, {
+    var trackingMod = createModule('tracking', CFG.urls.tracking, {
         loading: 'trackingTableLoading', container: 'trackingTableContainer', empty: 'trackingEmptyState',
         tbody: 'trackingTableBody', pagination: 'trackingPagination', info: 'trackingPaginationInfo',
         formContainer: 'trackingFormContainer', form: 'trackingForm',
         addBtn: 'trackingAddBtn', closeBtn: 'trackingCloseForm', cancelBtn: 'trackingCancelBtn',
         applyBtn: 'trackingApplyFilter', resetBtn: 'trackingResetFilter',
-        getId: () => $('trackingId')?.value || null,
-        getFilters: () => ({
-            delivery_order_id: $('trackingOrderFilter')?.value    || '',
-            provider_id:       $('trackingProviderFilter')?.value || ''
-        }),
-        reset: () => {
-            ['trackingOrderFilter','trackingProviderFilter'].forEach(id => { const el = $(id); if (el) el.value = ''; });
+        getId: function() { return $('trackingId') && $('trackingId').value || null; },
+        getFilters: function() {
+            return {
+                delivery_order_id: $('trackingOrderFilter') && $('trackingOrderFilter').value || '',
+                provider_id:       $('trackingProviderFilter') && $('trackingProviderFilter').value || ''
+            };
         },
-        setForm: t => {
-            if ($('trackingId'))         $('trackingId').value         = t.id                || '';
-            if ($('trackingOrderId'))    $('trackingOrderId').value    = t.delivery_order_id || '';
-            if ($('trackingProviderId')) $('trackingProviderId').value = t.provider_id       || '';
-            if ($('trackingLat'))        $('trackingLat').value        = t.latitude          || '';
-            if ($('trackingLng'))        $('trackingLng').value        = t.longitude         || '';
-            if ($('trackingNote'))       $('trackingNote').value       = t.status_note       || '';
+        reset: function() {
+            ['trackingOrderFilter','trackingProviderFilter'].forEach(function(id) { var el = $(id); if (el) el.value = ''; });
         },
-        getFormData: () => ({
-            id:                $('trackingId')?.value          || null,
-            delivery_order_id: $('trackingOrderId')?.value     || '',
-            provider_id:       $('trackingProviderId')?.value  || null,
-            latitude:          $('trackingLat')?.value         || '',
-            longitude:         $('trackingLng')?.value         || '',
-            status_note:       $('trackingNote')?.value        || null,
-            tenant_id:         state.tenant
-        }),
-        row: t => `<tr>
-            <td>${esc(t.id)}</td>
-            <td>${esc(t.delivery_order_id)}</td>
-            <td>${esc(t.provider_id || '–')}</td>
-            <td>${esc(t.latitude)}</td>
-            <td>${esc(t.longitude)}</td>
-            <td>${esc(t.status_note || '–')}</td>
-            <td>${esc(t.created_at || '')}</td>
-            <td class="actions">
-                ${CFG.canDelete ? `<button class="btn btn-sm btn-danger" onclick="Delivery.delTracking(${t.id})"><i class="fas fa-trash"></i></button>` : ''}
-            </td></tr>`
+        setForm: function(t) {
+            if ($('trackingId'))           $('trackingId').value           = t.id                || '';
+            if ($('trackingOrderId'))      $('trackingOrderId').value      = t.delivery_order_id || '';
+            if ($('trackingProviderId'))   $('trackingProviderId').value   = t.provider_id       || '';
+            if ($('trackingProviderName') && t.provider_id) {
+                $('trackingProviderName').textContent = '#' + t.provider_id;
+                $('trackingProviderName').className = 'provider-name-badge found';
+            }
+            if ($('trackingLat'))          $('trackingLat').value          = t.latitude          || '';
+            if ($('trackingLng'))          $('trackingLng').value          = t.longitude         || '';
+            if ($('trackingNote'))         $('trackingNote').value         = t.status_note       || '';
+        },
+        getFormData: function() {
+            return {
+                id:                $('trackingId') && $('trackingId').value               || null,
+                delivery_order_id: $('trackingOrderId') && $('trackingOrderId').value     || '',
+                provider_id:       $('trackingProviderId') && $('trackingProviderId').value || null,
+                latitude:          $('trackingLat') && $('trackingLat').value             || '',
+                longitude:         $('trackingLng') && $('trackingLng').value             || '',
+                status_note:       $('trackingNote') && $('trackingNote').value           || null,
+                tenant_id:         state.tenant
+            };
+        },
+        row: function(t) {
+            return '<tr>' +
+                '<td>' + esc(t.id) + '</td>' +
+                '<td>' + esc(t.delivery_order_id) + '</td>' +
+                '<td>' + esc(t.provider_id || '–') + '</td>' +
+                '<td>' + esc(t.latitude) + '</td>' +
+                '<td>' + esc(t.longitude) + '</td>' +
+                '<td>' + esc(t.status_note || '–') + '</td>' +
+                '<td>' + esc(t.created_at || '') + '</td>' +
+                '<td class="actions">' +
+                (CFG.canDelete ? '<button class="btn btn-sm btn-danger" onclick="Delivery.delTracking(' + t.id + ')"><i class="fas fa-trash"></i></button>' : '') +
+                '</td></tr>';
+        }
     });
 
     // ─── Provider Zones Module ────────────────────────────────────────
-    const pzonesMod = Object.assign(
+    var pzonesMod = Object.assign(
         createModule('provider_zones', CFG.urls.provider_zones, {
             loading: 'pzonesTableLoading', container: 'pzonesTableContainer', empty: 'pzonesEmptyState',
             tbody: 'pzonesTableBody', pagination: 'pzonesPagination', info: 'pzonesPaginationInfo',
             formContainer: 'pzoneFormContainer', form: 'pzoneForm',
             addBtn: 'pzonesAddBtn', closeBtn: 'pzoneCloseForm', cancelBtn: 'pzoneCancelBtn',
             applyBtn: 'pzonesApplyFilter', resetBtn: 'pzonesResetFilter',
-            getId: () => null,
-            getFilters: () => ({
-                provider_id: $('pzonesProviderFilter')?.value || '',
-                zone_id:     $('pzonesZoneFilter')?.value     || '',
-                is_active:   $('pzonesActiveFilter')?.value   ?? ''
-            }),
-            reset: () => {
-                ['pzonesProviderFilter','pzonesZoneFilter','pzonesActiveFilter']
-                    .forEach(id => { const el = $(id); if (el) el.value = ''; });
+            getId: function() { return null; },
+            getFilters: function() {
+                return {
+                    provider_id: $('pzonesProviderFilter') && $('pzonesProviderFilter').value || '',
+                    zone_id:     $('pzonesZoneFilter') && $('pzonesZoneFilter').value || '',
+                    is_active:   $('pzonesActiveFilter') ? $('pzonesActiveFilter').value : ''
+                };
             },
-            setForm: pz => {
+            reset: function() {
+                ['pzonesProviderFilter','pzonesZoneFilter','pzonesActiveFilter']
+                    .forEach(function(id) { var el = $(id); if (el) el.value = ''; });
+            },
+            setForm: function(pz) {
                 if ($('pzoneProviderId')) $('pzoneProviderId').value = pz.provider_id || '';
-                if ($('pzoneZoneId'))     $('pzoneZoneId').value     = pz.zone_id    || '';
+                if ($('pzoneZoneId'))     $('pzoneZoneId').value     = pz.zone_id     || '';
                 if ($('pzoneActive'))     $('pzoneActive').checked   = !!+pz.is_active;
             },
-            getFormData: () => ({
-                provider_id: $('pzoneProviderId')?.value || '',
-                zone_id:     $('pzoneZoneId')?.value     || '',
-                is_active:   $('pzoneActive')?.checked   ? 1 : 0
-            }),
-            delUrl: id => {
-                // id format: "providerId_zoneId" (underscore delimiter, IDs are integers)
-                const sep = id.indexOf('_');
-                const pid = id.substring(0, sep);
-                const zid = id.substring(sep + 1);
-                return `${CFG.urls.provider_zones}?provider_id=${encodeURIComponent(pid)}&zone_id=${encodeURIComponent(zid)}`;
+            getFormData: function() {
+                return {
+                    provider_id: $('pzoneProviderId') && $('pzoneProviderId').value || '',
+                    zone_id:     $('pzoneZoneId') && $('pzoneZoneId').value         || '',
+                    is_active:   $('pzoneActive') ? ($('pzoneActive').checked ? 1 : 0) : 1
+                };
             },
-            row: pz => `<tr data-pzid="${esc(pz.provider_id)}_${esc(pz.zone_id)}" data-pid="${esc(pz.provider_id)}" data-zid="${esc(pz.zone_id)}">
-                <td>${esc(pz.provider_id)}</td>
-                <td>${esc(pz.zone_id)}</td>
-                <td>${badge(pz.is_active ? 'Active' : 'Inactive', { Active: 'success', Inactive: 'secondary' })}</td>
-                <td>${esc(pz.assigned_at || '')}</td>
-                <td class="actions">
-                    ${CFG.canDelete ? `<button class="btn btn-sm btn-danger" onclick="Delivery.delPZone('${esc(pz.provider_id)}_${esc(pz.zone_id)}')"><i class="fas fa-trash"></i></button>` : ''}
-                </td></tr>`
+            delUrl: function(id) {
+                var sep = id.indexOf('_'), pid = id.substring(0, sep), zid = id.substring(sep + 1);
+                return CFG.urls.provider_zones + '?provider_id=' + encodeURIComponent(pid) + '&zone_id=' + encodeURIComponent(zid);
+            },
+            row: function(pz) {
+                return '<tr data-pzid="' + esc(pz.provider_id) + '_' + esc(pz.zone_id) + '">' +
+                    '<td>' + esc(pz.provider_id) + '</td>' +
+                    '<td>' + esc(pz.zone_id) + '</td>' +
+                    '<td>' + badge(pz.is_active ? 'Active' : 'Inactive', { Active:'success', Inactive:'secondary' }) + '</td>' +
+                    '<td>' + esc(pz.assigned_at || '') + '</td>' +
+                    '<td class="actions">' +
+                    (CFG.canDelete ? '<button class="btn btn-sm btn-danger" onclick="Delivery.delPZone(\'' + esc(pz.provider_id) + '_' + esc(pz.zone_id) + '\')"><i class="fas fa-trash"></i></button>' : '') +
+                    '</td></tr>';
+            }
         }),
         {
-            async save(e) {
+            save: async function(e) {
                 e.preventDefault();
-                const body = this.cfg.getFormData();
+                var body = pzonesMod.cfg.getFormData();
                 try {
-                    const r = await api(CFG.urls.provider_zones, { method: 'POST', json: body });
-                    if (r.success === false) throw new Error(r.error || r.message || 'Save failed');
+                    await api(CFG.urls.provider_zones, { method: 'POST', json: body });
                     notify('Saved successfully', 'success');
-                    this.hideForm();
-                    this.load(state.provider_zones.page);
-                } catch (err) { notify(err.message, 'error'); }
+                    pzonesMod.hideForm();
+                    pzonesMod.load(state.provider_zones.page);
+                } catch(err) { notify(err.message, 'error'); }
             }
         }
     );
 
     // ─── Dropdown Loaders ─────────────────────────────────────────────
     async function loadDrops() {
-        // Providers dropdown (used across multiple modules)
-        let providerOpts = '<option value="">–</option>';
+        // Zones
         try {
-            const r = await api(`${CFG.urls.providers}?limit=500&tenant_id=${state.tenant}`);
-            const items = r.data || r.items || [];
-            providerOpts = '<option value="">–</option>' + items.map(p => `<option value="${esc(p.id)}">#${esc(p.id)} ${esc(p.provider_type)}</option>`).join('');
-        } catch (e) { /* silent */ }
+            var rz = await api(CFG.urls.zones + '?limit=500&tenant_id=' + state.tenant);
+            var zitems = (rz.data !== undefined ? rz.data : null) || rz.items || [];
+            var zhtml = '<option value="">–</option>' + zitems.map(function(z) {
+                return '<option value="' + esc(z.id) + '">' + esc(z.zone_name) + '</option>';
+            }).join('');
+            ['pzoneZoneId','pzonesZoneFilter','orderZoneId','ordersZoneFilter'].forEach(function(id) {
+                var el = $(id); if (el) el.innerHTML = zhtml;
+            });
+        } catch(e) { console.warn('[Delivery] zones dropdown:', e.message); }
 
-        ['zoneProviderId','orderProviderId','ordersProviderFilter',
-         'locationProviderId','locationsProviderFilter',
-         'pzoneProviderId','pzonesProviderFilter',
-         'trackingProviderId','trackingProviderFilter']
-            .forEach(id => { const el = $(id); if (el) el.innerHTML = providerOpts; });
+        // Countries + Cities
+        await loadCountries();
+        await loadCitiesForCountry('');
 
-        // Zones dropdown
-        let zoneOpts = '<option value="">–</option>';
+        // Delivery orders for tracking
         try {
-            const r = await api(`${CFG.urls.zones}?limit=500&tenant_id=${state.tenant}`);
-            const items = r.data || r.items || [];
-            zoneOpts = '<option value="">–</option>' + items.map(z => `<option value="${esc(z.id)}">${esc(z.zone_name)}</option>`).join('');
-        } catch (e) { /* silent */ }
+            var ro = await api(CFG.urls.orders + '?limit=500&tenant_id=' + state.tenant);
+            var oitems = (ro.data !== undefined ? ro.data : null) || ro.items || [];
+            var ohtml = '<option value="">–</option>' + oitems.map(function(o) {
+                return '<option value="' + esc(o.id) + '">#' + esc(o.id) + ' (order:' + esc(o.order_id) + ')</option>';
+            }).join('');
+            ['trackingOrderId','trackingOrderFilter'].forEach(function(id) { var el = $(id); if (el) el.innerHTML = ohtml; });
+        } catch(e) { console.warn('[Delivery] orders dropdown:', e.message); }
 
-        ['pzoneZoneId','pzonesZoneFilter','orderZoneId','ordersZoneFilter']
-            .forEach(id => { const el = $(id); if (el) el.innerHTML = zoneOpts; });
-
-        // Cities
+        // Entities
         try {
-            const r = await api(`${CFG.urls.cities}?limit=500`);
-            const items = r.data || r.items || [];
-            const html = '<option value="">–</option>' + items.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
-            const el = $('zoneCityId');
-            if (el) el.innerHTML = html;
-        } catch (e) { /* silent */ }
+            var re = await api(CFG.urls.entities + '?limit=500&tenant_id=' + state.tenant);
+            var eitems = (re.data !== undefined ? re.data : null) || re.items || [];
+            var ehtml = '<option value="">–</option>' + eitems.map(function(e) {
+                return '<option value="' + esc(e.id) + '">' + esc(e.store_name || e.name) + '</option>';
+            }).join('');
+            var eel = $('providerEntityId'); if (eel) eel.innerHTML = ehtml;
+        } catch(e) { console.warn('[Delivery] entities dropdown:', e.message); }
 
-        // Delivery orders for tracking dropdown
-        let orderOpts = '<option value="">–</option>';
+        // Tenant Users
         try {
-            const r = await api(`${CFG.urls.orders}?limit=500&tenant_id=${state.tenant}`);
-            const items = r.data || r.items || [];
-            orderOpts = '<option value="">–</option>' + items.map(o => `<option value="${esc(o.id)}">#${esc(o.id)} (order:${esc(o.order_id)})</option>`).join('');
-        } catch (e) { /* silent */ }
+            var ru = await api(CFG.urls.tenant_users + '?limit=500&tenant_id=' + state.tenant);
+            var uitems = (ru.data !== undefined ? ru.data : null) || ru.items || [];
+            var uhtml = '<option value="">–</option>' + uitems.map(function(u) {
+                return '<option value="' + esc(u.id) + '">#' + esc(u.id) + ' (' + esc(u.username || u.user_id) + ')</option>';
+            }).join('');
+            var uel = $('providerTenantUserId'); if (uel) uel.innerHTML = uhtml;
+        } catch(e) { console.warn('[Delivery] tenant_users dropdown:', e.message); }
 
-        ['trackingOrderId','trackingOrderFilter']
-            .forEach(id => { const el = $(id); if (el) el.innerHTML = orderOpts; });
-
-        // Entities & Tenant Users for provider form
+        // Provider filter dropdowns (not form inputs - those use ID lookup)
         try {
-            const r = await api(`${CFG.urls.entities}?limit=500&tenant_id=${state.tenant}`);
-            const items = r.data || r.items || [];
-            const html = '<option value="">–</option>' + items.map(e => `<option value="${esc(e.id)}">${esc(e.store_name)}</option>`).join('');
-            const el = $('providerEntityId');
-            if (el) el.innerHTML = html;
-        } catch (e) { /* silent */ }
-
-        try {
-            const r = await api(`${CFG.urls.tenant_users}?limit=500&tenant_id=${state.tenant}`);
-            const items = r.data || r.items || [];
-            const html = '<option value="">–</option>' + items.map(u => `<option value="${esc(u.id)}">#${esc(u.id)} (user:${esc(u.user_id)})</option>`).join('');
-            const el = $('providerTenantUserId');
-            if (el) el.innerHTML = html;
-        } catch (e) { /* silent */ }
+            var rp = await api(CFG.urls.providers + '?limit=500&tenant_id=' + state.tenant);
+            var pitems = (rp.data !== undefined ? rp.data : null) || rp.items || [];
+            var phtml = '<option value="">–</option>' + pitems.map(function(p) {
+                return '<option value="' + esc(p.id) + '">#' + esc(p.id) + ' ' + esc(p.provider_type) + '</option>';
+            }).join('');
+            ['ordersProviderFilter','locationsProviderFilter','pzonesProviderFilter','trackingProviderFilter'].forEach(function(id) {
+                var el = $(id); if (el) el.innerHTML = phtml;
+            });
+        } catch(e) { console.warn('[Delivery] providers filter:', e.message); }
     }
 
     // ─── Tabs ─────────────────────────────────────────────────────────
     function initTabs() {
-        document.querySelectorAll('#workspaceTabs .tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('#workspaceTabs .tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('#workspaceTabs .tab-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('#workspaceTabs .tab-btn').forEach(function(b) { b.classList.remove('active'); });
                 btn.classList.add('active');
-                document.querySelectorAll('.ws-panel').forEach(p => p.style.display = 'none');
-
-                const tab   = btn.dataset.tab;
-                const panel = document.getElementById(tab + 'Tab');
+                document.querySelectorAll('.ws-panel').forEach(function(p) { p.style.display = 'none'; });
+                var tab = btn.dataset.tab;
+                var panel = document.getElementById(tab + 'Tab');
                 if (panel) panel.style.display = '';
-
-                // Force Leaflet to recalculate on show
-                if (tab === 'zones' && zonesMap) {
-                    setTimeout(() => zonesMap.invalidateSize(), 100);
-                }
-
-                const modMap = {
+                if (tab === 'zones' && zonesMap) setTimeout(function() { zonesMap.invalidateSize(); }, 100);
+                var modMap = {
                     zones: zonesMod, providers: providersMod, orders: ordersMod,
                     locations: locationsMod, tracking: trackingMod, provider_zones: pzonesMod
                 };
-                const mod = modMap[tab];
-                if (mod && !state[tab]?.loaded) mod.load(1);
+                var mod = modMap[tab];
+                if (mod && state[tab] && !state[tab].loaded) mod.load(1);
             });
         });
     }
 
-    // ─── Zone type change ─────────────────────────────────────────────
+    function bindCascade() {
+        var countryEl = $('zoneCountryId');
+        if (countryEl) countryEl.addEventListener('change', function() {
+            loadCitiesForCountry(this.value);
+        });
+    }
+
     function bindZoneTypeChange() {
-        $('zoneType')?.addEventListener('change', toggleRadiusFields);
+        var zt = $('zoneType');
+        if (zt) zt.addEventListener('change', toggleRadiusFields);
     }
 
     // ─── Init ─────────────────────────────────────────────────────────
     async function init() {
         initTabs();
         bindZoneTypeChange();
+        bindCascade();
+        initCoordPicker();
 
-        // Bind all module events
-        [zonesMod, providersMod, ordersMod, locationsMod, trackingMod, pzonesMod].forEach(m => m.bindEvents());
+        bindProviderLookup('orderProviderId',    'orderProviderName');
+        bindProviderLookup('locationProviderId', 'locationProviderName');
+        bindProviderLookup('trackingProviderId', 'trackingProviderName');
 
-        // Init Leaflet map (may be deferred if leaflet loads async)
-        function tryInitMap() {
-            if (typeof L !== 'undefined') {
-                initZonesMap();
-            } else {
-                setTimeout(tryInitMap, 200);
-            }
+        [zonesMod, providersMod, ordersMod, locationsMod, trackingMod, pzonesMod].forEach(function(m) { m.bindEvents(); });
+
+        if (typeof L !== 'undefined') {
+            initZonesMap();
+        } else {
+            // Leaflet scripts should load synchronously; this is a safety fallback
+            var attempts = 0;
+            var iv = setInterval(function() {
+                if (typeof L !== 'undefined') { clearInterval(iv); initZonesMap(); }
+                else if (++attempts > 30) { clearInterval(iv); console.warn('[Delivery] Leaflet failed to load after 3s'); }
+            }, 100);
         }
-        tryInitMap();
 
         await loadDrops();
-        await zonesMod.load(1); // Load first tab
+        await zonesMod.load(1);
     }
 
     // ─── Public API ───────────────────────────────────────────────────
     window.Delivery = {
-        init,
-        editZone:     id => zonesMod.edit(id),
-        delZone:      id => zonesMod.del(id),
-        editProvider: id => providersMod.edit(id),
-        delProvider:  id => providersMod.del(id),
-        editOrder:    id => ordersMod.edit(id),
-        editLocation: id => locationsMod.edit(id),
-        delLocation:  id => locationsMod.del(id),
-        delTracking:  id => trackingMod.del(id),
-        delPZone:     id => pzonesMod.del(id)
+        init: init,
+        editZone:     function(id) { zonesMod.edit(id); },
+        delZone:      function(id) { zonesMod.del(id); },
+        editProvider: function(id) { providersMod.edit(id); },
+        delProvider:  function(id) { providersMod.del(id); },
+        editOrder:    function(id) { ordersMod.edit(id); },
+        editLocation: function(id) { locationsMod.edit(id); },
+        delLocation:  function(id) { locationsMod.del(id); },
+        delTracking:  function(id) { trackingMod.del(id); },
+        delPZone:     function(id) { pzonesMod.del(id); }
     };
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
