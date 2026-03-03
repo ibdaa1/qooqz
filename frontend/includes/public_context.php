@@ -449,10 +449,41 @@ if (!function_exists('pub_load_theme')) {
                         $css .= '  --' . preg_replace('/[^a-z0-9_\-]/', '-', strtolower($d['setting_key'])) . ': ' . $cssEsc((string)$d['setting_value']) . ";\n";
                     }
                     $css .= "}\n";
+                    // Apply font_settings variables to relevant UI elements
+                    $fontSelMap = [
+                        'card_font'       => '.pub-card, .pub-entity-card, .pub-job-card, .pub-deal-card, .pub-cat-card',
+                        'footer_font'     => '.pub-footer',
+                        'form_font'       => '.pub-form input, .pub-form select, .pub-form textarea, .pub-search-input',
+                        'promo_font'      => '.pub-deal-card, .pub-promo-card',
+                        'small_text_font' => '.pub-muted, .pub-tag, small',
+                        'code_font'       => 'code, pre',
+                        'alert_font'      => '.pub-toast, .pub-notice, .pub-alert',
+                    ];
+                    foreach ($fonts as $f) {
+                        if (empty($f['setting_key'])) continue;
+                        $sk  = preg_replace('/[^a-z0-9_\-]/', '-', strtolower($f['setting_key']));
+                        $sel = $fontSelMap[$f['setting_key']] ?? null;
+                        if (!$sel) continue;
+                        $props = [];
+                        if (!empty($f['font_family'])) $props[] = '  font-family: var(--' . $sk . '-family)';
+                        if (!empty($f['font_size']))   $props[] = '  font-size: var(--'   . $sk . '-size)';
+                        if (!empty($f['font_weight'])) $props[] = '  font-weight: var(--' . $sk . '-weight)';
+                        if ($props) $css .= $sel . " {\n" . implode(";\n", $props) . ";\n}\n";
+                    }
+                    // Map button_type to .pub-btn-- class names used in HTML
+                    $pubBtnTypeMap = ['transpa' => 'ghost', 'transparent' => 'ghost'];
                     foreach ($buttons as $b) {
                         if (empty($b['slug'])) continue;
-                        $slugB = preg_replace('/[^a-z0-9_\-]/', '-', (string)$b['slug']);
-                        $css .= ".btn-{$slugB} {\n";
+                        $slugB    = preg_replace('/[^a-z0-9_\-]/', '-', (string)$b['slug']);
+                        $btnType  = strtolower(trim((string)($b['button_type'] ?? '')));
+                        $pubClass = $pubBtnTypeMap[$btnType] ?? $btnType;
+                        $isDisabled = strpos($slugB, '-disabled') !== false;
+                        // Combine .btn-{slug} with .pub-btn--{type} for non-disabled buttons
+                        $sel = ".btn-{$slugB}";
+                        if (!$isDisabled && $pubClass && preg_match('/^[a-z][a-z0-9\-]*$/', $pubClass)) {
+                            $sel .= ", .pub-btn--{$pubClass}";
+                        }
+                        $css .= "{$sel} {\n";
                         if (!empty($b['background_color'])) $css .= '  background-color: ' . $cssEsc((string)$b['background_color']) . ";\n";
                         if (!empty($b['text_color']))       $css .= '  color: '            . $cssEsc((string)$b['text_color'])       . ";\n";
                         if (!empty($b['border_color']))     $css .= '  border: '           . (int)$b['border_width'] . 'px solid ' . $cssEsc((string)$b['border_color']) . ";\n";
@@ -462,7 +493,11 @@ if (!function_exists('pub_load_theme')) {
                         if (!empty($b['font_weight']))      $css .= '  font-weight: '      . $cssEsc((string)$b['font_weight'])      . ";\n";
                         $css .= "}\n";
                         if (!empty($b['hover_background_color'])) {
-                            $css .= ".btn-{$slugB}:hover {\n  background-color: " . $cssEsc((string)$b['hover_background_color']) . ";\n";
+                            $hoverSel = ".btn-{$slugB}:hover";
+                            if (!$isDisabled && $pubClass && preg_match('/^[a-z][a-z0-9\-]*$/', $pubClass)) {
+                                $hoverSel .= ", .pub-btn--{$pubClass}:hover";
+                            }
+                            $css .= "{$hoverSel} {\n  background-color: " . $cssEsc((string)$b['hover_background_color']) . ";\n";
                             if (!empty($b['hover_text_color'])) $css .= '  color: ' . $cssEsc((string)$b['hover_text_color']) . ";\n";
                             $css .= "}\n";
                         }

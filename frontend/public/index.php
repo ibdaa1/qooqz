@@ -69,15 +69,15 @@ $_cardEntity    = pub_card_inline_style('entities');
 $_cardTenant    = pub_card_inline_style('tenants');
 $_cardProduct   = pub_card_inline_style('product');
 $_cardCategory  = pub_card_inline_style('category');
-$_cardDeal      = pub_card_inline_style('deal');
-$_cardJob       = pub_card_inline_style('job');
+$_cardDeal      = pub_card_inline_style('promo');
+$_cardJob       = pub_card_inline_style('feature');
 // CSS class names for hover effects (generated from card_styles.hover_effect in pub_load_theme)
 $_clsEntity     = pub_card_css_class('entities');
 $_clsTenant     = pub_card_css_class('tenants');
 $_clsProduct    = pub_card_css_class('product');
 $_clsCategory   = pub_card_css_class('category');
-$_clsDeal       = pub_card_css_class('deal');
-$_clsJob        = pub_card_css_class('job');
+$_clsDeal       = pub_card_css_class('promo');
+$_clsJob        = pub_card_css_class('feature');
 // Image-wrapper aspect ratios from card_styles.image_aspect_ratio
 $_imgProduct    = pub_card_img_style('product');
 $_imgCategory   = pub_card_img_style('category');
