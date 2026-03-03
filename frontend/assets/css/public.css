@@ -845,8 +845,8 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
    17. Footer
    ----------------------------------------------------- */
 .pub-footer {
-  background: #1e2a38;
-  color: rgba(255,255,255,0.8);
+  background: var(--pub-footer-bg, #1e2a38);
+  color: var(--pub-footer-text, rgba(255,255,255,0.8));
   padding: 40px 0 0;
   margin-top: 48px;
 }

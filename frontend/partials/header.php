@@ -190,10 +190,12 @@ $_fontUrl = $dir === 'rtl'
         --pub-text:       <?= e($theme['text']       ?? '#FFFFFF') ?>;
         --pub-muted:      <?= e($theme['text_muted'] ?? '#B0B0B0') ?>;
         --pub-border:     <?= e($theme['border']     ?? '#333333') ?>;
-        --pub-header-bg:  <?= e($theme['header_bg']  ?? $theme['primary'] ?? '#FF0000') ?>;
-        --pub-footer-bg:  <?= e($theme['footer_bg']  ?? '#1a1a2e') ?>;
+        --pub-header-bg:  <?= e($theme['header_bg']        ?? $theme['primary'] ?? '#1e2533') ?>;
+        --pub-header-text: <?= e($theme['header_text_color'] ?? '#FFFFFF') ?>;
+        --pub-footer-bg:  <?= e($theme['footer_bg']        ?? '#1e2a38') ?>;
+        --pub-footer-text:<?= e($theme['footer_text_color'] ?? '#B0B0B0') ?>;
     }
-    .pub-header  { background: var(--pub-header-bg) !important; }
+    .pub-header  { background: var(--pub-header-bg) !important; color: var(--pub-header-text) !important; }
     .pub-hero    { background: linear-gradient(135deg, var(--pub-header-bg) 0%, var(--pub-accent) 100%) !important; }
     </style>
     <?php if (!empty($theme['generated_css'])): ?>

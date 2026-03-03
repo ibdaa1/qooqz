@@ -261,8 +261,10 @@ if (!function_exists('pub_load_theme')) {
             'text'       => '#FFFFFF',
             'text_muted' => '#B0B0B0',
             'border'     => '#333333',
-            'header_bg'  => '#03874e',
-            'footer_bg'  => '#1e2a38',
+            'header_bg'        => '#1e2533',
+            'header_text_color'=> '#FFFFFF',
+            'footer_bg'        => '#1e2a38',
+            'footer_text_color'=> '#B0B0B0',
             'logo_url'   => '',          // set from design_settings WHERE setting_key='logo_url'
             'generated_css' => '',
             'fonts'      => [],
@@ -353,11 +355,13 @@ if (!function_exists('pub_load_theme')) {
                         'secondary_text'       => 'text_muted',
                         // Border
                         'border_color'         => 'border',
-                        // Header/Footer background
+                        // Header/Footer background and text
                         'header_bg_color'      => 'header_bg',
                         'header_background'    => 'header_bg',
+                        'header_text'          => 'header_text_color',
                         'footer_bg_color'      => 'footer_bg',
                         'footer_background'    => 'footer_bg',
+                        'footer_text'          => 'footer_text_color',
                     ];
                     foreach ($colorRows as $row) {
                         $k = $row['setting_key'] ?? '';
@@ -368,7 +372,7 @@ if (!function_exists('pub_load_theme')) {
                         $colors[$k] = $v;
                     }
                     // header_bg defaults to primary if not explicitly set
-                    if (empty($colors['header_bg_color'])) {
+                    if (empty($colors['header_bg_color']) && empty($colors['header_background'])) {
                         $theme['header_bg'] = $theme['primary'];
                     }
 
@@ -421,6 +425,10 @@ if (!function_exists('pub_load_theme')) {
                         'text_primary'         => ['pub-text'],
                         'text_secondary'       => ['pub-muted'],
                         'border_color'         => ['pub-border'],
+                        'header_background'    => ['pub-header-bg'],
+                        'footer_background'    => ['pub-footer-bg'],
+                        'header_text'          => ['pub-header-text'],
+                        'footer_text'          => ['pub-footer-text'],
                     ];
                     foreach ($pubAliases as $srcKey => $aliases) {
                         if (empty($colors[$srcKey])) continue;
@@ -496,7 +504,11 @@ if (!function_exists('pub_load_theme')) {
                 'text_secondary'       => 'text_muted',
                 'border_color'         => 'border',
                 'header_bg_color'      => 'header_bg',
+                'header_background'    => 'header_bg',
+                'header_text'          => 'header_text_color',
                 'footer_bg_color'      => 'footer_bg',
+                'footer_background'    => 'footer_bg',
+                'footer_text'          => 'footer_text_color',
             ];
             foreach ($resp['data']['colors'] ?? [] as $item) {
                 $k = $item['key'] ?? '';
