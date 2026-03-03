@@ -63,6 +63,14 @@ $totalEntities  = (int)($rEnt['data']['meta']['total']  ?? 0);
 $totalTenants   = (int)($rTen['data']['meta']['total']  ?? 0);
 
 include dirname(__DIR__) . '/partials/header.php';
+
+// Resolve card styles from DB card_styles table (no extra query — already loaded in theme)
+$_cardEntity   = pub_card_inline_style('entity');
+$_cardTenant   = pub_card_inline_style('tenant');
+$_cardProduct  = pub_card_inline_style('product');
+$_cardCategory = pub_card_inline_style('category');
+$_cardDeal     = pub_card_inline_style('deal');
+$_cardJob      = pub_card_inline_style('job');
 ?>
 
 <!-- =============================================
@@ -196,7 +204,7 @@ include dirname(__DIR__) . '/partials/header.php';
         elseif ($secType === 'deals'): ?>
         <div class="pub-grid-lg">
             <?php foreach ($items as $deal): ?>
-            <div class="pub-deal-card">
+            <div class="pub-deal-card"<?= $_cardDeal ? ' style="'.e($_cardDeal).'"' : '' ?>>
                 <?php if (!empty($deal['code'])): ?>
                     <span class="pub-deal-badge"><?= e($deal['code']) ?></span>
                 <?php endif; ?>
@@ -217,7 +225,7 @@ include dirname(__DIR__) . '/partials/header.php';
             <?php foreach ($items as $cat): ?>
             <a href="/frontend/public/products.php?category_id=<?= (int)($cat['id'] ?? 0) ?>"
                class="pub-cat-card<?= !empty($cat['is_featured']) ? ' pub-cat-card--featured' : '' ?>"
-               style="text-decoration:none;">
+               style="text-decoration:none;<?= e($_cardCategory) ?>">
                 <div class="pub-cat-img-wrap">
                     <?php if (!empty($cat['image_url'])): ?>
                         <img src="<?= e(pub_img($cat['image_url'], 'category')) ?>"
@@ -249,7 +257,7 @@ include dirname(__DIR__) . '/partials/header.php';
                 $pCur2  = $p['currency_code'] ?? t('common.currency');
                 $pImg2  = pub_img($p['image_url'] ?? $p['image_thumb_url'] ?? null, 'product');
             ?>
-            <div class="pub-product-card" style="position:relative;">
+            <div class="pub-product-card" style="position:relative;<?= e($_cardProduct) ?>">
                 <!-- Wishlist heart -->
                 <button class="pub-wishlist-btn"
                         type="button"
@@ -307,7 +315,7 @@ include dirname(__DIR__) . '/partials/header.php';
         <div class="pub-grid-md">
             <?php foreach ($items as $ent): ?>
             <a href="/frontend/public/entity.php?id=<?= (int)($ent['id'] ?? 0) ?>"
-               class="pub-entity-card" style="text-decoration:none;">
+               class="pub-entity-card" style="text-decoration:none;<?= e($_cardEntity) ?>">
                 <div class="pub-entity-avatar">
                     <?php if (!empty($ent['logo_url'])): ?>
                         <img src="<?= e(pub_img($ent['logo_url'], 'entity_logo')) ?>"
@@ -360,7 +368,7 @@ else:
             <?php foreach ($featuredCategories as $cat): ?>
             <a href="/frontend/public/products.php?category_id=<?= (int)($cat['id'] ?? 0) ?>"
                class="pub-cat-card<?= !empty($cat['is_featured']) ? ' pub-cat-card--featured' : '' ?>"
-               style="text-decoration:none;">
+               style="text-decoration:none;<?= e($_cardCategory) ?>">
                 <div class="pub-cat-img-wrap">
                     <?php if (!empty($cat['image_url'])): ?>
                         <img src="<?= e(pub_img($cat['image_url'], 'category')) ?>"
@@ -385,7 +393,7 @@ else:
 <?php endif; ?>
 
 <?php if (!empty($featuredProducts)): ?>
-<section class="pub-section" style="background:var(--pub-surface);">
+<section class="pub-section"<?= !empty($theme['surface']) ? ' style="background:'.e($theme['surface']).';"' : '' ?>>
     <div class="pub-container">
         <div class="pub-section-head">
             <h2 class="pub-section-title"><?= e(t('sections.featured_products')) ?></h2>
@@ -394,7 +402,7 @@ else:
         <div class="pub-grid">
             <?php foreach ($featuredProducts as $p): ?>
             <a href="/frontend/public/product.php?id=<?= (int)($p['id'] ?? 0) ?>"
-               class="pub-product-card" style="text-decoration:none;">
+               class="pub-product-card" style="text-decoration:none;<?= e($_cardProduct) ?>">
                 <div class="pub-cat-img-wrap" style="aspect-ratio:1;">
                     <?php if (!empty($p['image_url'])): ?>
                         <img src="<?= e(pub_img($p['image_url'], 'product')) ?>"
@@ -434,7 +442,7 @@ else:
         <div class="pub-grid-lg">
             <?php foreach ($latestJobs as $j): ?>
             <a href="/frontend/public/jobs.php?id=<?= (int)($j['id'] ?? 0) ?>"
-               class="pub-job-card" style="text-decoration:none;">
+               class="pub-job-card" style="text-decoration:none;<?= e($_cardJob) ?>">
                 <h3 class="pub-job-title"><?= e($j['title'] ?? '') ?></h3>
                 <div class="pub-job-meta">
                     <?php if (!empty($j['employment_type'])): ?>
@@ -454,7 +462,7 @@ else:
 <?php endif; ?>
 
 <?php if (!empty($featuredEntities)): ?>
-<section class="pub-section" style="background:var(--pub-surface);">
+<section class="pub-section"<?= !empty($theme['surface']) ? ' style="background:'.e($theme['surface']).';"' : '' ?>>
     <div class="pub-container">
         <div class="pub-section-head">
             <h2 class="pub-section-title"><?= e(t('sections.entities')) ?></h2>
@@ -463,7 +471,7 @@ else:
         <div class="pub-grid-md">
             <?php foreach ($featuredEntities as $ent): ?>
             <a href="/frontend/public/entity.php?id=<?= (int)($ent['id'] ?? 0) ?>"
-               class="pub-entity-card" style="text-decoration:none;">
+               class="pub-entity-card" style="text-decoration:none;<?= e($_cardEntity) ?>">
                 <div class="pub-entity-avatar">
                     <?php if (!empty($ent['logo_url'])): ?>
                         <img src="<?= e(pub_img($ent['logo_url'], 'entity_logo')) ?>"
@@ -500,7 +508,7 @@ else:
         <div class="pub-grid-md">
             <?php foreach ($featuredTenants as $ten): ?>
             <a href="/frontend/public/tenants.php?id=<?= (int)($ten['id'] ?? 0) ?>"
-               class="pub-entity-card" style="text-decoration:none;">
+               class="pub-entity-card" style="text-decoration:none;<?= e($_cardTenant) ?>">
                 <div class="pub-entity-avatar">🏪</div>
                 <div class="pub-entity-info">
                     <p class="pub-entity-name"><?= e($ten['name'] ?? '') ?></p>
