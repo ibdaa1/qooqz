@@ -1,7 +1,7 @@
 // admin/assets/js/pages/DeliveryZone.js
-// Delivery Zones admin UI — aligned to delivery_zones DB schema
-// Fixes: DOMContentLoaded fragment mode, Leaflet CSS timing, correct field names,
-//         REST API (/api/delivery_zones), map rendering for radius + polygon zones.
+// Delivery Zones admin UI — aligned to delivery_zones DB schema.
+// Self-loads Leaflet JS and CSS so the map works whether this script is
+// included statically or injected dynamically by admin_core.js runScripts.
 
 (function () {
     'use strict';
@@ -10,10 +10,10 @@
     var TENANT_ID  = (window.DZ && window.DZ.TENANT_ID)  || 1;
     var CSRF_TOKEN = (window.DZ && window.DZ.CSRF_TOKEN) || '';
 
-    var LEAFLET_CSS = [
-        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-        'https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css'
-    ];
+    var LEAFLET_JS   = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    var DRAW_JS      = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js';
+    var LEAFLET_CSS  = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    var DRAW_CSS     = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css';
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
     function qs(sel) { return document.querySelector(sel); }
@@ -24,29 +24,57 @@
         return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
-    // ─── Ensure Leaflet CSS is in <head> ─────────────────────────────────────
-    function ensureLeafletCss(cb) {
-        var pending = 0, done = false;
-        function finish() { if (!done) { done = true; cb(); } }
-        LEAFLET_CSS.forEach(function (href) {
-            // Remove any stray link inside a body div (not head)
-            qsa('link[rel="stylesheet"]').forEach(function (el) {
-                if (el.href === href && !el.closest('head')) { el.parentNode.removeChild(el); }
-            });
-            var inHead = false;
-            qsa('head link[rel="stylesheet"]').forEach(function (el) {
-                if (el.href === href) { inHead = true; }
-            });
-            if (!inHead) {
-                pending++;
-                var l = document.createElement('link');
-                l.rel = 'stylesheet';
-                l.href = href;
-                l.onload = l.onerror = function () { if (--pending === 0) finish(); };
-                document.head.appendChild(l);
+    // ─── Serial script loader ─────────────────────────────────────────────────
+    // Appends a <script> to <head> and fires cb() when it finishes (or errors).
+    function loadScript(src, cb) {
+        // If already present (from a previous fragment load) re-use it.
+        var existing = false;
+        qsa('script').forEach(function (el) { if (el.src === src) existing = true; });
+        if (existing) { cb(); return; }
+        var s = document.createElement('script');
+        s.src = src;
+        s.onload = cb;
+        s.onerror = function () {
+            console.error('[DZ] Failed to load script: ' + src);
+            cb(); // continue so we don't hang indefinitely
+        };
+        document.head.appendChild(s);
+    }
+
+    // Load leaflet.js, then leaflet.draw.js (draw depends on leaflet).
+    function ensureLeafletJs(cb) {
+        if (window.L && window.L.Draw) { cb(); return; }
+        if (window.L) { loadScript(DRAW_JS, cb); return; }
+        loadScript(LEAFLET_JS, function () {
+            loadScript(DRAW_JS, cb);
+        });
+    }
+
+    // ─── CSS loader ─────────────────────────────────────────────────────────
+    function ensureCss(href, cb) {
+        var found = false;
+        qsa('link[rel="stylesheet"]').forEach(function (el) {
+            if (el.href === href) {
+                // Move to head if it was injected inside body by runScripts
+                if (!el.closest('head')) {
+                    document.head.appendChild(el);
+                }
+                found = true;
             }
         });
-        if (pending === 0) finish();
+        if (found) { cb(); return; }
+        var l = document.createElement('link');
+        l.rel  = 'stylesheet';
+        l.href = href;
+        l.onload = l.onerror = cb;
+        document.head.appendChild(l);
+    }
+
+    function ensureLeafletCss(cb) {
+        var pending = 2, done = false;
+        function finish() { if (!done && --pending === 0) { done = true; cb(); } }
+        ensureCss(LEAFLET_CSS, finish);
+        ensureCss(DRAW_CSS, finish);
     }
 
     // ─── Map state ───────────────────────────────────────────────────────────
@@ -54,8 +82,14 @@
 
     function initMap() {
         var mapEl = qs('#dzMap');
-        if (!mapEl || map) return;
-        if (typeof L === 'undefined') { console.error('[DZ] Leaflet not loaded'); return; }
+        if (!mapEl) return;
+        // If map container already has a Leaflet instance remove it first
+        if (map) {
+            try { map.remove(); } catch(e) {}
+            map = null;
+            drawnItems = null;
+        }
+        if (typeof L === 'undefined') { console.error('[DZ] Leaflet (L) still undefined — map skipped'); return; }
 
         map = L.map('dzMap').setView([24.7136, 46.6753], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -97,8 +131,8 @@
             });
         }
 
-        // Invalidate size for layout reflow
-        [100, 400, 900].forEach(function (ms) {
+        // Trigger size recalculation after layout settles
+        [50, 300, 800].forEach(function (ms) {
             setTimeout(function () { if (map) map.invalidateSize(); }, ms);
         });
     }
@@ -114,14 +148,10 @@
             safeSet('zone_type', 'radius');
             safeSet('zone_value', '');
             showHideConditionalFields('radius');
-        } else {
-            // polygon
-            var coords, geo;
-            if (layer.getLatLngs) {
-                coords = layer.getLatLngs()[0].map(function (p) { return [p.lng, p.lat]; });
-                geo = { type: 'Polygon', coordinates: [coords] };
-            }
-            safeSet('zone_value', geo ? JSON.stringify(geo) : '');
+        } else if (layer.getLatLngs) {
+            var coords = layer.getLatLngs()[0].map(function (p) { return [p.lng, p.lat]; });
+            var geo = { type: 'Polygon', coordinates: [coords] };
+            safeSet('zone_value', JSON.stringify(geo));
             safeSet('center_lat', '');
             safeSet('center_lng', '');
             safeSet('radius_km', '');
@@ -130,7 +160,7 @@
 
     // ─── Draw a geometry on the map ───────────────────────────────────────────
     function drawGeometry(zone) {
-        if (!drawnItems) return;
+        if (!drawnItems || typeof L === 'undefined') return;
         drawnItems.clearLayers();
         var layer = null;
         var t = (zone.zone_type || '').toLowerCase();
@@ -143,8 +173,7 @@
         } else if (zone.zone_value) {
             try {
                 var geo = JSON.parse(zone.zone_value);
-                var gt = (geo.type || '').toLowerCase();
-                if (gt === 'polygon') {
+                if ((geo.type || '').toLowerCase() === 'polygon') {
                     var lls = (geo.coordinates && geo.coordinates[0] || []).map(function (p) { return [p[1], p[0]]; });
                     layer = L.polygon(lls, { color: '#ff7800', fillOpacity: 0.15 });
                 }
@@ -162,68 +191,76 @@
         var cityRow   = qs('#dz_city_row');
         var radiusRow = qs('#dz_radius_row');
         var geoRow    = qs('#dz_geojson_row');
-        if (cityRow)   cityRow.style.display   = (type === 'city')    ? '' : 'none';
-        if (radiusRow) radiusRow.style.display  = (type === 'radius')  ? '' : 'none';
+        if (cityRow)   cityRow.style.display   = (type === 'city')                     ? '' : 'none';
+        if (radiusRow) radiusRow.style.display  = (type === 'radius')                   ? '' : 'none';
         if (geoRow)    geoRow.style.display     = (type === 'polygon' || type === 'district') ? '' : 'none';
     }
 
     // ─── API wrapper ─────────────────────────────────────────────────────────
-    async function apiCall(url, opts) {
+    function apiCall(url, opts) {
         opts = opts || {};
-        var headers = { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': CSRF_TOKEN };
+        var headers = { 'X-Requested-With': 'XMLHttpRequest' };
+        if (CSRF_TOKEN) headers['X-CSRF-Token'] = CSRF_TOKEN;
         if (opts.json) {
             headers['Content-Type'] = 'application/json';
             opts.body = JSON.stringify(opts.json);
             delete opts.json;
         }
-        var res = await fetch(url, Object.assign({}, opts, { headers: headers, credentials: 'same-origin' }));
-        var j;
-        try { j = await res.json(); } catch(e) { throw new Error('HTTP ' + res.status); }
-        if (j && j.success === false) throw new Error(j.message || 'API error');
-        return j;
+        return fetch(url, Object.assign({}, opts, { headers: headers, credentials: 'same-origin' }))
+            .then(function (res) {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.json().catch(function () { throw new Error('Invalid JSON response'); });
+            })
+            .then(function (j) {
+                if (j && j.success === false) throw new Error(j.message || 'API error');
+                return j;
+            });
     }
 
     // ─── Load and render list ─────────────────────────────────────────────────
-    async function loadList() {
+    function loadList() {
         var listEl = qs('#dzList');
         if (listEl) listEl.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
 
-        var isActive = (qs('#dzStatusFilter') || {}).value;
-        var q        = ((qs('#dzSearch') || {}).value || '').trim();
-        var params   = new URLSearchParams({ tenant_id: TENANT_ID, limit: 100 });
-        if (isActive !== '') params.append('is_active', isActive);
-        if (q) params.append('q', q);
+        var isActive = ((qs('#dzStatusFilter') || {}).value) || '';
+        var q        = (((qs('#dzSearch') || {}).value) || '').trim();
+        var params   = 'tenant_id=' + encodeURIComponent(TENANT_ID) + '&limit=100';
+        if (isActive !== '') params += '&is_active=' + encodeURIComponent(isActive);
+        if (q) params += '&q=' + encodeURIComponent(q);
 
-        try {
-            var r = await apiCall(API + '?' + params.toString());
-            var items = (r.data && r.data.items) || r.items || [];
-            renderList(items);
-            renderZonesOnMap(items);
-        } catch (e) {
-            if (listEl) listEl.innerHTML = '<div class="table-error-row">' + esc(e.message) + '</div>';
-        }
+        apiCall(API + '?' + params)
+            .then(function (r) {
+                var items = (r.data && r.data.items) || r.items || [];
+                renderList(items);
+                renderZonesOnMap(items);
+            })
+            .catch(function (e) {
+                if (listEl) listEl.innerHTML = '<div class="table-error-row">' + esc(e.message) + '</div>';
+            });
     }
 
     function renderList(rows) {
         var listEl = qs('#dzList');
         if (!listEl) return;
         if (!rows || rows.length === 0) {
-            listEl.innerHTML = '<div class="empty-state"><div class="empty-icon">🗺️</div><p>لا توجد مناطق</p></div>';
+            listEl.innerHTML = '<div class="empty-state"><div class="empty-icon"><i class="fas fa-map-marked-alt"></i></div><p data-i18n="delivery_zone.no_zones">No zones found</p></div>';
             return;
         }
         listEl.innerHTML = '';
         rows.forEach(function (r) {
+            var activeHtml = r.is_active
+                ? '<span class="badge badge-success" data-i18n="statuses.active">Active</span>'
+                : '<span class="badge badge-danger" data-i18n="statuses.inactive">Inactive</span>';
             var item = document.createElement('div');
             item.className = 'dz-list-item';
             item.innerHTML =
                 '<div class="dz-item-main">' +
-                  '<strong>' + esc(r.zone_name || 'بدون اسم') + '</strong>' +
-                  '<div class="dz-meta">' + esc(r.zone_type) + ' · ' + (r.delivery_fee || 0) +
-                  ' · ' + (r.is_active ? '<span class="badge badge-success">نشط</span>' : '<span class="badge badge-danger">غير نشط</span>') + '</div>' +
+                  '<strong>' + esc(r.zone_name || '(unnamed)') + '</strong>' +
+                  '<div class="dz-meta">' + esc(r.zone_type) + ' &middot; ' + esc(r.delivery_fee || 0) + ' &middot; ' + activeHtml + '</div>' +
                 '</div>' +
                 '<div class="dz-item-actions">' +
-                  '<button class="btn btn-sm btn-outline edit-btn" data-id="' + r.id + '"><i class="fas fa-edit"></i></button>' +
-                  '<button class="btn btn-sm btn-danger del-btn" data-id="' + r.id + '"><i class="fas fa-trash"></i></button>' +
+                  '<button class="btn btn-sm btn-outline edit-btn" data-id="' + esc(r.id) + '" data-i18n-title="actions.edit" title="Edit"><i class="fas fa-edit"></i></button>' +
+                  '<button class="btn btn-sm btn-danger del-btn"  data-id="' + esc(r.id) + '" data-i18n-title="actions.delete" title="Delete"><i class="fas fa-trash"></i></button>' +
                 '</div>';
             listEl.appendChild(item);
         });
@@ -236,7 +273,7 @@
     }
 
     function renderZonesOnMap(rows) {
-        if (!drawnItems) return;
+        if (!drawnItems || typeof L === 'undefined') return;
         drawnItems.clearLayers();
         zoneLayerMap.clear();
 
@@ -252,8 +289,7 @@
             } else if (r.zone_value) {
                 try {
                     var geo = JSON.parse(r.zone_value);
-                    var gt = (geo.type || '').toLowerCase();
-                    if (gt === 'polygon') {
+                    if ((geo.type || '').toLowerCase() === 'polygon') {
                         var lls = (geo.coordinates && geo.coordinates[0] || []).map(function (p) { return [p[1], p[0]]; });
                         layer = L.polygon(lls, { color: '#3388ff', fillOpacity: 0.15 });
                     }
@@ -262,9 +298,9 @@
 
             if (layer) {
                 drawnItems.addLayer(layer);
-                layer.bindPopup('<strong>' + esc(r.zone_name) + '</strong><br/>' + esc(t) + ' · ' + (r.delivery_fee || 0));
+                layer.bindPopup('<strong>' + esc(r.zone_name) + '</strong><br>' + esc(t) + ' &middot; ' + esc(r.delivery_fee || 0));
                 zoneLayerMap.set(String(r.id), layer);
-                layer.on('click', function () { openEdit(r.id); });
+                layer.on('click', (function (id) { return function () { openEdit(id); }; })(r.id));
             }
         });
 
@@ -274,87 +310,77 @@
     }
 
     // ─── Open edit ───────────────────────────────────────────────────────────
-    async function openEdit(id) {
+    function openEdit(id) {
         if (!id) return;
-        try {
-            var r = await apiCall(API + '/' + id + '?tenant_id=' + TENANT_ID);
-            var z = (r && r.data) ? r.data : r;
-            safeSet('id', z.id || 0);
-            safeSet('zone_name', z.zone_name || '');
-            safeSet('zone_type', z.zone_type || 'city');
-            safeSet('provider_id', z.provider_id || '');
-            safeSet('city_id', z.city_id || '');
-            safeSet('center_lat', z.center_lat || '');
-            safeSet('center_lng', z.center_lng || '');
-            safeSet('radius_km', z.radius_km || '');
-            safeSet('delivery_fee', z.delivery_fee || '0.00');
-            safeSet('free_delivery_over', z.free_delivery_over || '');
-            safeSet('min_order_value', z.min_order_value || '');
-            safeSet('estimated_minutes', z.estimated_minutes || 45);
-            safeSet('is_active', z.is_active ? '1' : '0');
-            safeSet('zone_value', z.zone_value || '');
-
-            showHideConditionalFields(z.zone_type || 'city');
-            showForm('تعديل المنطقة');
-            drawGeometry(z);
-        } catch (e) {
-            alert(e.message || 'فشل تحميل المنطقة');
-        }
+        apiCall(API + '/' + id + '?tenant_id=' + TENANT_ID)
+            .then(function (r) {
+                var z = (r && r.data) ? r.data : r;
+                safeSet('id', z.id || 0);
+                safeSet('zone_name', z.zone_name || '');
+                safeSet('zone_type', z.zone_type || 'city');
+                safeSet('provider_id', z.provider_id || '');
+                safeSet('city_id', z.city_id || '');
+                safeSet('center_lat', z.center_lat || '');
+                safeSet('center_lng', z.center_lng || '');
+                safeSet('radius_km', z.radius_km || '');
+                safeSet('delivery_fee', z.delivery_fee || '0.00');
+                safeSet('free_delivery_over', z.free_delivery_over || '');
+                safeSet('min_order_value', z.min_order_value || '');
+                safeSet('estimated_minutes', z.estimated_minutes || 45);
+                safeSet('is_active', z.is_active ? '1' : '0');
+                safeSet('zone_value', z.zone_value || '');
+                showHideConditionalFields(z.zone_type || 'city');
+                showForm('Edit Zone');
+                drawGeometry(z);
+            })
+            .catch(function (e) { alert(e.message || 'Failed to load zone'); });
     }
 
     // ─── Save ────────────────────────────────────────────────────────────────
-    async function saveZone() {
-        var idVal = (fld('id') || {}).value;
+    function saveZone() {
+        var idVal = ((fld('id') || {}).value) || '';
         var isCreate = !idVal || idVal === '0';
 
         var body = {
-            zone_name:          ((fld('zone_name') || {}).value || '').trim(),
-            zone_type:          (fld('zone_type') || {}).value || 'city',
-            provider_id:        parseInt((fld('provider_id') || {}).value, 10) || null,
-            city_id:            parseInt((fld('city_id') || {}).value, 10) || null,
-            center_lat:         ((fld('center_lat') || {}).value || '').trim() || null,
-            center_lng:         ((fld('center_lng') || {}).value || '').trim() || null,
-            radius_km:          ((fld('radius_km') || {}).value || '').trim() || null,
-            delivery_fee:       (fld('delivery_fee') || {}).value || '0.00',
-            free_delivery_over: ((fld('free_delivery_over') || {}).value || '').trim() || null,
-            min_order_value:    ((fld('min_order_value') || {}).value || '').trim() || null,
-            estimated_minutes:  parseInt((fld('estimated_minutes') || {}).value, 10) || 45,
-            is_active:          (fld('is_active') || {}).value === '1' ? 1 : 0,
-            zone_value:         ((fld('zone_value') || {}).value || '').trim() || null,
+            zone_name:          (((fld('zone_name') || {}).value) || '').trim(),
+            zone_type:          ((fld('zone_type') || {}).value) || 'city',
+            provider_id:        parseInt(((fld('provider_id') || {}).value), 10) || null,
+            city_id:            parseInt(((fld('city_id') || {}).value), 10) || null,
+            center_lat:         (((fld('center_lat') || {}).value) || '').trim() || null,
+            center_lng:         (((fld('center_lng') || {}).value) || '').trim() || null,
+            radius_km:          (((fld('radius_km') || {}).value) || '').trim() || null,
+            delivery_fee:       ((fld('delivery_fee') || {}).value) || '0.00',
+            free_delivery_over: (((fld('free_delivery_over') || {}).value) || '').trim() || null,
+            min_order_value:    (((fld('min_order_value') || {}).value) || '').trim() || null,
+            estimated_minutes:  parseInt(((fld('estimated_minutes') || {}).value), 10) || 45,
+            is_active:          ((fld('is_active') || {}).value) === '1' ? 1 : 0,
+            zone_value:         (((fld('zone_value') || {}).value) || '').trim() || null,
             tenant_id:          TENANT_ID
         };
-
         if (!isCreate) body.id = parseInt(idVal, 10);
 
-        var url    = isCreate ? API : API + '/' + idVal;
-        var method = isCreate ? 'POST' : 'PUT';
-
-        try {
-            var j = await apiCall(url, { method: method, json: body });
-            if (isCreate) {
-                var newId = j.data && j.data.id;
-                if (newId) { safeSet('id', newId); } else { console.warn('[DZ] create response missing data.id', j); }
-            }
-            showSuccess('تم الحفظ بنجاح');
-            loadList();
-        } catch (e) {
-            alert(e.message || 'فشل الحفظ');
-        }
+        apiCall(isCreate ? API : API + '/' + idVal, { method: isCreate ? 'POST' : 'PUT', json: body })
+            .then(function (j) {
+                if (isCreate) {
+                    var newId = j.data && j.data.id;
+                    if (newId) { safeSet('id', newId); } else { console.warn('[DZ] create response missing data.id', j); }
+                }
+                showSuccess('Saved successfully');
+                loadList();
+            })
+            .catch(function (e) { alert(e.message || 'Save failed'); });
     }
 
     // ─── Delete ──────────────────────────────────────────────────────────────
-    async function deleteZone(id) {
-        if (!id || !confirm('هل تريد حذف هذه المنطقة؟')) return;
-        try {
-            await apiCall(API + '/' + id + '?tenant_id=' + TENANT_ID, {
-                method: 'DELETE'
-            });
-            showSuccess('تم الحذف بنجاح');
-            clearForm();
-            loadList();
-        } catch (e) {
-            alert(e.message || 'فشل الحذف');
-        }
+    function deleteZone(id) {
+        if (!id || !confirm('Delete this delivery zone?')) return;
+        apiCall(API + '/' + id + '?tenant_id=' + TENANT_ID, { method: 'DELETE' })
+            .then(function () {
+                showSuccess('Deleted successfully');
+                clearForm();
+                loadList();
+            })
+            .catch(function (e) { alert(e.message || 'Delete failed'); });
     }
 
     // ─── Form helpers ────────────────────────────────────────────────────────
@@ -362,7 +388,7 @@
         var card = qs('#dzFormCard');
         if (card) card.style.display = '';
         var t = qs('#dzFormTitle');
-        if (t) t.textContent = title || 'تفاصيل المنطقة';
+        if (t) t.textContent = title || 'Zone Details';
     }
 
     function clearForm() {
@@ -378,7 +404,6 @@
     }
 
     function showSuccess(msg) {
-        // Use AdminFramework toast if available, else console
         if (window.AdminFramework && typeof window.AdminFramework.success === 'function') {
             window.AdminFramework.success(msg);
         } else if (window.AF && typeof window.AF.success === 'function') {
@@ -388,41 +413,40 @@
         }
     }
 
-    // ─── Bind events ────────────────────────────────────────────────────────
+    // ─── Bind UI events ──────────────────────────────────────────────────────
     function bindEvents() {
-        var saveBtn   = qs('#dzSaveBtn');
-        var resetBtn  = qs('#dzResetBtn');
-        var newBtn    = qs('#dzNewBtn');
-        var refreshBtn= qs('#dzRefresh');
-        var closeBtn  = qs('#dzCloseForm');
-        var search    = qs('#dzSearch');
-        var statusSel = qs('#dzStatusFilter');
-        var zoneType  = qs('#dz_zone_type');
+        var saveBtn    = qs('#dzSaveBtn');
+        var resetBtn   = qs('#dzResetBtn');
+        var newBtn     = qs('#dzNewBtn');
+        var refreshBtn = qs('#dzRefresh');
+        var closeBtn   = qs('#dzCloseForm');
+        var search     = qs('#dzSearch');
+        var statusSel  = qs('#dzStatusFilter');
+        var zoneType   = qs('#dz_zone_type');
+        var geoField   = qs('#dz_zone_value');
 
         if (saveBtn)    saveBtn.addEventListener('click',  saveZone);
         if (resetBtn)   resetBtn.addEventListener('click', clearForm);
         if (closeBtn)   closeBtn.addEventListener('click', clearForm);
-        if (newBtn)     newBtn.addEventListener('click', function () { clearForm(); showForm('منطقة جديدة'); });
+        if (newBtn)     newBtn.addEventListener('click', function () { clearForm(); showForm('New Zone'); });
         if (refreshBtn) refreshBtn.addEventListener('click', loadList);
         if (search)     search.addEventListener('input', function () { setTimeout(loadList, 300); });
         if (statusSel)  statusSel.addEventListener('change', loadList);
         if (zoneType)   zoneType.addEventListener('change', function () { showHideConditionalFields(this.value); });
 
-        // GeoJSON textarea → draw on map
-        var geoField = qs('#dz_zone_value');
         if (geoField) {
             geoField.addEventListener('change', function () {
+                if (!drawnItems || typeof L === 'undefined') return;
                 var txt = this.value.trim();
-                if (!txt || !drawnItems) return;
+                if (!txt) return;
                 try {
                     var geo = JSON.parse(txt);
-                    var gt = (geo.type || '').toLowerCase();
-                    if (gt === 'polygon' && drawnItems) {
+                    if ((geo.type || '').toLowerCase() === 'polygon') {
                         drawnItems.clearLayers();
                         var lls = (geo.coordinates && geo.coordinates[0] || []).map(function (p) { return [p[1], p[0]]; });
-                        var layer = L.polygon(lls, { color: '#ff7800', fillOpacity: 0.15 });
-                        drawnItems.addLayer(layer);
-                        try { map.fitBounds(layer.getBounds()); } catch(e) {}
+                        var l = L.polygon(lls, { color: '#ff7800', fillOpacity: 0.15 });
+                        drawnItems.addLayer(l);
+                        try { map.fitBounds(l.getBounds()); } catch(e) {}
                     }
                 } catch(e) {}
             });
@@ -430,30 +454,27 @@
     }
 
     // ─── Entry point ─────────────────────────────────────────────────────────
-    function initDeliveryZone() {
-        if (typeof L === 'undefined') {
-            // Leaflet not yet loaded – poll for it (happens in some fragment-injection scenarios)
-            var tries = 0;
-            var iv = setInterval(function () {
-                if (typeof L !== 'undefined') {
-                    clearInterval(iv);
-                    ensureLeafletCss(function () { initMap(); bindEvents(); loadList(); });
-                } else if (++tries > 60) {
-                    clearInterval(iv);
-                    console.error('[DZ] Leaflet failed to load after 6s');
-                }
-            }, 100);
-            return;
-        }
-        ensureLeafletCss(function () { initMap(); bindEvents(); loadList(); });
+    function boot() {
+        // Guard: don't init twice if script gets re-injected without a page reload
+        var mapEl = qs('#dzMap');
+        if (!mapEl) return;
+        if (mapEl.getAttribute('data-dz-init')) return;
+        mapEl.setAttribute('data-dz-init', '1');
+
+        ensureLeafletJs(function () {
+            ensureLeafletCss(function () {
+                initMap();
+                bindEvents();
+                loadList();
+            });
+        });
     }
 
-    // Support both direct page load (DOMContentLoaded not yet fired) and
-    // AJAX-fragment injection (DOMContentLoaded already fired).
+    // Works in both direct page load and AJAX fragment injection modes.
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initDeliveryZone);
+        document.addEventListener('DOMContentLoaded', boot);
     } else {
-        initDeliveryZone();
+        boot();
     }
 
 })();

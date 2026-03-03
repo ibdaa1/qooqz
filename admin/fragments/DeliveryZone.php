@@ -246,17 +246,17 @@ if ($shouldRenderFull && !$parentHasHeader) {
 // Leaflet CSS is loaded into <head> by DeliveryZone.js (ensureLeafletCss) to guarantee
 // tile panes are positioned correctly even when the fragment is AJAX-injected.
 ?>
-<link rel="stylesheet" href="/admin/assets/css/pages/DeliveryZone.css?v=<?php echo time(); ?>">
+<link rel="stylesheet" href="/admin/assets/css/pages/DeliveryZone.css">
 
 <div id="adminDeliveryZone" class="dz-page-container" dir="<?php echo htmlspecialchars($langDirection, ENT_QUOTES | ENT_SUBSTITUTE); ?>" data-lang="<?php echo htmlspecialchars($preferredLang, ENT_QUOTES | ENT_SUBSTITUTE); ?>">
 
   <div class="page-header">
     <div class="page-header-content">
-      <h1 class="page-title" id="dz_title">مناطق التوصيل</h1>
+      <h1 class="page-title" id="dz_title" data-i18n="delivery_zone.module_title">Delivery Zones</h1>
     </div>
     <div class="page-header-actions">
-      <button id="dzNewBtn" class="btn btn-primary" type="button"><i class="fas fa-plus"></i> منطقة جديدة</button>
-      <button id="dzRefresh" class="btn btn-outline" type="button"><i class="fas fa-sync-alt"></i> تحديث</button>
+      <button id="dzNewBtn" class="btn btn-primary" type="button"><i class="fas fa-plus"></i> <span data-i18n="delivery_zone.new_zone">New Zone</span></button>
+      <button id="dzRefresh" class="btn btn-outline" type="button"><i class="fas fa-sync-alt"></i> <span data-i18n="actions.refresh">Refresh</span></button>
     </div>
   </div>
 
@@ -265,11 +265,11 @@ if ($shouldRenderFull && !$parentHasHeader) {
     <aside class="dz-sidebar">
       <div class="card">
         <div class="card-body dz-filters">
-          <input id="dzSearch" class="form-control" placeholder="بحث عن منطقة...">
+          <input id="dzSearch" class="form-control" data-i18n-placeholder="placeholders.search" placeholder="Search zones...">
           <select id="dzStatusFilter" class="form-control">
-            <option value="">الكل</option>
-            <option value="1">نشط</option>
-            <option value="0">غير نشط</option>
+            <option value="" data-i18n="delivery_zone.all_statuses">All</option>
+            <option value="1" data-i18n="statuses.active">Active</option>
+            <option value="0" data-i18n="statuses.inactive">Inactive</option>
           </select>
         </div>
       </div>
@@ -288,7 +288,7 @@ if ($shouldRenderFull && !$parentHasHeader) {
 
       <div id="dzFormCard" class="card form-card" style="display:none">
         <div class="card-header">
-          <h3 class="card-title" id="dzFormTitle">تفاصيل المنطقة</h3>
+          <h3 class="card-title" id="dzFormTitle" data-i18n="delivery_zone.zone_details">Zone Details</h3>
           <button id="dzCloseForm" class="btn btn-sm btn-outline" type="button"><i class="fas fa-times"></i></button>
         </div>
         <div class="card-body">
@@ -298,44 +298,44 @@ if ($shouldRenderFull && !$parentHasHeader) {
             <!-- Row 1: zone_name + zone_type + provider_id -->
             <div class="form-row">
               <div class="form-group col-4">
-                <label class="required">اسم المنطقة</label>
-                <input id="dz_zone_name" name="zone_name" class="form-control" required placeholder="e.g. الرياض - شمال">
+                <label class="required" data-i18n="fields.zone_name">Zone Name</label>
+                <input id="dz_zone_name" name="zone_name" class="form-control" required placeholder="e.g. North District">
               </div>
               <div class="form-group col-4">
-                <label class="required">نوع المنطقة</label>
+                <label class="required" data-i18n="fields.zone_type">Zone Type</label>
                 <select id="dz_zone_type" name="zone_type" class="form-control" required>
-                  <option value="city">مدينة (City)</option>
-                  <option value="district">حي (District)</option>
-                  <option value="radius">نطاق دائري (Radius)</option>
-                  <option value="polygon">مضلع (Polygon)</option>
+                  <option value="city" data-i18n="zone_type_values.city">City</option>
+                  <option value="district" data-i18n="zone_type_values.district">District</option>
+                  <option value="radius" data-i18n="zone_type_values.radius">Radius</option>
+                  <option value="polygon" data-i18n="zone_type_values.polygon">Polygon</option>
                 </select>
               </div>
               <div class="form-group col-4">
-                <label class="required">رقم المزود (Provider ID)</label>
-                <input id="dz_provider_id" name="provider_id" type="number" class="form-control" required min="1" placeholder="أدخل رقم المزود">
+                <label class="required" data-i18n="fields.provider_id">Provider ID</label>
+                <input id="dz_provider_id" name="provider_id" type="number" class="form-control" required min="1" placeholder="Enter provider ID">
               </div>
             </div>
 
             <!-- Row 2: city_id (shown for city type) -->
             <div id="dz_city_row" class="form-row" style="display:none">
               <div class="form-group col-12">
-                <label>رقم المدينة (City ID)</label>
-                <input id="dz_city_id" name="city_id" type="number" class="form-control" min="1" placeholder="أدخل رقم المدينة">
+                <label data-i18n="fields.city_id">City ID</label>
+                <input id="dz_city_id" name="city_id" type="number" class="form-control" min="1" placeholder="Enter city ID">
               </div>
             </div>
 
             <!-- Row 3: center_lat + center_lng + radius_km (shown for radius type) -->
             <div id="dz_radius_row" class="form-row" style="display:none">
               <div class="form-group col-4">
-                <label>خط العرض (Center Lat)</label>
+                <label data-i18n="fields.center_lat">Center Latitude</label>
                 <input id="dz_center_lat" name="center_lat" type="text" class="form-control" placeholder="24.7136">
               </div>
               <div class="form-group col-4">
-                <label>خط الطول (Center Lng)</label>
+                <label data-i18n="fields.center_lng">Center Longitude</label>
                 <input id="dz_center_lng" name="center_lng" type="text" class="form-control" placeholder="46.6753">
               </div>
               <div class="form-group col-4">
-                <label>نصف القطر بالكيلومتر (Radius km)</label>
+                <label data-i18n="fields.radius_km">Radius (km)</label>
                 <input id="dz_radius_km" name="radius_km" type="number" step="0.01" class="form-control" placeholder="5.00">
               </div>
             </div>
@@ -343,15 +343,15 @@ if ($shouldRenderFull && !$parentHasHeader) {
             <!-- Row 4: delivery_fee + free_delivery_over + min_order_value -->
             <div class="form-row">
               <div class="form-group col-4">
-                <label class="required">رسوم التوصيل (Delivery Fee)</label>
+                <label class="required" data-i18n="fields.delivery_fee">Delivery Fee</label>
                 <input id="dz_delivery_fee" name="delivery_fee" type="number" step="0.01" class="form-control" value="0.00" min="0" required>
               </div>
               <div class="form-group col-4">
-                <label>توصيل مجاني فوق (Free Delivery Over)</label>
+                <label data-i18n="fields.free_delivery_over">Free Delivery Over</label>
                 <input id="dz_free_delivery_over" name="free_delivery_over" type="number" step="0.01" class="form-control" placeholder="">
               </div>
               <div class="form-group col-4">
-                <label>الحد الأدنى للطلب (Min Order Value)</label>
+                <label data-i18n="fields.min_order_value">Min Order Value</label>
                 <input id="dz_min_order_value" name="min_order_value" type="number" step="0.01" class="form-control" placeholder="">
               </div>
             </div>
@@ -359,28 +359,27 @@ if ($shouldRenderFull && !$parentHasHeader) {
             <!-- Row 5: estimated_minutes + is_active -->
             <div class="form-row">
               <div class="form-group col-6">
-                <label>وقت التوصيل المقدر (دقيقة)</label>
+                <label data-i18n="fields.estimated_minutes">Estimated Minutes</label>
                 <input id="dz_estimated_minutes" name="estimated_minutes" type="number" class="form-control" value="45" min="1">
               </div>
               <div class="form-group col-6">
-                <label>الحالة</label>
+                <label data-i18n="fields.status">Status</label>
                 <select id="dz_is_active" name="is_active" class="form-control">
-                  <option value="1">نشط</option>
-                  <option value="0">غير نشط</option>
+                  <option value="1" data-i18n="statuses.active">Active</option>
+                  <option value="0" data-i18n="statuses.inactive">Inactive</option>
                 </select>
               </div>
             </div>
 
-            <!-- GeoJSON boundary (populated by map drawing for polygon/district) -->
             <div id="dz_geojson_row" class="form-group" style="display:none">
-              <label>حدود المنطقة (GeoJSON) — ارسم على الخريطة أو الصق JSON</label>
+              <label data-i18n="fields.zone_boundary">Zone Boundary (GeoJSON) &mdash; draw on map or paste JSON</label>
               <textarea id="dz_zone_value" name="zone_value" class="form-control" rows="3"
                         placeholder='{"type":"Polygon","coordinates":[...]}'></textarea>
             </div>
 
             <div class="form-actions-footer">
-              <button id="dzSaveBtn" class="btn btn-primary" type="button"><i class="fas fa-save"></i> حفظ</button>
-              <button id="dzResetBtn" class="btn btn-outline" type="button">إلغاء</button>
+              <button id="dzSaveBtn" class="btn btn-primary" type="button"><i class="fas fa-save"></i> <span data-i18n="actions.save">Save</span></button>
+              <button id="dzResetBtn" class="btn btn-outline" type="button" data-i18n="actions.cancel">Cancel</button>
             </div>
           </form>
         </div>
@@ -399,10 +398,8 @@ if ($shouldRenderFull && !$parentHasHeader) {
   window.LANG_DIRECTION= '<?php echo htmlspecialchars($langDirection, ENT_QUOTES | ENT_SUBSTITUTE); ?>';
 </script>
 
-<!-- Leaflet JS: loaded sync so L is available before DeliveryZone.js runs -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-<script src="/admin/assets/js/pages/DeliveryZone.js?v=<?php echo time(); ?>"></script>
+<!-- DeliveryZone.js self-loads Leaflet JS + CSS before initialising the map -->
+<script src="/admin/assets/js/pages/DeliveryZone.js"></script>
 
 <?php
 // ---------------- Post-render: buffer check and footer inclusion ----------------
