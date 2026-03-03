@@ -26,27 +26,40 @@
 
     // ─── Serial script loader ─────────────────────────────────────────────────
     // Appends a <script> to <head> and fires cb() when it finishes (or errors).
-    function loadScript(src, cb) {
-        // If already present (from a previous fragment load) re-use it.
-        var existing = false;
-        qsa('script').forEach(function (el) { if (el.src === src) existing = true; });
-        if (existing) { cb(); return; }
-        var s = document.createElement('script');
-        s.src = src;
-        s.onload = cb;
-        s.onerror = function () {
-            console.error('[DZ] Failed to load script: ' + src);
-            cb(); // continue so we don't hang indefinitely
-        };
-        document.head.appendChild(s);
+    // Injects <script src> into <head> if not already present, then polls
+    // checkFn() every POLL_INTERVAL_MS until it returns true.
+    // Max wait: POLL_MAX_TICKS * POLL_INTERVAL_MS = 10 s.
+    // This correctly handles the race where admin_core.js runScripts has
+    // already added the <script> tag but the browser hasn't executed it yet.
+    var POLL_INTERVAL_MS = 50;
+    var POLL_MAX_TICKS   = 200; // 200 × 50 ms = 10 s
+    function loadScript(src, checkFn, cb) {
+        if (checkFn()) { cb(); return; }
+        // Add tag only if not already in DOM
+        var found = false;
+        var allScripts = document.querySelectorAll('script');
+        for (var i = 0; i < allScripts.length; i++) {
+            if (allScripts[i].src === src) { found = true; break; }
+        }
+        if (!found) {
+            var s = document.createElement('script');
+            s.src = src;
+            s.onerror = function () { console.error('[DZ] Failed to load: ' + src); };
+            document.head.appendChild(s);
+        }
+        var ticks = 0;
+        var timer = setInterval(function () {
+            ticks++;
+            if (checkFn()) { clearInterval(timer); cb(); return; }
+            if (ticks >= POLL_MAX_TICKS) { clearInterval(timer); console.error('[DZ] Timed out loading: ' + src); cb(); }
+        }, POLL_INTERVAL_MS);
     }
 
-    // Load leaflet.js, then leaflet.draw.js (draw depends on leaflet).
+    // Load leaflet.js then leaflet.draw.js in a guaranteed serial chain,
+    // verified via library globals — not just <script> tag presence.
     function ensureLeafletJs(cb) {
-        if (window.L && window.L.Draw) { cb(); return; }
-        if (window.L) { loadScript(DRAW_JS, cb); return; }
-        loadScript(LEAFLET_JS, function () {
-            loadScript(DRAW_JS, cb);
+        loadScript(LEAFLET_JS, function () { return !!window.L; }, function () {
+            loadScript(DRAW_JS, function () { return !!(window.L && window.L.Draw); }, cb);
         });
     }
 
