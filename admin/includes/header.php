@@ -220,8 +220,9 @@ body {
 }
 
 .admin-header {
-    background: var(--sidebar_background);
-    color: var(--sidebar_text);
+    background: var(--background_main);
+    color: var(--text_primary);
+    border-bottom: 1px solid var(--border_color);
 }
 
 .admin-sidebar {

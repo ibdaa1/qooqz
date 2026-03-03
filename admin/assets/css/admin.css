@@ -86,9 +86,9 @@ a {
     position: sticky;
     top: 0;
     z-index: 1000;
-    background: var(--sidebar-background, #4B0082);
-    color: var(--sidebar-text, #FFF);
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+    background: var(--background-main, #0d0d0d);
+    color: var(--text-primary, #FFFFFF);
+    border-bottom: 1px solid var(--border-color, #333333);
     padding: 0 1.5rem;
     display: flex;
     align-items: center;
@@ -432,9 +432,9 @@ a {
    ════════════════════════════════════════════════════════════ */
 
 .admin-footer {
-    background: var(--sidebar-background, #4B0082);
-    color: var(--sidebar-text, #FFF);
-    border-top: 1px solid rgba(255,255,255,0.1);
+    background: var(--background-secondary, #4f4f4f);
+    color: var(--text-secondary, #B0B0B0);
+    border-top: 1px solid var(--border-color, #333333);
     padding: 1.5rem;
     text-align: center;
     font-size: 0.875rem;

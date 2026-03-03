@@ -66,11 +66,11 @@ $brand = $payload['strings']['brand'] ?? 'Admin';
     <?php endforeach; ?>
 }
 
-/* Footer styles using the same colors as header */
+/* Footer styles — colors from DB via :root vars above */
 .admin-footer {
-    background: var(--footer_bg_color, var(--footer-bg-color, var(--sidebar_background))) !important;
-    color: var(--sidebar_text) !important;
-    border-top: 1px solid var(--primary_color);
+    background: var(--background_secondary) !important;
+    color: var(--text_secondary) !important;
+    border-top: 1px solid var(--border_color);
     padding: 1rem 0;
     margin-top: auto;
 }
