@@ -326,7 +326,7 @@ if (!function_exists('pub_load_theme')) {
                 $buttons = $st->fetchAll(PDO::FETCH_ASSOC);
 
                 // card_styles
-                $st = $pdo->prepare('SELECT slug, card_type, background_color, border_color, border_width, border_radius, shadow_style, padding FROM card_styles WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY card_type');
+                $st = $pdo->prepare('SELECT slug, card_type, background_color, border_color, border_width, border_radius, shadow_style, padding, hover_effect, text_align, image_aspect_ratio FROM card_styles WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY card_type');
                 $st->execute($thP([$tenantId]));
                 $cards = $st->fetchAll(PDO::FETCH_ASSOC);
 
@@ -470,13 +470,37 @@ if (!function_exists('pub_load_theme')) {
                     foreach ($cards as $c) {
                         if (empty($c['slug'])) continue;
                         $slugC = preg_replace('/[^a-z0-9_\-]/', '-', (string)$c['slug']);
+                        $hoverEffect = strtolower(trim((string)($c['hover_effect'] ?? '')));
                         $css .= ".card-{$slugC} {\n";
                         if (!empty($c['background_color'])) $css .= '  background-color: ' . $cssEsc((string)$c['background_color']) . ";\n";
                         if (!empty($c['border_color']))     $css .= '  border: '           . (int)$c['border_width'] . 'px solid ' . $cssEsc((string)$c['border_color']) . ";\n";
                         if (isset($c['border_radius']))     $css .= '  border-radius: '    . (int)$c['border_radius'] . "px;\n";
                         if (!empty($c['shadow_style']))     $css .= '  box-shadow: '       . $cssEsc((string)$c['shadow_style'])     . ";\n";
                         if (!empty($c['padding']))          $css .= '  padding: '          . $cssEsc((string)$c['padding'])          . ";\n";
+                        if (!empty($c['text_align']))       $css .= '  text-align: '       . $cssEsc((string)$c['text_align'])       . ";\n";
+                        // Only add transition when a hover effect is configured
+                        if ($hoverEffect && $hoverEffect !== 'none') {
+                            $css .= "  transition: transform .2s ease, box-shadow .2s ease;\n";
+                        }
                         $css .= "}\n";
+                        // Image wrapper aspect ratio (e.g. "1:1" stored in DB → CSS "1/1")
+                        if (!empty($c['image_aspect_ratio'])) {
+                            $ratio = preg_replace('/[^0-9:]/', '', (string)$c['image_aspect_ratio']);
+                            $ratio = str_replace(':', '/', $ratio);
+                            if ($ratio) $css .= ".card-{$slugC} .pub-cat-img-wrap { aspect-ratio: {$ratio}; }\n";
+                        }
+                        // Hover effect — translate/scale/shadow values match standard UX conventions
+                        if ($hoverEffect && $hoverEffect !== 'none') {
+                            $css .= ".card-{$slugC}:hover {\n";
+                            if ($hoverEffect === 'lift')   $css .= "  transform: translateY(-4px);\n  box-shadow: 0 8px 24px rgba(0,0,0,0.18);\n";
+                            if ($hoverEffect === 'zoom')   $css .= "  transform: scale(1.03);\n";
+                            if ($hoverEffect === 'shadow') $css .= "  box-shadow: 0 8px 28px rgba(0,0,0,0.22);\n";
+                            if ($hoverEffect === 'border' && !empty($c['border_color'])) {
+                                // Increase border by 1px on hover to create a highlight effect
+                                $css .= "  border-width: " . (max(1, (int)$c['border_width']) + 1) . "px;\n";
+                            }
+                            $css .= "}\n";
+                        }
                     }
                     $theme['generated_css'] = $css;
 
@@ -737,8 +761,20 @@ if (!function_exists('pub_img_tag')) {
 }
 
 /* -------------------------------------------------------
- * 11. Card inline-style helper — DB-driven card_styles
+ * 11. Card helpers — DB-driven card_styles
  * ----------------------------------------------------- */
+
+/** @internal Shared lookup for card_styles row by card_type or slug */
+function _pub_card_row(string $cardType): ?array {
+    $cards = $GLOBALS['PUB_CONTEXT']['theme']['cards'] ?? [];
+    foreach ($cards as $c) {
+        if (($c['card_type'] ?? '') === $cardType || ($c['slug'] ?? '') === $cardType) {
+            return $c;
+        }
+    }
+    return null;
+}
+
 if (!function_exists('pub_card_inline_style')) {
     /**
      * Return an inline CSS style string for a card element, sourced from the
@@ -749,14 +785,7 @@ if (!function_exists('pub_card_inline_style')) {
      * @param string $cardType  e.g. 'entity', 'tenant', 'product'
      */
     function pub_card_inline_style(string $cardType): string {
-        $cards = $GLOBALS['PUB_CONTEXT']['theme']['cards'] ?? [];
-        $row   = null;
-        foreach ($cards as $c) {
-            if (($c['card_type'] ?? '') === $cardType || ($c['slug'] ?? '') === $cardType) {
-                $row = $c;
-                break;
-            }
-        }
+        $row = _pub_card_row($cardType);
         if (!$row) return '';
 
         // Escape a CSS value: HTML-encode and also strip characters that could
@@ -774,9 +803,42 @@ if (!function_exists('pub_card_inline_style')) {
         if (isset($row['border_radius']) && $row['border_radius'] !== '') $parts[] = 'border-radius:' . (int)$row['border_radius'] . 'px';
         if (!empty($row['shadow_style']))  $parts[] = 'box-shadow:' . $esc($row['shadow_style']);
         if (!empty($row['padding']))       $parts[] = 'padding:' . $esc($row['padding']);
+        if (!empty($row['text_align']))    $parts[] = 'text-align:' . $esc($row['text_align']);
         return implode(';', $parts);
     }
 }
+
+if (!function_exists('pub_card_css_class')) {
+    /**
+     * Return the generated CSS class name for a card type, e.g. "card-product-default".
+     * This class is emitted by pub_load_theme() as .card-{slug} in generated_css,
+     * and includes hover effects. Returns '' when no matching row exists.
+     */
+    function pub_card_css_class(string $cardType): string {
+        $row = _pub_card_row($cardType);
+        if (empty($row['slug'])) return '';
+        return 'card-' . preg_replace('/[^a-z0-9_\-]/', '-', strtolower((string)$row['slug']));
+    }
+}
+
+if (!function_exists('pub_card_img_style')) {
+    /**
+     * Return an inline style string for the image wrapper of a card, providing
+     * the aspect-ratio from card_styles.image_aspect_ratio (e.g. "1:1" → "aspect-ratio:1/1").
+     * Falls back to the provided default ratio string if no DB row exists.
+     */
+    function pub_card_img_style(string $cardType, string $fallback = '1/1'): string {
+        $row = _pub_card_row($cardType);
+        $ratio = $fallback;
+        if (!empty($row['image_aspect_ratio'])) {
+            $r = preg_replace('/[^0-9:]/', '', (string)$row['image_aspect_ratio']);
+            $r = str_replace(':', '/', $r);
+            if ($r) $ratio = $r;
+        }
+        return 'aspect-ratio:' . htmlspecialchars($ratio, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+}
+
 
 /* -------------------------------------------------------
  * 12. Compose the shared context globals

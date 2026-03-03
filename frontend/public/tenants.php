@@ -37,6 +37,7 @@ include dirname(__DIR__) . '/partials/header.php';
 
 // Resolve tenant card style from DB card_styles (card_type='tenant')
 $_tenantCardStyle = pub_card_inline_style('tenant');
+$_tenantCardClass = pub_card_css_class('tenant');
 ?>
 
 
@@ -81,7 +82,7 @@ $_tenantCardStyle = pub_card_inline_style('tenant');
     <div class="pub-grid-md">
         <?php foreach ($tenants as $ten): ?>
         <a href="/frontend/public/tenant.php?id=<?= (int)($ten['id'] ?? 0) ?>"
-           class="pub-entity-card" style="text-decoration:none;<?= e($_tenantCardStyle) ?>">
+           class="pub-entity-card<?= $_tenantCardClass ? ' '.$_tenantCardClass : '' ?>" style="text-decoration:none;<?= e($_tenantCardStyle) ?>">
             <div class="pub-entity-avatar">🏪</div>
             <div class="pub-entity-info">
                 <p class="pub-entity-name"><?= e($ten['store_name'] ?? $ten['name'] ?? '') ?></p>

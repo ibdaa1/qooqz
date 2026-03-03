@@ -53,6 +53,9 @@ $GLOBALS['PUB_SEO'] = [
 ];
 
 include dirname(__DIR__) . '/partials/header.php';
+$_categoryCardStyle = pub_card_inline_style('category');
+$_categoryCardClass = pub_card_css_class('category');
+$_categoryImgStyle  = pub_card_img_style('category', '16/9');
 ?>
 
 <div class="pub-container" style="padding-top:28px;">
@@ -117,12 +120,12 @@ include dirname(__DIR__) . '/partials/header.php';
             $catDesc   = $cat['description'] ?? '';
         ?>
         <a href="/frontend/public/products.php?category_id=<?= (int)($cat['id'] ?? 0) ?>"
-           class="pub-cat-card<?= $isFeatured ? ' pub-cat-card--featured' : '' ?>"
-           style="text-decoration:none;"
+           class="pub-cat-card<?= $isFeatured ? ' pub-cat-card--featured' : '' ?><?= $_categoryCardClass ? ' '.$_categoryCardClass : '' ?>"
+           style="text-decoration:none;<?= e($_categoryCardStyle) ?>"
            aria-label="<?= e($catName) ?>">
 
             <!-- Category image -->
-            <div class="pub-cat-img-wrap">
+            <div class="pub-cat-img-wrap" style="<?= e($_categoryImgStyle) ?>">
                 <?php if ($catImg): ?>
                     <img src="<?= e(pub_img($catImg, 'category')) ?>"
                          alt="<?= e($catName) ?>"

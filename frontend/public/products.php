@@ -105,6 +105,9 @@ if (!$products && !$pdo) {
 $totalPg = ($limit > 0 && $total > 0) ? (int)ceil($total / $limit) : 1;
 
 include dirname(__DIR__) . '/partials/header.php';
+$_productCardStyle = pub_card_inline_style('product');
+$_productCardClass = pub_card_css_class('product');
+$_productImgStyle  = pub_card_img_style('product');
 ?>
 
 <div class="pub-container" style="padding-top:28px;">
@@ -154,7 +157,7 @@ include dirname(__DIR__) . '/partials/header.php';
             $pCur   = $p['currency_code'] ?? t('common.currency');
             $imgSrc = pub_img($p['image_thumb_url'] ?? $p['image_url'] ?? null, 'product_thumb');
         ?>
-        <div class="pub-product-card" style="position:relative;">
+        <div class="pub-product-card<?= $_productCardClass ? ' '.$_productCardClass : '' ?>" style="position:relative;<?= e($_productCardStyle) ?>">
             <!-- Wishlist heart -->
             <button class="pub-wishlist-btn"
                     type="button"
@@ -165,7 +168,7 @@ include dirname(__DIR__) . '/partials/header.php';
             <a href="/frontend/public/product.php?id=<?= $pId ?>"
                style="text-decoration:none;display:flex;flex-direction:column;flex:1;"
                aria-label="<?= e($pName) ?>">
-                <div class="pub-cat-img-wrap" style="aspect-ratio:1;">
+                <div class="pub-cat-img-wrap" style="<?= e($_productImgStyle) ?>">
                     <?php if ($imgSrc): ?>
                         <img src="<?= e($imgSrc) ?>"
                              alt="<?= e($pName) ?>" class="pub-cat-img" loading="lazy"

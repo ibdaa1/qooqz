@@ -85,6 +85,7 @@ include dirname(__DIR__) . '/partials/header.php';
 
 // Resolve entity card style from DB card_styles (card_type='entity')
 $_entityCardStyle = pub_card_inline_style('entity');
+$_entityCardClass = pub_card_css_class('entity');
 ?>
 
 
@@ -134,7 +135,7 @@ $_entityCardStyle = pub_card_inline_style('entity');
     <div class="pub-grid-md">
         <?php foreach ($entities as $ent): ?>
         <a href="/frontend/public/entity.php?id=<?= (int)($ent['id'] ?? 0) ?>"
-           class="pub-entity-card" style="text-decoration:none;<?= e($_entityCardStyle) ?>">
+           class="pub-entity-card<?= $_entityCardClass ? ' '.$_entityCardClass : '' ?>" style="text-decoration:none;<?= e($_entityCardStyle) ?>">
             <div class="pub-entity-avatar">
                 <?php $logoSrc = pub_img($ent['logo_url'] ?? null, 'entity_logo'); ?>
                 <?php if ($logoSrc): ?>

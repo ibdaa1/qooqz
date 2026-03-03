@@ -65,12 +65,22 @@ $totalTenants   = (int)($rTen['data']['meta']['total']  ?? 0);
 include dirname(__DIR__) . '/partials/header.php';
 
 // Resolve card styles from DB card_styles table (no extra query — already loaded in theme)
-$_cardEntity   = pub_card_inline_style('entity');
-$_cardTenant   = pub_card_inline_style('tenant');
-$_cardProduct  = pub_card_inline_style('product');
-$_cardCategory = pub_card_inline_style('category');
-$_cardDeal     = pub_card_inline_style('deal');
-$_cardJob      = pub_card_inline_style('job');
+$_cardEntity    = pub_card_inline_style('entity');
+$_cardTenant    = pub_card_inline_style('tenant');
+$_cardProduct   = pub_card_inline_style('product');
+$_cardCategory  = pub_card_inline_style('category');
+$_cardDeal      = pub_card_inline_style('deal');
+$_cardJob       = pub_card_inline_style('job');
+// CSS class names for hover effects (generated from card_styles.hover_effect in pub_load_theme)
+$_clsEntity     = pub_card_css_class('entity');
+$_clsTenant     = pub_card_css_class('tenant');
+$_clsProduct    = pub_card_css_class('product');
+$_clsCategory   = pub_card_css_class('category');
+$_clsDeal       = pub_card_css_class('deal');
+$_clsJob        = pub_card_css_class('job');
+// Image-wrapper aspect ratios from card_styles.image_aspect_ratio
+$_imgProduct    = pub_card_img_style('product');
+$_imgCategory   = pub_card_img_style('category');
 ?>
 
 <!-- =============================================
@@ -204,7 +214,7 @@ $_cardJob      = pub_card_inline_style('job');
         elseif ($secType === 'deals'): ?>
         <div class="pub-grid-lg">
             <?php foreach ($items as $deal): ?>
-            <div class="pub-deal-card"<?= $_cardDeal ? ' style="'.e($_cardDeal).'"' : '' ?>>
+            <div class="pub-deal-card<?= $_clsDeal ? ' '.$_clsDeal : '' ?>"<?= $_cardDeal ? ' style="'.e($_cardDeal).'"' : '' ?>>
                 <?php if (!empty($deal['code'])): ?>
                     <span class="pub-deal-badge"><?= e($deal['code']) ?></span>
                 <?php endif; ?>
@@ -224,9 +234,9 @@ $_cardJob      = pub_card_inline_style('job');
         <div class="pub-grid-cat">
             <?php foreach ($items as $cat): ?>
             <a href="/frontend/public/products.php?category_id=<?= (int)($cat['id'] ?? 0) ?>"
-               class="pub-cat-card<?= !empty($cat['is_featured']) ? ' pub-cat-card--featured' : '' ?>"
+               class="pub-cat-card<?= !empty($cat['is_featured']) ? ' pub-cat-card--featured' : '' ?><?= $_clsCategory ? ' '.$_clsCategory : '' ?>"
                style="text-decoration:none;<?= e($_cardCategory) ?>">
-                <div class="pub-cat-img-wrap">
+                <div class="pub-cat-img-wrap" style="<?= e($_imgCategory) ?>">
                     <?php if (!empty($cat['image_url'])): ?>
                         <img src="<?= e(pub_img($cat['image_url'], 'category')) ?>"
                              alt="<?= e($cat['name'] ?? '') ?>" class="pub-cat-img" loading="lazy"
@@ -257,7 +267,7 @@ $_cardJob      = pub_card_inline_style('job');
                 $pCur2  = $p['currency_code'] ?? t('common.currency');
                 $pImg2  = pub_img($p['image_url'] ?? $p['image_thumb_url'] ?? null, 'product');
             ?>
-            <div class="pub-product-card" style="position:relative;<?= e($_cardProduct) ?>">
+            <div class="pub-product-card<?= $_clsProduct ? ' '.$_clsProduct : '' ?>" style="position:relative;<?= e($_cardProduct) ?>">
                 <!-- Wishlist heart -->
                 <button class="pub-wishlist-btn"
                         type="button"
@@ -268,7 +278,7 @@ $_cardJob      = pub_card_inline_style('job');
                 <a href="/frontend/public/product.php?id=<?= $pId2 ?>"
                    style="text-decoration:none;display:flex;flex-direction:column;flex:1;"
                    aria-label="<?= e($pName2) ?>">
-                    <div class="pub-cat-img-wrap" style="aspect-ratio:1;">
+                    <div class="pub-cat-img-wrap" style="<?= e($_imgProduct) ?>">
                         <?php if ($pImg2): ?>
                             <img src="<?= e($pImg2) ?>"
                                  alt="<?= e($pName2) ?>" class="pub-cat-img" loading="lazy"
@@ -315,7 +325,7 @@ $_cardJob      = pub_card_inline_style('job');
         <div class="pub-grid-md">
             <?php foreach ($items as $ent): ?>
             <a href="/frontend/public/entity.php?id=<?= (int)($ent['id'] ?? 0) ?>"
-               class="pub-entity-card" style="text-decoration:none;<?= e($_cardEntity) ?>">
+               class="pub-entity-card<?= $_clsEntity ? ' '.$_clsEntity : '' ?>" style="text-decoration:none;<?= e($_cardEntity) ?>">
                 <div class="pub-entity-avatar">
                     <?php if (!empty($ent['logo_url'])): ?>
                         <img src="<?= e(pub_img($ent['logo_url'], 'entity_logo')) ?>"
@@ -367,9 +377,9 @@ else:
         <div class="pub-grid-cat">
             <?php foreach ($featuredCategories as $cat): ?>
             <a href="/frontend/public/products.php?category_id=<?= (int)($cat['id'] ?? 0) ?>"
-               class="pub-cat-card<?= !empty($cat['is_featured']) ? ' pub-cat-card--featured' : '' ?>"
+               class="pub-cat-card<?= !empty($cat['is_featured']) ? ' pub-cat-card--featured' : '' ?><?= $_clsCategory ? ' '.$_clsCategory : '' ?>"
                style="text-decoration:none;<?= e($_cardCategory) ?>">
-                <div class="pub-cat-img-wrap">
+                <div class="pub-cat-img-wrap" style="<?= e($_imgCategory) ?>">
                     <?php if (!empty($cat['image_url'])): ?>
                         <img src="<?= e(pub_img($cat['image_url'], 'category')) ?>"
                              alt="<?= e($cat['name'] ?? '') ?>" class="pub-cat-img" loading="lazy"
@@ -402,8 +412,8 @@ else:
         <div class="pub-grid">
             <?php foreach ($featuredProducts as $p): ?>
             <a href="/frontend/public/product.php?id=<?= (int)($p['id'] ?? 0) ?>"
-               class="pub-product-card" style="text-decoration:none;<?= e($_cardProduct) ?>">
-                <div class="pub-cat-img-wrap" style="aspect-ratio:1;">
+               class="pub-product-card<?= $_clsProduct ? ' '.$_clsProduct : '' ?>" style="text-decoration:none;<?= e($_cardProduct) ?>">
+                <div class="pub-cat-img-wrap" style="<?= e($_imgProduct) ?>">
                     <?php if (!empty($p['image_url'])): ?>
                         <img src="<?= e(pub_img($p['image_url'], 'product')) ?>"
                              alt="<?= e($p['name'] ?? '') ?>" class="pub-cat-img" loading="lazy"
@@ -442,7 +452,7 @@ else:
         <div class="pub-grid-lg">
             <?php foreach ($latestJobs as $j): ?>
             <a href="/frontend/public/jobs.php?id=<?= (int)($j['id'] ?? 0) ?>"
-               class="pub-job-card" style="text-decoration:none;<?= e($_cardJob) ?>">
+               class="pub-job-card<?= $_clsJob ? ' '.$_clsJob : '' ?>" style="text-decoration:none;<?= e($_cardJob) ?>">
                 <h3 class="pub-job-title"><?= e($j['title'] ?? '') ?></h3>
                 <div class="pub-job-meta">
                     <?php if (!empty($j['employment_type'])): ?>
@@ -471,7 +481,7 @@ else:
         <div class="pub-grid-md">
             <?php foreach ($featuredEntities as $ent): ?>
             <a href="/frontend/public/entity.php?id=<?= (int)($ent['id'] ?? 0) ?>"
-               class="pub-entity-card" style="text-decoration:none;<?= e($_cardEntity) ?>">
+               class="pub-entity-card<?= $_clsEntity ? ' '.$_clsEntity : '' ?>" style="text-decoration:none;<?= e($_cardEntity) ?>">
                 <div class="pub-entity-avatar">
                     <?php if (!empty($ent['logo_url'])): ?>
                         <img src="<?= e(pub_img($ent['logo_url'], 'entity_logo')) ?>"
@@ -508,7 +518,7 @@ else:
         <div class="pub-grid-md">
             <?php foreach ($featuredTenants as $ten): ?>
             <a href="/frontend/public/tenants.php?id=<?= (int)($ten['id'] ?? 0) ?>"
-               class="pub-entity-card" style="text-decoration:none;<?= e($_cardTenant) ?>">
+               class="pub-entity-card<?= $_clsTenant ? ' '.$_clsTenant : '' ?>" style="text-decoration:none;<?= e($_cardTenant) ?>">
                 <div class="pub-entity-avatar">🏪</div>
                 <div class="pub-entity-info">
                     <p class="pub-entity-name"><?= e($ten['name'] ?? '') ?></p>
