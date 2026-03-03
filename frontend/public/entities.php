@@ -1,0 +1,184 @@
+<?php
+/**
+ * frontend/public/entities.php
+ * QOOQZ — Public Entities Listing Page
+ */
+
+require_once dirname(__DIR__) . '/includes/public_context.php';
+
+$ctx      = $GLOBALS['PUB_CONTEXT'];
+$lang     = $ctx['lang'];
+$tenantId = $ctx['tenant_id'];
+
+$GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
+$GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
+$GLOBALS['PUB_PAGE_TITLE'] = t('entities.page_title') . ' — QOOQZ';
+
+/* Filters */
+$page   = max(1, (int)($_GET['page'] ?? 1));
+$limit  = 18;
+$search = trim($_GET['q'] ?? '');
+$vType  = trim($_GET['vendor_type'] ?? '');
+
+/* Fetch — PDO-first */
+$entities = [];
+$total    = 0;
+$pdo = pub_get_pdo();
+if ($pdo) {
+    try {
+        $where  = ["e.status NOT IN ('suspended','rejected')"];
+        $params = [];
+
+        if ($tenantId) { $where[] = 'e.tenant_id = ?'; $params[] = $tenantId; }
+
+        if ($search !== '') {
+            $like = '%' . addcslashes($search, '%_\\') . '%';
+            $where[] = '(e.store_name LIKE ? OR e.email LIKE ?)';
+            $params[] = $like; $params[] = $like;
+        }
+
+        if ($vType !== '') { $where[] = 'e.vendor_type = ?'; $params[] = $vType; }
+
+        $whereClause = implode(' AND ', $where);
+
+        $cStmt = $pdo->prepare("SELECT COUNT(*) FROM entities e WHERE $whereClause");
+        $cStmt->execute($params);
+        $total = (int)$cStmt->fetchColumn();
+
+        $offset = ($page - 1) * $limit;
+        $stmt = $pdo->prepare(
+            "SELECT e.id, e.store_name, e.slug, e.vendor_type, e.is_verified,
+                    (SELECT et2.description FROM entity_translations et2
+                     WHERE et2.entity_id = e.id AND et2.language_code = ? LIMIT 1) AS description,
+                    (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url
+             FROM entities e
+             WHERE $whereClause
+             ORDER BY e.is_verified DESC, e.id DESC
+             LIMIT $limit OFFSET $offset"
+        );
+        $stmt->execute(array_merge([$lang], $params));
+        $entities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[entities.php] PDO error: ' . $e->getMessage());
+    }
+}
+if (!$entities && !$pdo) {
+    $qs = http_build_query(array_filter([
+        'lang' => $lang, 'page' => $page, 'limit' => $limit,
+        'tenant_id' => $tenantId, 'vendor_type' => $vType ?: null, 'q' => $search ?: null,
+    ]));
+    $resp     = pub_fetch(pub_api_url('public/entities') . '?' . $qs);
+    $entities = $resp['data']['data'] ?? ($resp['data']['items'] ?? []);
+    $total    = (int)(($resp['data']['meta']['total'] ?? count($entities)));
+}
+$totalPg = ($limit > 0 && $total > 0) ? (int)ceil($total / $limit) : 1;
+
+/* Vendor type labels (static map — no API call needed) */
+$vendorTypes = [
+    ''                => t('entities.type_all'),
+    'product_seller'  => t('entities.type_product'),
+    'service_provider'=> t('entities.type_service'),
+    'both'            => t('entities.type_both'),
+];
+
+include dirname(__DIR__) . '/partials/header.php';
+?>
+
+<div class="pub-container" style="padding-top:28px;">
+
+    <!-- Breadcrumb -->
+    <nav style="font-size:0.84rem;color:var(--pub-muted);margin-bottom:20px;" aria-label="breadcrumb">
+        <a href="/frontend/public/index.php"><?= e(t('common.home')) ?></a>
+        <span style="margin:0 6px;">›</span>
+        <span><?= e(t('nav.entities')) ?></span>
+    </nav>
+
+    <div class="pub-section-head" style="margin-bottom:16px;">
+        <h1 style="font-size:1.4rem;margin:0;">🏢 <?= e(t('nav.entities')) ?></h1>
+        <span style="font-size:0.85rem;color:var(--pub-muted);">
+            <?= number_format($total) ?> <?= e(t('entities.entity_count')) ?>
+        </span>
+    </div>
+
+    <!-- Join as Vendor CTA -->
+    <div class="pub-cta-banner">
+        <div>
+            <h2>🚀 <?= e(t('join_entity.cta_title')) ?></h2>
+            <p><?= e(t('join_entity.cta_subtitle')) ?></p>
+        </div>
+        <a href="/frontend/public/join_entity.php" class="pub-btn--cta"><?= e(t('join_entity.cta_btn')) ?></a>
+    </div>
+
+    <!-- Filters -->
+    <form method="get" class="pub-filter-bar">
+        <input type="search" name="q" class="pub-search-input"
+               placeholder="<?= e(t('entities.search_placeholder')) ?>"
+               value="<?= e($search) ?>">
+        <select name="vendor_type" class="pub-filter-select" data-auto-submit>
+            <?php foreach ($vendorTypes as $val => $label): ?>
+                <option value="<?= e($val) ?>" <?= $vType===$val?'selected':'' ?>><?= e($label) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm"><?= e(t('entities.filter')) ?></button>
+        <?php if ($search||$vType): ?>
+            <a href="/frontend/public/entities.php" class="pub-btn pub-btn--ghost pub-btn--sm"><?= e(t('entities.clear')) ?></a>
+        <?php endif; ?>
+    </form>
+
+    <!-- Entities grid -->
+    <?php if (!empty($entities)): ?>
+    <div class="pub-grid-md">
+        <?php foreach ($entities as $ent): ?>
+        <a href="/frontend/public/entity.php?id=<?= (int)($ent['id'] ?? 0) ?>"
+           class="pub-entity-card" style="text-decoration:none;">
+            <div class="pub-entity-avatar">
+                <?php $logoSrc = pub_img($ent['logo_url'] ?? null, 'entity_logo'); ?>
+                <?php if ($logoSrc): ?>
+                    <img src="<?= e($logoSrc) ?>"
+                         alt="<?= e($ent['store_name'] ?? '') ?>" loading="lazy"
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                    <span style="display:none;align-items:center;justify-content:center;">🏢</span>
+                <?php else: ?>
+                    🏢
+                <?php endif; ?>
+            </div>
+            <div class="pub-entity-info">
+                <p class="pub-entity-name"><?= e($ent['store_name'] ?? $ent['name'] ?? '') ?></p>
+                <?php if (!empty($ent['vendor_type'])): ?>
+                    <p class="pub-entity-desc"><?= e($vendorTypes[$ent['vendor_type']] ?? $ent['vendor_type']) ?></p>
+                <?php endif; ?>
+                <?php if (!empty($ent['description'])): ?>
+                    <p class="pub-entity-desc" style="margin-top:3px;"><?= e($ent['description']) ?></p>
+                <?php endif; ?>
+                <?php if (!empty($ent['is_verified'])): ?>
+                    <span class="pub-entity-verified">✅ <?= e(t('entities.verified')) ?></span>
+                <?php endif; ?>
+            </div>
+        </a>
+        <?php endforeach; ?>
+    </div>
+
+    <?php if ($totalPg > 1): ?>
+    <nav class="pub-pagination">
+        <?php
+        $base_qs = http_build_query(array_filter(['q'=>$search,'vendor_type'=>$vType]));
+        $pg_url  = fn(int $pg) => '?' . ($base_qs?$base_qs.'&':'') . 'page='.$pg;
+        ?>
+        <a href="<?= $pg_url(max(1,$page-1)) ?>" class="pub-page-btn <?= $page<=1?'disabled':'' ?>"><?= e(t('pagination.prev')) ?></a>
+        <?php for ($i = max(1,$page-2); $i <= min($totalPg,$page+2); $i++): ?>
+            <a href="<?= $pg_url($i) ?>" class="pub-page-btn <?= $i===$page?'active':'' ?>"><?= $i ?></a>
+        <?php endfor; ?>
+        <a href="<?= $pg_url(min($totalPg,$page+1)) ?>" class="pub-page-btn <?= $page>=$totalPg?'disabled':'' ?>"><?= e(t('pagination.next')) ?></a>
+    </nav>
+    <?php endif; ?>
+
+    <?php else: ?>
+    <div class="pub-empty">
+        <div class="pub-empty-icon">🏢</div>
+        <p class="pub-empty-msg"><?= e(t('entities.empty')) ?></p>
+    </div>
+    <?php endif; ?>
+
+</div>
+
+<?php include dirname(__DIR__) . '/partials/footer.php'; ?>
