@@ -793,6 +793,7 @@ if (!function_exists('__t')) {
 
 </div><!-- /page-container -->
 
+<?php $deliveryJsVer = '2'; ?>
 <script type="text/javascript">
 window.APP_CONFIG = window.APP_CONFIG || {};
 window.APP_CONFIG.TENANT_ID = <?= (int)$tenantId ?>;
@@ -834,19 +835,24 @@ window.PAGE_PERMISSIONS = <?= json_encode(['canCreate'=>$canCreate, 'canEdit'=>$
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js" crossorigin=""></script>
 
 <?php if ($isFragment): ?>
-<script src="/admin/assets/js/admin_framework.js?v=<?= time() ?>"></script>
-<script src="/admin/assets/js/pages/delivery.js?v=<?= time() ?>"></script>
+<script src="/admin/assets/js/pages/delivery.js?v=<?= $deliveryJsVer ?>"></script>
 <script>(function(){
-    var i=0;
-    var iv=setInterval(function(){
-        if(window.Delivery && typeof window.Delivery.init==='function'){
-            clearInterval(iv);
-            window.Delivery.init();
-        } else if(++i > 120){ clearInterval(iv); console.error('Delivery init timeout'); }
+    // If delivery.js was already loaded on a prior navigation, Delivery.reinit() resets maps
+    // and re-runs init() on the fresh DOM.  On the very first load delivery.js auto-inits.
+    if (window.Delivery && typeof window.Delivery.reinit === 'function') {
+        window.Delivery.reinit();
+        return;
+    }
+    // delivery.js not yet loaded — it will self-init via its own IIFE.
+    // Just watch for load timeout as a safety net.
+    var i = 0;
+    var iv = setInterval(function(){
+        if (window.Delivery) { clearInterval(iv); }
+        else if (++i > 120) { clearInterval(iv); console.error('Delivery init timeout'); }
     }, 100);
 })();</script>
 <?php else: ?>
-<script src="/admin/assets/js/pages/delivery.js?v=<?= time() ?>"></script>
+<script src="/admin/assets/js/pages/delivery.js?v=<?= $deliveryJsVer ?>"></script>
 <?php endif; ?>
 
 <?php if (!$isFragment): require_once __DIR__ . '/../includes/footer.php'; endif; ?>

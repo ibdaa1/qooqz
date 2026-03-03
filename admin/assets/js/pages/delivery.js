@@ -1143,6 +1143,7 @@
                 });
             } else {
                 // Leaflet scripts should load synchronously; this is a safety fallback
+                var MAX_LEAFLET_LOAD_ATTEMPTS = 100; // 100 × 100 ms = 10 s
                 var attempts = 0;
                 var iv = setInterval(function() {
                     if (typeof L !== 'undefined') {
@@ -1151,7 +1152,7 @@
                         [300, 700, 1500].forEach(function(ms) {
                             setTimeout(function() { if (zonesMap) zonesMap.invalidateSize(); }, ms);
                         });
-                    } else if (++attempts > 30) { clearInterval(iv); console.warn('[Delivery] Leaflet failed to load after 3s'); }
+                    } else if (++attempts > MAX_LEAFLET_LOAD_ATTEMPTS) { clearInterval(iv); console.warn('[Delivery] Leaflet failed to load after 10s'); }
                 }, 100);
             }
         }
@@ -1162,9 +1163,30 @@
         await zonesMod.load(1);
     }
 
+    // ─── Reinitialise after AJAX re-navigation ────────────────────────
+    // Called by delivery.php inline script when the fragment is reloaded.
+    // Destroys existing Leaflet maps (their container divs are gone from the
+    // re-injected DOM), resets state, then calls init() on the fresh DOM.
+    function reinit() {
+        if (zonesMap) {
+            try { zonesMap.off(); zonesMap.remove(); } catch(e) {}
+            zonesMap = null;
+            drawnItems = null;
+            zoneLayerMap.clear();
+        }
+        if (coordPickerMap) {
+            try { coordPickerMap.off(); coordPickerMap.remove(); } catch(e) {}
+            coordPickerMap = null;
+            coordPickerMarker = null;
+        }
+        state.initialized = false;
+        init();
+    }
+
     // ─── Public API ───────────────────────────────────────────────────
     window.Delivery = {
         init: init,
+        reinit: reinit,
         editZone:     function(id) { zonesMod.edit(id); },
         delZone:      function(id) { zonesMod.del(id); },
         editProvider: function(id) { providersMod.edit(id); },

@@ -157,6 +157,7 @@ $ADMIN_MENU = [
     ['id'=>'categories','i18n'=>'nav.categories','icon'=>'📂','url'=>'/admin/menus_list.php','load'=>'/admin/menus_list.php'],
     ['id'=>'products','i18n'=>'nav.products','icon'=>'📦','url'=>'/admin/fragments/products.php','load'=>'/admin/fragments/products.php'],
     ['id'=>'vendors','i18n'=>'menu.vendors','icon'=>'🏪','url'=>'/admin/fragments/tenant_categories.php','load'=>'/admin/fragments/tenant_categories.php'],
+    ['id'=>'delivery','i18n'=>'nav.delivery','icon'=>'🗺️','url'=>'/admin/fragments/delivery.php','load'=>'/admin/fragments/delivery.php'],
     ['id'=>'delivery_companies','i18n'=>'menu.delivery_companies','icon'=>'🚚','url'=>'/admin/fragments/IndependentDriver.php','load'=>'/admin/fragments/IndependentDriver.php'],
     ['id'=>'orders','i18n'=>'nav.orders','icon'=>'🧾','url'=>'/admin/orders.php','load'=>'/admin/orders.php'],
     ['id'=>'payments','i18n'=>'menu.payments','icon'=>'💳','url'=>'/admin/payments.php','load'=>'/admin/payments.php'],
