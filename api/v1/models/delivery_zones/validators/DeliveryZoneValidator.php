@@ -25,8 +25,16 @@ final class DeliveryZoneValidator
         }
 
         if (isset($data['zone_type'])) {
-            if ($data['zone_type'] === 'polygon' && empty($data['zone_value'])) {
-                throw new InvalidArgumentException('Polygon zones require zone_value (GeoJSON geometry).');
+            if ($data['zone_type'] === 'polygon') {
+                $zoneValueProvided = array_key_exists('zone_value', $data);
+                $zoneValueEmpty    = $zoneValueProvided && empty($data['zone_value']);
+
+                if (!$isUpdate && !$zoneValueProvided) {
+                    throw new InvalidArgumentException('Polygon zones require zone_value (GeoJSON geometry).');
+                }
+                if ($zoneValueEmpty) {
+                    throw new InvalidArgumentException('Polygon zones require zone_value (GeoJSON geometry).');
+                }
             }
 
             if ($data['zone_type'] === 'polygon' && !empty($data['zone_value'])) {
