@@ -34,7 +34,11 @@ $total   = (int)($meta['total'] ?? count($tenants));
 $totalPg = (int)($meta['total_pages'] ?? (($limit > 0 && $total > 0) ? (int)ceil($total / $limit) : 1));
 
 include dirname(__DIR__) . '/partials/header.php';
+
+// Resolve tenant card style from DB card_styles (card_type='tenant')
+$_tenantCardStyle = pub_card_inline_style('tenant');
 ?>
+
 
 <div class="pub-container" style="padding-top:28px;">
 
@@ -77,7 +81,7 @@ include dirname(__DIR__) . '/partials/header.php';
     <div class="pub-grid-md">
         <?php foreach ($tenants as $ten): ?>
         <a href="/frontend/public/tenant.php?id=<?= (int)($ten['id'] ?? 0) ?>"
-           class="pub-entity-card" style="text-decoration:none;">
+           class="pub-entity-card" style="text-decoration:none;<?= e($_tenantCardStyle) ?>">
             <div class="pub-entity-avatar">🏪</div>
             <div class="pub-entity-info">
                 <p class="pub-entity-name"><?= e($ten['store_name'] ?? $ten['name'] ?? '') ?></p>

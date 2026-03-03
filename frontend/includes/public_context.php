@@ -737,7 +737,49 @@ if (!function_exists('pub_img_tag')) {
 }
 
 /* -------------------------------------------------------
- * 11. Compose the shared context globals
+ * 11. Card inline-style helper — DB-driven card_styles
+ * ----------------------------------------------------- */
+if (!function_exists('pub_card_inline_style')) {
+    /**
+     * Return an inline CSS style string for a card element, sourced from the
+     * DB card_styles table (already loaded into $GLOBALS['PUB_CONTEXT']['theme']['cards']).
+     *
+     * Matches by card_type first, then by slug. Returns '' when no matching row exists.
+     *
+     * @param string $cardType  e.g. 'entity', 'tenant', 'product'
+     */
+    function pub_card_inline_style(string $cardType): string {
+        $cards = $GLOBALS['PUB_CONTEXT']['theme']['cards'] ?? [];
+        $row   = null;
+        foreach ($cards as $c) {
+            if (($c['card_type'] ?? '') === $cardType || ($c['slug'] ?? '') === $cardType) {
+                $row = $c;
+                break;
+            }
+        }
+        if (!$row) return '';
+
+        // Escape a CSS value: HTML-encode and also strip characters that could
+        // break out of a style="..." attribute or inject extra CSS properties.
+        $esc = function(string $v): string {
+            $v = str_replace(['"', "'", ';', '{', '}', '\\'], '', $v);
+            return htmlspecialchars($v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        };
+        $parts = [];
+        if (!empty($row['background_color'])) $parts[] = 'background-color:' . $esc($row['background_color']);
+        if (!empty($row['border_color'])) {
+            $bw = max(0, (int)($row['border_width'] ?? 1));
+            $parts[] = 'border:' . $bw . 'px solid ' . $esc($row['border_color']);
+        }
+        if (isset($row['border_radius']) && $row['border_radius'] !== '') $parts[] = 'border-radius:' . (int)$row['border_radius'] . 'px';
+        if (!empty($row['shadow_style']))  $parts[] = 'box-shadow:' . $esc($row['shadow_style']);
+        if (!empty($row['padding']))       $parts[] = 'padding:' . $esc($row['padding']);
+        return implode(';', $parts);
+    }
+}
+
+/* -------------------------------------------------------
+ * 12. Compose the shared context globals
  * ----------------------------------------------------- */
 $tenantId = (int)($_GET['tenant_id'] ?? $_SESSION['pub_tenant_id'] ?? 1);
 $_SESSION['pub_tenant_id'] = $tenantId;
