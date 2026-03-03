@@ -68,8 +68,8 @@ $brand = $payload['strings']['brand'] ?? 'Admin';
 
 /* Footer styles — colors from DB via :root vars above */
 .admin-footer {
-    background: var(--background_secondary) !important;
-    color: var(--text_secondary) !important;
+    background: var(--footer_background, var(--background_secondary, #1e2533)) !important;
+    color: var(--footer_text, var(--text_secondary, #B0B0B0)) !important;
     border-top: 1px solid var(--border_color);
     padding: 1rem 0;
     margin-top: auto;

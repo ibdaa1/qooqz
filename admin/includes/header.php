@@ -220,8 +220,8 @@ body {
 }
 
 .admin-header {
-    background: var(--background_main);
-    color: var(--text_primary);
+    background: var(--header_background, var(--background_secondary, #1e2533));
+    color: var(--header_text, var(--text_primary, #FFFFFF));
     border-bottom: 1px solid var(--border_color);
 }
 

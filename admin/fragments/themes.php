@@ -321,7 +321,8 @@ window.THEMES_CONFIG = {
                             <option value="primary">Primary</option><option value="secondary">Secondary</option>
                             <option value="accent">Accent</option><option value="background">Background</option>
                             <option value="text">Text</option><option value="border">Border</option>
-                            <option value="status">Status</option><option value="other">Other</option>
+                            <option value="status">Status</option><option value="header">Header</option>
+                            <option value="footer">Footer</option><option value="other">Other</option>
                         </select>
                     </div>
                     <div class="form-group">
