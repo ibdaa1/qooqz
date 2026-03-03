@@ -793,7 +793,7 @@ if (!function_exists('__t')) {
 
 </div><!-- /page-container -->
 
-<?php $deliveryJsVer = '2'; ?>
+<?php $deliveryJsVer = '3'; ?>
 <script type="text/javascript">
 window.APP_CONFIG = window.APP_CONFIG || {};
 window.APP_CONFIG.TENANT_ID = <?= (int)$tenantId ?>;
@@ -830,10 +830,7 @@ window.DELIVERY_CONFIG = {
 window.PAGE_PERMISSIONS = <?= json_encode(['canCreate'=>$canCreate, 'canEdit'=>$canEdit, 'canDelete'=>$canDelete], JSON_UNESCAPED_UNICODE) ?>;
 </script>
 
-<!-- Leaflet JS (sync load before delivery.js) -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js" crossorigin=""></script>
-
+<!-- delivery.js self-loads Leaflet JS + CSS (same pattern as test_map.php / DeliveryZone.js) -->
 <?php if ($isFragment): ?>
 <script src="/admin/assets/js/pages/delivery.js?v=<?= $deliveryJsVer ?>"></script>
 <script>(function(){
