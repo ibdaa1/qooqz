@@ -100,11 +100,11 @@ final class PdoDeliveryZoneRepository implements DeliveryZoneRepositoryInterface
         $stmt = $this->pdo->prepare("
             INSERT INTO delivery_zones (
                 tenant_id, provider_id, zone_name, zone_type, city_id, 
-                center_lat, center_lng, radius_km, delivery_fee, 
+                center_lat, center_lng, radius_km, zone_value, delivery_fee, 
                 free_delivery_over, min_order_value, estimated_minutes, is_active
             ) VALUES (
                 :tenant_id, :provider_id, :zone_name, :zone_type, :city_id, 
-                :center_lat, :center_lng, :radius_km, :delivery_fee, 
+                :center_lat, :center_lng, :radius_km, :zone_value, :delivery_fee, 
                 :free_delivery_over, :min_order_value, :estimated_minutes, :is_active
             )
         ");
@@ -118,6 +118,9 @@ final class PdoDeliveryZoneRepository implements DeliveryZoneRepositoryInterface
             ':center_lat'         => $data['center_lat'] ?? null,
             ':center_lng'         => $data['center_lng'] ?? null,
             ':radius_km'          => $data['radius_km'] ?? null,
+            ':zone_value'         => isset($data['zone_value'])
+                                        ? (is_array($data['zone_value']) ? json_encode($data['zone_value'], JSON_UNESCAPED_UNICODE) : $data['zone_value'])
+                                        : null,
             ':delivery_fee'       => $data['delivery_fee'],
             ':free_delivery_over' => $data['free_delivery_over'] ?? null,
             ':min_order_value'    => $data['min_order_value'] ?? null,
@@ -139,14 +142,18 @@ final class PdoDeliveryZoneRepository implements DeliveryZoneRepositoryInterface
 
         $allowedFields = [
             'provider_id', 'zone_name', 'zone_type', 'city_id', 
-            'center_lat', 'center_lng', 'radius_km', 'delivery_fee', 
+            'center_lat', 'center_lng', 'radius_km', 'zone_value', 'delivery_fee', 
             'free_delivery_over', 'min_order_value', 'estimated_minutes', 'is_active'
         ];
 
         foreach ($allowedFields as $field) {
             if (array_key_exists($field, $data)) {
                 $fields[] = "{$field} = :{$field}";
-                $params[":{$field}"] = $data[$field];
+                $value = $data[$field];
+                if ($field === 'zone_value' && is_array($value)) {
+                    $value = json_encode($value, JSON_UNESCAPED_UNICODE);
+                }
+                $params[":{$field}"] = $value;
             }
         }
 
