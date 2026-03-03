@@ -53,6 +53,10 @@ $tenantName = e($tenant['name'] ?? 'Tenant');
 $GLOBALS['PUB_PAGE_TITLE'] = $tenantName . ' — QOOQZ';
 
 include dirname(__DIR__) . '/partials/header.php';
+
+// Resolve entity card style from DB card_styles (card_type='entities')
+$_tenantEntityCardStyle = pub_card_inline_style('entities');
+$_tenantEntityCardClass = pub_card_css_class('entities');
 ?>
 
 <div class="pub-container" style="padding-top:28px;padding-bottom:40px;">
@@ -114,7 +118,7 @@ include dirname(__DIR__) . '/partials/header.php';
     <div class="pub-grid-md">
         <?php foreach ($entities as $en): ?>
         <a href="/frontend/public/entity.php?id=<?= (int)($en['id'] ?? 0) ?>"
-           class="pub-entity-card" style="text-decoration:none;">
+           class="pub-entity-card<?= $_tenantEntityCardClass ? ' ' . $_tenantEntityCardClass : '' ?>" style="text-decoration:none;<?= e($_tenantEntityCardStyle) ?>">
             <div class="pub-entity-card-logo">
                 <?php if (!empty($en['logo_url'])): ?>
                     <img src="<?= e(pub_img($en['logo_url'], 'entity_logo')) ?>"

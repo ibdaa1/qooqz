@@ -301,6 +301,13 @@ $dayNames = [
 ];
 
 include dirname(__DIR__) . '/partials/header.php';
+
+// Resolve card styles from DB card_styles for cards rendered on this page
+$_entityProductCardStyle = pub_card_inline_style('product');
+$_entityProductCardClass = pub_card_css_class('product');
+$_entityProductImgStyle  = pub_card_img_style('product');
+$_entityDiscountCardStyle = pub_card_inline_style('discount');
+$_entityDiscountCardClass = pub_card_css_class('discount');
 ?>
 
 <!-- Entity Banner -->
@@ -491,10 +498,10 @@ include dirname(__DIR__) . '/partials/header.php';
         <?php if (!empty($products)): ?>
         <div class="pub-grid" style="margin-top:20px;">
             <?php foreach ($products as $p): ?>
-            <div class="pub-product-card">
+            <div class="pub-product-card<?= $_entityProductCardClass ? ' ' . $_entityProductCardClass : '' ?>"<?= $_entityProductCardStyle ? ' style="' . e($_entityProductCardStyle) . '"' : '' ?>>
                 <a href="/frontend/public/product.php?id=<?= (int)($p['id'] ?? 0) ?>"
                    style="text-decoration:none;display:block;">
-                <div class="pub-cat-img-wrap" style="aspect-ratio:1;">
+                <div class="pub-cat-img-wrap" style="<?= e($_entityProductImgStyle) ?>">
                     <?php if (!empty($p['image_url'])): ?>
                         <img src="<?= e(pub_img($p['image_url'], 'product_thumb')) ?>"
                              alt="<?= e($p['name'] ?? '') ?>" class="pub-cat-img" loading="lazy"
@@ -664,7 +671,7 @@ include dirname(__DIR__) . '/partials/header.php';
         <?php if (!empty($discounts)): ?>
         <div style="margin-top:20px;display:grid;gap:14px;">
             <?php foreach ($discounts as $d): ?>
-            <div class="pub-discount-card">
+            <div class="pub-discount-card<?= $_entityDiscountCardClass ? ' ' . $_entityDiscountCardClass : '' ?>"<?= $_entityDiscountCardStyle ? ' style="' . e($_entityDiscountCardStyle) . '"' : '' ?>>
                 <?php if (!empty($d['marketing_badge'])): ?>
                     <span class="pub-discount-badge-top"><?= e($d['marketing_badge']) ?></span>
                 <?php endif; ?>

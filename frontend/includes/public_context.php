@@ -371,8 +371,24 @@ if (!function_exists('pub_load_theme')) {
                         if ($mapped) $theme[$mapped] = $v;
                         $colors[$k] = $v;
                     }
+                    // Also fill theme keys from color-type design_settings when color_settings is absent
+                    $dColorThemeMap = [
+                        'header_bg_color'   => 'header_bg',
+                        'footer_bg_color'   => 'footer_bg',
+                        'header_text_color' => 'header_text_color',
+                        'footer_text_color' => 'footer_text_color',
+                    ];
+                    foreach ($designs as $_d) {
+                        if (($_d['setting_type'] ?? '') !== 'color' || empty($_d['setting_value'])) continue;
+                        $_dk = $_d['setting_key'] ?? '';
+                        if (isset($dColorThemeMap[$_dk], $defaults[$dColorThemeMap[$_dk]]) && $theme[$dColorThemeMap[$_dk]] === $defaults[$dColorThemeMap[$_dk]]) {
+                            $theme[$dColorThemeMap[$_dk]] = $_d['setting_value'];
+                        }
+                    }
+                    unset($dColorThemeMap, $_d, $_dk);
+
                     // header_bg defaults to primary if not explicitly set
-                    if (empty($colors['header_bg_color']) && empty($colors['header_background'])) {
+                    if (empty($colors['header_bg_color']) && empty($colors['header_background']) && $theme['header_bg'] === $defaults['header_bg']) {
                         $theme['header_bg'] = $theme['primary'];
                     }
 
@@ -444,9 +460,40 @@ if (!function_exists('pub_load_theme')) {
                         if (!empty($f['font_size']))   $css .= '  --' . $sk . '-size: '   . $cssEsc((string)$f['font_size'])   . ";\n";
                         if (!empty($f['font_weight'])) $css .= '  --' . $sk . '-weight: ' . $cssEsc((string)$f['font_weight']) . ";\n";
                     }
+                    // design_settings → raw CSS vars + --pub-* aliases for color and layout keys
+                    $dColorToCssVar = [
+                        'header_bg_color'    => 'pub-header-bg',
+                        'footer_bg_color'    => 'pub-footer-bg',
+                        'header_text_color'  => 'pub-header-text',
+                        'footer_text_color'  => 'pub-footer-text',
+                        'sidebar_bg_color'   => 'pub-sidebar-bg',
+                        'sidebar_text_color' => 'pub-sidebar-text',
+                    ];
+                    $dLayoutToCssVar = [
+                        'container_max_width' => 'pub-max-width',
+                        'header_height'       => 'pub-header-height',
+                        'sidebar_width'       => 'pub-sidebar-width',
+                        'default_padding'     => 'pub-padding',
+                        'logo_height'         => 'pub-logo-height',
+                    ];
                     foreach ($designs as $d) {
                         if (empty($d['setting_key']) || empty($d['setting_value'])) continue;
-                        $css .= '  --' . preg_replace('/[^a-z0-9_\-]/', '-', strtolower($d['setting_key'])) . ': ' . $cssEsc((string)$d['setting_value']) . ";\n";
+                        $dk = $d['setting_key'];
+                        $dv = (string)$d['setting_value'];
+                        $dt = $d['setting_type'] ?? '';
+                        $css .= '  --' . preg_replace('/[^a-z0-9_\-]/', '-', strtolower($dk)) . ': ' . $cssEsc($dv) . ";\n";
+                        // Generate --pub-* alias for color-type entries
+                        if ($dt === 'color' && isset($dColorToCssVar[$dk])) {
+                            $css .= '  --' . $dColorToCssVar[$dk] . ': ' . $cssEsc($dv) . ";\n";
+                        }
+                        // Generate --pub-* alias for layout/size entries
+                        if (in_array($dt, ['number', 'text'], true) && isset($dLayoutToCssVar[$dk])) {
+                            $cssVal = $dv;
+                            if ($dt === 'number' && !preg_match('/[a-z%]$/i', $cssVal)) {
+                                $cssVal .= 'px';
+                            }
+                            $css .= '  --' . $dLayoutToCssVar[$dk] . ': ' . $cssEsc($cssVal) . ";\n";
+                        }
                     }
                     $css .= "}\n";
                     // Apply font_settings variables to relevant UI elements

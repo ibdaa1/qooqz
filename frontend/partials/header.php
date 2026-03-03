@@ -194,6 +194,7 @@ $_fontUrl = $dir === 'rtl'
         --pub-header-text: <?= e($theme['header_text_color'] ?? '#FFFFFF') ?>;
         --pub-footer-bg:  <?= e($theme['footer_bg']        ?? '#1e2a38') ?>;
         --pub-footer-text:<?= e($theme['footer_text_color'] ?? '#B0B0B0') ?>;
+        --pub-card:       <?= e($theme['surface']    ?? '#1a1a2e') ?>;
     }
     .pub-header  { background: var(--pub-header-bg) !important; color: var(--pub-header-text) !important; }
     .pub-hero    { background: linear-gradient(135deg, var(--pub-header-bg) 0%, var(--pub-accent) 100%) !important; }

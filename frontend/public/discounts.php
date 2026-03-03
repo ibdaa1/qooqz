@@ -15,6 +15,10 @@ $qs       = 'lang=' . urlencode($lang) . '&tenant_id=' . $tenantId;
 
 $GLOBALS['PUB_PAGE_TITLE'] = t('discounts.page_title') . ' — QOOQZ';
 
+// Resolve discount card style from DB card_styles (card_type='discount')
+$_discountCardStyle = pub_card_inline_style('discount');
+$_discountCardClass = pub_card_css_class('discount');
+
 /* -------------------------------------------------------
  * Fetch all active discounts for this tenant
  * ----------------------------------------------------- */
@@ -50,7 +54,7 @@ include dirname(__DIR__) . '/partials/header.php';
 
     <div style="display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">
         <?php foreach ($discounts as $d): ?>
-        <div class="pub-discount-card">
+        <div class="pub-discount-card<?= $_discountCardClass ? ' ' . $_discountCardClass : '' ?>"<?= $_discountCardStyle ? ' style="' . e($_discountCardStyle) . '"' : '' ?>>
             <?php if (!empty($d['marketing_badge'])): ?>
                 <span class="pub-discount-badge-top"><?= e($d['marketing_badge']) ?></span>
             <?php endif; ?>

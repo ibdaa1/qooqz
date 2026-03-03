@@ -10,6 +10,11 @@ if (!$_isLoggedIn) {
 $GLOBALS['PUB_PAGE_TITLE'] = e(t('wishlist.page_title')) . ' — QOOQZ';
 include dirname(__DIR__) . '/partials/header.php';
 
+// Resolve product card style from DB card_styles (card_type='product')
+$_wishProductCardStyle = pub_card_inline_style('product');
+$_wishProductCardClass = pub_card_css_class('product');
+$_wishProductImgStyle  = pub_card_img_style('product');
+
 // Load wishlist items via direct PDO for reliability
 $wishItems = [];
 $wishlistId = 0;
@@ -77,7 +82,7 @@ if ($pdo) {
             $wCur   = $wi['currency_code'] ?? '';
             $wImg   = pub_img($wi['image_url'] ?? null, 'product');
         ?>
-        <div class="pub-product-card" style="position:relative;" id="wishcard-<?= $wPid ?>">
+        <div class="pub-product-card<?= $_wishProductCardClass ? ' ' . $_wishProductCardClass : '' ?>" style="position:relative;<?= e($_wishProductCardStyle) ?>" id="wishcard-<?= $wPid ?>">
             <!-- Heart button (active — in wishlist) -->
             <button class="pub-wishlist-btn pub-wishlist-active"
                     type="button"

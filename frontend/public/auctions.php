@@ -84,6 +84,11 @@ function auc_countdown_label(string $endDate, string $lang): string {
 }
 
 include dirname(__DIR__) . '/partials/header.php';
+
+// Resolve auction card style from DB card_styles (card_type='auction')
+$_auctionCardStyle = pub_card_inline_style('auction');
+$_auctionCardClass = pub_card_css_class('auction');
+$_auctionImgStyle  = pub_card_img_style('auction', '4/3');
 ?>
 <div class="pub-page pub-auctions-page">
   <div class="pub-container">
@@ -137,7 +142,7 @@ include dirname(__DIR__) . '/partials/header.php';
         $aCountdown = $aEnd ? auc_countdown_label($aEnd, $lang) : '';
         $aUrl    = '/frontend/public/auction.php?id=' . $aId;
       ?>
-      <div class="pub-auction-card<?= $aFeat ? ' pub-auction-featured' : '' ?>">
+      <div class="pub-auction-card<?= $aFeat ? ' pub-auction-featured' : '' ?><?= $_auctionCardClass ? ' ' . $_auctionCardClass : '' ?>"<?= $_auctionCardStyle ? ' style="' . e($_auctionCardStyle) . '"' : '' ?>>
         <?php if ($aFeat): ?><div class="pub-auction-badge-feat"><?= e(t('auctions.featured')) ?></div><?php endif; ?>
         <a href="<?= e($aUrl) ?>" class="pub-auction-img-wrap">
           <?php if ($aImg): ?>

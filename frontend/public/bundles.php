@@ -20,6 +20,11 @@ $meta    = $resp['meta'] ?? [];
 
 $GLOBALS['PUB_PAGE_TITLE'] = e(t('bundles.page_title', ['default' => 'Bundle Deals'])) . ' — QOOQZ';
 include dirname(__DIR__) . '/partials/header.php';
+
+// Resolve bundle card style from DB card_styles (card_type='bundle')
+$_bundleCardStyle = pub_card_inline_style('bundle');
+$_bundleCardClass = pub_card_css_class('bundle');
+$_bundleImgStyle  = pub_card_img_style('bundle', '4/3');
 ?>
 <main class="pub-container" style="padding:28px 0 48px;">
     <div class="pub-section-head">
@@ -45,7 +50,7 @@ include dirname(__DIR__) . '/partials/header.php';
             $bId   = (int)($b['id'] ?? 0);
             $bStock= (int)($b['stock_quantity'] ?? 0);
         ?>
-        <div class="pub-card" style="position:relative;overflow:hidden;border-radius:12px;padding:0;">
+        <div class="pub-card<?= $_bundleCardClass ? ' ' . $_bundleCardClass : '' ?>" style="position:relative;overflow:hidden;border-radius:12px;padding:0;<?= e($_bundleCardStyle) ?>">
             <?php if ($bPct > 0): ?>
             <div style="position:absolute;top:12px;left:12px;background:var(--pub-accent,#f59e0b);color:#000;
                         border-radius:20px;padding:3px 12px;font-size:0.82rem;font-weight:700;z-index:2;">

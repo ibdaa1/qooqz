@@ -15,6 +15,10 @@ $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = t('jobs.page_title') . ' — QOOQZ';
 
+// Resolve job card style from DB card_styles (card_type='job')
+$_jobCardStyle = pub_card_inline_style('job');
+$_jobCardClass = pub_card_css_class('job');
+
 /* Filters */
 $page      = max(1, (int)($_GET['page'] ?? 1));
 $limit     = 15;
@@ -99,7 +103,8 @@ include dirname(__DIR__) . '/partials/header.php';
     <div class="pub-grid-lg">
         <?php foreach ($jobs as $j): ?>
         <a href="/frontend/public/job.php?id=<?= (int)($j['id'] ?? 0) ?>"
-           class="pub-job-card" style="text-decoration:none;">
+           class="pub-job-card<?= $_jobCardClass ? ' ' . $_jobCardClass : '' ?>"
+           style="text-decoration:none;<?= e($_jobCardStyle) ?>">
             <h2 class="pub-job-title"><?= e($j['title'] ?? '') ?></h2>
             <div class="pub-job-meta">
                 <?php if (!empty($j['city_name'])): ?>
