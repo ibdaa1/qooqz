@@ -483,6 +483,11 @@
         });
     }
 
+    // Expose boot so the fragment's inline script can re-trigger initialisation
+    // on subsequent AJAX loads (runScripts skips already-loaded external .js tags).
+    window.DZ = window.DZ || {};
+    window.DZ.boot = boot;
+
     // Works in both direct page load and AJAX fragment injection modes.
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', boot);

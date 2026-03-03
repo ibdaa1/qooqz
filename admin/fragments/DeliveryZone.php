@@ -396,6 +396,9 @@ if ($shouldRenderFull && !$parentHasHeader) {
   try { window.CURRENT_USER = <?php echo $currentUserJson; ?>; } catch (e) { window.CURRENT_USER = {id:0}; }
   window.ADMIN_LANG    = '<?php echo htmlspecialchars($preferredLang, ENT_QUOTES | ENT_SUBSTITUTE); ?>';
   window.LANG_DIRECTION= '<?php echo htmlspecialchars($langDirection, ENT_QUOTES | ENT_SUBSTITUTE); ?>';
+  // If DeliveryZone.js was already loaded (prior AJAX navigation), runScripts
+  // will have skipped the <script src> tag below — call boot() explicitly here.
+  if (window.DZ && typeof window.DZ.boot === 'function') window.DZ.boot();
 </script>
 
 <!-- DeliveryZone.js self-loads Leaflet JS + CSS before initialising the map -->
