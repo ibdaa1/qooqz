@@ -83,9 +83,9 @@ $vendorTypes = [
 
 include dirname(__DIR__) . '/partials/header.php';
 
-// Resolve entity card style from DB card_styles (card_type='entity')
-$_entityCardStyle = pub_card_inline_style('entity');
-$_entityCardClass = pub_card_css_class('entity');
+// Resolve entity card style from DB card_styles (card_type='entities')
+$_entityCardStyle = pub_card_inline_style('entities');
+$_entityCardClass = pub_card_css_class('entities');
 ?>
 
 

@@ -65,15 +65,15 @@ $totalTenants   = (int)($rTen['data']['meta']['total']  ?? 0);
 include dirname(__DIR__) . '/partials/header.php';
 
 // Resolve card styles from DB card_styles table (no extra query — already loaded in theme)
-$_cardEntity    = pub_card_inline_style('entity');
-$_cardTenant    = pub_card_inline_style('tenant');
+$_cardEntity    = pub_card_inline_style('entities');
+$_cardTenant    = pub_card_inline_style('tenants');
 $_cardProduct   = pub_card_inline_style('product');
 $_cardCategory  = pub_card_inline_style('category');
 $_cardDeal      = pub_card_inline_style('deal');
 $_cardJob       = pub_card_inline_style('job');
 // CSS class names for hover effects (generated from card_styles.hover_effect in pub_load_theme)
-$_clsEntity     = pub_card_css_class('entity');
-$_clsTenant     = pub_card_css_class('tenant');
+$_clsEntity     = pub_card_css_class('entities');
+$_clsTenant     = pub_card_css_class('tenants');
 $_clsProduct    = pub_card_css_class('product');
 $_clsCategory   = pub_card_css_class('category');
 $_clsDeal       = pub_card_css_class('deal');

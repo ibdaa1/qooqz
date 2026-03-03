@@ -35,9 +35,9 @@ $totalPg = (int)($meta['total_pages'] ?? (($limit > 0 && $total > 0) ? (int)ceil
 
 include dirname(__DIR__) . '/partials/header.php';
 
-// Resolve tenant card style from DB card_styles (card_type='tenant')
-$_tenantCardStyle = pub_card_inline_style('tenant');
-$_tenantCardClass = pub_card_css_class('tenant');
+// Resolve tenant card style from DB card_styles (card_type='tenants')
+$_tenantCardStyle = pub_card_inline_style('tenants');
+$_tenantCardClass = pub_card_css_class('tenants');
 ?>
 
 
