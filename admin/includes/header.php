@@ -171,60 +171,83 @@ foreach ($theme['design_settings'] ?? [] as $d) {
     </style>
     <?php endif; ?>
 
-    <!-- CSS Variables -->
+    <!-- CSS Variables — DB-driven (both underscore and hyphen forms for full compatibility) -->
     <style id="dynamic-theme-vars">
 :root {
-<?php foreach ($theme['color_settings'] ?? [] as $c): ?>
-    --<?= htmlspecialchars($c['setting_key']) ?>: <?= htmlspecialchars($c['color_value']) ?>;
+<?php foreach ($theme['color_settings'] ?? [] as $c):
+    $k = htmlspecialchars($c['setting_key']);
+    $h = htmlspecialchars(str_replace('_', '-', $c['setting_key']));
+    $v = htmlspecialchars($c['color_value']);
+?>
+    --<?= $k ?>: <?= $v ?>;
+<?php if ($h !== $k): ?>    --<?= $h ?>: <?= $v ?>;
+<?php endif; ?>
 <?php endforeach; ?>
-<?php foreach ($theme['font_settings'] ?? [] as $f): ?>
+<?php foreach ($theme['font_settings'] ?? [] as $f):
+    $sk = htmlspecialchars($f['setting_key']);
+    $sh = htmlspecialchars(str_replace('_', '-', $f['setting_key']));
+?>
 <?php if (!empty($f['font_family'])): ?>
-    --<?= htmlspecialchars($f['setting_key']) ?>-family: <?= htmlspecialchars($f['font_family']) ?>;
+    --<?= $sk ?>-family: <?= htmlspecialchars($f['font_family']) ?>;
+    --<?= $sh ?>-family: <?= htmlspecialchars($f['font_family']) ?>;
 <?php endif; ?>
 <?php if (!empty($f['font_size'])): ?>
-    --<?= htmlspecialchars($f['setting_key']) ?>-size: <?= htmlspecialchars($f['font_size']) ?>;
+    --<?= $sk ?>-size: <?= htmlspecialchars($f['font_size']) ?>;
+    --<?= $sh ?>-size: <?= htmlspecialchars($f['font_size']) ?>;
 <?php endif; ?>
 <?php if (!empty($f['font_weight'])): ?>
-    --<?= htmlspecialchars($f['setting_key']) ?>-weight: <?= htmlspecialchars($f['font_weight']) ?>;
+    --<?= $sk ?>-weight: <?= htmlspecialchars($f['font_weight']) ?>;
+    --<?= $sh ?>-weight: <?= htmlspecialchars($f['font_weight']) ?>;
 <?php endif; ?>
 <?php endforeach; ?>
-<?php foreach ($theme['design_settings'] ?? [] as $d): ?>
-<?php if (!empty($d['setting_value'])): ?>
-    --<?= htmlspecialchars($d['setting_key']) ?>: <?= htmlspecialchars($d['setting_value']) ?>;
+<?php foreach ($theme['design_settings'] ?? [] as $d):
+    if (empty($d['setting_value'])) continue;
+    $dk = htmlspecialchars($d['setting_key']);
+    $dh = htmlspecialchars(str_replace('_', '-', $d['setting_key']));
+    $dv = htmlspecialchars($d['setting_value']);
+?>
+    --<?= $dk ?>: <?= $dv ?>;
+<?php if ($dh !== $dk): ?>    --<?= $dh ?>: <?= $dv ?>;
 <?php endif; ?>
 <?php endforeach; ?>
 }
 
-/* Apply theme immediately */
+/* Apply theme immediately — these rules rely solely on DB CSS vars */
 body {
-    background: var(--background-main, var(--background_main));
-    color: var(--text-primary, var(--text_primary));
+    background: var(--background_main);
+    color: var(--text_primary);
+    font-family: var(--body_font-family, inherit);
 }
 
 .admin-header {
-    background: var(--sidebar-background, var(--sidebar_background));
-    color: var(--sidebar-text, var(--sidebar_text));
+    background: var(--sidebar_background);
+    color: var(--sidebar_text);
 }
 
 .admin-sidebar {
-    background: var(--sidebar-background, var(--sidebar_background));
-    color: var(--sidebar-text, var(--sidebar_text));
+    background: var(--sidebar_background);
+    color: var(--sidebar_text);
 }
     </style>
 
     <!-- Load Google Fonts -->
     <?php 
     $loadedFonts = [];
+    $genericFontNames = ['sans-serif','serif','monospace','cursive','fantasy','system-ui','ui-sans-serif','ui-serif','ui-monospace'];
     foreach ($theme['font_settings'] ?? [] as $f): 
         if (empty($f['font_family'])) continue;
-        if (preg_match('/system|arial|verdana/i', $f['font_family'])) continue;
-        if (in_array($f['font_family'], $loadedFonts)) continue;
-        $loadedFonts[] = $f['font_family'];
+        // Extract only the primary font name (DB may store "Roboto, sans-serif"; Google Fonts needs just "Roboto")
+        $primaryFont = trim(explode(',', $f['font_family'])[0]);
+        // Skip generic/system fonts that cannot be loaded from Google Fonts
+        if (in_array(strtolower($primaryFont), $genericFontNames)) continue;
+        if (preg_match('/\b(system|arial|verdana|helvetica|georgia|times|courier|impact)\b/i', $primaryFont)) continue;
+        if (in_array($primaryFont, $loadedFonts)) continue;
+        $loadedFonts[] = $primaryFont;
     ?>
     <?php if (!empty($f['font_url'])): ?>
     <link rel="stylesheet" href="<?= htmlspecialchars($f['font_url']) ?>">
     <?php else: ?>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=<?= urlencode(str_replace(' ', '+', $f['font_family'])) ?>&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=<?= urlencode($primaryFont) ?>&display=swap">
     <?php endif; ?>
     <?php endforeach; ?>
 

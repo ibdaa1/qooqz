@@ -55,16 +55,20 @@ $brand = $payload['strings']['brand'] ?? 'Admin';
   </footer>
 
 <style>
-/* Dynamic CSS Variables from DB (same as header) */
+/* Dynamic CSS Variables from DB (both underscore and hyphen for compatibility) */
 :root {
-    <?php foreach ($colors as $key => $value): ?>
+    <?php foreach ($colors as $key => $value):
+        $hkey = str_replace('_', '-', $key);
+    ?>
     --<?= htmlspecialchars($key) ?>: <?= htmlspecialchars($value) ?>;
+    <?php if ($hkey !== $key): ?>--<?= htmlspecialchars($hkey) ?>: <?= htmlspecialchars($value) ?>;
+    <?php endif; ?>
     <?php endforeach; ?>
 }
 
 /* Footer styles using the same colors as header */
 .admin-footer {
-    background: var(--sidebar_background) !important;
+    background: var(--footer_bg_color, var(--footer-bg-color, var(--sidebar_background))) !important;
     color: var(--sidebar_text) !important;
     border-top: 1px solid var(--primary_color);
     padding: 1rem 0;
