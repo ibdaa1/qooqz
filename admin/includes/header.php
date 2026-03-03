@@ -197,18 +197,18 @@ foreach ($theme['design_settings'] ?? [] as $d) {
 
 /* Apply theme immediately */
 body {
-    background: var(--background-main, var(--background_main, #0A0A0A));
-    color: var(--text-primary, var(--text_primary, #FFFFFF));
+    background: var(--background-main, var(--background_main));
+    color: var(--text-primary, var(--text_primary));
 }
 
 .admin-header {
-    background: var(--sidebar-background, var(--sidebar_background, #4B0082));
-    color: var(--sidebar-text, var(--sidebar_text, #FFFFFF));
+    background: var(--sidebar-background, var(--sidebar_background));
+    color: var(--sidebar-text, var(--sidebar_text));
 }
 
 .admin-sidebar {
-    background: var(--sidebar-background, var(--sidebar_background, #4B0082));
-    color: var(--sidebar-text, var(--sidebar_text, #FFFFFF));
+    background: var(--sidebar-background, var(--sidebar_background));
+    color: var(--sidebar-text, var(--sidebar_text));
 }
     </style>
 
@@ -350,7 +350,7 @@ body {
         if (is_readable($menuFile)) {
             include $menuFile;
         } else {
-            echo '<p style="padding:1rem; color:rgba(255,255,255,0.7);" data-i18n="menu_unavailable">Menu not available</p>';
+            echo '<p style="padding:1rem; color:var(--sidebar_text);" data-i18n="menu_unavailable">Menu not available</p>';
         }
         ?>
     </aside>

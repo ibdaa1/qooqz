@@ -33,16 +33,6 @@ foreach ($theme['color_settings'] ?? [] as $c) {
 }
 
 // Get specific colors
-$sidebarBg = $colors['sidebar_background'] ?? '#4B0082';
-$sidebarText = $colors['sidebar_text'] ?? '#FFFFFF';
-$primaryColor = $colors['primary_color'] ?? '#3b82f6';
-$dangerColor = $colors['danger_color'] ?? '#ef4444';
-$sidebarHover = $colors['sidebar_hover'] ?? '#6A0DAD';
-$sidebarActive = $colors['sidebar_active'] ?? '#8A2BE2';
-$infoColor = $colors['info_color'] ?? '#3b82f6';
-$successColor = $colors['success_color'] ?? '#10b981';
-$warningColor = $colors['warning_color'] ?? '#f59e0b';
-
 // Get design settings for footer text
 $footerText = '© ' . date('Y') . ' Admin Panel';
 foreach ($theme['design_settings'] ?? [] as $d) {
@@ -74,9 +64,9 @@ $brand = $payload['strings']['brand'] ?? 'Admin';
 
 /* Footer styles using the same colors as header */
 .admin-footer {
-    background: var(--sidebar_background, #4B0082) !important;
-    color: var(--sidebar_text, #FFFFFF) !important;
-    border-top: 1px solid var(--primary_color, #3b82f6);
+    background: var(--sidebar_background) !important;
+    color: var(--sidebar_text) !important;
+    border-top: 1px solid var(--primary_color);
     padding: 1rem 0;
     margin-top: auto;
 }
@@ -171,20 +161,22 @@ $brand = $payload['strings']['brand'] ?? 'Admin';
     toast.style.right = '20px';
     toast.style.padding = '10px';
     toast.style.borderRadius = '5px';
-    toast.style.color = '#fff';
     toast.style.zIndex = '10000';
 
-    // Get colors from CSS variables (set by theme)
+    // Get colors from CSS variables (set by theme from DB)
     const rootStyles = getComputedStyle(document.documentElement);
     const colors = {
-      info: rootStyles.getPropertyValue('--info_color') || '#3b82f6',
-      success: rootStyles.getPropertyValue('--success_color') || '#10b981',
-      warning: rootStyles.getPropertyValue('--warning_color') || '#f59e0b',
-      error: rootStyles.getPropertyValue('--danger_color') || '#ef4444',
-      default: rootStyles.getPropertyValue('--primary_color') || '#4B0082'
+      info: rootStyles.getPropertyValue('--info_color').trim(),
+      success: rootStyles.getPropertyValue('--success_color').trim(),
+      warning: rootStyles.getPropertyValue('--warning_color').trim(),
+      error: rootStyles.getPropertyValue('--danger_color').trim(),
+      default: rootStyles.getPropertyValue('--primary_color').trim()
     };
 
-    toast.style.background = colors[type] || colors.default;
+    const bg = colors[type] || colors.default;
+    if (bg) toast.style.background = bg;
+    const fg = rootStyles.getPropertyValue('--sidebar_text').trim();
+    toast.style.color = fg || 'inherit';
     toast.textContent = msg;
     document.body.appendChild(toast);
     setTimeout(() => document.body.removeChild(toast), 4000);
