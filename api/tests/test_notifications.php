@@ -5,15 +5,17 @@ declare(strict_types=1);
  * api/tests/test_notifications.php
  * QOOQZ — Notification Endpoints Test Suite
  *
- * Tests all five public notification endpoints plus routing-logic edge cases.
- * Can be run two ways:
+ * Can be run three ways:
  *
  *   1. CLI unit tests only (no DB, no HTTP server needed):
  *      php api/tests/test_notifications.php
  *
- *   2. Full integration tests against a live server:
+ *   2. CLI with full integration tests:
  *      php api/tests/test_notifications.php --base-url=https://hcsfcs.top --user-id=5 --tenant-id=1
- *      (adjust --base-url, --user-id, --tenant-id to match your environment)
+ *
+ *   3. Via browser / web server — base URL and params are auto-detected:
+ *      https://hcsfcs.top/api/tests/test_notifications.php
+ *      https://hcsfcs.top/api/tests/test_notifications.php?user_id=5&tenant_id=1
  *
  * Endpoints tested:
  *   GET  /api/public/notifications/types
@@ -26,39 +28,72 @@ declare(strict_types=1);
  */
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Context detection — CLI vs web
+// ---------------------------------------------------------------------------
+$isCli = (PHP_SAPI === 'cli');
+
+if (!$isCli) {
+    // Send plain-text header so browsers display output cleanly (no ANSI artifacts)
+    header('Content-Type: text/plain; charset=utf-8');
+}
+
+// ---------------------------------------------------------------------------
+// Helpers — use ANSI colors on CLI, plain markers on web
 // ---------------------------------------------------------------------------
 
 $passed = 0;
 $failed = 0;
 
 function pass(string $label): void {
-    global $passed;
+    global $passed, $isCli;
     $passed++;
-    echo "\033[32m[PASS]\033[0m " . $label . "\n";
+    echo ($isCli ? "\033[32m[PASS]\033[0m" : '[PASS]') . ' ' . $label . "\n";
 }
 
 function fail(string $label, string $detail = ''): void {
-    global $failed;
+    global $failed, $isCli;
     $failed++;
-    echo "\033[31m[FAIL]\033[0m " . $label . ($detail ? " — $detail" : '') . "\n";
+    echo ($isCli ? "\033[31m[FAIL]\033[0m" : '[FAIL]') . ' ' . $label . ($detail ? " — $detail" : '') . "\n";
 }
 
 function section(string $title): void {
-    echo "\n\033[33m=== " . $title . " ===\033[0m\n";
+    global $isCli;
+    echo "\n" . ($isCli ? "\033[33m" : '') . "=== $title ===" . ($isCli ? "\033[0m" : '') . "\n";
 }
 
 // ---------------------------------------------------------------------------
-// Parse CLI args
+// Parse args — CLI flags first, then $_GET fallback, then auto-detect
 // ---------------------------------------------------------------------------
-$baseUrl  = null;
+$baseUrl      = null;
 $testUserId   = 0;
 $testTenantId = 1;
 
+// 1. CLI args
 foreach ($argv ?? [] as $arg) {
     if (str_starts_with($arg, '--base-url='))  $baseUrl      = rtrim(substr($arg, 11), '/');
     if (str_starts_with($arg, '--user-id='))   $testUserId   = (int)substr($arg, 10);
     if (str_starts_with($arg, '--tenant-id=')) $testTenantId = (int)substr($arg, 13);
+}
+
+// 2. $_GET fallback (web context or CLI-via-query-string)
+if ($baseUrl === null && !empty($_GET['base_url'])) {
+    $baseUrl = rtrim((string)$_GET['base_url'], '/');
+}
+if (!empty($_GET['user_id']))   $testUserId   = (int)$_GET['user_id'];
+if (!empty($_GET['tenant_id'])) $testTenantId = (int)$_GET['tenant_id'];
+
+// 3. Auto-detect base URL when running via web server and no explicit value given
+if ($baseUrl === null && !$isCli && !empty($_SERVER['HTTP_HOST'])) {
+    // Sanitize HTTP_HOST to prevent header-injection (keep only valid hostname/port chars)
+    $host = preg_replace('/[^a-zA-Z0-9.\-:]/', '', (string)$_SERVER['HTTP_HOST']);
+    // Respect X-Forwarded-Proto set by trusted reverse proxies
+    $fwdProto = strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+    if ($fwdProto === 'https' || $fwdProto === 'http') {
+        $scheme = $fwdProto;
+    } else {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    }
+    $baseUrl = $scheme . '://' . $host;
 }
 
 // ---------------------------------------------------------------------------
@@ -300,8 +335,9 @@ if ($pdo instanceof PDO) {
 section('3. HTTP Integration Tests');
 
 if (!$baseUrl) {
-    echo "  No --base-url provided — skipping HTTP tests.\n";
-    echo "  Example: php " . basename(__FILE__) . " --base-url=https://hcsfcs.top --user-id=5 --tenant-id=1\n";
+    echo "  No base URL available — skipping HTTP tests.\n";
+    echo "  CLI:  php " . basename(__FILE__) . " --base-url=https://hcsfcs.top --user-id=5 --tenant-id=1\n";
+    echo "  Web:  https://hcsfcs.top/api/tests/" . basename(__FILE__) . "?user_id=5&tenant_id=1\n";
 } elseif (!function_exists('curl_init')) {
     echo "  cURL not available — skipping HTTP tests.\n";
 } else {
@@ -439,12 +475,16 @@ if (!$baseUrl) {
 // ---------------------------------------------------------------------------
 section('Summary');
 $total = $passed + $failed;
-echo "Total: $total  Passed: \033[32m$passed\033[0m  Failed: \033[31m$failed\033[0m\n\n";
+if ($isCli) {
+    echo "Total: $total  Passed: \033[32m$passed\033[0m  Failed: \033[31m$failed\033[0m\n\n";
+} else {
+    echo "Total: $total  Passed: $passed  Failed: $failed\n\n";
+}
 
 if ($failed > 0) {
-    echo "\033[31mSome tests FAILED.\033[0m Review the output above.\n";
+    echo ($isCli ? "\033[31mSome tests FAILED.\033[0m" : 'Some tests FAILED.') . " Review the output above.\n";
     exit(1);
 }
 
-echo "\033[32mAll tests passed.\033[0m\n";
+echo ($isCli ? "\033[32mAll tests passed.\033[0m" : 'All tests passed.') . "\n";
 exit(0);
