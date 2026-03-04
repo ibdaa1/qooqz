@@ -17,6 +17,11 @@ declare(strict_types=1);
  *      https://hcsfcs.top/api/tests/test_notifications.php
  *      https://hcsfcs.top/api/tests/test_notifications.php?user_id=5&tenant_id=1
  *
+ *      When accessed while logged in, the browser session is automatically
+ *      forwarded to the HTTP integration tests so authenticated endpoints
+ *      (unread-count, list, mark-read, mark-all-read) return 200 with real
+ *      user data instead of 401.
+ *
  * Endpoints tested:
  *   GET  /api/public/notifications/types
  *   GET  /api/public/notifications/unread-count
@@ -94,6 +99,55 @@ if ($baseUrl === null && !$isCli && !empty($_SERVER['HTTP_HOST'])) {
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     }
     $baseUrl = $scheme . '://' . $host;
+}
+
+// ---------------------------------------------------------------------------
+// Session bootstrap (web mode only) — load the shared session so we can read
+// the logged-in user and forward their cookie to HTTP integration tests.
+// ---------------------------------------------------------------------------
+$webSessionUser   = null;   // ['id'=>…,'name'=>…] if a user is logged in
+$webSessionCookie = '';     // "APP_SESSID=<id>" to forward in curl requests
+
+if (!$isCli) {
+    // Load the shared session configuration (same path as public_context.php uses)
+    $__sessionCfg = null;
+    foreach ([
+        ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/shared/config/session.php',
+        dirname(__DIR__, 2)               . '/api/shared/config/session.php',
+        dirname(__DIR__)                  . '/../shared/config/session.php',
+    ] as $__p) {
+        if ($__p && file_exists($__p)) { $__sessionCfg = $__p; break; }
+    }
+    if ($__sessionCfg && session_status() === PHP_SESSION_NONE) {
+        require_once $__sessionCfg;
+    } elseif (session_status() === PHP_SESSION_NONE) {
+        // Minimal fallback: start a session with the shared name.
+        // session_start() may emit warnings if headers were already sent in a
+        // different execution path; those are non-fatal for this test helper.
+        if (session_name() !== 'APP_SESSID') session_name('APP_SESSID');
+        session_start();
+    }
+    unset($__sessionCfg, $__p);
+
+    // Resolve the logged-in user from the session (two formats used across the app):
+    //   Format A: $_SESSION['user'] = ['id'=>…,'name'=>…,…]  (set by API auth middleware)
+    //   Format B: $_SESSION['user_id'] = 7  (scalar) + optionally $_SESSION['username']
+    if (!empty($_SESSION['user']['id'])) {
+        $webSessionUser = $_SESSION['user'];
+    } elseif (!empty($_SESSION['user_id'])) {
+        $webSessionUser = [
+            'id'   => (int)$_SESSION['user_id'],
+            'name' => (string)($_SESSION['username'] ?? ($_SESSION['user']['name'] ?? '')),
+        ];
+    }
+
+    // If user is logged in, pull their user_id / tenant_id when not already set via args
+    if ($webSessionUser) {
+        if (!$testUserId)   $testUserId   = (int)($webSessionUser['id'] ?? 0);
+        if (!$testTenantId) $testTenantId = (int)($_SESSION['pub_tenant_id'] ?? 1) ?: 1;
+        // Build the session cookie string to forward to curl
+        $webSessionCookie = session_name() . '=' . session_id();
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -347,16 +401,20 @@ if (!$baseUrl) {
      * Do not use against untrusted hosts.
      * @return array{int, array<mixed>|null, string}
      */
-    function http(string $method, string $url, array $body = [], array $extraHeaders = []): array {
+    function http(string $method, string $url, array $body = [], array $extraHeaders = [], string $cookie = ''): array {
         $ch = curl_init($url);
         $headers = array_merge(['Content-Type: application/json', 'Accept: application/json'], $extraHeaders);
-        curl_setopt_array($ch, [
+        $opts = [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 10,
             CURLOPT_HTTPHEADER     => $headers,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_SSL_VERIFYPEER => false, // acceptable for internal test use only
-        ]);
+        ];
+        if ($cookie !== '') {
+            $opts[CURLOPT_COOKIE] = $cookie;
+        }
+        curl_setopt_array($ch, $opts);
         if ($method === 'POST') {
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
@@ -375,8 +433,19 @@ if (!$baseUrl) {
     $notifBase = $baseUrl . '/api/public/notifications';
     $tenantQs  = $qs(['tenant_id' => $testTenantId]);
 
+    // Show who is making the requests (guest vs logged-in user)
+    if ($webSessionUser) {
+        $webUserName = (string)($webSessionUser['name'] ?: ('user #' . $webSessionUser['id']));
+        echo "  Logged in as: $webUserName (id={$webSessionUser['id']}, tenant=$testTenantId) — forwarding session cookie\n";
+    } else {
+        echo "  Running as guest (no session) — auth endpoints will return 401\n";
+    }
+
+    // Wrapper closure: every HTTP request forwards the session cookie when available
+    $httpWithSession = fn(string $m, string $u, array $b = [], array $h = []) => http($m, $u, $b, $h, $webSessionCookie);
+
     // 3a. GET /api/public/notifications/types — public, no login required
-    [$code, $body, $err] = http('GET', $notifBase . '/types' . $tenantQs);
+    [$code, $body, $err] = $httpWithSession('GET', $notifBase . '/types' . $tenantQs);
     if ($err) {
         fail('GET /notifications/types — curl error', $err);
     } elseif ($code === 200 && isset($body['data']['types'])) {
@@ -388,31 +457,33 @@ if (!$baseUrl) {
     }
 
     // 3b. GET /api/public/notifications/unread-count — requires login
-    [$code, $body, $err] = http('GET', $notifBase . '/unread-count' . $tenantQs);
+    [$code, $body, $err] = $httpWithSession('GET', $notifBase . '/unread-count' . $tenantQs);
     if ($err) {
         fail('GET /notifications/unread-count — curl error', $err);
     } elseif ($code === 401) {
         pass('GET /notifications/unread-count → 401 (login required, correct)');
     } elseif ($code === 200 && array_key_exists('unread_count', $body['data'] ?? $body)) {
-        pass('GET /notifications/unread-count → 200');
+        $uc = (int)(($body['data'] ?? $body)['unread_count']);
+        pass("GET /notifications/unread-count → 200 (unread=$uc)");
     } else {
         fail('GET /notifications/unread-count', "HTTP $code, body=" . json_encode($body));
     }
 
     // 3c. GET /api/public/notifications — requires login
-    [$code, $body, $err] = http('GET', $notifBase . $tenantQs);
+    [$code, $body, $err] = $httpWithSession('GET', $notifBase . $tenantQs);
     if ($err) {
         fail('GET /notifications — curl error', $err);
     } elseif ($code === 401) {
         pass('GET /notifications → 401 (login required, correct)');
     } elseif ($code === 200) {
-        pass('GET /notifications → 200');
+        $cnt = count(($body['data'] ?? $body)['items'] ?? ($body['items'] ?? []));
+        pass("GET /notifications → 200 ($cnt items)");
     } else {
         fail('GET /notifications', "HTTP $code, body=" . json_encode($body));
     }
 
     // 3d. POST /api/public/notifications/mark-read — requires login
-    [$code, $body, $err] = http('POST', $notifBase . '/mark-read', ['ids' => [1]]);
+    [$code, $body, $err] = $httpWithSession('POST', $notifBase . '/mark-read', ['ids' => [1]]);
     if ($err) {
         fail('POST /notifications/mark-read — curl error', $err);
     } elseif ($code === 401) {
@@ -424,7 +495,7 @@ if (!$baseUrl) {
     }
 
     // 3e. POST /api/public/notifications/mark-all-read — requires login
-    [$code, $body, $err] = http('POST', $notifBase . '/mark-all-read');
+    [$code, $body, $err] = $httpWithSession('POST', $notifBase . '/mark-all-read');
     if ($err) {
         fail('POST /notifications/mark-all-read — curl error', $err);
     } elseif ($code === 401) {
@@ -436,7 +507,7 @@ if (!$baseUrl) {
     }
 
     // 3f. POST mark-read with empty ids → 422
-    [$code, $body, $err] = http('POST', $notifBase . '/mark-read', ['ids' => []]);
+    [$code, $body, $err] = $httpWithSession('POST', $notifBase . '/mark-read', ['ids' => []]);
     if ($err) {
         fail('POST /notifications/mark-read empty-ids — curl error', $err);
     } elseif ($code === 422) {

@@ -26,3 +26,24 @@
 [2026-03-04 07:57:19] [info] [RID:{REQUEST_ID}] RedisHelper loaded | {"request_id":"fa1e89252b6ea142","memory_mb":2,"timestamp":"2026-03-04 07:57:19"}
 [2026-03-04 07:57:19] [info] [RID:{REQUEST_ID}] RequestContext class loaded | {"request_id":"fa1e89252b6ea142","memory_mb":2,"timestamp":"2026-03-04 07:57:19"}
 [2026-03-04 07:57:19] [critical] [RID:{REQUEST_ID}] Database connection failed during bootstrap | {"message":"Database environment variables missing","file":"/home/runner/work/qooqz/qooqz/api/shared/core/DatabaseConnection.php","line":21,"request_id":"fa1e89252b6ea142","memory_mb":2,"timestamp":"2026-03-04 07:57:19"}
+[2026-03-04 08:38:55] [info] [RID:b57242dd49e6e9ce] Advanced Logger initialized successfully | {"request_id":"b57242dd49e6e9ce","memory_mb":2,"timestamp":"2026-03-04 08:38:55"}
+[2026-03-04 08:38:55] [info] [RID:{REQUEST_ID}] Bootstrap initializing | {"env":"production","request_id":"b57242dd49e6e9ce","memory_mb":2,"timestamp":"2026-03-04 08:38:55"}
+[2026-03-04 08:38:55] [info] [RID:{REQUEST_ID}] API routing detected | {"version":"v1","route":"/public/notifications","is_versioned":true,"request_id":"b57242dd49e6e9ce","memory_mb":2,"timestamp":"2026-03-04 08:38:55"}
+[2026-03-04 08:38:55] [info] [RID:{REQUEST_ID}] Session config loaded | {"request_id":"b57242dd49e6e9ce","memory_mb":2,"timestamp":"2026-03-04 08:38:55"}
+[2026-03-04 08:38:55] [info] [RID:{REQUEST_ID}] RedisHelper loaded | {"request_id":"b57242dd49e6e9ce","memory_mb":2,"timestamp":"2026-03-04 08:38:55"}
+[2026-03-04 08:38:55] [info] [RID:{REQUEST_ID}] RequestContext class loaded | {"request_id":"b57242dd49e6e9ce","memory_mb":2,"timestamp":"2026-03-04 08:38:55"}
+[2026-03-04 08:38:55] [critical] [RID:{REQUEST_ID}] Database connection failed during bootstrap | {"message":"Database environment variables missing","file":"/home/runner/work/qooqz/qooqz/api/shared/core/DatabaseConnection.php","line":21,"request_id":"b57242dd49e6e9ce","memory_mb":2,"timestamp":"2026-03-04 08:38:55"}
+[2026-03-04 08:39:26] [info] [RID:c591c03ebeb07c51] Advanced Logger initialized successfully | {"request_id":"c591c03ebeb07c51","memory_mb":2,"timestamp":"2026-03-04 08:39:26"}
+[2026-03-04 08:39:26] [info] [RID:{REQUEST_ID}] Bootstrap initializing | {"env":"production","request_id":"c591c03ebeb07c51","memory_mb":2,"timestamp":"2026-03-04 08:39:26"}
+[2026-03-04 08:39:26] [info] [RID:{REQUEST_ID}] API routing detected | {"version":"v1","route":"/public/notifications","is_versioned":true,"request_id":"c591c03ebeb07c51","memory_mb":2,"timestamp":"2026-03-04 08:39:26"}
+[2026-03-04 08:39:26] [info] [RID:{REQUEST_ID}] Session config loaded | {"request_id":"c591c03ebeb07c51","memory_mb":2,"timestamp":"2026-03-04 08:39:26"}
+[2026-03-04 08:39:26] [info] [RID:{REQUEST_ID}] RedisHelper loaded | {"request_id":"c591c03ebeb07c51","memory_mb":2,"timestamp":"2026-03-04 08:39:26"}
+[2026-03-04 08:39:26] [info] [RID:{REQUEST_ID}] RequestContext class loaded | {"request_id":"c591c03ebeb07c51","memory_mb":2,"timestamp":"2026-03-04 08:39:26"}
+[2026-03-04 08:39:26] [critical] [RID:{REQUEST_ID}] Database connection failed during bootstrap | {"message":"Database environment variables missing","file":"/home/runner/work/qooqz/qooqz/api/shared/core/DatabaseConnection.php","line":21,"request_id":"c591c03ebeb07c51","memory_mb":2,"timestamp":"2026-03-04 08:39:26"}
+[2026-03-04 08:40:50] [info] [RID:094844f98c52bea0] Advanced Logger initialized successfully | {"request_id":"094844f98c52bea0","memory_mb":2,"timestamp":"2026-03-04 08:40:50"}
+[2026-03-04 08:40:50] [info] [RID:{REQUEST_ID}] Bootstrap initializing | {"env":"production","request_id":"094844f98c52bea0","memory_mb":2,"timestamp":"2026-03-04 08:40:50"}
+[2026-03-04 08:40:50] [info] [RID:{REQUEST_ID}] API routing detected | {"version":"v1","route":"/public/notifications","is_versioned":true,"request_id":"094844f98c52bea0","memory_mb":2,"timestamp":"2026-03-04 08:40:50"}
+[2026-03-04 08:40:50] [info] [RID:{REQUEST_ID}] Session config loaded | {"request_id":"094844f98c52bea0","memory_mb":2,"timestamp":"2026-03-04 08:40:50"}
+[2026-03-04 08:40:50] [info] [RID:{REQUEST_ID}] RedisHelper loaded | {"request_id":"094844f98c52bea0","memory_mb":2,"timestamp":"2026-03-04 08:40:50"}
+[2026-03-04 08:40:50] [info] [RID:{REQUEST_ID}] RequestContext class loaded | {"request_id":"094844f98c52bea0","memory_mb":2,"timestamp":"2026-03-04 08:40:50"}
+[2026-03-04 08:40:50] [critical] [RID:{REQUEST_ID}] Database connection failed during bootstrap | {"message":"Database environment variables missing","file":"/home/runner/work/qooqz/qooqz/api/shared/core/DatabaseConnection.php","line":21,"request_id":"094844f98c52bea0","memory_mb":2,"timestamp":"2026-03-04 08:40:50"}
