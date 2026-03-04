@@ -965,12 +965,48 @@ if (!function_exists('pub_card_img_style')) {
 
 
 /* -------------------------------------------------------
+ * 11b. Notifications loader — reads recent notifications for a tenant
+ *      directly via the shared PDO connection. Returns array of rows
+ *      sorted newest-first. Silently returns [] on error.
+ *
+ *      Columns used: id, tenant_id, title, message, sent_at,
+ *                    notification_type_id, priority
+ *      Compatible with the current `notifications` table schema.
+ * ----------------------------------------------------- */
+if (!function_exists('pub_load_notifications')) {
+    function pub_load_notifications(int $tenantId, int $limit = 8): array {
+        $pdo = pub_get_pdo();
+        if (!$pdo) return [];
+        try {
+            // Join with notification_types to get the type name/code for icons
+            $st = $pdo->prepare(
+                'SELECT n.id, n.title, n.message, n.sent_at, n.priority,
+                        nt.code AS type_code, nt.name AS type_name
+                   FROM notifications n
+              LEFT JOIN notification_types nt ON nt.id = n.notification_type_id
+                  WHERE n.tenant_id = ?
+                    AND (n.expires_at IS NULL OR n.expires_at > NOW())
+                  ORDER BY n.sent_at DESC
+                  LIMIT ?'
+            );
+            $st->execute([$tenantId, $limit]);
+            return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (Throwable $e) {
+            error_log('[pub_load_notifications] ' . $e->getMessage());
+            return [];
+        }
+    }
+}
+
+
+/* -------------------------------------------------------
  * 12. Compose the shared context globals
  * ----------------------------------------------------- */
 $tenantId = (int)($_GET['tenant_id'] ?? $_SESSION['pub_tenant_id'] ?? 1);
 $_SESSION['pub_tenant_id'] = $tenantId;
 
 $theme = pub_load_theme($tenantId);
+$_pubNotifications = pub_load_notifications($tenantId);
 
 // Resolve logged-in user from session.
 // Supports two formats set by different auth paths:
@@ -992,12 +1028,13 @@ if (empty($_pubUser['id']) && !empty($_SESSION['user_id'])) {
 }
 
 $GLOBALS['PUB_CONTEXT'] = [
-    'lang'      => $lang,
-    'dir'       => $dir,
-    'tenant_id' => $tenantId,
-    'theme'     => $theme,
-    'app'       => $appConfig,
-    'user'      => $_pubUser,
+    'lang'          => $lang,
+    'dir'           => $dir,
+    'tenant_id'     => $tenantId,
+    'theme'         => $theme,
+    'app'           => $appConfig,
+    'user'          => $_pubUser,
+    'notifications' => $_pubNotifications,
 ];
 
 // Export user and login state as global PHP variables so any PHP page can use
@@ -1007,4 +1044,4 @@ $GLOBALS['PUB_CONTEXT'] = [
 $_user       = $_pubUser;
 $_isLoggedIn = !empty($_pubUser['id']);
 
-unset($_pubUser);
+unset($_pubUser, $_pubNotifications);

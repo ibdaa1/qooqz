@@ -60,12 +60,16 @@
     try { theme = JSON.parse(raw); } catch (e) { return; }
 
     var map = {
-      primary:    '--pub-primary',
-      secondary:  '--pub-secondary',
-      accent:     '--pub-accent',
-      background: '--pub-bg',
-      surface:    '--pub-surface',
-      text:       '--pub-text',
+      primary:           '--pub-primary',
+      secondary:         '--pub-secondary',
+      accent:            '--pub-accent',
+      background:        '--pub-bg',
+      surface:           '--pub-surface',
+      text:              '--pub-text',
+      header_bg:         '--pub-header-bg',
+      header_text_color: '--pub-header-text',
+      footer_bg:         '--pub-footer-bg',
+      footer_text_color: '--pub-footer-text',
     };
 
     Object.keys(map).forEach(function (key) {
@@ -310,6 +314,138 @@
   }
 
   /* -------------------------------------------------------
+   * 9c. Notification Bell
+   *     Reads from #pubNotifData JSON element (injected by header.php).
+   *     Tracks "seen" IDs in localStorage to show unread badge.
+   * ----------------------------------------------------- */
+  function initNotifBell() {
+    var btn      = document.getElementById('pubNotifBtn');
+    var dropdown = document.getElementById('pubNotifDropdown');
+    var badge    = document.getElementById('pubNotifBadge');
+    var list     = document.getElementById('pubNotifList');
+    var markAll  = document.getElementById('pubNotifMarkAll');
+
+    if (!btn || !dropdown) return;
+
+    // Parse notification data injected by PHP
+    var notifications = [];
+    var dataEl = document.getElementById('pubNotifData');
+    if (dataEl) {
+      try { notifications = JSON.parse(dataEl.textContent || '[]'); } catch (e) {}
+    }
+    if (!Array.isArray(notifications)) notifications = [];
+
+    // Load seen IDs from localStorage
+    var seenKey = 'pub_notif_seen';
+    var seenIds = [];
+    try { seenIds = JSON.parse(localStorage.getItem(seenKey) || '[]'); } catch (e) {}
+    if (!Array.isArray(seenIds)) seenIds = [];
+
+    // Count unread (notifications whose id is NOT in seenIds)
+    var unread = notifications.filter(function (n) {
+      return seenIds.indexOf(String(n.id)) === -1;
+    }).length;
+
+    // Update badge
+    function updateBadge(count) {
+      if (!badge) return;
+      badge.textContent = count > 99 ? '99+' : String(count);
+      if (count > 0) {
+        badge.classList.add('visible');
+      } else {
+        badge.classList.remove('visible');
+      }
+    }
+    updateBadge(unread);
+
+    // Notification type code → emoji icon
+    function typeIcon(code) {
+      var icons = {
+        order: '📦', payment: '💳', shipment: '🚚', 'return': '↩️',
+        review: '⭐', promotion: '🎉', system: '⚙️', entities: '🏢',
+        support: '🆘', wallet: '💰', loyalty: '🏅',
+        audit_completed: '✅', audit_rejected: '❌',
+      };
+      return icons[code] || '🔔';
+    }
+
+    // Render notifications list
+    function renderList() {
+      if (!list) return;
+      if (!notifications.length) {
+        list.innerHTML = '<div class="pub-notif-empty">' +
+          (document.documentElement.lang === 'ar' ? 'لا توجد إشعارات' : 'No notifications') +
+          '</div>';
+        return;
+      }
+      list.innerHTML = notifications.map(function (n) {
+        var isSeen = seenIds.indexOf(String(n.id)) !== -1;
+        var icon   = typeIcon(n.type_code || '');
+        var time   = n.sent_at ? n.sent_at.replace('T', ' ').substring(0, 16) : '';
+        var title  = (n.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        var msg    = (n.message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return '<div class="pub-notif-item' + (isSeen ? '' : ' unread') + '" data-id="' + n.id + '">' +
+          '<span class="pub-notif-icon">' + icon + '</span>' +
+          '<div class="pub-notif-body">' +
+            '<p class="pub-notif-title">' + title + '</p>' +
+            (msg ? '<p class="pub-notif-msg">' + msg + '</p>' : '') +
+            (time ? '<div class="pub-notif-time">' + time + '</div>' : '') +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      // Click on item → mark as seen
+      list.querySelectorAll('.pub-notif-item').forEach(function (item) {
+        item.addEventListener('click', function () {
+          var id = String(item.dataset.id);
+          if (seenIds.indexOf(id) === -1) {
+            seenIds.push(id);
+            try { localStorage.setItem(seenKey, JSON.stringify(seenIds)); } catch (e) {}
+            item.classList.remove('unread');
+            unread = Math.max(0, unread - 1);
+            updateBadge(unread);
+          }
+        });
+      });
+    }
+    renderList();
+
+    // Mark all as seen
+    if (markAll) {
+      markAll.addEventListener('click', function () {
+        seenIds = notifications.map(function (n) { return String(n.id); });
+        try { localStorage.setItem(seenKey, JSON.stringify(seenIds)); } catch (e) {}
+        unread = 0;
+        updateBadge(0);
+        renderList();
+      });
+    }
+
+    // Toggle dropdown
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var isOpen = dropdown.classList.toggle('open');
+      btn.setAttribute('aria-expanded', String(isOpen));
+    });
+
+    // Close on outside click
+    document.addEventListener('click', function (e) {
+      if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
+        dropdown.classList.remove('open');
+        btn.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        dropdown.classList.remove('open');
+        btn.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+
+  /* -------------------------------------------------------
    * 10. Init all on DOMContentLoaded
    * ----------------------------------------------------- */
   document.addEventListener('DOMContentLoaded', function () {
@@ -324,6 +460,7 @@
     initBackToTop();
     initCartBadge();
     updateUserDisplay();
+    initNotifBell();
   });
 
 })();

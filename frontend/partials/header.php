@@ -222,6 +222,12 @@ $_fontUrl = $dir === 'rtl'
     window.PUB_TENANT_ID = <?= (int)($ctx['tenant_id'] ?? 1) ?>;
     window.PUB_LANG = <?= json_encode($ctx['lang'] ?? 'en', JSON_HEX_TAG) ?>;
     </script>
+    <?php
+    // Inject notifications as JSON for the bell widget (pub_load_notifications already ran)
+    $_pubNotifJson = $ctx['notifications'] ?? [];
+    ?>
+    <script type="application/json" id="pubNotifData"><?= json_encode($_pubNotifJson, JSON_HEX_TAG | JSON_UNESCAPED_UNICODE) ?></script>
+    <?php unset($_pubNotifJson); ?>
 </head>
 
 <body class="pub-body <?= e($dir) ?>">
@@ -288,6 +294,31 @@ $_fontUrl = $dir === 'rtl'
 
         <!-- Header actions -->
         <div class="pub-header-actions">
+            <!-- Notification bell (all users) -->
+            <div class="pub-notif-wrap" id="pubNotifWrap">
+                <button class="pub-notif-btn" id="pubNotifBtn"
+                        aria-label="<?= e(t('nav.notifications', ['default' => 'Notifications'])) ?>"
+                        aria-haspopup="true" aria-expanded="false">
+                    🔔
+                    <span class="pub-notif-badge" id="pubNotifBadge"></span>
+                </button>
+                <!-- Notification dropdown -->
+                <div class="pub-notif-dropdown" id="pubNotifDropdown" role="dialog"
+                     aria-label="<?= e(t('nav.notifications', ['default' => 'Notifications'])) ?>">
+                    <div class="pub-notif-header">
+                        <span><?= e(t('nav.notifications', ['default' => 'Notifications'])) ?></span>
+                        <button class="pub-notif-mark-all" id="pubNotifMarkAll">
+                            <?= e(t('notifications.mark_all_read', ['default' => 'Mark all read'])) ?>
+                        </button>
+                    </div>
+                    <div class="pub-notif-list" id="pubNotifList">
+                        <div class="pub-notif-empty"><?= e(t('notifications.empty', ['default' => 'No notifications'])) ?></div>
+                    </div>
+                    <div class="pub-notif-footer">
+                        <a href="/frontend/public/notifications.php"><?= e(t('notifications.view_all', ['default' => 'View all'])) ?></a>
+                    </div>
+                </div>
+            </div>
             <!-- Login / user — no language switcher button (auto-detected) -->
             <?php if ($_isLoggedIn): ?>
                 <a href="/frontend/profile.php" class="pub-login-btn" style="margin-inline-end:6px;">
