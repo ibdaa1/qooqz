@@ -81,12 +81,7 @@ if ($pdo && $userId) {
         $cSt->execute($params);
         $notifTotal = (int)$cSt->fetchColumn();
 
-        // Items
-        // Items -- use only positional ? to avoid SQLSTATE HY093 (mixed placeholders in MySQL PDO)
-        $itemParams   = $params;
-        $itemParams[] = $perPage;
-        $itemParams[] = $offset;
-
+        // Items — embed LIMIT/OFFSET as cast integers to avoid PDO type-casting issues
         $iSt = $pdo->prepare(
             "SELECT n.id, n.title, n.message, n.sent_at, n.priority,
                     nr.is_read, nr.read_at,
@@ -96,35 +91,35 @@ if ($pdo && $userId) {
           LEFT JOIN notification_types nt    ON nt.id = n.notification_type_id
               WHERE $whereClause
            ORDER BY n.sent_at DESC
-              LIMIT ? OFFSET ?"
+              LIMIT " . (int)$perPage . " OFFSET " . (int)$offset
         );
-        $iSt->execute($itemParams);
+        $iSt->execute($params);
         $notifItems = $iSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
-        // Unread count (for the "Mark all read" button badge)
-        $ucSt = $pdo->prepare(
-            "SELECT COALESCE(
-               (SELECT unread_count FROM notification_counters
-                 WHERE tenant_id      = ?
-                   AND recipient_type = 'user'
-                   AND recipient_id   = ?
-                 LIMIT 1),
-               (SELECT COUNT(*)
-                  FROM notification_recipients nr2
-                  JOIN notifications n2 ON n2.id = nr2.notification_id
-                 WHERE nr2.recipient_type = 'user'
-                   AND nr2.recipient_id   = ?
-                   AND nr2.is_read        = 0
-                   AND n2.tenant_id       = ?
-                   AND (n2.expires_at IS NULL OR n2.expires_at > NOW()))
-            ) AS unread_count"
-        );
-        $ucSt->execute([$tenantId, $userId, $userId, $tenantId]);
-        $unreadCount = (int)$ucSt->fetchColumn();
 
     } catch (Throwable $e) {
         $notifError = true;
         error_log('[notifications.php] ' . $e->getMessage());
+    }
+
+    // Unread count — separate try-catch so a failure here does not hide the notifications list
+    if (!$notifError) {
+        try {
+            $ucSt = $pdo->prepare(
+                "SELECT COUNT(*)
+                   FROM notification_recipients nr2
+                   JOIN notifications n2 ON n2.id = nr2.notification_id
+                  WHERE nr2.recipient_type = 'user'
+                    AND nr2.recipient_id   = ?
+                    AND nr2.is_read        = 0
+                    AND n2.tenant_id       = ?
+                    AND (n2.expires_at IS NULL OR n2.expires_at > NOW())"
+            );
+            $ucSt->execute([$userId, $tenantId]);
+            $unreadCount = (int)$ucSt->fetchColumn();
+        } catch (Throwable $e) {
+            $unreadCount = 0;
+            error_log('[notifications.php] unread-count: ' . $e->getMessage());
+        }
     }
 }
 
