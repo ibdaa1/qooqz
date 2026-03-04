@@ -493,5 +493,26 @@
     "payment_failed": "Payment Failed",
     "payment_refunded": "Refunded",
     "pay_now": "Pay Now"
+  },
+  "notifications": {
+    "page_title": "My Notifications",
+    "unread_count": "unread",
+    "unread_only": "Unread only",
+    "mark_all_read": "Mark all as read",
+    "filter_type": "Type",
+    "all_types": "All types",
+    "filter_priority": "Priority",
+    "all_priorities": "All",
+    "priority_urgent": "Urgent",
+    "priority_high": "High",
+    "priority_normal": "Normal",
+    "priority_low": "Low",
+    "reset_filters": "Reset",
+    "empty": "No notifications yet",
+    "unread": "Unread",
+    "load_error": "Could not load notifications. Please try again.",
+    "view_all": "View all",
+    "bell_title": "Notifications",
+    "no_new": "No new notifications"
   }
 }

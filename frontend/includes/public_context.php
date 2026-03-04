@@ -977,20 +977,36 @@ if (!function_exists('pub_load_notifications')) {
     function pub_load_notifications(int $tenantId, int $limit = 8): array {
         $pdo = pub_get_pdo();
         if (!$pdo) return [];
+        // Resolve user from session (supports both session formats used across the app)
+        $userId = (int)(
+            $_SESSION['user_id'] ??
+            ($_SESSION['user']['id'] ?? 0)
+        );
+        if (!$userId) return [];
         try {
-            // Join with notification_types to get the type name/code for icons
+            // Join notification_recipients so we only return notifications addressed
+            // to this specific user, and include the is_read flag for the bell badge.
             $st = $pdo->prepare(
-                'SELECT n.id, n.title, n.message, n.sent_at, n.priority,
+                "SELECT n.id, n.title, n.message, n.sent_at, n.priority,
+                        nr.is_read,
                         nt.code AS type_code, nt.name AS type_name
-                   FROM notifications n
-              LEFT JOIN notification_types nt ON nt.id = n.notification_type_id
-                  WHERE n.tenant_id = ?
+                   FROM notification_recipients nr
+                   JOIN notifications n          ON n.id  = nr.notification_id
+              LEFT JOIN notification_types nt    ON nt.id = n.notification_type_id
+                  WHERE nr.recipient_type = 'user'
+                    AND nr.recipient_id   = ?
+                    AND n.tenant_id       = ?
                     AND (n.expires_at IS NULL OR n.expires_at > NOW())
                   ORDER BY n.sent_at DESC
-                  LIMIT ?'
+                  LIMIT ?"
             );
-            $st->execute([$tenantId, $limit]);
-            return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            $st->execute([$userId, $tenantId, $limit]);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($rows as &$row) {
+                $row['is_read'] = (bool)$row['is_read'];
+            }
+            unset($row);
+            return $rows;
         } catch (Throwable $e) {
             error_log('[pub_load_notifications] ' . $e->getMessage());
             return [];

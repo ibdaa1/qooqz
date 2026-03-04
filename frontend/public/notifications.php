@@ -1,42 +1,58 @@
 <?php
 /**
  * frontend/public/notifications.php
- * QOOQZ — Notifications Page (full list)
+ * QOOQZ — My Notifications Page
  *
- * Displays all notifications for the current tenant.
- * No login required (notifications are tenant-level broadcasts).
- * Linked from the notification bell "View all" footer link.
+ * Displays notifications addressed to the logged-in user via
+ * notification_recipients. Supports read/unread state, mark-all-read,
+ * type and priority filters, and pagination.
+ *
+ * Requires: authenticated session.
  */
 require_once dirname(__DIR__) . '/includes/public_context.php';
 
-$GLOBALS['PUB_PAGE_TITLE'] = e(t('notifications.page_title', ['default' => 'Notifications'])) . ' — QOOQZ';
+// Login required — notifications are user-specific
+if (!$_isLoggedIn) {
+    header('Location: /frontend/login.php?redirect=' . urlencode($_SERVER['REQUEST_URI'] ?? '/frontend/public/notifications.php'));
+    exit;
+}
+
+$GLOBALS['PUB_PAGE_TITLE'] = e(t('notifications.page_title', ['default' => 'My Notifications'])) . ' — QOOQZ';
 include dirname(__DIR__) . '/partials/header.php';
 
-// Resolve current page for pagination
-$currentPage  = max(1, (int)($_GET['page'] ?? 1));
-$perPage      = 20;
+$userId = (int)($_SESSION['user_id'] ?? $_SESSION['user']['id'] ?? 0);
+$pdo    = pub_get_pdo();
+
+// Filters
+$currentPage    = max(1, (int)($_GET['page'] ?? 1));
+$perPage        = 20;
 $typeCodeFilter = trim($_GET['type_code'] ?? '');
 $priorityFilter = in_array($_GET['priority'] ?? '', ['low','normal','high','urgent']) ? $_GET['priority'] : '';
+$unreadOnly     = !empty($_GET['unread']);
 
-// Load notifications directly via PDO (same connection used by public_context)
-$notifItems    = [];
-$notifTotal    = 0;
-$notifTypes    = [];
-$notifError    = false;
+$notifItems = [];
+$notifTotal = 0;
+$notifTypes = [];
+$unreadCount = 0;
+$notifError  = false;
 
-$pdo = pub_get_pdo();
-if ($pdo) {
+if ($pdo && $userId) {
     try {
-        // Load active notification types for filter dropdown
+        // Active notification types for the filter dropdown
         $stTypes = $pdo->prepare(
             'SELECT id, code, name FROM notification_types WHERE is_active = 1 ORDER BY id ASC'
         );
         $stTypes->execute();
         $notifTypes = $stTypes->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        // Build WHERE clause
-        $where  = ['n.tenant_id = ?', '(n.expires_at IS NULL OR n.expires_at > NOW())'];
-        $params = [$tenantId];
+        // Build WHERE clause joining notification_recipients → notifications
+        $where  = [
+            "nr.recipient_type = 'user'",
+            'nr.recipient_id   = ?',
+            'n.tenant_id       = ?',
+            '(n.expires_at IS NULL OR n.expires_at > NOW())',
+        ];
+        $params = [$userId, $tenantId];
 
         if ($typeCodeFilter !== '') {
             $where[]  = 'nt.code = ?';
@@ -46,15 +62,20 @@ if ($pdo) {
             $where[]  = 'n.priority = ?';
             $params[] = $priorityFilter;
         }
+        if ($unreadOnly) {
+            $where[] = 'nr.is_read = 0';
+        }
 
         $whereClause = implode(' AND ', $where);
         $offset      = ($currentPage - 1) * $perPage;
 
-        // Total count
+        // Total count (for pagination)
         $cSt = $pdo->prepare(
-            "SELECT COUNT(*) FROM notifications n
-             LEFT JOIN notification_types nt ON nt.id = n.notification_type_id
-             WHERE $whereClause"
+            "SELECT COUNT(*)
+               FROM notification_recipients nr
+               JOIN notifications n          ON n.id  = nr.notification_id
+          LEFT JOIN notification_types nt    ON nt.id = n.notification_type_id
+              WHERE $whereClause"
         );
         $cSt->execute($params);
         $notifTotal = (int)$cSt->fetchColumn();
@@ -62,9 +83,11 @@ if ($pdo) {
         // Items
         $iSt = $pdo->prepare(
             "SELECT n.id, n.title, n.message, n.sent_at, n.priority,
+                    nr.is_read, nr.read_at,
                     nt.code AS type_code, nt.name AS type_name
-               FROM notifications n
-          LEFT JOIN notification_types nt ON nt.id = n.notification_type_id
+               FROM notification_recipients nr
+               JOIN notifications n          ON n.id  = nr.notification_id
+          LEFT JOIN notification_types nt    ON nt.id = n.notification_type_id
               WHERE $whereClause
            ORDER BY n.sent_at DESC
               LIMIT :limit OFFSET :offset"
@@ -77,6 +100,27 @@ if ($pdo) {
         $iSt->execute();
         $notifItems = $iSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+        // Unread count (for the "Mark all read" button badge)
+        $ucSt = $pdo->prepare(
+            "SELECT COALESCE(
+               (SELECT unread_count FROM notification_counters
+                 WHERE tenant_id      = ?
+                   AND recipient_type = 'user'
+                   AND recipient_id   = ?
+                 LIMIT 1),
+               (SELECT COUNT(*)
+                  FROM notification_recipients nr2
+                  JOIN notifications n2 ON n2.id = nr2.notification_id
+                 WHERE nr2.recipient_type = 'user'
+                   AND nr2.recipient_id   = ?
+                   AND nr2.is_read        = 0
+                   AND n2.tenant_id       = ?
+                   AND (n2.expires_at IS NULL OR n2.expires_at > NOW()))
+            ) AS unread_count"
+        );
+        $ucSt->execute([$tenantId, $userId, $userId, $tenantId]);
+        $unreadCount = (int)$ucSt->fetchColumn();
+
     } catch (Throwable $e) {
         $notifError = true;
         error_log('[notifications.php] ' . $e->getMessage());
@@ -85,7 +129,7 @@ if ($pdo) {
 
 $totalPages = $notifTotal > 0 ? (int)ceil($notifTotal / $perPage) : 0;
 
-// Notification type → emoji icon map (mirrors JS initNotifBell)
+// Type → emoji icon
 function notif_icon(string $code): string {
     $icons = [
         'order' => '📦', 'payment' => '💳', 'shipment' => '🚚', 'return' => '↩️',
@@ -96,44 +140,63 @@ function notif_icon(string $code): string {
     return $icons[$code] ?? '🔔';
 }
 
-// Priority label
+// Priority dot
 function notif_priority_label(string $p): string {
-    $labels = ['low' => '🔵', 'normal' => '⚪', 'high' => '🟠', 'urgent' => '🔴'];
-    return $labels[$p] ?? '';
+    return ['low' => '🔵', 'normal' => '⚪', 'high' => '🟠', 'urgent' => '🔴'][$p] ?? '';
 }
 
-// Build filter query string (strip page)
+// Build filter query string preserving current filters
 function notif_filter_qs(array $extra = []): string {
     $base = [];
     if (!empty($_GET['type_code'])) $base['type_code'] = $_GET['type_code'];
     if (!empty($_GET['priority']))  $base['priority']  = $_GET['priority'];
-    if (!empty($_GET['tenant_id'])) $base['tenant_id'] = $_GET['tenant_id'];
-    $merged = array_merge($base, $extra);
-    return $merged ? '?' . http_build_query($merged) : '';
+    if (!empty($_GET['unread']))    $base['unread']    = '1';
+    if (!empty($_GET['tenant_id'])) $base['tenant_id'] = (int)$_GET['tenant_id'];
+    // Remove keys explicitly set to null (used to clear individual filters)
+    $merged = array_filter(array_merge($base, $extra), fn($v) => $v !== null && $v !== '');
+    return '?' . http_build_query($merged);
 }
 ?>
 
 <main class="pub-container" style="padding-top:24px;padding-bottom:48px;">
 
     <!-- Page header -->
-    <div class="pub-page-hero">
-        <h1>🔔 <?= e(t('notifications.page_title', ['default' => 'Notifications'])) ?></h1>
-        <?php if ($notifTotal > 0): ?>
-        <p><?= $notifTotal ?> <?= e(t('notifications.total_count', ['default' => 'notification(s)'])) ?></p>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+        <div>
+            <h1 style="margin:0;font-size:1.4rem;">🔔 <?= e(t('notifications.page_title', ['default' => 'My Notifications'])) ?></h1>
+            <?php if ($unreadCount > 0): ?>
+            <p style="color:var(--pub-muted);font-size:0.85rem;margin:4px 0 0;">
+                <?= $unreadCount ?> <?= e(t('notifications.unread_count', ['default' => 'unread'])) ?>
+            </p>
+            <?php endif; ?>
+        </div>
+        <?php if ($unreadCount > 0): ?>
+        <button type="button" class="pub-btn pub-btn--primary pub-btn--sm" id="pubMarkAllReadBtn">
+            ✓ <?= e(t('notifications.mark_all_read', ['default' => 'Mark all as read'])) ?>
+        </button>
         <?php endif; ?>
     </div>
 
     <!-- Filters bar -->
-    <form method="get" action="" class="pub-filters-bar" style="margin-bottom:24px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+    <form method="get" action="" style="margin-bottom:20px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
         <?php if (!empty($_GET['tenant_id'])): ?>
             <input type="hidden" name="tenant_id" value="<?= (int)$_GET['tenant_id'] ?>">
         <?php endif; ?>
+
+        <!-- Unread-only toggle -->
+        <div>
+            <label class="pub-label">&nbsp;</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.88rem;">
+                <input type="checkbox" name="unread" value="1" onchange="this.form.submit()" <?= $unreadOnly ? 'checked' : '' ?>>
+                <?= e(t('notifications.unread_only', ['default' => 'Unread only'])) ?>
+            </label>
+        </div>
 
         <!-- Type filter -->
         <?php if (!empty($notifTypes)): ?>
         <div>
             <label class="pub-label"><?= e(t('notifications.filter_type', ['default' => 'Type'])) ?></label>
-            <select name="type_code" class="pub-select pub-filter-select" style="min-width:140px;" onchange="this.form.submit()">
+            <select name="type_code" class="pub-select" style="min-width:140px;" onchange="this.form.submit()">
                 <option value=""><?= e(t('notifications.all_types', ['default' => 'All types'])) ?></option>
                 <?php foreach ($notifTypes as $nt): ?>
                 <option value="<?= e($nt['code']) ?>" <?= $typeCodeFilter === $nt['code'] ? 'selected' : '' ?>>
@@ -147,7 +210,7 @@ function notif_filter_qs(array $extra = []): string {
         <!-- Priority filter -->
         <div>
             <label class="pub-label"><?= e(t('notifications.filter_priority', ['default' => 'Priority'])) ?></label>
-            <select name="priority" class="pub-select pub-filter-select" style="min-width:120px;" onchange="this.form.submit()">
+            <select name="priority" class="pub-select" style="min-width:120px;" onchange="this.form.submit()">
                 <option value=""><?= e(t('notifications.all_priorities', ['default' => 'All'])) ?></option>
                 <option value="urgent" <?= $priorityFilter === 'urgent' ? 'selected' : '' ?>>🔴 <?= e(t('notifications.priority_urgent', ['default' => 'Urgent'])) ?></option>
                 <option value="high"   <?= $priorityFilter === 'high'   ? 'selected' : '' ?>>🟠 <?= e(t('notifications.priority_high',   ['default' => 'High'])) ?></option>
@@ -156,10 +219,11 @@ function notif_filter_qs(array $extra = []): string {
             </select>
         </div>
 
-        <!-- Reset -->
-        <?php if ($typeCodeFilter || $priorityFilter): ?>
-        <a href="?<?= !empty($_GET['tenant_id']) ? 'tenant_id='.(int)$_GET['tenant_id'] : '' ?>"
-           class="pub-btn pub-btn--ghost pub-btn--sm">✕ <?= e(t('notifications.reset_filters', ['default' => 'Reset'])) ?></a>
+        <?php if ($typeCodeFilter || $priorityFilter || $unreadOnly): ?>
+        <a href="<?= notif_filter_qs(['type_code' => null, 'priority' => null, 'unread' => null, 'page' => null]) ?>"
+           class="pub-btn pub-btn--ghost pub-btn--sm" style="align-self:flex-end;">
+            ✕ <?= e(t('notifications.reset_filters', ['default' => 'Reset'])) ?>
+        </a>
         <?php endif; ?>
     </form>
 
@@ -168,7 +232,7 @@ function notif_filter_qs(array $extra = []): string {
         ⚠️ <?= e(t('notifications.load_error', ['default' => 'Could not load notifications. Please try again.'])) ?>
     </div>
     <?php elseif (empty($notifItems)): ?>
-    <div class="pub-empty-state" style="text-align:center;padding:60px 20px;">
+    <div style="text-align:center;padding:60px 20px;">
         <div style="font-size:3rem;margin-bottom:16px;">🔔</div>
         <p style="color:var(--pub-muted);font-size:1rem;">
             <?= e(t('notifications.empty', ['default' => 'No notifications yet'])) ?>
@@ -185,14 +249,20 @@ function notif_filter_qs(array $extra = []): string {
             $nTime  = isset($n['sent_at']) ? substr((string)$n['sent_at'], 0, 16) : '';
             $nCode  = $n['type_code'] ?? '';
             $nPrio  = $n['priority'] ?? 'normal';
+            $nRead  = (bool)$n['is_read'];
             $nIcon  = notif_icon($nCode);
             $nPLbl  = notif_priority_label($nPrio);
         ?>
-        <div class="pub-notif-page-item" data-id="<?= $nId ?>" data-priority="<?= e($nPrio) ?>">
+        <div class="pub-notif-page-item<?= $nRead ? ' pub-notif-read' : ' pub-notif-unread' ?>"
+             data-id="<?= $nId ?>"
+             data-priority="<?= e($nPrio) ?>">
             <span class="pub-notif-page-icon" aria-hidden="true"><?= $nIcon ?></span>
             <div class="pub-notif-page-body">
                 <div class="pub-notif-page-row">
                     <p class="pub-notif-page-title"><?= e($nTitle) ?></p>
+                    <?php if (!$nRead): ?>
+                    <span class="pub-notif-badge-unread" title="<?= e(t('notifications.unread', ['default' => 'Unread'])) ?>"></span>
+                    <?php endif; ?>
                     <?php if ($nPLbl): ?>
                     <span class="pub-notif-page-priority" title="<?= e($nPrio) ?>"><?= $nPLbl ?></span>
                     <?php endif; ?>
@@ -233,7 +303,6 @@ function notif_filter_qs(array $extra = []): string {
 .pub-notif-page-list {
     display: flex;
     flex-direction: column;
-    gap: 0;
     border: 1px solid var(--pub-border, #e6e9ee);
     border-radius: var(--pub-radius, 10px);
     overflow: hidden;
@@ -247,39 +316,53 @@ function notif_filter_qs(array $extra = []): string {
     transition: background 0.15s;
 }
 .pub-notif-page-item:last-child { border-bottom: none; }
-.pub-notif-page-item:hover { background: var(--pub-bg, #f9fafb); }
-.pub-notif-page-item[data-priority="urgent"] {
-    border-inline-start: 3px solid #ef4444;
+.pub-notif-page-item:hover      { background: var(--pub-bg, #f9fafb); }
+.pub-notif-page-item.pub-notif-unread { background: #eef2ff; } /* fallback for older browsers */
+@supports (background: color-mix(in srgb, red 5%, white)) {
+    .pub-notif-page-item.pub-notif-unread { background: color-mix(in srgb, var(--pub-primary, #2563eb) 5%, var(--pub-surface, #fff)); }
 }
-.pub-notif-page-item[data-priority="high"] {
-    border-inline-start: 3px solid #f97316;
-}
-.pub-notif-page-icon {
-    font-size: 1.4rem;
-    flex-shrink: 0;
-    margin-top: 2px;
-}
-.pub-notif-page-body  { flex: 1; min-width: 0; }
-.pub-notif-page-row   { display: flex; align-items: flex-start; gap: 8px; }
-.pub-notif-page-title {
-    font-size: 0.92rem;
-    font-weight: 600;
-    color: var(--pub-text, #111);
-    margin: 0;
-    flex: 1;
-}
+.pub-notif-page-item[data-priority="urgent"] { border-inline-start: 3px solid #ef4444; }
+.pub-notif-page-item[data-priority="high"]   { border-inline-start: 3px solid #f97316; }
+.pub-notif-page-icon     { font-size: 1.4rem; flex-shrink: 0; margin-top: 2px; }
+.pub-notif-page-body     { flex: 1; min-width: 0; }
+.pub-notif-page-row      { display: flex; align-items: flex-start; gap: 8px; }
+.pub-notif-page-title    { font-size: 0.92rem; font-weight: 600; color: var(--pub-text, #111); margin: 0; flex: 1; }
+.pub-notif-read .pub-notif-page-title { font-weight: 400; color: var(--pub-muted, #6b7280); }
+.pub-notif-badge-unread  { width: 8px; height: 8px; border-radius: 50%; background: var(--pub-primary, #2563eb); flex-shrink: 0; margin-top: 5px; }
 .pub-notif-page-priority { font-size: 0.9rem; flex-shrink: 0; }
-.pub-notif-page-msg {
-    font-size: 0.83rem;
-    color: var(--pub-muted, #6b7280);
-    margin: 4px 0 0;
-    line-height: 1.5;
-}
-.pub-notif-page-time {
-    font-size: 0.73rem;
-    color: var(--pub-muted, #9ca3af);
-    margin-top: 5px;
-}
+.pub-notif-page-msg      { font-size: 0.83rem; color: var(--pub-muted, #6b7280); margin: 4px 0 0; line-height: 1.5; }
+.pub-notif-page-time     { font-size: 0.73rem; color: var(--pub-muted, #9ca3af); margin-top: 5px; }
 </style>
+
+<script>
+(function () {
+    var markAllBtn = document.getElementById('pubMarkAllReadBtn');
+    if (markAllBtn) {
+        markAllBtn.addEventListener('click', function () {
+            markAllBtn.disabled = true;
+            fetch('/api/public/notifications/mark-all-read', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.success) {
+                    // Update all unread items visually
+                    document.querySelectorAll('#pubNotifPageList .pub-notif-unread').forEach(function (el) {
+                        el.classList.remove('pub-notif-unread');
+                        el.classList.add('pub-notif-read');
+                        var dot = el.querySelector('.pub-notif-badge-unread');
+                        if (dot) dot.remove();
+                    });
+                    markAllBtn.style.display = 'none';
+                }
+            })
+            .catch(function () {})
+            .finally(function () { markAllBtn.disabled = false; });
+        });
+    }
+})();
+</script>
 
 <?php include dirname(__DIR__) . '/partials/footer.php'; ?>

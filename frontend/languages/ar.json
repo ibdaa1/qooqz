@@ -493,5 +493,26 @@
     "payment_failed": "فشل الدفع",
     "payment_refunded": "مسترد",
     "pay_now": "ادفع الآن"
+  },
+  "notifications": {
+    "page_title": "إشعاراتي",
+    "unread_count": "غير مقروء",
+    "unread_only": "غير المقروءة فقط",
+    "mark_all_read": "تعيين الكل كمقروء",
+    "filter_type": "النوع",
+    "all_types": "جميع الأنواع",
+    "filter_priority": "الأولوية",
+    "all_priorities": "الكل",
+    "priority_urgent": "عاجل",
+    "priority_high": "مرتفع",
+    "priority_normal": "عادي",
+    "priority_low": "منخفض",
+    "reset_filters": "إعادة تعيين",
+    "empty": "لا توجد إشعارات بعد",
+    "unread": "غير مقروء",
+    "load_error": "تعذّر تحميل الإشعارات. يرجى المحاولة مرة أخرى.",
+    "view_all": "عرض الكل",
+    "bell_title": "الإشعارات",
+    "no_new": "لا توجد إشعارات جديدة"
   }
 }
