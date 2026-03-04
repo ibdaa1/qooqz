@@ -81,6 +81,11 @@ if ($pdo && $userId) {
         $notifTotal = (int)$cSt->fetchColumn();
 
         // Items
+        // Items -- use only positional ? to avoid SQLSTATE HY093 (mixed placeholders in MySQL PDO)
+        $itemParams   = $params;
+        $itemParams[] = $perPage;
+        $itemParams[] = $offset;
+
         $iSt = $pdo->prepare(
             "SELECT n.id, n.title, n.message, n.sent_at, n.priority,
                     nr.is_read, nr.read_at,
@@ -90,14 +95,9 @@ if ($pdo && $userId) {
           LEFT JOIN notification_types nt    ON nt.id = n.notification_type_id
               WHERE $whereClause
            ORDER BY n.sent_at DESC
-              LIMIT :limit OFFSET :offset"
+              LIMIT ? OFFSET ?"
         );
-        foreach ($params as $i => $v) {
-            $iSt->bindValue($i + 1, $v, is_int($v) ? PDO::PARAM_INT : PDO::PARAM_STR);
-        }
-        $iSt->bindValue(':limit',  $perPage, PDO::PARAM_INT);
-        $iSt->bindValue(':offset', $offset,  PDO::PARAM_INT);
-        $iSt->execute();
+        $iSt->execute($itemParams);
         $notifItems = $iSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         // Unread count (for the "Mark all read" button badge)

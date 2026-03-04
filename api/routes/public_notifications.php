@@ -30,6 +30,16 @@ declare(strict_types=1);
 $notifMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $notifSub    = strtolower($segments[1] ?? '');
 
+// Handle CORS preflight so POST mark-read / mark-all-read calls succeed
+if ($notifMethod === 'OPTIONS') {
+    if (!headers_sent()) {
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-CSRF-Token, X-Requested-With');
+        http_response_code(204);
+    }
+    exit;
+}
+
 // Resolve authenticated user from session (same pattern as rest of public.php)
 $notifUserId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
 
