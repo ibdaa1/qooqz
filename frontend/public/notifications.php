@@ -17,6 +17,7 @@ if (!$_isLoggedIn) {
     exit;
 }
 
+$ctx = $GLOBALS['PUB_CONTEXT'];
 $GLOBALS['PUB_PAGE_TITLE'] = e(t('notifications.page_title', ['default' => 'My Notifications'])) . ' — QOOQZ';
 include dirname(__DIR__) . '/partials/header.php';
 

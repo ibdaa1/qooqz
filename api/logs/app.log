@@ -68,3 +68,10 @@
 [2026-03-04 09:14:27] [info] [RID:7285a393185718a9] RedisHelper loaded | {"request_id":"7285a393185718a9","memory_mb":2,"timestamp":"2026-03-04 09:14:27"}
 [2026-03-04 09:14:27] [info] [RID:7285a393185718a9] RequestContext class loaded | {"request_id":"7285a393185718a9","memory_mb":2,"timestamp":"2026-03-04 09:14:27"}
 [2026-03-04 09:14:27] [critical] [RID:7285a393185718a9] Database connection failed during bootstrap | {"message":"Database environment variables missing","file":"/home/runner/work/qooqz/qooqz/api/shared/core/DatabaseConnection.php","line":21,"request_id":"7285a393185718a9","memory_mb":2,"timestamp":"2026-03-04 09:14:27"}
+[2026-03-04 09:32:24] [info] [RID:72c5598ba29337bb] Advanced Logger initialized successfully | {"request_id":"72c5598ba29337bb","memory_mb":2,"timestamp":"2026-03-04 09:32:24"}
+[2026-03-04 09:32:24] [info] [RID:72c5598ba29337bb] Bootstrap initializing | {"env":"production","request_id":"72c5598ba29337bb","memory_mb":2,"timestamp":"2026-03-04 09:32:24"}
+[2026-03-04 09:32:24] [info] [RID:72c5598ba29337bb] API routing detected | {"version":"v1","route":"/public/notifications","is_versioned":true,"request_id":"72c5598ba29337bb","memory_mb":2,"timestamp":"2026-03-04 09:32:24"}
+[2026-03-04 09:32:24] [info] [RID:72c5598ba29337bb] Session config loaded | {"request_id":"72c5598ba29337bb","memory_mb":2,"timestamp":"2026-03-04 09:32:24"}
+[2026-03-04 09:32:24] [info] [RID:72c5598ba29337bb] RedisHelper loaded | {"request_id":"72c5598ba29337bb","memory_mb":2,"timestamp":"2026-03-04 09:32:24"}
+[2026-03-04 09:32:24] [info] [RID:72c5598ba29337bb] RequestContext class loaded | {"request_id":"72c5598ba29337bb","memory_mb":2,"timestamp":"2026-03-04 09:32:24"}
+[2026-03-04 09:32:24] [critical] [RID:72c5598ba29337bb] Database connection failed during bootstrap | {"message":"Database environment variables missing","file":"/home/runner/work/qooqz/qooqz/api/shared/core/DatabaseConnection.php","line":21,"request_id":"72c5598ba29337bb","memory_mb":2,"timestamp":"2026-03-04 09:32:24"}
