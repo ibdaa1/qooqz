@@ -355,13 +355,17 @@ if (!function_exists('pub_load_theme')) {
                         'secondary_text'       => 'text_muted',
                         // Border
                         'border_color'         => 'border',
-                        // Header/Footer background and text
+                        // Header/Footer background and text — all naming variants
+                        'header_bg'            => 'header_bg',
                         'header_bg_color'      => 'header_bg',
                         'header_background'    => 'header_bg',
                         'header_text'          => 'header_text_color',
+                        'header_text_color'    => 'header_text_color',
+                        'footer_bg'            => 'footer_bg',
                         'footer_bg_color'      => 'footer_bg',
                         'footer_background'    => 'footer_bg',
                         'footer_text'          => 'footer_text_color',
+                        'footer_text_color'    => 'footer_text_color',
                     ];
                     foreach ($colorRows as $row) {
                         $k = $row['setting_key'] ?? '';
@@ -371,26 +375,41 @@ if (!function_exists('pub_load_theme')) {
                         if ($mapped) $theme[$mapped] = $v;
                         $colors[$k] = $v;
                     }
-                    // Also fill theme keys from color-type design_settings when color_settings is absent
+                    // Track whether any color_settings row explicitly configured header_bg
+                    $_headerBgSet = !empty($colors['header_bg']) || !empty($colors['header_bg_color']) || !empty($colors['header_background']);
+                    // Also fill theme keys from color-type design_settings when color_settings is absent.
+                    // Covers all naming variants; only overwrites if color_settings didn't already set it.
                     $dColorThemeMap = [
-                        'header_bg_color'   => 'header_bg',
-                        'footer_bg_color'   => 'footer_bg',
-                        'header_text_color' => 'header_text_color',
-                        'footer_text_color' => 'footer_text_color',
+                        'header_bg'          => 'header_bg',
+                        'header_bg_color'    => 'header_bg',
+                        'header_background'  => 'header_bg',
+                        'footer_bg'          => 'footer_bg',
+                        'footer_bg_color'    => 'footer_bg',
+                        'footer_background'  => 'footer_bg',
+                        'header_text'        => 'header_text_color',
+                        'header_text_color'  => 'header_text_color',
+                        'footer_text'        => 'footer_text_color',
+                        'footer_text_color'  => 'footer_text_color',
                     ];
                     foreach ($designs as $_d) {
                         if (($_d['setting_type'] ?? '') !== 'color' || empty($_d['setting_value'])) continue;
                         $_dk = $_d['setting_key'] ?? '';
-                        if (isset($dColorThemeMap[$_dk], $defaults[$dColorThemeMap[$_dk]]) && $theme[$dColorThemeMap[$_dk]] === $defaults[$dColorThemeMap[$_dk]]) {
-                            $theme[$dColorThemeMap[$_dk]] = $_d['setting_value'];
+                        if (!isset($dColorThemeMap[$_dk])) continue;
+                        $_thKey = $dColorThemeMap[$_dk];
+                        // Only overwrite from design_settings if color_settings didn't already set it
+                        if (isset($theme[$_thKey], $defaults[$_thKey]) && $theme[$_thKey] === $defaults[$_thKey]) {
+                            $theme[$_thKey] = $_d['setting_value'];
                         }
+                        // Track that header_bg was explicitly configured (even via design_settings)
+                        if ($_thKey === 'header_bg') $_headerBgSet = true;
                     }
-                    unset($dColorThemeMap, $_d, $_dk);
+                    unset($dColorThemeMap, $_d, $_dk, $_thKey);
 
-                    // header_bg defaults to primary if not explicitly set
-                    if (empty($colors['header_bg_color']) && empty($colors['header_background']) && $theme['header_bg'] === $defaults['header_bg']) {
+                    // header_bg defaults to primary only when NO source explicitly configured it
+                    if (!$_headerBgSet) {
                         $theme['header_bg'] = $theme['primary'];
                     }
+                    unset($_headerBgSet);
 
                     $theme['fonts']   = $fonts;
                     $theme['design']  = $designs;
@@ -441,10 +460,12 @@ if (!function_exists('pub_load_theme')) {
                         'text_primary'         => ['pub-text'],
                         'text_secondary'       => ['pub-muted'],
                         'border_color'         => ['pub-border'],
-                        // Header background: both naming conventions map to --pub-header-bg
+                        // Header background: all naming conventions → --pub-header-bg
+                        'header_bg'            => ['pub-header-bg'],
                         'header_bg_color'      => ['pub-header-bg'],
                         'header_background'    => ['pub-header-bg'],
-                        // Footer background: both naming conventions map to --pub-footer-bg
+                        // Footer background: all naming conventions → --pub-footer-bg
+                        'footer_bg'            => ['pub-footer-bg'],
                         'footer_bg_color'      => ['pub-footer-bg'],
                         'footer_background'    => ['pub-footer-bg'],
                         // Header / footer text
@@ -469,9 +490,15 @@ if (!function_exists('pub_load_theme')) {
                     }
                     // design_settings → raw CSS vars + --pub-* aliases for color and layout keys
                     $dColorToCssVar = [
+                        'header_bg'          => 'pub-header-bg',
                         'header_bg_color'    => 'pub-header-bg',
+                        'header_background'  => 'pub-header-bg',
+                        'footer_bg'          => 'pub-footer-bg',
                         'footer_bg_color'    => 'pub-footer-bg',
+                        'footer_background'  => 'pub-footer-bg',
+                        'header_text'        => 'pub-header-text',
                         'header_text_color'  => 'pub-header-text',
+                        'footer_text'        => 'pub-footer-text',
                         'footer_text_color'  => 'pub-footer-text',
                         'sidebar_bg_color'   => 'pub-sidebar-bg',
                         'sidebar_text_color' => 'pub-sidebar-text',
@@ -502,6 +529,14 @@ if (!function_exists('pub_load_theme')) {
                             $css .= '  --' . $dLayoutToCssVar[$dk] . ': ' . $cssEsc($cssVal) . ";\n";
                         }
                     }
+                    // Always emit the resolved --pub-header/footer vars last in :root {}
+                    // so they reflect the correct DB-sourced $theme values regardless of
+                    // which setting key / table was used — prevents any earlier rule from
+                    // overriding them with a stale or conflicting intermediate value.
+                    $css .= '  --pub-header-bg: '   . $cssEsc($theme['header_bg'])         . ";\n";
+                    $css .= '  --pub-header-text: ' . $cssEsc($theme['header_text_color'])  . ";\n";
+                    $css .= '  --pub-footer-bg: '   . $cssEsc($theme['footer_bg'])          . ";\n";
+                    $css .= '  --pub-footer-text: ' . $cssEsc($theme['footer_text_color'])  . ";\n";
                     $css .= "}\n";
                     // Apply font_settings variables to relevant UI elements
                     $fontSelMap = [
