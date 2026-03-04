@@ -1017,6 +1017,16 @@ if ($first === 'brands') {
 }
 
 /* -------------------------------------------------------
+ * /api/public/notifications — Public notifications for tenant
+ * Delegated to a dedicated route file for maintainability.
+ * Sub-paths: (none)=list, types=type-list, mark-seen=POST
+ * ----------------------------------------------------- */
+if ($first === 'notifications') {
+    require __DIR__ . '/public_notifications.php';
+    exit;
+}
+
+/* -------------------------------------------------------
  * /api/public/cart — DB-backed user cart
  * Requires authenticated session.
  * Sub-paths: (none)=GET, add=POST, update=POST, remove=POST, clear=POST
