@@ -71,8 +71,8 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
    4. Header
    ----------------------------------------------------- */
 .pub-header {
-  background: var(--pub-primary);
-  color: #fff;
+  background: var(--pub-header-bg, var(--pub-primary));
+  color: var(--pub-header-text, #fff);
   height: var(--pub-header-h);
   position: sticky;
   top: 0;
@@ -865,7 +865,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .pub-footer-brand-name {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--pub-footer-text, #fff);
   margin: 0 0 8px;
 }
 .pub-footer-brand-desc {
@@ -876,19 +876,20 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .pub-footer-col-title {
   font-size: 0.88rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--pub-footer-text, #fff);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-bottom: 14px;
 }
 .pub-footer-col a {
   display: block;
-  color: rgba(255,255,255,0.65);
+  color: var(--pub-footer-text, #fff);
+  opacity: 0.75;
   font-size: 0.88rem;
   padding: 4px 0;
-  transition: color var(--pub-transition);
+  transition: opacity var(--pub-transition);
 }
-.pub-footer-col a:hover { color: #fff; }
+.pub-footer-col a:hover { opacity: 1; }
 
 .pub-footer-bottom {
   border-top: 1px solid rgba(255,255,255,0.1);

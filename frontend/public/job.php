@@ -60,6 +60,10 @@ $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = e($jobTitle) . ' — QOOQZ';
 
 include dirname(__DIR__) . '/partials/header.php';
+
+// Resolve job card style from DB card_styles (card_type='job')
+$_jobDetailCardStyle = pub_card_inline_style('job');
+$_jobDetailCardClass = pub_card_css_class('job');
 ?>
 
 <!-- Breadcrumb -->
@@ -82,7 +86,7 @@ include dirname(__DIR__) . '/partials/header.php';
         <!-- =============================================
              JOB HEADER CARD
         ============================================= -->
-        <div class="pub-card" style="padding:28px;">
+        <div class="pub-card<?= $_jobDetailCardClass ? ' ' . $_jobDetailCardClass : '' ?>" style="padding:28px;<?= e($_jobDetailCardStyle) ?>">
             <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:16px;margin-bottom:18px;">
                 <div style="flex:1;min-width:0;">
                     <h1 style="font-size:1.5rem;font-weight:700;color:var(--pub-text);margin:0 0 10px;">
@@ -161,7 +165,7 @@ include dirname(__DIR__) . '/partials/header.php';
              DESCRIPTION / REQUIREMENTS / BENEFITS
         ============================================= -->
         <?php if ($desc): ?>
-        <div class="pub-card" style="padding:24px;">
+        <div class="pub-card<?= $_jobDetailCardClass ? ' ' . $_jobDetailCardClass : '' ?>" style="padding:24px;<?= e($_jobDetailCardStyle) ?>">
             <h2 style="font-size:1.1rem;font-weight:600;margin:0 0 14px;color:var(--pub-text);">
                 📋 <?= e(t('products.description')) ?>
             </h2>
@@ -170,7 +174,7 @@ include dirname(__DIR__) . '/partials/header.php';
         <?php endif; ?>
 
         <?php if ($reqs): ?>
-        <div class="pub-card" style="padding:24px;">
+        <div class="pub-card<?= $_jobDetailCardClass ? ' ' . $_jobDetailCardClass : '' ?>" style="padding:24px;<?= e($_jobDetailCardStyle) ?>">
             <h2 style="font-size:1.1rem;font-weight:600;margin:0 0 14px;color:var(--pub-text);">
                 ✅ <?= e(t('jobs.requirements')) ?>
             </h2>
@@ -179,7 +183,7 @@ include dirname(__DIR__) . '/partials/header.php';
         <?php endif; ?>
 
         <?php if ($benefits): ?>
-        <div class="pub-card" style="padding:24px;">
+        <div class="pub-card<?= $_jobDetailCardClass ? ' ' . $_jobDetailCardClass : '' ?>" style="padding:24px;<?= e($_jobDetailCardStyle) ?>">
             <h2 style="font-size:1.1rem;font-weight:600;margin:0 0 14px;color:var(--pub-text);">
                 🎁 <?= e(t('jobs.benefits')) ?>
             </h2>
@@ -190,7 +194,7 @@ include dirname(__DIR__) . '/partials/header.php';
         <!-- =============================================
              APPLICATION FORM
         ============================================= -->
-        <div class="pub-card" id="pub-apply-form" style="padding:28px;">
+        <div class="pub-card<?= $_jobDetailCardClass ? ' ' . $_jobDetailCardClass : '' ?>" id="pub-apply-form" style="padding:28px;<?= e($_jobDetailCardStyle) ?>">
             <h2 style="font-size:1.2rem;font-weight:700;margin:0 0 20px;color:var(--pub-text);">
                 📝 <?= e(t('jobs.apply_title')) ?>
             </h2>

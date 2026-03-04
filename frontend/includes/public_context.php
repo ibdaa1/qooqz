@@ -441,10 +441,17 @@ if (!function_exists('pub_load_theme')) {
                         'text_primary'         => ['pub-text'],
                         'text_secondary'       => ['pub-muted'],
                         'border_color'         => ['pub-border'],
+                        // Header background: both naming conventions map to --pub-header-bg
+                        'header_bg_color'      => ['pub-header-bg'],
                         'header_background'    => ['pub-header-bg'],
+                        // Footer background: both naming conventions map to --pub-footer-bg
+                        'footer_bg_color'      => ['pub-footer-bg'],
                         'footer_background'    => ['pub-footer-bg'],
+                        // Header / footer text
                         'header_text'          => ['pub-header-text'],
+                        'header_text_color'    => ['pub-header-text'],
                         'footer_text'          => ['pub-footer-text'],
+                        'footer_text_color'    => ['pub-footer-text'],
                     ];
                     foreach ($pubAliases as $srcKey => $aliases) {
                         if (empty($colors[$srcKey])) continue;

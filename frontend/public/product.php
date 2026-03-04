@@ -384,6 +384,11 @@ $GLOBALS['PUB_SEO'] = [
 ];
 
 include dirname(__DIR__) . '/partials/header.php';
+
+// Resolve product card style from DB card_styles (card_type='product')
+$_productCardStyle = pub_card_inline_style('product');
+$_productCardClass = pub_card_css_class('product');
+$_productImgStyle  = pub_card_img_style('product');
 ?>
 
 <!-- Breadcrumb -->
@@ -742,9 +747,9 @@ include dirname(__DIR__) . '/partials/header.php';
         </div>
         <div class="pub-grid">
             <?php foreach ($rItems as $p): ?>
-            <div class="pub-product-card">
+            <div class="pub-product-card<?= $_productCardClass ? ' ' . $_productCardClass : '' ?>"<?= $_productCardStyle ? ' style="' . e($_productCardStyle) . '"' : '' ?>>
                 <a href="/frontend/public/product.php?id=<?= (int)($p['id'] ?? 0) ?>" style="text-decoration:none;">
-                    <div class="pub-cat-img-wrap" style="aspect-ratio:1;">
+                    <div class="pub-cat-img-wrap" style="<?= e($_productImgStyle) ?>">
                         <?php if (!empty($p['image_url'])): ?>
                         <img src="<?= e(pub_img($p['image_url'], 'product')) ?>" alt="<?= e($p['name'] ?? '') ?>" class="pub-cat-img" loading="lazy"
                              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
@@ -785,8 +790,9 @@ include dirname(__DIR__) . '/partials/header.php';
         <div class="pub-grid">
             <?php foreach ($related as $p): ?>
             <a href="/frontend/public/product.php?id=<?= (int)($p['id'] ?? 0) ?>"
-               class="pub-product-card" style="text-decoration:none;">
-                <div class="pub-cat-img-wrap" style="aspect-ratio:1;">
+               class="pub-product-card<?= $_productCardClass ? ' ' . $_productCardClass : '' ?>"
+               style="text-decoration:none;<?= $_productCardStyle ? e($_productCardStyle) : '' ?>">
+                <div class="pub-cat-img-wrap" style="<?= e($_productImgStyle) ?>">
                     <?php if (!empty($p['image_url'])): ?>
                     <img src="<?= e(pub_img($p['image_url'], 'product')) ?>"
                          alt="<?= e($p['name'] ?? '') ?>" class="pub-cat-img" loading="lazy"
