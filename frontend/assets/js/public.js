@@ -341,9 +341,9 @@
     try { seenIds = JSON.parse(localStorage.getItem(seenKey) || '[]'); } catch (e) {}
     if (!Array.isArray(seenIds)) seenIds = [];
 
-    // Count unread (notifications whose id is NOT in seenIds)
+    // Count unread: a notification is unread if server says is_read===false AND not in local seenIds
     var unread = notifications.filter(function (n) {
-      return seenIds.indexOf(String(n.id)) === -1;
+      return !n.is_read && seenIds.indexOf(String(n.id)) === -1;
     }).length;
 
     // Update badge
@@ -379,7 +379,7 @@
         return;
       }
       list.innerHTML = notifications.map(function (n) {
-        var isSeen = seenIds.indexOf(String(n.id)) !== -1;
+        var isSeen = n.is_read || seenIds.indexOf(String(n.id)) !== -1;
         var icon   = typeIcon(n.type_code || '');
         var time   = n.sent_at ? n.sent_at.replace('T', ' ').substring(0, 16) : '';
         var title  = (n.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -394,7 +394,7 @@
         '</div>';
       }).join('');
 
-      // Click on item → mark as seen
+      // Click on item → mark as seen locally and persist to server
       list.querySelectorAll('.pub-notif-item').forEach(function (item) {
         item.addEventListener('click', function () {
           var id = String(item.dataset.id);
@@ -404,20 +404,34 @@
             item.classList.remove('unread');
             unread = Math.max(0, unread - 1);
             updateBadge(unread);
+            // Persist to server (best-effort)
+            fetch('/api/public/notifications/mark-read', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ids: [parseInt(id, 10)] })
+            }).catch(function () {});
           }
         });
       });
     }
     renderList();
 
-    // Mark all as seen
+    // Mark all as seen — also persist to server via API
     if (markAll) {
       markAll.addEventListener('click', function () {
+        // Optimistic local update
         seenIds = notifications.map(function (n) { return String(n.id); });
         try { localStorage.setItem(seenKey, JSON.stringify(seenIds)); } catch (e) {}
         unread = 0;
         updateBadge(0);
         renderList();
+        // Persist to server (best-effort — do not block UI)
+        fetch('/api/public/notifications/mark-all-read', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        }).catch(function () {});
       });
     }
 

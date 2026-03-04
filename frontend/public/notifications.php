@@ -336,6 +336,15 @@ function notif_filter_qs(array $extra = []): string {
 
 <script>
 (function () {
+    // Helper: visually mark a single notification item as read
+    function markItemRead(el) {
+        el.classList.remove('pub-notif-unread');
+        el.classList.add('pub-notif-read');
+        var dot = el.querySelector('.pub-notif-badge-unread');
+        if (dot) dot.remove();
+    }
+
+    // Mark-all-read button
     var markAllBtn = document.getElementById('pubMarkAllReadBtn');
     if (markAllBtn) {
         markAllBtn.addEventListener('click', function () {
@@ -348,13 +357,7 @@ function notif_filter_qs(array $extra = []): string {
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 if (d.success) {
-                    // Update all unread items visually
-                    document.querySelectorAll('#pubNotifPageList .pub-notif-unread').forEach(function (el) {
-                        el.classList.remove('pub-notif-unread');
-                        el.classList.add('pub-notif-read');
-                        var dot = el.querySelector('.pub-notif-badge-unread');
-                        if (dot) dot.remove();
-                    });
+                    document.querySelectorAll('#pubNotifPageList .pub-notif-unread').forEach(markItemRead);
                     markAllBtn.style.display = 'none';
                 }
             })
@@ -362,6 +365,23 @@ function notif_filter_qs(array $extra = []): string {
             .finally(function () { markAllBtn.disabled = false; });
         });
     }
+
+    // Individual mark-read on click for unread items
+    document.querySelectorAll('#pubNotifPageList .pub-notif-page-item.pub-notif-unread').forEach(function (el) {
+        el.style.cursor = 'pointer';
+        el.addEventListener('click', function () {
+            var id = parseInt(el.dataset.id, 10);
+            if (!id || el.classList.contains('pub-notif-read')) return;
+            // Optimistic UI update
+            markItemRead(el);
+            fetch('/api/public/notifications/mark-read', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: [id] })
+            }).catch(function () {});
+        });
+    });
 })();
 </script>
 

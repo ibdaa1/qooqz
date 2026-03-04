@@ -27,7 +27,7 @@ declare(strict_types=1);
  *  $offset     int
  */
 
-$notifMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$notifMethod = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 $notifSub    = strtolower($segments[1] ?? '');
 
 // Handle CORS preflight so POST mark-read / mark-all-read calls succeed
