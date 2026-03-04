@@ -57,7 +57,7 @@ function safe_log(string $level, string $message, array $context = []): void
         'timestamp' => $timestamp
     ]);
     $contextStr = $context ? ' | ' . json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : '';
-    $line = "[{$timestamp}] [{$level}] [RID:{REQUEST_ID}] {$message}{$contextStr}\n";
+    $line = sprintf('[%s] [%s] [RID:%s] %s%s' . "\n", $timestamp, $level, REQUEST_ID, $message, $contextStr);
 
     // Buffer logs for performance
     $buffer[] = $line;
@@ -590,6 +590,9 @@ if (!IS_DEBUG) {
     if (class_exists('RedisHelper', false)) {
         try {
             $redis = RedisHelper::getInstance();
+            if ($redis === null) {
+                throw new RuntimeException('Redis unavailable');
+            }
             $requests = $redis->incr($rateLimitKey);
             $redis->expire($rateLimitKey, 60); // 1 minute window
             
