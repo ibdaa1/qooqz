@@ -147,6 +147,10 @@ if (!$isCli) {
         if (!$testTenantId) $testTenantId = (int)($_SESSION['pub_tenant_id'] ?? 1) ?: 1;
         // Build the session cookie string to forward to curl
         $webSessionCookie = session_name() . '=' . session_id();
+        // Release the session file lock so curl requests can read the same session
+        // without being blocked. PHP session files are exclusively locked while
+        // a session is open, which causes concurrent API requests to get user_id=null.
+        session_write_close();
     }
 }
 
