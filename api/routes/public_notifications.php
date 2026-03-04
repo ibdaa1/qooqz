@@ -20,7 +20,7 @@ declare(strict_types=1);
  * Variables provided by the parent (public.php):
  *  $pdo        PDO|null
  *  $segments   array
- *  $tenantId   int|null
+ *  $notifTenantId   int|null
  *  $lang       string
  *  $page       int
  *  $per        int
@@ -32,6 +32,10 @@ $notifSub    = strtolower($segments[1] ?? '');
 
 // Resolve authenticated user from session (same pattern as rest of public.php)
 $notifUserId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
+
+// $tenantId from public.php is null when no ?tenant_id= param is present.
+// Fall back to the session-cached value (set by public_context.php) or default to 1.
+$notifTenantId = (int)($tenantId ?? $_SESSION['pub_tenant_id'] ?? 1) ?: 1;
 
 /* ------------------------------------------------------------------
  * GET /api/public/notifications/types
@@ -72,7 +76,7 @@ if ($notifMethod === 'GET' && $notifSub === 'unread-count') {
               WHERE tenant_id = ? AND recipient_type = 'user' AND recipient_id = ?
               LIMIT 1"
         );
-        $cntSt->execute([$tenantId, $notifUserId]);
+        $cntSt->execute([$notifTenantId, $notifUserId]);
         $row = $cntSt->fetch(PDO::FETCH_ASSOC);
 
         if ($row !== false) {
@@ -88,7 +92,7 @@ if ($notifMethod === 'GET' && $notifSub === 'unread-count') {
                     AND n.tenant_id       = ?
                     AND (n.expires_at IS NULL OR n.expires_at > NOW())"
             );
-            $fbSt->execute([$notifUserId, $tenantId]);
+            $fbSt->execute([$notifUserId, $notifTenantId]);
             $count = (int)$fbSt->fetchColumn();
         }
         ResponseFormatter::success(['unread_count' => $count]);
@@ -127,7 +131,7 @@ if ($notifMethod === 'GET' && $notifSub === '') {
         'n.tenant_id       = ?',
         '(n.expires_at IS NULL OR n.expires_at > NOW())',
     ];
-    $params = [$notifUserId, $tenantId];
+    $params = [$notifUserId, $notifTenantId];
 
     if (!empty($_GET['type_code'])) {
         $where[]  = 'nt.code = ?';
@@ -156,7 +160,12 @@ if ($notifMethod === 'GET' && $notifSub === '') {
         $cSt->execute($params);
         $total = (int)$cSt->fetchColumn();
 
-        // Items
+        // Items — use only positional ? placeholders to avoid SQLSTATE HY093 when
+        // mixing positional and named parameters in MySQL PDO.
+        $itemParams = $params;
+        $itemParams[] = $nLimit;
+        $itemParams[] = $nOffset;
+
         $qSt = $pdo->prepare(
             "SELECT n.id, n.title, n.message, n.sent_at, n.priority, n.data,
                     n.entity_id, n.sender_entity_id,
@@ -169,14 +178,9 @@ if ($notifMethod === 'GET' && $notifSub === '') {
           LEFT JOIN notification_types nt    ON nt.id = n.notification_type_id
               WHERE $whereClause
            ORDER BY n.sent_at DESC
-              LIMIT :limit OFFSET :offset"
+              LIMIT ? OFFSET ?"
         );
-        foreach ($params as $i => $v) {
-            $qSt->bindValue($i + 1, $v, is_int($v) ? PDO::PARAM_INT : PDO::PARAM_STR);
-        }
-        $qSt->bindValue(':limit',  $nLimit,  PDO::PARAM_INT);
-        $qSt->bindValue(':offset', $nOffset, PDO::PARAM_INT);
-        $qSt->execute();
+        $qSt->execute($itemParams);
         $items = $qSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         // Cast is_read to bool for clean JSON
@@ -248,7 +252,7 @@ if ($notifMethod === 'POST' && $notifSub === 'mark-read') {
                      )
                      ON DUPLICATE KEY UPDATE
                          unread_count = VALUES(unread_count)"
-                )->execute([$tenantId, $notifUserId, $notifUserId, $tenantId]);
+                )->execute([$notifTenantId, $notifUserId, $notifUserId, $notifTenantId]);
             } catch (Throwable) {}
         }
 
@@ -282,7 +286,7 @@ if ($notifMethod === 'POST' && $notifSub === 'mark-all-read') {
                 AND n.tenant_id       = ?
                 AND (n.expires_at IS NULL OR n.expires_at > NOW())"
         );
-        $upSt->execute([$notifUserId, $tenantId]);
+        $upSt->execute([$notifUserId, $notifTenantId]);
         $affected = $upSt->rowCount();
 
         // Recalculate counter from source to ensure consistency (non-fatal)
@@ -291,7 +295,7 @@ if ($notifMethod === 'POST' && $notifSub === 'mark-all-read') {
                 "INSERT INTO notification_counters (tenant_id, recipient_type, recipient_id, unread_count)
                  VALUES (?, 'user', ?, 0)
                  ON DUPLICATE KEY UPDATE unread_count = 0"
-            )->execute([$tenantId, $notifUserId]);
+            )->execute([$notifTenantId, $notifUserId]);
         } catch (Throwable) {}
 
         ResponseFormatter::success(['affected' => $affected]);
