@@ -166,7 +166,7 @@ final class AdminUiThemeLoader
         try {
             $stmt = $this->pdo->prepare("
                 SELECT * FROM card_styles
-                WHERE tenant_id = ? AND theme_id = ? AND is_active = 1
+                WHERE tenant_id = ? AND (theme_id = ? OR theme_id IS NULL) AND is_active = 1
                 ORDER BY card_type, name
             ");
             $stmt->execute([$tenantId, $themeId]);
