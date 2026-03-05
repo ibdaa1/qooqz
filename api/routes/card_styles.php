@@ -55,9 +55,14 @@ try {
         );
     } elseif ($method === 'GET') {
         $slug = $_GET['slug'] ?? null;
+        $id   = isset($_GET['id']) ? (int)$_GET['id'] : null;
         if ($slug) {
             ResponseFormatter::success(
                 $controller->get($tenantId, $slug)
+            );
+        } elseif ($id) {
+            ResponseFormatter::success(
+                $controller->getById($tenantId, $id)
             );
         } else {
             ResponseFormatter::success(
@@ -76,6 +81,10 @@ try {
         );
     } elseif ($method === 'PUT') {
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        // Allow id to be passed in the query string (?id=N) as well as in the body.
+        if (empty($data['id']) && !empty($_GET['id'])) {
+            $data['id'] = (int)$_GET['id'];
+        }
         ResponseFormatter::success(
             $controller->update($tenantId, $data)
         );

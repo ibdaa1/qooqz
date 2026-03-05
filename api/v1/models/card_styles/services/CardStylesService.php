@@ -34,6 +34,16 @@ final class CardStylesService
         return $row;
     }
 
+    public function getById(int $tenantId, int $id): array
+    {
+        $row = $this->repo->findById($tenantId, $id);
+        if (!$row) {
+            throw new RuntimeException('Card style not found');
+        }
+
+        return $row;
+    }
+
     public function save(int $tenantId, array $data): array
     {
         // Auto-derive card_type from slug when the stored value is empty.

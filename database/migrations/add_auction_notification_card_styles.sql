@@ -1,15 +1,33 @@
 -- database/migrations/add_auction_notification_card_styles.sql
--- Extends the card_type enum to support auction/notification/discount/jobs types
--- and seeds default (theme-agnostic, theme_id = NULL) card style rows for each.
+-- Extends card_type support for auction/notification/discount/jobs card style rows.
 --
 -- This migration is idempotent and safe to re-run.
--- IMPORTANT: back-fill UPDATEs run FIRST so that empty card_type rows are fixed
--- before the ENUM is extended (avoids strict-mode failures on ALTER TABLE).
+--
+-- STRATEGY: Convert card_type from ENUM to VARCHAR(50) FIRST.
+--   - The original ENUM only contains the legacy values; trying to UPDATE a row
+--     with 'auction' before extending the ENUM fails in MySQL strict mode.
+--   - Converting to VARCHAR(50) removes the DB-level constraint entirely.
+--     PHP (CardStylesValidator) remains the single validation gatekeeper.
+--   - This also adds `updated_at` if it does not already exist.
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 1. Back-fill card_type for rows already in the DB with an empty/null value.
---    Uses slug prefix to determine the correct type.
---    Must run BEFORE the ALTER TABLE so there are no invalid-enum rows left.
+-- 1. Convert card_type column from ENUM to VARCHAR(50).
+--    VARCHAR allows any string value including the current empty-string rows.
+--    Existing rows with '' are left as-is and back-filled in step 2.
+-- ─────────────────────────────────────────────────────────────────────────────
+ALTER TABLE `card_styles`
+  MODIFY `card_type` VARCHAR(50) NOT NULL DEFAULT '';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 2. Add updated_at column if it does not exist.
+--    The repository UPDATE sets updated_at = NOW(); missing column → 500 error.
+-- ─────────────────────────────────────────────────────────────────────────────
+ALTER TABLE `card_styles`
+  ADD COLUMN IF NOT EXISTS `updated_at` DATETIME NULL DEFAULT NULL;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 3. Back-fill card_type for rows that have an empty or null value.
+--    The column is now VARCHAR so these UPDATEs are unconditionally safe.
 -- ─────────────────────────────────────────────────────────────────────────────
 UPDATE `card_styles`
 SET    `card_type` = 'auction'
@@ -37,18 +55,7 @@ WHERE  `slug` LIKE 'plan-%'
   AND  (`card_type` IS NULL OR `card_type` = '');
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 2. Extend the card_type ENUM (safe now — no more empty rows)
---    Original: enum('product','category','vendor','blog','feature','testimonial','other')
---    After:    adds 'auction','notification','discount','jobs'
--- ─────────────────────────────────────────────────────────────────────────────
-ALTER TABLE `card_styles`
-  MODIFY `card_type` ENUM(
-    'product', 'category', 'vendor', 'blog', 'feature', 'testimonial', 'other',
-    'auction', 'notification', 'discount', 'jobs'
-  ) NOT NULL;
-
--- ─────────────────────────────────────────────────────────────────────────────
--- 3. Seed one default row per new card type for tenant_id = 1.
+-- 4. Seed one default row per new card type for tenant_id = 1.
 --    Uses INSERT ... WHERE NOT EXISTS to avoid duplicate rows even when there
 --    is no UNIQUE constraint on (tenant_id, slug).
 -- ─────────────────────────────────────────────────────────────────────────────

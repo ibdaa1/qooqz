@@ -18,7 +18,7 @@ final class PdoCardStylesRepository
             SELECT id, tenant_id, theme_id, name, slug, card_type,
                    background_color, border_color, border_width, border_radius,
                    shadow_style, padding, hover_effect, text_align, image_aspect_ratio,
-                   is_active, created_at, updated_at
+                   is_active, created_at
             FROM card_styles
             WHERE tenant_id = :tenantId
         ";
