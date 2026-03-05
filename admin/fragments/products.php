@@ -132,6 +132,10 @@ $apiBase = '/api';
         </div>
         <div class="page-header-actions">
             <?php if ($canCreate): ?>
+            <button id="btnImportCsv" class="btn btn-secondary">
+                <i class="fas fa-file-csv"></i>
+                <span>Import CSV</span>
+            </button>
             <button id="btnAddProduct" class="btn btn-primary">
                 <i class="fas fa-plus"></i>
                 <span data-i18n="products.add_new"><?= __t('products.add_new', 'Add Product') ?></span>
@@ -327,6 +331,73 @@ $apiBase = '/api';
                                 <option value="0" data-i18n="form.fields.new.no">No</option>
                                 <option value="1" data-i18n="form.fields.new.yes">Yes</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <!-- ═══════════════════════════════════════════════ -->
+                    <!-- English Content (Default Language) - Always Visible -->
+                    <!-- ═══════════════════════════════════════════════ -->
+                    <div class="english-content-section" style="margin-top:28px; padding-top:20px; border-top:2px solid var(--primary-color,#3b82f6);">
+                        <h4 style="margin-bottom:16px; color:var(--text-primary,#fff); display:flex; align-items:center; gap:10px;">
+                            <span style="background:var(--primary-color,#3b82f6); color:#fff; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:700;">EN</span>
+                            English Content <span style="color:var(--text-secondary,#94a3b8); font-size:0.8rem; font-weight:400; margin-left:6px;">(Default Language — required)</span>
+                        </h4>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enProdName" class="required">Product Name (English)</label>
+                                <input type="text" id="enProdName" name="en_name" class="form-control" required
+                                       placeholder="Enter product name in English">
+                                <div class="invalid-feedback">English product name is required</div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enProdShortDesc">Short Description (English)</label>
+                                <textarea id="enProdShortDesc" name="en_short_description" class="form-control" rows="2"
+                                          placeholder="Brief product summary in English"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enProdDesc">Full Description (English)</label>
+                                <textarea id="enProdDesc" name="en_description" class="form-control" rows="4"
+                                          placeholder="Detailed product description in English"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enProdSpecs">Specifications (English)</label>
+                                <textarea id="enProdSpecs" name="en_specifications" class="form-control" rows="3"
+                                          placeholder="Technical specifications in English"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enMetaTitle">Meta Title (English)</label>
+                                <input type="text" id="enMetaTitle" name="en_meta_title" class="form-control"
+                                       placeholder="SEO meta title in English">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enMetaDescription">Meta Description (English)</label>
+                                <textarea id="enMetaDescription" name="en_meta_description" class="form-control" rows="2"
+                                          placeholder="SEO meta description in English"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enMetaKeywords">Meta Keywords (English)</label>
+                                <input type="text" id="enMetaKeywords" name="en_meta_keywords" class="form-control"
+                                       placeholder="keyword1, keyword2, keyword3">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -526,6 +597,10 @@ $apiBase = '/api';
                         <h4 style="margin-bottom:12px; color:var(--text-primary,#fff); border-bottom:1px solid var(--border-color,#263044); padding-bottom:8px;">
                             <i class="fas fa-language"></i> Translations
                         </h4>
+                        <div style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.25); border-radius:8px; padding:12px; margin-bottom:16px; font-size:0.85rem; color:var(--text-secondary,#94a3b8);">
+                            <i class="fas fa-info-circle" style="color:#3b82f6;"></i>
+                            <strong style="color:var(--text-primary,#fff);">English</strong> translation fields are in the <strong style="color:var(--text-primary,#fff);">General tab</strong>. Use this tab to add translations for other languages (Arabic, French, etc.).
+                        </div>
                         <div id="prodTranslations" class="translation-panels"></div>
                         <div class="form-group" style="margin-top:12px;">
                             <label for="prodLangSelect" data-i18n="form.translations.select_lang">Select Language</label>
@@ -695,6 +770,73 @@ $apiBase = '/api';
         <div class="modal-content">
             <span class="close" id="prodMediaStudioClose">&times;</span>
             <iframe id="prodMediaStudioFrame" src="/admin/fragments/media_studio.php?embedded=1&tenant_id=<?= $tenantId ?>&lang=<?= $lang ?>" style="width:100%; height:500px; border:none;"></iframe>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- CSV Import Modal -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div id="csvImportModal" class="modal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.7); align-items:center; justify-content:center;">
+        <div class="modal-content" style="background:var(--card-bg,#0d1b2e); border:1px solid var(--border-color,#263044); border-radius:12px; padding:28px; width:min(640px,95vw); max-height:85vh; overflow-y:auto; position:relative;">
+            <!-- Header -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h3 style="color:var(--text-primary,#fff); margin:0;">
+                    <i class="fas fa-file-csv" style="color:var(--primary-color,#3b82f6);"></i>
+                    Import Products via CSV
+                </h3>
+                <button type="button" id="csvImportClose" style="background:none; border:none; color:var(--text-secondary,#94a3b8); font-size:1.4rem; cursor:pointer; padding:4px;">&times;</button>
+            </div>
+
+            <!-- Instructions -->
+            <div style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.25); border-radius:8px; padding:14px; margin-bottom:18px;">
+                <p style="color:var(--text-secondary,#94a3b8); margin:0; font-size:0.88rem; line-height:1.6;">
+                    <i class="fas fa-info-circle" style="color:#3b82f6;"></i>
+                    Upload a CSV file to bulk-import products with English translations. Each row = one product.
+                    Max recommended: <strong style="color:#fff;">1000 rows</strong> per file.
+                </p>
+            </div>
+
+            <!-- Download Sample -->
+            <div style="margin-bottom:18px;">
+                <button type="button" id="btnDownloadSample" class="btn btn-outline" style="width:100%;">
+                    <i class="fas fa-download"></i> Download Sample CSV Template
+                </button>
+            </div>
+
+            <!-- File Input -->
+            <div class="form-group" style="margin-bottom:18px;">
+                <label style="color:var(--text-primary,#fff); margin-bottom:8px; display:block;">Select CSV File</label>
+                <input type="file" id="csvFileInput" accept=".csv,text/csv" class="form-control"
+                       style="color:var(--text-secondary,#94a3b8); padding:10px;">
+            </div>
+
+            <!-- Preview Info -->
+            <div id="csvPreviewInfo" style="display:none; margin-bottom:16px; background:rgba(0,0,0,0.2); border-radius:8px; padding:12px;">
+                <span id="csvRowCount" style="color:var(--text-primary,#fff); font-size:0.9rem;"></span>
+            </div>
+
+            <!-- Progress -->
+            <div id="csvProgressArea" style="display:none; margin-bottom:16px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                    <span id="csvProgressLabel" style="color:var(--text-secondary,#94a3b8); font-size:0.85rem;">Importing...</span>
+                    <span id="csvProgressPct" style="color:var(--text-primary,#fff); font-size:0.85rem; font-weight:600;">0%</span>
+                </div>
+                <div style="background:rgba(255,255,255,0.1); border-radius:20px; height:8px; overflow:hidden;">
+                    <div id="csvProgressBar" style="background:var(--primary-color,#3b82f6); height:100%; width:0%; transition:width 0.3s ease; border-radius:20px;"></div>
+                </div>
+                <div id="csvProgressLog" style="margin-top:10px; max-height:150px; overflow-y:auto; font-size:0.78rem; color:var(--text-secondary,#94a3b8); font-family:monospace;"></div>
+            </div>
+
+            <!-- Result Summary -->
+            <div id="csvResultSummary" style="display:none; margin-bottom:16px; padding:12px; border-radius:8px;"></div>
+
+            <!-- Actions -->
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button type="button" id="csvImportCancel" class="btn btn-outline">Cancel</button>
+                <button type="button" id="csvImportStart" class="btn btn-primary" disabled>
+                    <i class="fas fa-upload"></i> Start Import
+                </button>
+            </div>
         </div>
     </div>
 
