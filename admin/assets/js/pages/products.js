@@ -1,4 +1,4 @@
-(function(){
+(function () {
     'use strict';
 
     /**
@@ -13,7 +13,7 @@
     const CONFIG = window.PRODUCTS_CONFIG || {};
     const AF = window.AdminFramework || {};
     const PERMS = window.PAGE_PERMISSIONS || {};
-    
+
     const API = {
         products: CONFIG.apiUrl || '/api/products',
         categories: CONFIG.categoriesApi || '/api/categories',
@@ -128,7 +128,8 @@
                     pricing_type: { label: p.pricing },
                     stock_quantity: { label: inv.stock_quantity },
                     low_stock_threshold: { label: inv.low_stock_threshold },
-                    stock_status: { label: inv.stock_status,
+                    stock_status: {
+                        label: inv.stock_status,
                         in_stock: inv.in_stock, out_of_stock: inv.out_of_stock, on_backorder: inv.on_backorder
                     },
                     manage_stock: { label: inv.manage_stock, yes: g.yes, no: g.no },
@@ -194,7 +195,8 @@
                 error: { load_failed: msg.server_error || 'Error loading data' }
             },
             // strings used internally
-            strings: { save_success: s.save_success, update_success: s.update_success,
+            strings: {
+                save_success: s.save_success, update_success: s.update_success,
                 delete_confirm: s.delete_confirm, delete_success: s.delete_success,
                 saving: s.saving, loading: s.loading
             }
@@ -217,7 +219,7 @@
     function applyTranslations() {
         const container = document.getElementById('productsPageContainer');
         if (!container) return;
-        
+
         container.querySelectorAll('[data-i18n]').forEach(elem => {
             const key = elem.getAttribute('data-i18n');
             const txt = t(key);
@@ -270,7 +272,7 @@
         try {
             const res = await fetch(url, config);
             const contentType = res.headers.get('content-type');
-            
+
             if (contentType && contentType.includes('application/json')) {
                 const data = await res.json();
                 if (!res.ok) {
@@ -328,14 +330,14 @@
                 // API returns { data: { items: [], meta: {} } }
                 const items = result.data.items || result.data;
                 const meta = result.data.meta || result.meta || {};
-                
+
                 state.products = Array.isArray(items) ? items : [];
                 state.total = meta.total || state.products.length;
-                
+
                 await renderTable(state.products);
                 updatePagination(meta.total !== undefined ? meta : { page, per_page: state.perPage, total: state.total });
                 updateResultsCount(state.total);
-                
+
                 showTable();
             } else {
                 throw new Error(result.error || result.message || 'Invalid response format');
@@ -444,9 +446,9 @@
 
     function populateDropdown(selectEl, data, valueKey, textKey, placeholder = '') {
         if (!selectEl) return;
-        
+
         selectEl.innerHTML = '';
-        
+
         if (placeholder) {
             const opt = document.createElement('option');
             opt.value = '';
@@ -464,9 +466,9 @@
 
     function populateAttributeSelect(attributes) {
         if (!el.attrSelect) return;
-        
+
         el.attrSelect.innerHTML = '<option value="">' + t('form.attributes.select', 'Select attribute') + '</option>';
-        
+
         attributes.forEach(attr => {
             const opt = document.createElement('option');
             opt.value = attr.id;
@@ -502,15 +504,15 @@
             const price = prod.price ? Number(prod.price).toFixed(2) : '0.00';
             const currency = prod.currency_code || 'SAR';
             const stock = prod.stock_quantity || 0;
-            const statusBadge = prod.is_active == 1 
+            const statusBadge = prod.is_active == 1
                 ? `<span class="badge badge-active">${t('table.status.active', 'Active')}</span>`
                 : `<span class="badge badge-inactive">${t('table.status.inactive', 'Inactive')}</span>`;
 
-            const canEdit = state.permissions.canEdit || state.permissions.canEditAll || 
-                           (state.permissions.canEditOwn && prod.created_by_user_id == window.APP_CONFIG?.USER_ID);
-            const canDelete = state.permissions.canDelete || state.permissions.canDeleteAll || 
-                             (state.permissions.canDeleteOwn && prod.created_by_user_id == window.APP_CONFIG?.USER_ID);
-            
+            const canEdit = state.permissions.canEdit || state.permissions.canEditAll ||
+                (state.permissions.canEditOwn && prod.created_by_user_id == window.APP_CONFIG?.USER_ID);
+            const canDelete = state.permissions.canDelete || state.permissions.canDeleteAll ||
+                (state.permissions.canDeleteOwn && prod.created_by_user_id == window.APP_CONFIG?.USER_ID);
+
             return `
                 <tr data-id="${prod.id}">
                     <td>${esc(prod.id)}</td>
@@ -520,7 +522,7 @@
                     </td>
                     <td><strong>${esc(name)}</strong><br><small style="color:var(--text-secondary,#94a3b8);">${esc(prod.sku || '')}</small></td>
                     <td>${esc(prod.sku || '-')}</td>
-                    <td>${esc(prod.product_type_name || '-')}</td>
+                    <td>${esc(prod.product_type_name || (state.productTypes.find(pt => pt.id == prod.product_type_id)?.name) || '-')}</td>
                     <td>${price} ${esc(currency)}</td>
                     <td>${esc(stock)}</td>
                     <td>${statusBadge}</td>
@@ -589,14 +591,14 @@
             if (el.prodIsFeatured) el.prodIsFeatured.value = product.is_featured || '0';
             if (el.prodIsBestseller) el.prodIsBestseller.value = product.is_bestseller || '0';
             if (el.prodIsNew) el.prodIsNew.value = product.is_new || '0';
-            
+
             // Pricing
             if (el.prodPrice) el.prodPrice.value = product.price || '';
             if (el.prodComparePrice) el.prodComparePrice.value = product.compare_at_price || '';
             if (el.prodCostPrice) el.prodCostPrice.value = product.cost_price || '';
             if (el.prodCurrency) el.prodCurrency.value = product.currency_code || 'SAR';
             if (el.prodTaxRate) el.prodTaxRate.value = product.tax_rate || '';
-            
+
             // Inventory
             if (el.prodStockQty) el.prodStockQty.value = product.stock_quantity || '0';
             if (el.prodLowStock) el.prodLowStock.value = product.low_stock_threshold || '5';
@@ -627,8 +629,16 @@
             if (el.prodAttributesList) el.prodAttributesList.innerHTML = '';
             // Clear variants list
             if (el.prodVariantsList) el.prodVariantsList.innerHTML = '';
-            // Clear translations
+            // Clear translations panels
             if (el.prodTranslations) el.prodTranslations.innerHTML = '';
+            // Clear inline English fields
+            if (el.enProdName) el.enProdName.value = '';
+            if (el.enProdShortDesc) el.enProdShortDesc.value = '';
+            if (el.enProdDesc) el.enProdDesc.value = '';
+            if (el.enProdSpecs) el.enProdSpecs.value = '';
+            if (el.enMetaTitle) el.enMetaTitle.value = '';
+            if (el.enMetaDescription) el.enMetaDescription.value = '';
+            if (el.enMetaKeywords) el.enMetaKeywords.value = '';
             // Reset category dropdowns
             if (el.prodMainCategory) el.prodMainCategory.value = '';
             if (el.prodSubCategory) {
@@ -660,10 +670,10 @@
         tabButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 const targetTab = btn.dataset.tab;
-                
+
                 tabButtons.forEach(b => b.classList.remove('active'));
                 tabContents.forEach(c => c.style.display = 'none');
-                
+
                 btn.classList.add('active');
                 const targetContent = document.getElementById(`tab-${targetTab}`);
                 if (targetContent) targetContent.style.display = 'block';
@@ -688,10 +698,17 @@
             const isEdit = !!productId;
 
             // Build product data object
+            // Use English inline name as the authoritative product name
+            const enName = el.enProdName?.value?.trim() || '';
+            const baseName = enName || formData.get('name') || '';
+            if (el.prodName && !el.prodName.value.trim() && enName) {
+                el.prodName.value = enName;
+            }
+
             const productData = {
-                name: formData.get('name'),
+                name: baseName,
                 sku: formData.get('sku') || null,
-                slug: formData.get('slug') || generateSlug(formData.get('name')),
+                slug: formData.get('slug') || generateSlug(baseName),
                 barcode: formData.get('barcode') || null,
                 product_type_id: formData.get('product_type_id') || null,
                 brand_id: formData.get('brand_id') || null,
@@ -700,16 +717,15 @@
                 is_featured: formData.get('is_featured') || '0',
                 is_bestseller: formData.get('is_bestseller') || '0',
                 is_new: formData.get('is_new') || '0',
-                
+
                 // Inventory
                 stock_quantity: formData.get('stock_quantity') || '0',
                 low_stock_threshold: formData.get('low_stock_threshold') || '5',
                 stock_status: formData.get('stock_status') || 'in_stock',
                 manage_stock: formData.get('manage_stock') || '1',
                 allow_backorder: formData.get('allow_backorder') || '0',
-                
-                // Related data
-                translations: collectTranslations(),
+
+                // Related data — DO NOT pass translations here; they are saved via saveProductTranslations
                 categories: state.selectedCategories,
                 attributes: state.productAttributes,
                 variants: state.productVariants
@@ -1034,18 +1050,18 @@
     function validateForm() {
         let isValid = true;
 
-        // Validate required fields - only name is required, SKU is auto-generated
-        const requiredFields = [el.prodName];
-        
-        requiredFields.forEach(field => {
-            if (!field || !field.value.trim()) {
-                isValid = false;
-                if (field) {
-                    field.classList.add('is-invalid');
-                    field.addEventListener('input', () => field.classList.remove('is-invalid'), { once: true });
-                }
+        // Require English name (inline field) as main required field
+        const enNameVal = el.enProdName?.value?.trim();
+        if (!enNameVal) {
+            isValid = false;
+            if (el.enProdName) {
+                el.enProdName.classList.add('is-invalid');
+                el.enProdName.addEventListener('input', () => el.enProdName.classList.remove('is-invalid'), { once: true });
             }
-        });
+        } else {
+            // Auto-sync to base prodName field
+            if (el.prodName) el.prodName.value = enNameVal;
+        }
 
         return isValid;
     }
@@ -1099,7 +1115,7 @@
         el.prodAttributesList.innerHTML = state.productAttributes.map((attr, idx) => {
             // إذا كانت هناك قيم محددة مسبقاً، عرضها كقائمة منسدلة + حقل نص مخصص
             if (attr.available_values && attr.available_values.length > 0) {
-                const options = attr.available_values.map(v => 
+                const options = attr.available_values.map(v =>
                     `<option value="${esc(v.id)}" ${String(v.id) === String(attr.attribute_value_id) ? 'selected' : ''}>${esc(v.label || v.value || v.name)}</option>`
                 ).join('');
                 return `
@@ -1347,9 +1363,9 @@
 
         // القوائم الرئيسية = التي ليس لها أب (parent_id = null)
         const mainCategories = state.categories.filter(cat => !cat.parent_id);
-        
+
         el.prodMainCategory.innerHTML = '<option value="">' + t('form.fields.main_category.select', 'Select main category') + '</option>';
-        
+
         mainCategories.forEach(cat => {
             const opt = document.createElement('option');
             opt.value = cat.id;
@@ -1365,7 +1381,7 @@
 
     function onMainCategoryChange() {
         const mainCatId = el.prodMainCategory ? el.prodMainCategory.value : '';
-        
+
         if (!el.prodSubCategory) return;
 
         el.prodSubCategory.innerHTML = '<option value="">' + t('form.fields.sub_category.select', 'Select sub category') + '</option>';
@@ -1374,7 +1390,7 @@
 
         // القوائم الفرعية = التي parent_id = القائمة الرئيسية المختارة (+ أحفادها)
         const subCategories = state.categories.filter(cat => String(cat.parent_id) === String(mainCatId));
-        
+
         subCategories.forEach(cat => {
             const opt = document.createElement('option');
             opt.value = cat.id;
@@ -1421,7 +1437,7 @@
                 .map(cat => {
                     const isSelected = state.selectedCategories.includes(cat.id);
                     const children = buildTree(categories, cat.id);
-                    
+
                     return `
                         <div class="category-node" style="margin-left:${parentId ? '20px' : '0'};">
                             <label style="display:flex;align-items:center;gap:8px;padding:4px 0;">
@@ -1485,7 +1501,7 @@
         if (!langCode) return;
 
         const langName = el.prodLangSelect.options[el.prodLangSelect.selectedIndex].textContent;
-        
+
         // Check if already added
         const existingPanel = document.querySelector(`[data-lang="${langCode}"]`);
         if (existingPanel) {
@@ -1497,7 +1513,7 @@
         if (el.prodTranslations) {
             el.prodTranslations.appendChild(panel);
         }
-        
+
         el.prodLangSelect.value = '';
     }
 
@@ -1505,7 +1521,7 @@
         const panel = document.createElement('div');
         panel.className = 'translation-panel';
         panel.dataset.lang = langCode;
-        
+
         panel.innerHTML = `
             <div class="translation-panel-header">
                 <h5><i class="fas fa-language"></i> ${esc(langName)} (${esc(langCode)})</h5>
@@ -1544,15 +1560,38 @@
                 </div>
             </div>
         `;
-        
+
         return panel;
     }
 
     function collectTranslations() {
         const translations = {};
-        
+
+        // ── 1. Collect from the inline English section (always present) ──
+        const enName = el.enProdName?.value?.trim() || '';
+        const enShortDesc = el.enProdShortDesc?.value?.trim() || '';
+        const enDesc = el.enProdDesc?.value?.trim() || '';
+        const enSpecs = el.enProdSpecs?.value?.trim() || '';
+        const enMetaTitle = el.enMetaTitle?.value?.trim() || '';
+        const enMetaDesc = el.enMetaDescription?.value?.trim() || '';
+        const enMetaKw = el.enMetaKeywords?.value?.trim() || '';
+
+        if (enName || enShortDesc || enDesc || enSpecs || enMetaTitle || enMetaDesc || enMetaKw) {
+            translations['en'] = {
+                name: enName,
+                short_description: enShortDesc,
+                description: enDesc,
+                specifications: enSpecs,
+                meta_title: enMetaTitle,
+                meta_description: enMetaDesc,
+                meta_keywords: enMetaKw
+            };
+        }
+
+        // ── 2. Collect from the dynamic translation panels (other languages) ──
         document.querySelectorAll('.translation-panel').forEach(panel => {
             const lang = panel.dataset.lang;
+            if (lang === 'en') return; // already handled above
             const name = panel.querySelector('.trans-name')?.value || '';
             const shortDesc = panel.querySelector('.trans-short-desc')?.value || '';
             const desc = panel.querySelector('.trans-desc')?.value || '';
@@ -1560,20 +1599,15 @@
             const metaTitle = panel.querySelector('.trans-meta-title')?.value || '';
             const metaDesc = panel.querySelector('.trans-meta-desc')?.value || '';
             const metaKeywords = panel.querySelector('.trans-meta-keywords')?.value || '';
-            
+
             if (name || shortDesc || desc || specifications || metaTitle || metaDesc || metaKeywords) {
                 translations[lang] = {
-                    name: name,
-                    short_description: shortDesc,
-                    description: desc,
-                    specifications: specifications,
-                    meta_title: metaTitle,
-                    meta_description: metaDesc,
-                    meta_keywords: metaKeywords
+                    name, short_description: shortDesc, description: desc,
+                    specifications, meta_title: metaTitle, meta_description: metaDesc, meta_keywords: metaKeywords
                 };
             }
         });
-        
+
         return translations;
     }
 
@@ -1584,7 +1618,20 @@
             if (result.success) {
                 const items = Array.isArray(result.data) ? result.data : (result.data?.items || []);
                 if (el.prodTranslations) el.prodTranslations.innerHTML = '';
+
                 items.forEach(trans => {
+                    if (trans.language_code === 'en') {
+                        // Populate the inline English fields instead of creating a panel
+                        if (el.enProdName) el.enProdName.value = trans.name || '';
+                        if (el.enProdShortDesc) el.enProdShortDesc.value = trans.short_description || '';
+                        if (el.enProdDesc) el.enProdDesc.value = trans.description || '';
+                        if (el.enProdSpecs) el.enProdSpecs.value = trans.specifications || '';
+                        if (el.enMetaTitle) el.enMetaTitle.value = trans.meta_title || '';
+                        if (el.enMetaDescription) el.enMetaDescription.value = trans.meta_description || '';
+                        if (el.enMetaKeywords) el.enMetaKeywords.value = trans.meta_keywords || '';
+                        return; // skip creating a panel for English
+                    }
+
                     const langName = state.languages.find(l => l.code === trans.language_code)?.name || trans.language_code;
                     const panel = createTranslationPanel(trans.language_code, langName, {
                         name: trans.name || '',
@@ -1681,7 +1728,7 @@
             const result = await apiCall(`/api/product_attribute_assignments/by_product?product_id=${productId}`);
             if (result.success) {
                 const items = Array.isArray(result.data) ? result.data : (result.data?.items || []);
-                
+
                 // بناء قائمة السمات مع تحميل القيم المتاحة لكل سمة
                 const attrs = [];
                 for (const item of items) {
@@ -1698,7 +1745,7 @@
 
                     // البحث عن اسم السمة من state.attributes
                     const attrInfo = state.attributes.find(a => String(a.id) === String(item.attribute_id));
-                    
+
                     attrs.push({
                         attribute_id: item.attribute_id,
                         attribute_name: attrInfo?.name || item.attribute_name || item.attribute_slug || `Attribute #${item.attribute_id}`,
@@ -1709,7 +1756,7 @@
                         available_values: availableValues
                     });
                 }
-                
+
                 state.productAttributes = attrs;
                 renderAttributes();
             }
@@ -1755,7 +1802,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: id })
             });
-            
+
             if (result.success) {
                 showNotification(t('messages.deleted', 'Product deleted successfully'), 'success');
                 hideForm();
@@ -1772,7 +1819,7 @@
     async function duplicateProduct(id) {
         try {
             const result = await apiCall(`${API.products}?id=${id}&format=json&lang=${state.language}`);
-            
+
             if (result.success && result.data) {
                 const productData = result.data;
                 const product = { ...productData };
@@ -1783,7 +1830,7 @@
                 product.slug = `${product.slug || ''}-copy-${uid}`;
                 // مسح الباركود لتجنب خطأ الإدخال المكرر
                 product.barcode = null;
-                
+
                 showForm(product);
             } else {
                 throw new Error('Failed to load product for duplication');
@@ -1799,7 +1846,7 @@
     // ════════════════════════════════════════════════════════════
     function applyFilters() {
         state.filters = {};
-        
+
         if (el.searchInput?.value) state.filters.search = el.searchInput.value;
         if (el.tenantFilter?.value) state.filters.tenant_id = el.tenantFilter.value;
         if (el.typeFilter?.value) state.filters.product_type_id = el.typeFilter.value;
@@ -1811,7 +1858,7 @@
 
     function resetFilters() {
         state.filters = {};
-        
+
         if (el.searchInput) el.searchInput.value = '';
         if (el.tenantFilter) el.tenantFilter.value = state.tenantId;
         if (el.typeFilter) el.typeFilter.value = '';
@@ -1934,6 +1981,266 @@
     }
 
     // ════════════════════════════════════════════════════════════
+    // THEME CSS INJECTION FROM DATABASE
+    // ════════════════════════════════════════════════════════════
+    async function injectThemeCss() {
+        try {
+            const res = await fetch('/api/health?format=json', { credentials: 'same-origin' });
+            if (!res.ok) return;
+            const data = await res.json();
+            const generatedCss = data?.admin_ui?.theme?.generated_css;
+            if (!generatedCss) return;
+
+            // Remove old injected style if any
+            const old = document.getElementById('__products_theme_css__');
+            if (old) old.remove();
+
+            const style = document.createElement('style');
+            style.id = '__products_theme_css__';
+            style.textContent = generatedCss;
+            document.head.appendChild(style);
+            console.log('[Products] Theme CSS injected from DB (' + generatedCss.length + ' bytes)');
+        } catch (err) {
+            console.warn('[Products] Could not load theme CSS:', err);
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // CSV IMPORT
+    // ════════════════════════════════════════════════════════════
+    const CSV_COLUMNS = [
+        'sku', 'barcode', 'product_type_id', 'brand_id',
+        'is_active', 'is_featured', 'is_bestseller', 'is_new',
+        'price', 'compare_at_price', 'cost_price', 'currency_code', 'tax_rate',
+        'stock_quantity', 'low_stock_threshold', 'stock_status', 'manage_stock', 'allow_backorder',
+        'weight', 'length', 'width', 'height', 'weight_unit', 'dimension_unit',
+        'en_name', 'en_short_description', 'en_description',
+        'en_specifications', 'en_meta_title', 'en_meta_description', 'en_meta_keywords'
+    ];
+
+    let _csvParsedRows = [];
+    let _csvImporting = false;
+
+    function openCsvImport() {
+        const modal = document.getElementById('csvImportModal');
+        if (!modal) return;
+        // Reset state
+        _csvParsedRows = [];
+        _csvImporting = false;
+        document.getElementById('csvFileInput').value = '';
+        document.getElementById('csvPreviewInfo').style.display = 'none';
+        document.getElementById('csvProgressArea').style.display = 'none';
+        document.getElementById('csvResultSummary').style.display = 'none';
+        document.getElementById('csvProgressLog').textContent = '';
+        document.getElementById('csvProgressBar').style.width = '0%';
+        document.getElementById('csvProgressPct').textContent = '0%';
+        document.getElementById('csvImportStart').disabled = true;
+        modal.style.display = 'flex';
+    }
+
+    function closeCsvImport() {
+        if (_csvImporting) return;
+        const modal = document.getElementById('csvImportModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function downloadSampleCsv() {
+        const header = CSV_COLUMNS.join(',');
+        const example = [
+            'SKU-001', '', '1', '1',
+            '1', '0', '0', '0',
+            '99.99', '', '', 'SAR', '',
+            '100', '5', 'in_stock', '1', '0',
+            '', '', '', '', 'kg', 'cm',
+            'Sample Product Name', 'Short product summary', 'Full product description',
+            'Material: Cotton', 'Sample Product | Store', 'A great product', 'product, sample'
+        ].join(',');
+        const csv = header + '\n' + example;
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'products_import_sample.csv'; a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function parseCsv(text) {
+        // Simple CSV parser: handles quoted fields
+        const rows = [];
+        const lines = text.split(/\r?\n/);
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/^"|"$/g, ''));
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            // Split by comma, respecting quoted strings
+            const vals = [];
+            let inQuote = false, cur = '';
+            for (let c = 0; c < line.length; c++) {
+                const ch = line[c];
+                if (ch === '"') { inQuote = !inQuote; }
+                else if (ch === ',' && !inQuote) { vals.push(cur); cur = ''; }
+                else { cur += ch; }
+            }
+            vals.push(cur);
+            const row = {};
+            headers.forEach((h, idx) => { row[h] = (vals[idx] || '').trim(); });
+            rows.push(row);
+        }
+        return rows;
+    }
+
+    async function startCsvImport() {
+        if (_csvImporting || _csvParsedRows.length === 0) return;
+        _csvImporting = true;
+
+        const startBtn = document.getElementById('csvImportStart');
+        const cancelBtn = document.getElementById('csvImportCancel');
+        const progressArea = document.getElementById('csvProgressArea');
+        const progressBar = document.getElementById('csvProgressBar');
+        const progressPct = document.getElementById('csvProgressPct');
+        const progressLabel = document.getElementById('csvProgressLabel');
+        const progressLog = document.getElementById('csvProgressLog');
+        const resultDiv = document.getElementById('csvResultSummary');
+
+        startBtn.disabled = true;
+        cancelBtn.disabled = true;
+        progressArea.style.display = 'block';
+        resultDiv.style.display = 'none';
+
+        let successCount = 0, failCount = 0;
+        const total = _csvParsedRows.length;
+
+        function logLine(msg, ok = true) {
+            const span = document.createElement('span');
+            span.textContent = msg + '\n';
+            span.style.color = ok ? '#4ade80' : '#f87171';
+            progressLog.appendChild(span);
+            progressLog.scrollTop = progressLog.scrollHeight;
+        }
+
+        for (let i = 0; i < total; i++) {
+            const row = _csvParsedRows[i];
+            const pct = Math.round(((i) / total) * 100);
+            progressBar.style.width = pct + '%';
+            progressPct.textContent = pct + '%';
+            progressLabel.textContent = `Importing row ${i + 1} of ${total}...`;
+
+            try {
+                // Build product payload
+                const productData = {
+                    tenant_id: state.tenantId,
+                    sku: row.sku || null,
+                    barcode: row.barcode || null,
+                    product_type_id: row.product_type_id || null,
+                    brand_id: row.brand_id || null,
+                    is_active: row.is_active !== undefined ? row.is_active : '1',
+                    is_featured: row.is_featured !== undefined ? row.is_featured : '0',
+                    is_bestseller: row.is_bestseller !== undefined ? row.is_bestseller : '0',
+                    is_new: row.is_new !== undefined ? row.is_new : '0',
+                    stock_quantity: row.stock_quantity || '0',
+                    low_stock_threshold: row.low_stock_threshold || '5',
+                    stock_status: row.stock_status || 'in_stock',
+                    manage_stock: row.manage_stock !== undefined ? row.manage_stock : '1',
+                    allow_backorder: row.allow_backorder !== undefined ? row.allow_backorder : '0',
+                    // Use English name as the base product name
+                    name: row.en_name || row.sku || `Product ${i + 1}`,
+                    slug: generateSlug(row.en_name || row.sku || `product-${i + 1}`),
+                    translations: {}
+                };
+
+                // Create product
+                const prodResult = await apiCall(API.products, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(productData)
+                });
+
+                if (!prodResult.success) throw new Error(prodResult.error || prodResult.message || 'Product creation failed');
+
+                const savedId = prodResult.data?.id || prodResult.data?.items?.[0]?.id;
+                if (!savedId) throw new Error('No product ID returned');
+
+                // Save English translation
+                if (row.en_name || row.en_description || row.en_short_description) {
+                    const transData = {
+                        product_id: parseInt(savedId),
+                        language_code: 'en',
+                        name: row.en_name || '',
+                        short_description: row.en_short_description || '',
+                        description: row.en_description || '',
+                        specifications: row.en_specifications || '',
+                        meta_title: row.en_meta_title || '',
+                        meta_description: row.en_meta_description || '',
+                        meta_keywords: row.en_meta_keywords || ''
+                    };
+                    await apiCall('/api/product_translations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(transData)
+                    });
+                }
+
+                // Save pricing if price provided
+                if (row.price) {
+                    const formData = new Map(Object.entries(row));
+                    formData.get = (k) => row[k] || '';
+                    await savePricingData(savedId, formData);
+                }
+
+                // Save physical attributes if provided
+                if (row.weight || row.length || row.width || row.height) {
+                    const physData = {
+                        product_id: parseInt(savedId),
+                        weight: parseFloat(row.weight) || null,
+                        length: parseFloat(row.length) || null,
+                        width: parseFloat(row.width) || null,
+                        height: parseFloat(row.height) || null,
+                        weight_unit: row.weight_unit || 'kg',
+                        dimension_unit: row.dimension_unit || 'cm'
+                    };
+                    await apiCall('/api/product_physical_attributes', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(physData)
+                    });
+                }
+
+                successCount++;
+                logLine(`✓ Row ${i + 1}: "${row.en_name || row.sku}" imported (ID: ${savedId})`, true);
+
+            } catch (err) {
+                failCount++;
+                logLine(`✗ Row ${i + 1}: ${err.message}`, false);
+                console.warn('[Products CSV] Row failed:', i + 1, err);
+            }
+
+            // Small delay to avoid rate limiting
+            await new Promise(r => setTimeout(r, 80));
+        }
+
+        // Done
+        progressBar.style.width = '100%';
+        progressPct.textContent = '100%';
+        progressLabel.textContent = 'Import complete!';
+
+        const ok = failCount === 0;
+        resultDiv.style.display = 'block';
+        resultDiv.style.background = ok ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)';
+        resultDiv.style.border = `1px solid ${ok ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`;
+        resultDiv.style.color = 'var(--text-primary,#fff)';
+        resultDiv.innerHTML = `
+            <strong>${ok ? '✅' : '⚠️'} Import Finished</strong><br>
+            <span style="color:#4ade80;">✓ ${successCount} products imported successfully</span>
+            ${failCount > 0 ? `<br><span style="color:#f87171;">✗ ${failCount} rows failed (see log above)</span>` : ''}
+        `;
+
+        cancelBtn.disabled = false;
+        _csvImporting = false;
+
+        // Refresh table
+        if (successCount > 0) setTimeout(() => loadProducts(1), 500);
+    }
+
+    // ════════════════════════════════════════════════════════════
     // INITIALIZATION
     // ════════════════════════════════════════════════════════════
     async function init() {
@@ -1950,13 +2257,13 @@
             empty: $id('emptyState'),
             error: $id('errorState'),
             errorMessage: $id('errorMessage'),
-            
+
             // Form
             formContainer: $id('productFormContainer'),
             form: $id('productForm'),
             formTitle: $id('formTitle'),
             formId: $id('formId'),
-            
+
             // Form fields - General
             prodName: $id('prodName'),
             prodSku: $id('prodSku'),
@@ -1971,21 +2278,21 @@
             prodIsBestseller: $id('prodIsBestseller'),
             prodIsNew: $id('prodIsNew'),
             prodTenantId: $id('prodTenantId'),
-            
+
             // Form fields - Pricing
             prodPrice: $id('prodPrice'),
             prodComparePrice: $id('prodComparePrice'),
             prodCostPrice: $id('prodCostPrice'),
             prodCurrency: $id('prodCurrency'),
             prodTaxRate: $id('prodTaxRate'),
-            
+
             // Form fields - Inventory
             prodStockQty: $id('prodStockQty'),
             prodLowStock: $id('prodLowStock'),
             prodStockStatus: $id('prodStockStatus'),
             prodManageStock: $id('prodManageStock'),
             prodAllowBackorder: $id('prodAllowBackorder'),
-            
+
             // Form fields - Physical
             prodWeight: $id('prodWeight'),
             prodLength: $id('prodLength'),
@@ -1993,52 +2300,62 @@
             prodHeight: $id('prodHeight'),
             prodWeightUnit: $id('prodWeightUnit'),
             prodDimensionUnit: $id('prodDimensionUnit'),
-            
+
             // Attributes
             attrSelect: $id('attrSelect'),
             btnAddAttribute: $id('btnAddAttribute'),
             prodAttributesList: $id('prodAttributesList'),
-            
+
             // Variants
             btnGenerateVariants: $id('btnGenerateVariants'),
             btnAddVariant: $id('btnAddVariant'),
             prodVariantsList: $id('prodVariantsList'),
-            
+
             // Images
             prodSelectImageBtn: $id('prodSelectImageBtn'),
             prodImagesPreview: $id('prodImagesPreview'),
             mediaModal: $id('prodMediaStudioModal'),
             mediaFrame: $id('prodMediaStudioFrame'),
             mediaClose: $id('prodMediaStudioClose'),
-            
+
             // Categories
             prodCategoriesTree: $id('prodCategoriesTree'),
-            
+
             // Translations
             prodTranslations: $id('prodTranslations'),
             prodLangSelect: $id('prodLangSelect'),
             prodAddLangBtn: $id('prodAddLangBtn'),
-            
+
+            // English inline translation fields
+            enProdName: $id('enProdName'),
+            enProdShortDesc: $id('enProdShortDesc'),
+            enProdDesc: $id('enProdDesc'),
+            enProdSpecs: $id('enProdSpecs'),
+            enMetaTitle: $id('enMetaTitle'),
+            enMetaDescription: $id('enMetaDescription'),
+            enMetaKeywords: $id('enMetaKeywords'),
+
             // Table
             tbody: $id('tableBody'),
-            
+
             // Filters
             searchInput: $id('searchInput'),
             tenantFilter: $id('tenantFilter'),
             typeFilter: $id('typeFilter'),
             brandFilter: $id('brandFilter'),
             statusFilter: $id('statusFilter'),
-            
+
             // Buttons
             btnSubmit: $id('btnSubmitForm'),
             btnAdd: $id('btnAddProduct'),
+            btnImportCsv: $id('btnImportCsv'),
             btnClose: $id('btnCloseForm'),
             btnCancel: $id('btnCancelForm'),
             btnApply: $id('btnApplyFilters'),
             btnReset: $id('btnResetFilters'),
             btnRetry: $id('btnRetry'),
             btnDeleteProduct: $id('btnDeleteProduct'),
-            
+
             // Pagination
             pagination: $id('pagination'),
             paginationInfo: $id('paginationInfo'),
@@ -2063,6 +2380,9 @@
         // Load translations
         await loadTranslations(state.language);
 
+        // Inject DB theme CSS (colors, buttons, cards)
+        injectThemeCss();
+
         // Setup event listeners (use onXxx to prevent duplicate handlers on re-init)
         if (el.form) {
             el.form.onsubmit = saveProduct;
@@ -2071,7 +2391,7 @@
             console.error('[Products] ✗ Form element not found!');
         }
         if (el.btnAdd) {
-            el.btnAdd.onclick = function() { showForm(); };
+            el.btnAdd.onclick = function () { showForm(); };
             console.log('[Products] ✓ Add button handler attached');
         } else {
             console.error('[Products] ✗ Add button not found!');
@@ -2080,33 +2400,78 @@
         if (el.btnCancel) el.btnCancel.onclick = hideForm;
         if (el.btnApply) el.btnApply.onclick = applyFilters;
         if (el.btnReset) el.btnReset.onclick = resetFilters;
-        if (el.btnRetry) el.btnRetry.onclick = function() { loadProducts(state.page); };
-        if (el.btnDeleteProduct) el.btnDeleteProduct.onclick = function() {
+        if (el.btnRetry) el.btnRetry.onclick = function () { loadProducts(state.page); };
+        if (el.btnDeleteProduct) el.btnDeleteProduct.onclick = function () {
             if (state.currentProduct) deleteProduct(state.currentProduct.id);
         };
-        
+
         // Attributes
         if (el.btnAddAttribute) el.btnAddAttribute.onclick = addAttribute;
-        
+
         // Variants
         if (el.btnAddVariant) el.btnAddVariant.onclick = addVariant;
         if (el.btnGenerateVariants) el.btnGenerateVariants.onclick = generateVariantsFromAttributes;
-        
+
         // Images
         if (el.prodSelectImageBtn) el.prodSelectImageBtn.onclick = openMediaStudio;
         if (el.mediaClose) el.mediaClose.onclick = closeMediaStudio;
-        
+
         // Translations
         if (el.prodAddLangBtn) el.prodAddLangBtn.onclick = addTranslation;
+
+        // Auto-sync English Name → prodName (hidden base name field)
+        if (el.enProdName) {
+            el.enProdName.addEventListener('input', function () {
+                if (el.prodName) el.prodName.value = this.value;
+                if (el.prodSlug && !el.prodSlug.value) el.prodSlug.value = generateSlug(this.value);
+            });
+        }
+
+        // ── CSV Import ──
+        if (el.btnImportCsv) el.btnImportCsv.onclick = openCsvImport;
+        const csvCloseBtn = $id('csvImportClose');
+        const csvCancelBtn = $id('csvImportCancel');
+        const csvStartBtn = $id('csvImportStart');
+        const csvFileInput = $id('csvFileInput');
+        const csvSampleBtn = $id('btnDownloadSample');
+        if (csvCloseBtn) csvCloseBtn.onclick = closeCsvImport;
+        if (csvCancelBtn) csvCancelBtn.onclick = closeCsvImport;
+        if (csvStartBtn) csvStartBtn.onclick = startCsvImport;
+        if (csvSampleBtn) csvSampleBtn.onclick = downloadSampleCsv;
+        if (csvFileInput) {
+            csvFileInput.onchange = function () {
+                const file = this.files[0];
+                if (!file) { _csvParsedRows = []; $id('csvImportStart').disabled = true; $id('csvPreviewInfo').style.display = 'none'; return; }
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    _csvParsedRows = parseCsv(e.target.result);
+                    const infoEl = $id('csvPreviewInfo');
+                    const countEl = $id('csvRowCount');
+                    if (infoEl && countEl) {
+                        countEl.textContent = `📄 ${_csvParsedRows.length} product row(s) detected in file`;
+                        infoEl.style.display = 'block';
+                    }
+                    $id('csvImportStart').disabled = _csvParsedRows.length === 0;
+                };
+                reader.readAsText(file);
+            };
+        }
+        // Close CSV modal when clicking outside
+        const csvModal = $id('csvImportModal');
+        if (csvModal) {
+            csvModal.addEventListener('click', function (e) {
+                if (e.target === csvModal) closeCsvImport();
+            });
+        }
 
         // Main category → Sub category cascade
         if (el.prodMainCategory) el.prodMainCategory.onchange = onMainCategoryChange;
         if (el.prodSubCategory) el.prodSubCategory.onchange = onSubCategoryChange;
-        
+
         // Media Studio message listener (only add once to prevent accumulation)
         if (!_messageListenerAdded) {
             _messageListenerAdded = true;
-            window.addEventListener('message', function(e) {
+            window.addEventListener('message', function (e) {
                 if (e.data && e.data.type === 'media-selected') {
                     state.selectedImages = e.data.images || [];
                     renderProductImages();
@@ -2158,6 +2523,7 @@
         generateVariantsFromAttributes,
         removeImage,
         toggleCategory,
+        openCsvImport,
         setLanguage: async (lang) => {
             state.language = lang;
             await loadTranslations(lang);
@@ -2171,14 +2537,14 @@
 
     // Auto-init: matches categories.js pattern (which works)
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             if (window.AdminFramework && !window.page.__fragment_init) {
-                init().catch(function(e) { console.error('[Products] Auto-init failed:', e); });
+                init().catch(function (e) { console.error('[Products] Auto-init failed:', e); });
             }
         });
     } else {
         if (window.AdminFramework && !window.page.__fragment_init) {
-            init().catch(function(e) { console.error('[Products] Auto-init failed:', e); });
+            init().catch(function (e) { console.error('[Products] Auto-init failed:', e); });
         }
     }
     window.page.__fragment_init = false;
