@@ -19,6 +19,11 @@ if (!$_isLoggedIn) {
 
 $ctx = $GLOBALS['PUB_CONTEXT'];
 $GLOBALS['PUB_PAGE_TITLE'] = e(t('notifications.page_title', ['default' => 'My Notifications'])) . ' — QOOQZ';
+
+// Resolve notification card style from DB card_styles (card_type='notification')
+$_notifCardStyle = pub_card_inline_style('notification');
+$_notifCardClass = pub_card_css_class('notification');
+
 include dirname(__DIR__) . '/partials/header.php';
 
 $userId = (int)($_SESSION['user_id'] ?? $_SESSION['user']['id'] ?? 0);
@@ -215,6 +220,75 @@ function notif_filter_qs(array $extra = []): string {
             </select>
         </div>
 
+        ?>
+
+<main class="pub-container" style="padding-top:24px;padding-bottom:48px;">
+
+    <!-- Page header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+        <div>
+            <h1 style="margin:0;font-size:1.4rem;">🔔 <?= e(t('notifications.page_title', ['default' => 'My Notifications'])) ?></h1>
+            <?php if ($unreadCount > 0): ?>
+            <p style="color:var(--pub-muted);font-size:0.85rem;margin:4px 0 0;">
+                <?= $unreadCount ?> <?= e(t('notifications.unread_count', ['default' => 'unread'])) ?>
+            </p>
+            <?php endif; ?>
+        </div>
+        <?php if ($unreadCount > 0): ?>
+        <button type="button" class="pub-btn pub-btn--primary pub-btn--sm" id="pubMarkAllReadBtn">
+            ✓ <?= e(t('notifications.mark_all_read', ['default' => 'Mark all as read'])) ?>
+        </button>
+        <?php endif; ?>
+    </div>
+
+    <!-- Filters bar -->
+    <form method="get" action="<?= htmlspecialchars($_SERVER['PHP_SELF'] ?? '', ENT_QUOTES) ?>"
+          style="margin-bottom:24px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+        <?php if (!empty($_GET['tenant_id'])): ?>
+            <input type="hidden" name="tenant_id" value="<?= (int)$_GET['tenant_id'] ?>">
+        <?php endif; ?>
+
+        <!-- Unread-only toggle -->
+        <div>
+            <label class="pub-label">&nbsp;</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.88rem;">
+                <input type="checkbox" name="unread" value="1" <?= $unreadOnly ? 'checked' : '' ?>>
+                <?= e(t('notifications.unread_only', ['default' => 'Unread only'])) ?>
+            </label>
+        </div>
+
+        <!-- Type filter -->
+        <?php if (!empty($notifTypes)): ?>
+        <div>
+            <label class="pub-label"><?= e(t('notifications.filter_type', ['default' => 'Type'])) ?></label>
+            <select name="type_code" class="pub-select" style="min-width:140px;">
+                <option value=""><?= e(t('notifications.all_types', ['default' => 'All types'])) ?></option>
+                <?php foreach ($notifTypes as $nt): ?>
+                <option value="<?= e($nt['code']) ?>" <?= $typeCodeFilter === $nt['code'] ? 'selected' : '' ?>>
+                    <?= notif_icon($nt['code']) ?> <?= e($nt['name']) ?>
+                </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php endif; ?>
+
+        <!-- Priority filter -->
+        <div>
+            <label class="pub-label"><?= e(t('notifications.filter_priority', ['default' => 'Priority'])) ?></label>
+            <select name="priority" class="pub-select" style="min-width:120px;">
+                <option value=""><?= e(t('notifications.all_priorities', ['default' => 'All'])) ?></option>
+                <option value="urgent" <?= $priorityFilter === 'urgent' ? 'selected' : '' ?>>🔴 <?= e(t('notifications.priority_urgent', ['default' => 'Urgent'])) ?></option>
+                <option value="high"   <?= $priorityFilter === 'high'   ? 'selected' : '' ?>>🟠 <?= e(t('notifications.priority_high',   ['default' => 'High'])) ?></option>
+                <option value="normal" <?= $priorityFilter === 'normal' ? 'selected' : '' ?>>⚪ <?= e(t('notifications.priority_normal', ['default' => 'Normal'])) ?></option>
+                <option value="low"    <?= $priorityFilter === 'low'    ? 'selected' : '' ?>>🔵 <?= e(t('notifications.priority_low',    ['default' => 'Low'])) ?></option>
+            </select>
+        </div>
+
+        <!-- Explicit submit button so filters work without JavaScript -->
+        <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm" style="align-self:flex-end;">
+            🔍 <?= e(t('notifications.apply_filters', ['default' => 'Apply'])) ?>
+        </button>
+
         <?php if ($typeCodeFilter || $priorityFilter || $unreadOnly): ?>
         <a href="<?= notif_filter_qs(['type_code' => null, 'priority' => null, 'unread' => null, 'page' => null]) ?>"
            class="pub-btn pub-btn--ghost pub-btn--sm" style="align-self:flex-end;">
@@ -236,7 +310,7 @@ function notif_filter_qs(array $extra = []): string {
     </div>
     <?php else: ?>
 
-    <!-- Notification list -->
+    <!-- Notification cards grid -->
     <div class="pub-notif-page-list" id="pubNotifPageList">
         <?php foreach ($notifItems as $n):
             $nId    = (int)$n['id'];
@@ -248,26 +322,45 @@ function notif_filter_qs(array $extra = []): string {
             $nRead  = (bool)$n['is_read'];
             $nIcon  = notif_icon($nCode);
             $nPLbl  = notif_priority_label($nPrio);
+            // Use DB card style if present; otherwise fall back to CSS-only classes
+            $cardBaseStyle = $_notifCardStyle;
         ?>
-        <div class="pub-notif-page-item<?= $nRead ? ' pub-notif-read' : ' pub-notif-unread' ?>"
+        <div class="pub-notif-card<?= $_notifCardClass ? ' ' . $_notifCardClass : '' ?><?= $nRead ? ' pub-notif-read' : ' pub-notif-unread' ?>"
              data-id="<?= $nId ?>"
-             data-priority="<?= e($nPrio) ?>">
-            <span class="pub-notif-page-icon" aria-hidden="true"><?= $nIcon ?></span>
-            <div class="pub-notif-page-body">
-                <div class="pub-notif-page-row">
-                    <p class="pub-notif-page-title"><?= e($nTitle) ?></p>
+             data-priority="<?= e($nPrio) ?>"
+             <?= $cardBaseStyle ? 'style="' . e($cardBaseStyle) . '"' : '' ?>>
+
+            <!-- Card top row: icon + title + badges -->
+            <div class="pub-notif-card-header">
+                <span class="pub-notif-card-icon" aria-hidden="true"><?= $nIcon ?></span>
+                <div class="pub-notif-card-title-wrap">
+                    <p class="pub-notif-card-title"><?= e($nTitle) ?></p>
+                    <?php if ($nPLbl): ?>
+                    <span class="pub-notif-card-prio" title="<?= e($nPrio) ?>"><?= $nPLbl ?></span>
+                    <?php endif; ?>
                     <?php if (!$nRead): ?>
                     <span class="pub-notif-badge-unread" title="<?= e(t('notifications.unread', ['default' => 'Unread'])) ?>"></span>
                     <?php endif; ?>
-                    <?php if ($nPLbl): ?>
-                    <span class="pub-notif-page-priority" title="<?= e($nPrio) ?>"><?= $nPLbl ?></span>
-                    <?php endif; ?>
                 </div>
-                <?php if ($nMsg): ?>
-                <p class="pub-notif-page-msg"><?= e($nMsg) ?></p>
-                <?php endif; ?>
+            </div>
+
+            <!-- Message body -->
+            <?php if ($nMsg): ?>
+            <p class="pub-notif-card-msg"><?= e($nMsg) ?></p>
+            <?php endif; ?>
+
+            <!-- Card footer: timestamp + per-item mark-as-read button -->
+            <div class="pub-notif-card-footer">
                 <?php if ($nTime): ?>
-                <div class="pub-notif-page-time"><?= e($nTime) ?></div>
+                <span class="pub-notif-card-time">🕐 <?= e($nTime) ?></span>
+                <?php endif; ?>
+                <?php if (!$nRead): ?>
+                <button type="button"
+                        class="pub-btn pub-btn--ghost pub-btn--xs pub-notif-mark-read-btn"
+                        data-id="<?= $nId ?>"
+                        aria-label="<?= e(t('notifications.mark_read', ['default' => 'Mark as read'])) ?>">
+                    ✓ <?= e(t('notifications.mark_read', ['default' => 'Mark as read'])) ?>
+                </button>
                 <?php endif; ?>
             </div>
         </div>
@@ -296,48 +389,122 @@ function notif_filter_qs(array $extra = []): string {
 </main>
 
 <style>
+/* Notification card grid */
 .pub-notif-page-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+}
+@media (max-width: 480px) {
+    .pub-notif-page-list { grid-template-columns: 1fr; }
+}
+
+/* Individual notification card */
+.pub-notif-card {
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--pub-border, #e6e9ee);
-    border-radius: var(--pub-radius, 10px);
-    overflow: hidden;
+    gap: 8px;
+    /* CSS fallback for when DB card_styles has no 'notification' entry */
+    background-color: #fffbe6;
+    border: 1px solid #f59e0b;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(245,158,11,0.2);
+    padding: 14px;
+    transition: transform 0.15s, box-shadow 0.15s;
 }
-.pub-notif-page-item {
+.pub-notif-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12) !important;
+}
+.pub-notif-card.pub-notif-unread { border-inline-start-width: 3px !important; }
+.pub-notif-card[data-priority="urgent"] { border-inline-start-color: #ef4444 !important; }
+.pub-notif-card[data-priority="high"]   { border-inline-start-color: #f97316 !important; }
+.pub-notif-card[data-priority="normal"] { border-inline-start-color: #f59e0b !important; }
+.pub-notif-card[data-priority="low"]    { border-inline-start-color: #6b7280 !important; }
+
+/* Card inner elements */
+.pub-notif-card-header {
     display: flex;
-    gap: 14px;
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--pub-border, #e6e9ee);
-    background: var(--pub-surface, #fff);
-    transition: background 0.15s;
+    align-items: flex-start;
+    gap: 10px;
 }
-.pub-notif-page-item:last-child { border-bottom: none; }
-.pub-notif-page-item:hover      { background: var(--pub-bg, #f9fafb); }
-.pub-notif-page-item.pub-notif-unread { background: #eef2ff; } /* fallback for older browsers */
-@supports (background: color-mix(in srgb, red 5%, white)) {
-    .pub-notif-page-item.pub-notif-unread { background: color-mix(in srgb, var(--pub-primary, #2563eb) 5%, var(--pub-surface, #fff)); }
+.pub-notif-card-icon { font-size: 1.5rem; flex-shrink: 0; }
+.pub-notif-card-title-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
 }
-.pub-notif-page-item[data-priority="urgent"] { border-inline-start: 3px solid #ef4444; }
-.pub-notif-page-item[data-priority="high"]   { border-inline-start: 3px solid #f97316; }
-.pub-notif-page-icon     { font-size: 1.4rem; flex-shrink: 0; margin-top: 2px; }
-.pub-notif-page-body     { flex: 1; min-width: 0; }
-.pub-notif-page-row      { display: flex; align-items: flex-start; gap: 8px; }
-.pub-notif-page-title    { font-size: 0.92rem; font-weight: 600; color: var(--pub-text, #111); margin: 0; flex: 1; }
-.pub-notif-read .pub-notif-page-title { font-weight: 400; color: var(--pub-muted, #6b7280); }
-.pub-notif-badge-unread  { width: 8px; height: 8px; border-radius: 50%; background: var(--pub-primary, #2563eb); flex-shrink: 0; margin-top: 5px; }
-.pub-notif-page-priority { font-size: 0.9rem; flex-shrink: 0; }
-.pub-notif-page-msg      { font-size: 0.83rem; color: var(--pub-muted, #6b7280); margin: 4px 0 0; line-height: 1.5; }
-.pub-notif-page-time     { font-size: 0.73rem; color: var(--pub-muted, #9ca3af); margin-top: 5px; }
+.pub-notif-card-title {
+    font-size: 0.93rem;
+    font-weight: 600;
+    color: var(--pub-text, #111);
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    line-height: 1.4;
+}
+.pub-notif-read .pub-notif-card-title {
+    font-weight: 400;
+    color: var(--pub-muted, #6b7280);
+}
+.pub-notif-card-prio  { font-size: 0.85rem; }
+.pub-notif-badge-unread {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #f59e0b;
+    flex-shrink: 0;
+}
+.pub-notif-card-msg {
+    font-size: 0.84rem;
+    color: var(--pub-muted, #6b7280);
+    margin: 0;
+    line-height: 1.5;
+}
+.pub-notif-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+.pub-notif-card-time {
+    font-size: 0.73rem;
+    color: var(--pub-muted, #9ca3af);
+}
+/* Extra-small button variant */
+.pub-btn--xs {
+    padding: 3px 10px;
+    font-size: 0.75rem;
+    border-radius: 6px;
+}
 </style>
 
 <script>
 (function () {
-    // Helper: visually mark a single notification item as read
+    // Helper: visually mark a single notification card as read
     function markItemRead(el) {
         el.classList.remove('pub-notif-unread');
         el.classList.add('pub-notif-read');
         var dot = el.querySelector('.pub-notif-badge-unread');
         if (dot) dot.remove();
+        var btn = el.querySelector('.pub-notif-mark-read-btn');
+        if (btn) btn.remove();
+    }
+
+    // API call to mark specific IDs as read
+    function apiMarkRead(ids, onSuccess) {
+        fetch('/api/public/notifications/mark-read', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: ids })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) { if (d && d.success) onSuccess(); })
+        .catch(function () {});
     }
 
     // Mark-all-read button
@@ -352,7 +519,7 @@ function notif_filter_qs(array $extra = []): string {
             })
             .then(function (r) { return r.json(); })
             .then(function (d) {
-                if (d.success) {
+                if (d && d.success) {
                     document.querySelectorAll('#pubNotifPageList .pub-notif-unread').forEach(markItemRead);
                     markAllBtn.style.display = 'none';
                 }
@@ -362,20 +529,15 @@ function notif_filter_qs(array $extra = []): string {
         });
     }
 
-    // Individual mark-read on click for unread items
-    document.querySelectorAll('#pubNotifPageList .pub-notif-page-item.pub-notif-unread').forEach(function (el) {
-        el.style.cursor = 'pointer';
-        el.addEventListener('click', function () {
-            var id = parseInt(el.dataset.id, 10);
-            if (!id || el.classList.contains('pub-notif-read')) return;
-            // Optimistic UI update
-            markItemRead(el);
-            fetch('/api/public/notifications/mark-read', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ids: [id] })
-            }).catch(function () {});
+    // Per-card "Mark as read" buttons
+    document.querySelectorAll('.pub-notif-mark-read-btn').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var card = btn.closest('[data-id]');
+            var id   = card ? parseInt(card.dataset.id, 10) : 0;
+            if (!id) return;
+            btn.disabled = true;
+            apiMarkRead([id], function () { markItemRead(card); });
         });
     });
 })();

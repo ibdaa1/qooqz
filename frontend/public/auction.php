@@ -120,6 +120,10 @@ $GLOBALS['PUB_SEO'] = [
     'og_image'    => $aImg,
 ];
 
+// Resolve auction card style from DB card_styles (card_type='auction')
+$_auctionDetailCardStyle = pub_card_inline_style('auction');
+$_auctionDetailCardClass = pub_card_css_class('auction');
+
 include dirname(__DIR__) . '/partials/header.php';
 ?>
 <style>
@@ -258,7 +262,8 @@ include dirname(__DIR__) . '/partials/header.php';
     </div>
 
     <!-- Right: Bid Panel -->
-    <div class="pub-auc-panel" id="aucBidPanel">
+    <div class="pub-auc-panel<?= $_auctionDetailCardClass ? ' ' . $_auctionDetailCardClass : '' ?>"
+         id="aucBidPanel"<?= $_auctionDetailCardStyle ? ' style="' . e($_auctionDetailCardStyle) . '"' : '' ?>>
 
       <!-- Status bar -->
       <div class="pub-auc-status-bar">

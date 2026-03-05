@@ -508,6 +508,8 @@
     "priority_normal": "عادي",
     "priority_low": "منخفض",
     "reset_filters": "إعادة تعيين",
+    "apply_filters": "تطبيق",
+    "mark_read": "تعيين كمقروء",
     "empty": "لا توجد إشعارات بعد",
     "unread": "غير مقروء",
     "load_error": "تعذّر تحميل الإشعارات. يرجى المحاولة مرة أخرى.",

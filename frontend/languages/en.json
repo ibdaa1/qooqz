@@ -508,6 +508,8 @@
     "priority_normal": "Normal",
     "priority_low": "Low",
     "reset_filters": "Reset",
+    "apply_filters": "Apply",
+    "mark_read": "Mark as read",
     "empty": "No notifications yet",
     "unread": "Unread",
     "load_error": "Could not load notifications. Please try again.",
