@@ -7,7 +7,7 @@ final class CardStylesValidator
 {
     private const ALLOWED_CARD_TYPES = [
         'product', 'category', 'vendor', 'blog', 'feature', 'testimonial', 'other',
-        'auction', 'notification', 'discount', 'jobs',
+        'auction', 'notification', 'discount', 'jobs', 'plan',
     ];
 
     private const ALLOWED_HOVER_EFFECTS = ['none', 'lift', 'zoom', 'shadow', 'border', 'brightness'];

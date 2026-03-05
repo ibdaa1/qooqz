@@ -457,6 +457,9 @@ window.THEMES_CONFIG = {
                             <option value="product">Product</option><option value="category">Category</option>
                             <option value="vendor">Vendor</option><option value="blog">Blog</option>
                             <option value="feature">Feature</option><option value="testimonial">Testimonial</option>
+                            <option value="auction">Auction</option><option value="notification">Notification</option>
+                            <option value="discount">Discount</option><option value="jobs">Jobs</option>
+                            <option value="plan">Plan</option>
                             <option value="other">Other</option>
                         </select>
                     </div>

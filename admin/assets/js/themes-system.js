@@ -732,7 +732,15 @@
         } else if (prefix === 'card') {
             if ($('cardName')) $('cardName').value = item.name || '';
             if ($('cardSlug')) $('cardSlug').value = item.slug || '';
-            if ($('cardType')) $('cardType').value = item.card_type || 'product';
+            // Derive card_type from slug prefix when the stored value is empty (legacy rows).
+            // Only use the derived value if it matches a known allowed type.
+            const knownCardTypes = ['product','category','vendor','blog','feature','testimonial',
+                                    'auction','notification','discount','jobs','plan','other'];
+            const derivedFromSlug = ((item.slug || '').split('-')[0] || '').toLowerCase();
+            const cardTypeFallback = (item.card_type && item.card_type !== '')
+                ? item.card_type
+                : (knownCardTypes.includes(derivedFromSlug) ? derivedFromSlug : 'product');
+            if ($('cardType')) $('cardType').value = cardTypeFallback;
             if ($('cardBgColor')) $('cardBgColor').value = item.background_color || '#FFFFFF';
             if ($('cardBorderColor')) $('cardBorderColor').value = item.border_color || '#E0E0E0';
             if ($('cardBorderWidth')) $('cardBorderWidth').value = item.border_width || 1;
