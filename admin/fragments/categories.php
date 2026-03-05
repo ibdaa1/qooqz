@@ -111,11 +111,86 @@ function __tr($key, $replacements = []) {
 // ════════════════════════════════════════════════════════════
 $apiBase = '/api';
 
+// ════════════════════════════════════════════════════════════
+// DB-DRIVEN CSS VARS HELPER
+// Generates :root CSS vars from all DB theme settings so no
+// hardcoded fallback colors are ever used.
+// ════════════════════════════════════════════════════════════
+if (!function_exists('renderFragmentThemeVars')) {
+    function renderFragmentThemeVars(array $theme): void {
+        echo ':root {' . PHP_EOL;
+    // Color settings
+    foreach ($theme['color_settings'] ?? [] as $c) {
+        if (empty($c['setting_key']) || !isset($c['color_value'])) continue;
+        $k = htmlspecialchars($c['setting_key'], ENT_QUOTES);
+        $h = htmlspecialchars(str_replace('_', '-', $c['setting_key']), ENT_QUOTES);
+        $v = htmlspecialchars($c['color_value'], ENT_QUOTES);
+        echo "    --{$k}: {$v};" . PHP_EOL;
+        if ($h !== $k) echo "    --{$h}: {$v};" . PHP_EOL;
+    }
+    // Font settings
+    foreach ($theme['font_settings'] ?? [] as $f) {
+        if (empty($f['setting_key'])) continue;
+        $sk = htmlspecialchars($f['setting_key'], ENT_QUOTES);
+        $sh = htmlspecialchars(str_replace('_', '-', $f['setting_key']), ENT_QUOTES);
+        if (!empty($f['font_family'])) {
+            $ff = htmlspecialchars($f['font_family'], ENT_QUOTES);
+            echo "    --{$sk}-family: {$ff};" . PHP_EOL;
+            if ($sh !== $sk) echo "    --{$sh}-family: {$ff};" . PHP_EOL;
+        }
+        if (!empty($f['font_size'])) {
+            $fs = htmlspecialchars($f['font_size'], ENT_QUOTES);
+            echo "    --{$sk}-size: {$fs};" . PHP_EOL;
+            if ($sh !== $sk) echo "    --{$sh}-size: {$fs};" . PHP_EOL;
+        }
+        if (!empty($f['font_weight'])) {
+            $fw = htmlspecialchars($f['font_weight'], ENT_QUOTES);
+            echo "    --{$sk}-weight: {$fw};" . PHP_EOL;
+            if ($sh !== $sk) echo "    --{$sh}-weight: {$fw};" . PHP_EOL;
+        }
+    }
+    // Design settings (border-radius, padding, spacing, shadows…)
+    foreach ($theme['design_settings'] ?? [] as $d) {
+        if (empty($d['setting_key']) || !isset($d['setting_value'])) continue;
+        $dk = htmlspecialchars($d['setting_key'], ENT_QUOTES);
+        $dh = htmlspecialchars(str_replace('_', '-', $d['setting_key']), ENT_QUOTES);
+        $dv = htmlspecialchars($d['setting_value'], ENT_QUOTES);
+        echo "    --{$dk}: {$dv};" . PHP_EOL;
+        if ($dh !== $dk) echo "    --{$dh}: {$dv};" . PHP_EOL;
+    }
+    // Button styles exposed as CSS vars
+    foreach ($theme['button_styles'] ?? [] as $b) {
+        if (empty($b['slug'])) continue;
+        $slug = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$b['slug']));
+        if (!empty($b['background_color'])) echo "    --btn-{$slug}-bg: " . htmlspecialchars($b['background_color'], ENT_QUOTES) . ';' . PHP_EOL;
+        if (!empty($b['text_color']))       echo "    --btn-{$slug}-color: " . htmlspecialchars($b['text_color'], ENT_QUOTES) . ';' . PHP_EOL;
+        if (!empty($b['border_color']))     echo "    --btn-{$slug}-border: " . htmlspecialchars($b['border_color'], ENT_QUOTES) . ';' . PHP_EOL;
+        if (!empty($b['border_radius']))    echo "    --btn-{$slug}-radius: " . htmlspecialchars((string)$b['border_radius'], ENT_QUOTES) . 'px;' . PHP_EOL;
+    }
+    // Card styles exposed as CSS vars
+    foreach ($theme['card_styles'] ?? [] as $cs) {
+        if (empty($cs['slug'])) continue;
+        $slug = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$cs['slug']));
+        if (!empty($cs['background_color'])) echo "    --card-{$slug}-bg: " . htmlspecialchars($cs['background_color'], ENT_QUOTES) . ';' . PHP_EOL;
+        if (!empty($cs['border_color']))     echo "    --card-{$slug}-border: " . htmlspecialchars($cs['border_color'], ENT_QUOTES) . ';' . PHP_EOL;
+        if (!empty($cs['border_radius']))    echo "    --card-{$slug}-radius: " . htmlspecialchars((string)$cs['border_radius'], ENT_QUOTES) . 'px;' . PHP_EOL;
+        if (!empty($cs['shadow_style']))     echo "    --card-{$slug}-shadow: " . htmlspecialchars($cs['shadow_style'], ENT_QUOTES) . ';' . PHP_EOL;
+        if (!empty($cs['padding']))          echo "    --card-{$slug}-padding: " . htmlspecialchars($cs['padding'], ENT_QUOTES) . ';' . PHP_EOL;
+    }
+    echo '}' . PHP_EOL;
+}
+}
+
 ?>
-<!-- Force load CSS if embedded -->
-<?php if ($isFragment): ?>
-<link rel="stylesheet" href="/admin/assets/css/pages/categories.css?v=<?= time() ?>">
+<!-- DB-driven CSS vars (all settings, colors, fonts, cards, buttons from database) -->
+<style id="db-theme-vars-categories">
+<?php renderFragmentThemeVars($GLOBALS['ADMIN_UI']['theme'] ?? []); ?>
+<?php if (!empty($GLOBALS['ADMIN_UI']['theme']['generated_css'])): ?>
+<?= $GLOBALS['ADMIN_UI']['theme']['generated_css'] ?>
 <?php endif; ?>
+</style>
+<!-- Structural layout CSS (uses only var() for all visual properties) -->
+<link rel="stylesheet" href="/admin/assets/css/pages/categories.css?v=<?= time() ?>">
 
 <!-- Page Meta -->
 <meta data-page="categories"
@@ -132,6 +207,10 @@ $apiBase = '/api';
         </div>
         <div class="page-header-actions">
             <?php if ($canCreate): ?>
+            <button id="btnImportExcel" class="btn btn-secondary">
+                <i class="fas fa-file-excel"></i>
+                <span data-i18n="categories.import_excel"><?= __t('categories.import_excel', 'Import Excel') ?></span>
+            </button>
             <button id="btnAddCategory" class="btn btn-primary">
                 <i class="fas fa-plus"></i>
                 <span data-i18n="categories.add_new"><?= __t('categories.add_new', 'Add Category') ?></span>
@@ -500,6 +579,70 @@ $apiBase = '/api';
         </div>
     </div>
 
+    <!-- Excel Import Modal -->
+    <div id="catExcelImportModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;">
+        <div style="background:var(--card-bg,#081127); border:1px solid var(--border-color,#263044); border-radius:12px; width:min(700px,95vw); max-height:90vh; overflow-y:auto; padding:0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid var(--border-color,#263044);">
+                <h3 style="margin:0; color:var(--text-primary,#fff); font-size:1.1rem;"><i class="fas fa-file-excel" style="color:#22c55e; margin-right:8px;"></i> Import Categories from Excel</h3>
+                <button type="button" id="catExcelImportClose" style="background:none; border:none; color:var(--text-secondary,#94a3b8); cursor:pointer; font-size:1.2rem;">&times;</button>
+            </div>
+            <div style="padding:20px;">
+                <!-- Instructions -->
+                <div style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.3); border-radius:8px; padding:12px; margin-bottom:16px; font-size:0.85rem; color:var(--text-secondary,#94a3b8);">
+                    <strong style="color:var(--text-primary,#fff);"><i class="fas fa-info-circle"></i> Excel Column Format:</strong><br>
+                    <code style="color:#60a5fa;">name</code> (required) &nbsp;|&nbsp;
+                    <code style="color:#60a5fa;">parent_name</code> (optional, e.g. "Electronics") &nbsp;|&nbsp;
+                    <code style="color:#60a5fa;">level</code> (1=root, 2=sub, 3=sub-sub, 4=sub-sub-sub) &nbsp;|&nbsp;
+                    <code style="color:#60a5fa;">slug</code> &nbsp;|&nbsp;
+                    <code style="color:#60a5fa;">description</code> &nbsp;|&nbsp;
+                    <code style="color:#60a5fa;">sort_order</code> &nbsp;|&nbsp;
+                    <code style="color:#60a5fa;">is_active</code> (0/1) &nbsp;|&nbsp;
+                    <code style="color:#60a5fa;">is_featured</code> (0/1)<br>
+                    <small>English is the default language. First row = headers.</small>
+                </div>
+
+                <!-- File Upload -->
+                <div style="margin-bottom:16px;">
+                    <label style="display:block; margin-bottom:6px; color:var(--text-secondary,#94a3b8); font-size:0.85rem;">Select .xlsx or .csv file:</label>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <input type="file" id="catExcelFileInput" accept=".xlsx,.xls,.csv" style="flex:1; padding:8px; background:var(--input-bg,#0b1220); border:1px solid var(--border-color,#263044); border-radius:8px; color:var(--text-primary,#fff);">
+                        <button type="button" id="catExcelDownloadSample" class="btn btn-outline" style="white-space:nowrap;">
+                            <i class="fas fa-download"></i> Sample
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Preview Info -->
+                <div id="catExcelPreviewInfo" style="display:none; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); border-radius:8px; padding:10px; margin-bottom:12px; font-size:0.85rem; color:var(--text-secondary,#94a3b8);">
+                    <span id="catExcelPreviewText"></span>
+                </div>
+
+                <!-- Progress -->
+                <div id="catExcelProgressArea" style="display:none; margin-bottom:12px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:0.85rem; color:var(--text-secondary,#94a3b8);">
+                        <span id="catExcelProgressLabel">Importing...</span>
+                        <span id="catExcelProgressPct">0%</span>
+                    </div>
+                    <div style="background:var(--border-color,#263044); border-radius:4px; height:8px; overflow:hidden;">
+                        <div id="catExcelProgressBar" style="height:100%; background:var(--primary-color,#3b82f6); width:0%; transition:width 0.3s;"></div>
+                    </div>
+                    <pre id="catExcelProgressLog" style="margin-top:10px; max-height:200px; overflow-y:auto; background:rgba(0,0,0,0.3); padding:10px; border-radius:6px; font-size:0.75rem; color:var(--text-secondary,#94a3b8); white-space:pre-wrap;"></pre>
+                </div>
+
+                <!-- Result Summary -->
+                <div id="catExcelResultSummary" style="display:none; padding:12px; border-radius:8px; font-size:0.9rem;"></div>
+
+                <!-- Actions -->
+                <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
+                    <button type="button" id="catExcelImportCancel" class="btn btn-outline">Cancel</button>
+                    <button type="button" id="catExcelImportStart" class="btn btn-primary" disabled>
+                        <i class="fas fa-upload"></i> Start Import
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <!-- Expose client-side globals for the module -->
@@ -513,6 +656,12 @@ window.APP_CONFIG.USER_ID = window.APP_CONFIG.USER_ID || <?= admin_user_id() ?>;
 window.USER_LANGUAGE = window.USER_LANGUAGE || '<?= addslashes($lang) ?>';
 window.USER_DIRECTION = window.USER_DIRECTION || '<?= addslashes($dir) ?>';
 window.CSRF_TOKEN = window.CSRF_TOKEN || '<?= addslashes($csrf) ?>';
+
+// Inject ADMIN_UI with DB theme data (colors, fonts, cards, buttons, design settings)
+// so admin_core.js and category JS can apply all vars without any static fallbacks.
+if (!window.ADMIN_UI) {
+    window.ADMIN_UI = <?= json_encode($GLOBALS['ADMIN_UI'] ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+}
 
 // Page permissions available to JS
 window.PAGE_PERMISSIONS = <?= json_encode([

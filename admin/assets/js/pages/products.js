@@ -1985,23 +1985,64 @@
     // ════════════════════════════════════════════════════════════
     async function injectThemeCss() {
         try {
-            const res = await fetch('/api/health?format=json', { credentials: 'same-origin' });
-            if (!res.ok) return;
-            const data = await res.json();
-            const generatedCss = data?.admin_ui?.theme?.generated_css;
-            if (!generatedCss) return;
+            const themeData = window.ADMIN_UI && window.ADMIN_UI.theme;
+            if (!themeData) return;
 
-            // Remove old injected style if any
-            const old = document.getElementById('__products_theme_css__');
-            if (old) old.remove();
+            const root = document.documentElement;
 
-            const style = document.createElement('style');
-            style.id = '__products_theme_css__';
-            style.textContent = generatedCss;
-            document.head.appendChild(style);
-            console.log('[Products] Theme CSS injected from DB (' + generatedCss.length + ' bytes)');
+            // Apply color settings from DB
+            if (Array.isArray(themeData.color_settings)) {
+                themeData.color_settings.forEach(c => {
+                    if (!c || !c.setting_key || !c.color_value) return;
+                    root.style.setProperty('--' + c.setting_key, c.color_value);
+                    root.style.setProperty('--' + c.setting_key.replace(/_/g, '-'), c.color_value);
+                });
+            }
+
+            // Apply font settings from DB
+            if (Array.isArray(themeData.font_settings)) {
+                themeData.font_settings.forEach(f => {
+                    if (!f || !f.setting_key) return;
+                    const base = f.setting_key;
+                    const baseH = base.replace(/_/g, '-');
+                    if (f.font_family) {
+                        root.style.setProperty('--' + base + '-family', f.font_family);
+                        root.style.setProperty('--' + baseH + '-family', f.font_family);
+                    }
+                    if (f.font_size) {
+                        root.style.setProperty('--' + base + '-size', f.font_size);
+                        root.style.setProperty('--' + baseH + '-size', f.font_size);
+                    }
+                    if (f.font_weight) {
+                        root.style.setProperty('--' + base + '-weight', f.font_weight);
+                        root.style.setProperty('--' + baseH + '-weight', f.font_weight);
+                    }
+                });
+            }
+
+            // Apply design settings from DB
+            if (Array.isArray(themeData.design_settings)) {
+                themeData.design_settings.forEach(d => {
+                    if (!d || !d.setting_key || !d.setting_value) return;
+                    root.style.setProperty('--' + d.setting_key, d.setting_value);
+                    root.style.setProperty('--' + d.setting_key.replace(/_/g, '-'), d.setting_value);
+                });
+            }
+
+            // Inject generated_css if present
+            if (themeData.generated_css) {
+                let genStyle = document.getElementById('__products_theme_css__');
+                if (!genStyle) {
+                    genStyle = document.createElement('style');
+                    genStyle.id = '__products_theme_css__';
+                    document.head.appendChild(genStyle);
+                }
+                genStyle.textContent = themeData.generated_css;
+            }
+
+            console.log('[Products] DB theme CSS applied from window.ADMIN_UI');
         } catch (err) {
-            console.warn('[Products] Could not load theme CSS:', err);
+            console.warn('[Products] Could not apply theme CSS:', err);
         }
     }
 
