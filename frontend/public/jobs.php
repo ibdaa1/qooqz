@@ -16,8 +16,8 @@ $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = t('jobs.page_title') . ' — QOOQZ';
 
 // Resolve job card style from DB card_styles (card_type='job')
-$_jobCardStyle = pub_card_inline_style('job');
-$_jobCardClass = pub_card_css_class('job');
+$_jobCardStyle = pub_card_inline_style('jobs');
+$_jobCardClass = pub_card_css_class('jobs');
 
 /* Filters */
 $page      = max(1, (int)($_GET['page'] ?? 1));

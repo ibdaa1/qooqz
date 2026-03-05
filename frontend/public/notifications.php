@@ -179,69 +179,6 @@ function notif_filter_qs(array $extra = []): string {
     </div>
 
     <!-- Filters bar -->
-    <form method="get" action="" style="margin-bottom:20px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
-        <?php if (!empty($_GET['tenant_id'])): ?>
-            <input type="hidden" name="tenant_id" value="<?= (int)$_GET['tenant_id'] ?>">
-        <?php endif; ?>
-
-        <!-- Unread-only toggle -->
-        <div>
-            <label class="pub-label">&nbsp;</label>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.88rem;">
-                <input type="checkbox" name="unread" value="1" onchange="this.form.submit()" <?= $unreadOnly ? 'checked' : '' ?>>
-                <?= e(t('notifications.unread_only', ['default' => 'Unread only'])) ?>
-            </label>
-        </div>
-
-        <!-- Type filter -->
-        <?php if (!empty($notifTypes)): ?>
-        <div>
-            <label class="pub-label"><?= e(t('notifications.filter_type', ['default' => 'Type'])) ?></label>
-            <select name="type_code" class="pub-select" style="min-width:140px;" onchange="this.form.submit()">
-                <option value=""><?= e(t('notifications.all_types', ['default' => 'All types'])) ?></option>
-                <?php foreach ($notifTypes as $nt): ?>
-                <option value="<?= e($nt['code']) ?>" <?= $typeCodeFilter === $nt['code'] ? 'selected' : '' ?>>
-                    <?= notif_icon($nt['code']) ?> <?= e($nt['name']) ?>
-                </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <?php endif; ?>
-
-        <!-- Priority filter -->
-        <div>
-            <label class="pub-label"><?= e(t('notifications.filter_priority', ['default' => 'Priority'])) ?></label>
-            <select name="priority" class="pub-select" style="min-width:120px;" onchange="this.form.submit()">
-                <option value=""><?= e(t('notifications.all_priorities', ['default' => 'All'])) ?></option>
-                <option value="urgent" <?= $priorityFilter === 'urgent' ? 'selected' : '' ?>>🔴 <?= e(t('notifications.priority_urgent', ['default' => 'Urgent'])) ?></option>
-                <option value="high"   <?= $priorityFilter === 'high'   ? 'selected' : '' ?>>🟠 <?= e(t('notifications.priority_high',   ['default' => 'High'])) ?></option>
-                <option value="normal" <?= $priorityFilter === 'normal' ? 'selected' : '' ?>>⚪ <?= e(t('notifications.priority_normal', ['default' => 'Normal'])) ?></option>
-                <option value="low"    <?= $priorityFilter === 'low'    ? 'selected' : '' ?>>🔵 <?= e(t('notifications.priority_low',    ['default' => 'Low'])) ?></option>
-            </select>
-        </div>
-
-        ?>
-
-<main class="pub-container" style="padding-top:24px;padding-bottom:48px;">
-
-    <!-- Page header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
-        <div>
-            <h1 style="margin:0;font-size:1.4rem;">🔔 <?= e(t('notifications.page_title', ['default' => 'My Notifications'])) ?></h1>
-            <?php if ($unreadCount > 0): ?>
-            <p style="color:var(--pub-muted);font-size:0.85rem;margin:4px 0 0;">
-                <?= $unreadCount ?> <?= e(t('notifications.unread_count', ['default' => 'unread'])) ?>
-            </p>
-            <?php endif; ?>
-        </div>
-        <?php if ($unreadCount > 0): ?>
-        <button type="button" class="pub-btn pub-btn--primary pub-btn--sm" id="pubMarkAllReadBtn">
-            ✓ <?= e(t('notifications.mark_all_read', ['default' => 'Mark all as read'])) ?>
-        </button>
-        <?php endif; ?>
-    </div>
-
-    <!-- Filters bar -->
     <form method="get" action="<?= htmlspecialchars($_SERVER['PHP_SELF'] ?? '', ENT_QUOTES) ?>"
           style="margin-bottom:24px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
         <?php if (!empty($_GET['tenant_id'])): ?>

@@ -62,8 +62,8 @@ $GLOBALS['PUB_PAGE_TITLE'] = e($jobTitle) . ' — QOOQZ';
 include dirname(__DIR__) . '/partials/header.php';
 
 // Resolve job card style from DB card_styles (card_type='job')
-$_jobDetailCardStyle = pub_card_inline_style('job');
-$_jobDetailCardClass = pub_card_css_class('job');
+$_jobDetailCardStyle = pub_card_inline_style('jobs');
+$_jobDetailCardClass = pub_card_css_class('jobs');
 ?>
 
 <!-- Breadcrumb -->

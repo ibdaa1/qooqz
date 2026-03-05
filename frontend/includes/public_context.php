@@ -896,6 +896,16 @@ function _pub_card_row(string $cardType): ?array {
             return $c;
         }
     }
+    // Fallback: when card_type is empty, match by the base of the slug (e.g. 'auction' matches 'auction-default')
+    foreach ($cards as $c) {
+        if (!empty($c['card_type'])) continue;
+        $slug = $c['slug'] ?? '';
+        $dashPos = strpos($slug, '-');
+        $base = $dashPos !== false ? substr($slug, 0, $dashPos) : $slug;
+        if ($base === $cardType) {
+            return $c;
+        }
+    }
     return null;
 }
 
