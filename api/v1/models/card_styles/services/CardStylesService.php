@@ -36,6 +36,16 @@ final class CardStylesService
 
     public function save(int $tenantId, array $data): array
     {
+        // Auto-derive card_type from slug when the stored value is empty.
+        // This handles legacy DB rows that were inserted before the card_type enum
+        // was properly set (e.g. card_type = '' in existing rows).
+        if (empty($data['card_type']) && !empty($data['slug'])) {
+            $firstSegment = strtolower(explode('-', trim($data['slug']))[0]);
+            if ($firstSegment !== '' && in_array($firstSegment, CardStylesValidator::getAllowedCardTypes(), true)) {
+                $data['card_type'] = $firstSegment;
+            }
+        }
+
         $errors = $this->validator->validate($data);
         if (!empty($errors)) {
             throw new InvalidArgumentException(

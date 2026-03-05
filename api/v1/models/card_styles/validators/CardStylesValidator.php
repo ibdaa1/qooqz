@@ -14,6 +14,15 @@ final class CardStylesValidator
 
     private const ALLOWED_TEXT_ALIGNS = ['left', 'center', 'right'];
 
+    /**
+     * Returns the list of allowed card_type values.
+     * Used by CardStylesService to auto-derive card_type from slug for legacy rows.
+     */
+    public static function getAllowedCardTypes(): array
+    {
+        return self::ALLOWED_CARD_TYPES;
+    }
+
     public function validate(array $data): array
     {
         $errors = [];
