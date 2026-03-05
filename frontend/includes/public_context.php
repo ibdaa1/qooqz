@@ -300,7 +300,7 @@ if (!function_exists('pub_load_theme')) {
                     $thRow = $thSt->fetch(PDO::FETCH_ASSOC);
                 }
                 $themeDbId  = $thRow ? (int)$thRow['id'] : null;
-                $thIdCond   = $themeDbId ? ' AND theme_id = ?' : '';
+                $thIdCond   = $themeDbId ? ' AND (theme_id = ? OR theme_id IS NULL)' : '';
                 $thP = static function(array $base) use ($themeDbId): array {
                     return $themeDbId ? array_merge($base, [$themeDbId]) : $base;
                 };

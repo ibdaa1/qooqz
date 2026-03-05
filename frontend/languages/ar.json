@@ -515,6 +515,19 @@
     "load_error": "تعذّر تحميل الإشعارات. يرجى المحاولة مرة أخرى.",
     "view_all": "عرض الكل",
     "bell_title": "الإشعارات",
-    "no_new": "لا توجد إشعارات جديدة"
+    "no_new": "لا توجد إشعارات جديدة",
+    "type_order": "طلب",
+    "type_payment": "دفع",
+    "type_shipment": "شحنة",
+    "type_return": "إرجاع",
+    "type_review": "تقييم",
+    "type_promotion": "عرض",
+    "type_system": "النظام",
+    "type_entities": "متجر",
+    "type_support": "دعم",
+    "type_wallet": "محفظة",
+    "type_loyalty": "ولاء",
+    "type_audit_completed": "تدقيق مكتمل",
+    "type_audit_rejected": "تدقيق مرفوض"
   }
 }

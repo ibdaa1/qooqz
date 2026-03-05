@@ -149,7 +149,7 @@ if ($first === 'ui') {
         $uiThemeRow = $pdoOne('SELECT id FROM themes WHERE tenant_id = ? AND is_default = 1 LIMIT 1', [$tid]);
     }
     $uiThemeId  = $uiThemeRow ? (int)$uiThemeRow['id'] : null;
-    $uiTidCond  = $uiThemeId ? ' AND theme_id = ?' : '';
+    $uiTidCond  = $uiThemeId ? ' AND (theme_id = ? OR theme_id IS NULL)' : '';
     $uiP = static function(array $base) use ($uiThemeId): array {
         return $uiThemeId ? array_merge($base, [$uiThemeId]) : $base;
     };

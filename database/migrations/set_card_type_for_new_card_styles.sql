@@ -2,14 +2,14 @@
 -- Sets the card_type column for card_styles rows that were inserted
 -- without a card_type value (rows created 2026-03-05).
 -- These card_type values align with what pub_card_inline_style() looks up:
---   'job'          used by jobs.php / job.php
+--   'jobs'         used by jobs.php / job.php
 --   'notification' used by notifications.php
 --   'auction'      used by auctions.php / auction.php
 --   'discount'     used by discounts.php / wishlist.php
 --   'plan'         used by pricing plan pages
 
 UPDATE `card_styles`
-SET    `card_type` = 'job'
+SET    `card_type` = 'jobs'
 WHERE  `slug` = 'jobs-default'
   AND (`card_type` IS NULL OR `card_type` = '');
 

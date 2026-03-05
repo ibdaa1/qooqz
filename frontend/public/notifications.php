@@ -184,12 +184,15 @@ function notif_filter_qs(array $extra = []): string {
         <?php if (!empty($_GET['tenant_id'])): ?>
             <input type="hidden" name="tenant_id" value="<?= (int)$_GET['tenant_id'] ?>">
         <?php endif; ?>
+        <?php if (!empty($_GET['lang'])): ?>
+            <input type="hidden" name="lang" value="<?= e($_GET['lang']) ?>">
+        <?php endif; ?>
 
         <!-- Unread-only toggle -->
         <div>
             <label class="pub-label">&nbsp;</label>
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.88rem;">
-                <input type="checkbox" name="unread" value="1" <?= $unreadOnly ? 'checked' : '' ?>>
+                <input type="checkbox" name="unread" value="1" onchange="this.form.submit()" <?= $unreadOnly ? 'checked' : '' ?>>
                 <?= e(t('notifications.unread_only', ['default' => 'Unread only'])) ?>
             </label>
         </div>
@@ -198,11 +201,11 @@ function notif_filter_qs(array $extra = []): string {
         <?php if (!empty($notifTypes)): ?>
         <div>
             <label class="pub-label"><?= e(t('notifications.filter_type', ['default' => 'Type'])) ?></label>
-            <select name="type_code" class="pub-select" style="min-width:140px;">
+            <select name="type_code" class="pub-select" style="min-width:140px;" onchange="this.form.submit()">
                 <option value=""><?= e(t('notifications.all_types', ['default' => 'All types'])) ?></option>
                 <?php foreach ($notifTypes as $nt): ?>
                 <option value="<?= e($nt['code']) ?>" <?= $typeCodeFilter === $nt['code'] ? 'selected' : '' ?>>
-                    <?= notif_icon($nt['code']) ?> <?= e($nt['name']) ?>
+                    <?= notif_icon($nt['code']) ?> <?= e(t('notifications.type_' . $nt['code'], ['default' => $nt['name']])) ?>
                 </option>
                 <?php endforeach; ?>
             </select>
@@ -212,7 +215,7 @@ function notif_filter_qs(array $extra = []): string {
         <!-- Priority filter -->
         <div>
             <label class="pub-label"><?= e(t('notifications.filter_priority', ['default' => 'Priority'])) ?></label>
-            <select name="priority" class="pub-select" style="min-width:120px;">
+            <select name="priority" class="pub-select" style="min-width:120px;" onchange="this.form.submit()">
                 <option value=""><?= e(t('notifications.all_priorities', ['default' => 'All'])) ?></option>
                 <option value="urgent" <?= $priorityFilter === 'urgent' ? 'selected' : '' ?>>🔴 <?= e(t('notifications.priority_urgent', ['default' => 'Urgent'])) ?></option>
                 <option value="high"   <?= $priorityFilter === 'high'   ? 'selected' : '' ?>>🟠 <?= e(t('notifications.priority_high',   ['default' => 'High'])) ?></option>

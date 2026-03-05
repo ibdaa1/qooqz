@@ -515,6 +515,19 @@
     "load_error": "Could not load notifications. Please try again.",
     "view_all": "View all",
     "bell_title": "Notifications",
-    "no_new": "No new notifications"
+    "no_new": "No new notifications",
+    "type_order": "Order",
+    "type_payment": "Payment",
+    "type_shipment": "Shipment",
+    "type_return": "Return",
+    "type_review": "Review",
+    "type_promotion": "Promotion",
+    "type_system": "System",
+    "type_entities": "Store",
+    "type_support": "Support",
+    "type_wallet": "Wallet",
+    "type_loyalty": "Loyalty",
+    "type_audit_completed": "Audit Completed",
+    "type_audit_rejected": "Audit Rejected"
   }
 }
