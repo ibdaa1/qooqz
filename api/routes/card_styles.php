@@ -97,6 +97,9 @@ try {
     }
 } catch (InvalidArgumentException $e) {
     ResponseFormatter::error($e->getMessage(), 422);
+} catch (RuntimeException $e) {
+    safe_log('warning', 'Card styles not found', ['error' => $e->getMessage()]);
+    ResponseFormatter::error($e->getMessage(), 404);
 } catch (Throwable $e) {
     safe_log('error', 'Card styles route failed', [
         'error' => $e->getMessage(),

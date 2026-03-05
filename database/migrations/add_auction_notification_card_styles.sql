@@ -1,5 +1,5 @@
 -- database/migrations/add_auction_notification_card_styles.sql
--- Extends card_type support for auction/notification/discount/jobs card style rows.
+-- Extends card_type support for auction/notification/discount/jobs/plan card style rows.
 --
 -- This migration is idempotent and safe to re-run.
 --
@@ -13,7 +13,7 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 1. Convert card_type column from ENUM to VARCHAR(50).
 --    VARCHAR allows any string value including the current empty-string rows.
---    Existing rows with '' are left as-is and back-filled in step 2.
+--    Existing rows with '' are left as-is and back-filled in step 3.
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE `card_styles`
   MODIFY `card_type` VARCHAR(50) NOT NULL DEFAULT '';
@@ -21,9 +21,30 @@ ALTER TABLE `card_styles`
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. Add updated_at column if it does not exist.
 --    The repository UPDATE sets updated_at = NOW(); missing column → 500 error.
+--    NOTE: ADD COLUMN IF NOT EXISTS requires MySQL 8.0+.
+--    For MySQL 5.7 compatibility we use a stored-procedure workaround that
+--    only executes the ALTER when the column is absent.
 -- ─────────────────────────────────────────────────────────────────────────────
-ALTER TABLE `card_styles`
-  ADD COLUMN IF NOT EXISTS `updated_at` DATETIME NULL DEFAULT NULL;
+DROP PROCEDURE IF EXISTS `temp_add_updated_at_to_card_styles`;
+
+DELIMITER $$
+CREATE PROCEDURE `temp_add_updated_at_to_card_styles`()
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM   information_schema.COLUMNS
+    WHERE  TABLE_SCHEMA = DATABASE()
+      AND  TABLE_NAME   = 'card_styles'
+      AND  COLUMN_NAME  = 'updated_at'
+  ) THEN
+    ALTER TABLE `card_styles`
+      ADD COLUMN `updated_at` DATETIME NULL DEFAULT NULL;
+  END IF;
+END$$
+DELIMITER ;
+
+CALL `temp_add_updated_at_to_card_styles`();
+DROP PROCEDURE IF EXISTS `temp_add_updated_at_to_card_styles`;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3. Back-fill card_type for rows that have an empty or null value.
@@ -114,4 +135,18 @@ SELECT 1, NULL, 'Jobs Card - Default', 'jobs-default', 'jobs',
        1, NOW()
 WHERE NOT EXISTS (
   SELECT 1 FROM `card_styles` WHERE `tenant_id` = 1 AND `slug` = 'jobs-default'
+);
+
+-- Plan card
+INSERT INTO `card_styles`
+  (`tenant_id`, `theme_id`, `name`, `slug`, `card_type`,
+   `background_color`, `border_color`, `border_width`, `border_radius`,
+   `shadow_style`, `padding`, `hover_effect`, `text_align`, `image_aspect_ratio`,
+   `is_active`, `created_at`)
+SELECT 1, NULL, 'Plan Card - Default', 'plan-default', 'plan',
+       '#FFFFFF', '#E0E0E0', 1, 12,
+       '0 4px 16px rgba(0,0,0,0.10)', '20px', 'lift', 'center', '4:3',
+       1, NOW()
+WHERE NOT EXISTS (
+  SELECT 1 FROM `card_styles` WHERE `tenant_id` = 1 AND `slug` = 'plan-default'
 );
