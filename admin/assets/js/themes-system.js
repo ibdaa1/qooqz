@@ -917,4 +917,11 @@
         deleteSetting: deleteSetting
     };
 
+    // Auto-init when script loads (same pattern as permissions-system.js)
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
 })();

@@ -724,34 +724,6 @@ window.THEMES_CONFIG = {
 
 <!-- ═══════════ INIT SCRIPTS ═══════════ -->
 <script src="/admin/assets/js/themes-system.js?v=<?= time() ?>"></script>
-<?php if ($isFragment): ?>
-<script>
-(function() {
-    let attempts = 0;
-    const maxAttempts = 50;
-    function tryInit() {
-        if (window.ThemesSystem && typeof window.ThemesSystem.init === 'function') {
-            window.ThemesSystem.init();
-            return;
-        }
-        if (++attempts < maxAttempts) {
-            setTimeout(tryInit, 100);
-        }
-    }
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', tryInit);
-    } else {
-        tryInit();
-    }
-})();
-</script>
-<?php else: ?>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    if (window.ThemesSystem) window.ThemesSystem.init();
-});
-</script>
-<?php endif; ?>
 
 <?php if (!$isFragment): ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
