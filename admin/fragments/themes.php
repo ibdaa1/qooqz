@@ -56,7 +56,6 @@ if (!$canManage) {
 <!-- Page Meta -->
 <meta data-page="themes"
       data-assets-css="/admin/assets/css/themes-system.css"
-      data-assets-js="/admin/assets/js/themes-system.js"
       data-i18n-files="/languages/AdminUiTheme/<?= htmlspecialchars($lang) ?>.json">
 
 <script>

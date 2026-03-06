@@ -132,6 +132,7 @@
         "system": "System Settings"
     },
     "theme_manager_settings": {
+        "empty": "No items found",
         "design":   { "title": "Design Settings",       "add": "Add Setting"       },
         "colors":   { "title": "Color Settings",        "add": "Add Color"         },
         "fonts":    { "title": "Font Settings",         "add": "Add Font"          },

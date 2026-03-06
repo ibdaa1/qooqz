@@ -477,7 +477,7 @@
         if (!listEl) return;
 
         if (!items || items.length === 0) {
-            listEl.innerHTML = '<div class="empty-settings">No items found</div>';
+            listEl.innerHTML = '<div class="empty-settings">' + t('theme_manager_settings.empty', 'No items found') + '</div>';
             return;
         }
 
@@ -512,13 +512,13 @@
                 display = '<strong>' + escapeHtml(item.title || item.section_type || '') + '</strong>' +
                           ' <span class="badge badge-secondary">' + escapeHtml(item.section_type || '') + '</span>' +
                           ' <span class="badge badge-info">' + escapeHtml(item.layout_type || '') + '</span>' +
-                          (item.is_active ? ' <span class="badge badge-success">Active</span>' : ' <span class="badge badge-secondary">Inactive</span>');
+                          (item.is_active ? ' <span class="badge badge-success">' + t('theme_manager.status.active', 'Active') + '</span>' : ' <span class="badge badge-secondary">' + t('theme_manager.status.inactive', 'Inactive') + '</span>');
             } else if (type === 'system') {
                 display = '<strong>' + escapeHtml(item.setting_key || '') + '</strong>' +
                           ' <span class="badge badge-secondary">' + escapeHtml(item.setting_type || 'text') + '</span>' +
                           ' <span class="badge badge-info">' + escapeHtml(item.category || '') + '</span>' +
                           '<div class="setting-value">' + escapeHtml(String(item.setting_value || '').substring(0, 100)) + '</div>' +
-                          (item.is_public ? ' <span class="badge badge-success">Public</span>' : '');
+                          (item.is_public ? ' <span class="badge badge-success">' + t('theme_manager_settings.form.public', 'Public') + '</span>' : '');
             }
 
             return '<div class="settings-item" data-id="' + itemId + '">' +

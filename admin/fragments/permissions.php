@@ -135,7 +135,6 @@ $apiBase = '/api';
 <!-- Page Meta -->
 <meta data-page="permissions"
       data-assets-css="/admin/assets/css/permissions-system.css"
-      data-assets-js="/admin/assets/js/permissions-system.js"
       data-i18n-files="/languages/Permissions/<?= rawurlencode($lang) ?>.json">
 
 <!-- Page Container -->
