@@ -45,7 +45,15 @@
                     "active": "Active",
                     "inactive": "Inactive"
                 },
-                "is_default": "Set as default theme"
+                "is_default": "Set as default theme",
+                "thumbnail_url": {
+                    "label": "Thumbnail URL",
+                    "placeholder": "https://..."
+                },
+                "preview_url": {
+                    "label": "Preview URL",
+                    "placeholder": "https://..."
+                }
             }
         },
         "filters": {
@@ -67,6 +75,8 @@
             }
         },
         "table": {
+            "id": "ID",
+            "actions_label": "Actions",
             "empty": {
                 "title": "No Themes Found",
                 "message": "Start by creating your first theme",
@@ -110,5 +120,159 @@
     },
     "accessibility": {
         "close": "Close"
+    },
+    "tabs": {
+        "info": "Theme Info",
+        "design": "Design",
+        "colors": "Colors",
+        "fonts": "Fonts",
+        "buttons": "Buttons",
+        "cards": "Cards",
+        "homepage": "Homepage",
+        "system": "System Settings"
+    },
+    "theme_manager_settings": {
+        "design":   { "title": "Design Settings",       "add": "Add Setting"       },
+        "colors":   { "title": "Color Settings",        "add": "Add Color"         },
+        "fonts":    { "title": "Font Settings",         "add": "Add Font"          },
+        "buttons":  { "title": "Button Styles",         "add": "Add Button Style"  },
+        "cards":    { "title": "Card Styles",           "add": "Add Card Style"    },
+        "homepage": { "title": "Homepage Sections",     "add": "Add Section"       },
+        "system":   { "title": "System Settings",       "add": "Add Setting"       },
+        "form": {
+            "key":          "Key",
+            "name":         "Name",
+            "value":        "Value",
+            "type":         "Type",
+            "category":     "Category",
+            "active":       "Active",
+            "sort_order":   "Sort Order",
+            "color":        "Color",
+            "font_family":  "Font Family",
+            "size":         "Size",
+            "weight":       "Weight",
+            "line_height":  "Line Height",
+            "slug":         "Slug",
+            "bg_color":     "BG Color",
+            "text_color":   "Text Color",
+            "border_color": "Border Color",
+            "border_width": "Border Width",
+            "border_radius":"Border Radius",
+            "padding":      "Padding",
+            "font_size":    "Font Size",
+            "font_weight":  "Font Weight",
+            "hover_bg":     "Hover BG",
+            "hover_text":   "Hover Text",
+            "hover_border": "Hover Border",
+            "shadow":       "Shadow",
+            "hover_effect": "Hover Effect",
+            "text_align":   "Text Align",
+            "image_ratio":  "Image Ratio",
+            "section_type": "Section Type",
+            "title":        "Title",
+            "subtitle":     "Subtitle",
+            "layout":       "Layout",
+            "items_per_row":"Items / Row",
+            "data_source":  "Data Source",
+            "custom_css":   "Custom CSS",
+            "custom_html":  "Custom HTML",
+            "description":  "Description",
+            "public":       "Public",
+            "editable":     "Editable",
+            "yes":          "Yes",
+            "no":           "No",
+            "save":         "Save",
+            "cancel":       "Cancel"
+        },
+        "types": {
+            "text":     "Text",
+            "number":   "Number",
+            "color":    "Color",
+            "image":    "Image",
+            "boolean":  "Boolean",
+            "select":   "Select",
+            "json":     "JSON",
+            "file":     "File",
+            "email":    "Email"
+        },
+        "categories": {
+            "layout":     "Layout",
+            "header":     "Header",
+            "footer":     "Footer",
+            "sidebar":    "Sidebar",
+            "homepage":   "Homepage",
+            "product":    "Product",
+            "cart":       "Cart",
+            "checkout":   "Checkout",
+            "other":      "Other",
+            "primary":    "Primary",
+            "secondary":  "Secondary",
+            "accent":     "Accent",
+            "background": "Background",
+            "text":       "Text",
+            "border":     "Border",
+            "status":     "Status",
+            "heading":    "Heading",
+            "body":       "Body",
+            "button":     "Button",
+            "navigation": "Navigation"
+        },
+        "button_types": {
+            "primary":   "Primary",
+            "secondary": "Secondary",
+            "success":   "Success",
+            "danger":    "Danger",
+            "warning":   "Warning",
+            "info":      "Info",
+            "outline":   "Outline",
+            "link":      "Link"
+        },
+        "card_types": {
+            "product":      "Product",
+            "category":     "Category",
+            "vendor":       "Vendor",
+            "blog":         "Blog",
+            "feature":      "Feature",
+            "testimonial":  "Testimonial",
+            "auction":      "Auction",
+            "notification": "Notification",
+            "discount":     "Discount",
+            "jobs":         "Jobs",
+            "plan":         "Plan",
+            "other":        "Other"
+        },
+        "hover_effects": {
+            "none":       "None",
+            "lift":       "Lift",
+            "zoom":       "Zoom",
+            "shadow":     "Shadow",
+            "border":     "Border",
+            "brightness": "Brightness"
+        },
+        "text_aligns": {
+            "left":   "Left",
+            "center": "Center",
+            "right":  "Right"
+        },
+        "layouts": {
+            "grid":     "Grid",
+            "slider":   "Slider",
+            "list":     "List",
+            "carousel": "Carousel",
+            "masonry":  "Masonry"
+        },
+        "section_types": {
+            "slider":            "Slider",
+            "categories":        "Categories",
+            "featured_products": "Featured Products",
+            "new_products":      "New Products",
+            "deals":             "Deals",
+            "brands":            "Brands",
+            "vendors":           "Vendors",
+            "banners":           "Banners",
+            "testimonials":      "Testimonials",
+            "custom_html":       "Custom HTML",
+            "other":             "Other"
+        }
     }
 }

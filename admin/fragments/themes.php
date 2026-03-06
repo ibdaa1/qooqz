@@ -55,7 +55,9 @@ if (!$canManage) {
 
 <!-- Page Meta -->
 <meta data-page="themes"
-      data-assets-css="/admin/assets/css/themes-system.css">
+      data-assets-css="/admin/assets/css/themes-system.css"
+      data-assets-js="/admin/assets/js/themes-system.js"
+      data-i18n-files="/languages/AdminUiTheme/<?= htmlspecialchars($lang) ?>.json">
 
 <script>
 window.THEMES_CONFIG = {
@@ -119,13 +121,13 @@ window.THEMES_CONFIG = {
             <table class="data-table" id="themesTable">
                 <thead>
                     <tr>
-                        <th>ID</th>
+                        <th data-i18n="theme_manager.table.id">ID</th>
                         <th data-i18n="theme_manager.form.fields.name.label">Name</th>
                         <th data-i18n="theme_manager.form.fields.slug.label">Slug</th>
                         <th data-i18n="theme_manager.form.fields.version.label">Version</th>
                         <th data-i18n="theme_manager.form.fields.status.label">Status</th>
                         <th data-i18n="theme_manager.form.fields.is_default">Default</th>
-                        <th>Actions</th>
+                        <th data-i18n="theme_manager.table.actions_label">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="themesTableBody"></tbody>
@@ -225,12 +227,14 @@ window.THEMES_CONFIG = {
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="themeThumbnailUrl">Thumbnail URL</label>
-                        <input type="text" id="themeThumbnailUrl" class="form-control" placeholder="https://...">
+                        <label for="themeThumbnailUrl" data-i18n="theme_manager.form.fields.thumbnail_url.label">Thumbnail URL</label>
+                        <input type="text" id="themeThumbnailUrl" class="form-control"
+                               data-i18n-placeholder="theme_manager.form.fields.thumbnail_url.placeholder">
                     </div>
                     <div class="form-group">
-                        <label for="themePreviewUrl">Preview URL</label>
-                        <input type="text" id="themePreviewUrl" class="form-control" placeholder="https://...">
+                        <label for="themePreviewUrl" data-i18n="theme_manager.form.fields.preview_url.label">Preview URL</label>
+                        <input type="text" id="themePreviewUrl" class="form-control"
+                               data-i18n-placeholder="theme_manager.form.fields.preview_url.placeholder">
                     </div>
                 </div>
                 <div class="form-row">
@@ -254,50 +258,60 @@ window.THEMES_CONFIG = {
         <!-- TAB: Design Settings -->
         <div class="tab-content" id="tab-design" style="display:none">
             <div class="settings-header">
-                <h3 data-i18n="tabs.design">Design Settings</h3>
+                <h3 data-i18n="theme_manager_settings.design.title">Design Settings</h3>
                 <button class="btn btn-sm btn-primary" id="btnAddDesign">
-                    <i class="fas fa-plus"></i> Add Setting
+                    <i class="fas fa-plus"></i> <span data-i18n="theme_manager_settings.design.add">Add Setting</span>
                 </button>
             </div>
             <div id="designSettingsList" class="settings-list"></div>
             <div id="designForm" class="inline-form" style="display:none">
                 <input type="hidden" id="designId">
                 <div class="form-row">
-                    <div class="form-group"><label>Key</label><input type="text" id="designKey" class="form-control"></div>
-                    <div class="form-group"><label>Name</label><input type="text" id="designName" class="form-control"></div>
-                    <div class="form-group"><label>Value</label><input type="text" id="designValue" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.key">Key</label><input type="text" id="designKey" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.name">Name</label><input type="text" id="designName" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.value">Value</label><input type="text" id="designValue" class="form-control"></div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Type</label>
+                        <label data-i18n="theme_manager_settings.form.type">Type</label>
                         <select id="designType" class="form-control">
-                            <option value="text">Text</option><option value="number">Number</option>
-                            <option value="color">Color</option><option value="image">Image</option>
-                            <option value="boolean">Boolean</option><option value="select">Select</option>
-                            <option value="json">JSON</option>
+                            <option value="text"    data-i18n="theme_manager_settings.types.text">Text</option>
+                            <option value="number"  data-i18n="theme_manager_settings.types.number">Number</option>
+                            <option value="color"   data-i18n="theme_manager_settings.types.color">Color</option>
+                            <option value="image"   data-i18n="theme_manager_settings.types.image">Image</option>
+                            <option value="boolean" data-i18n="theme_manager_settings.types.boolean">Boolean</option>
+                            <option value="select"  data-i18n="theme_manager_settings.types.select">Select</option>
+                            <option value="json"    data-i18n="theme_manager_settings.types.json">JSON</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Category</label>
+                        <label data-i18n="theme_manager_settings.form.category">Category</label>
                         <select id="designCategory" class="form-control">
-                            <option value="layout">Layout</option><option value="header">Header</option>
-                            <option value="footer">Footer</option><option value="sidebar">Sidebar</option>
-                            <option value="homepage">Homepage</option><option value="product">Product</option>
-                            <option value="cart">Cart</option><option value="checkout">Checkout</option>
-                            <option value="other">Other</option>
+                            <option value="layout"   data-i18n="theme_manager_settings.categories.layout">Layout</option>
+                            <option value="header"   data-i18n="theme_manager_settings.categories.header">Header</option>
+                            <option value="footer"   data-i18n="theme_manager_settings.categories.footer">Footer</option>
+                            <option value="sidebar"  data-i18n="theme_manager_settings.categories.sidebar">Sidebar</option>
+                            <option value="homepage" data-i18n="theme_manager_settings.categories.homepage">Homepage</option>
+                            <option value="product"  data-i18n="theme_manager_settings.categories.product">Product</option>
+                            <option value="cart"     data-i18n="theme_manager_settings.categories.cart">Cart</option>
+                            <option value="checkout" data-i18n="theme_manager_settings.categories.checkout">Checkout</option>
+                            <option value="other"    data-i18n="theme_manager_settings.categories.other">Other</option>
                         </select>
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Active</label>
-                        <select id="designIsActive" class="form-control"><option value="1">Yes</option><option value="0">No</option></select>
+                        <label data-i18n="theme_manager_settings.form.active">Active</label>
+                        <select id="designIsActive" class="form-control">
+                            <option value="1" data-i18n="theme_manager_settings.form.yes">Yes</option>
+                            <option value="0" data-i18n="theme_manager_settings.form.no">No</option>
+                        </select>
                     </div>
-                    <div class="form-group"><label>Sort Order</label><input type="number" id="designSortOrder" class="form-control" value="0"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.sort_order">Sort Order</label><input type="number" id="designSortOrder" class="form-control" value="0"></div>
                 </div>
                 <div class="inline-form-actions">
-                    <button class="btn btn-primary btn-sm" id="btnSaveDesign">Save</button>
-                    <button class="btn btn-secondary btn-sm" id="btnCancelDesign">Cancel</button>
+                    <button class="btn btn-primary btn-sm" id="btnSaveDesign" data-i18n="theme_manager_settings.form.save">Save</button>
+                    <button class="btn btn-secondary btn-sm" id="btnCancelDesign" data-i18n="theme_manager_settings.form.cancel">Cancel</button>
                 </div>
             </div>
         </div>
@@ -305,39 +319,47 @@ window.THEMES_CONFIG = {
         <!-- TAB: Color Settings -->
         <div class="tab-content" id="tab-colors" style="display:none">
             <div class="settings-header">
-                <h3 data-i18n="tabs.colors">Color Settings</h3>
+                <h3 data-i18n="theme_manager_settings.colors.title">Color Settings</h3>
                 <button class="btn btn-sm btn-primary" id="btnAddColor">
-                    <i class="fas fa-plus"></i> Add Color
+                    <i class="fas fa-plus"></i> <span data-i18n="theme_manager_settings.colors.add">Add Color</span>
                 </button>
             </div>
             <div id="colorSettingsList" class="settings-list"></div>
             <div id="colorForm" class="inline-form" style="display:none">
                 <input type="hidden" id="colorId">
                 <div class="form-row">
-                    <div class="form-group"><label>Key</label><input type="text" id="colorKey" class="form-control"></div>
-                    <div class="form-group"><label>Name</label><input type="text" id="colorName" class="form-control"></div>
-                    <div class="form-group"><label>Color</label><input type="color" id="colorValue" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.key">Key</label><input type="text" id="colorKey" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.name">Name</label><input type="text" id="colorName" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.color">Color</label><input type="color" id="colorValue" class="form-control"></div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Category</label>
+                        <label data-i18n="theme_manager_settings.form.category">Category</label>
                         <select id="colorCategory" class="form-control">
-                            <option value="primary">Primary</option><option value="secondary">Secondary</option>
-                            <option value="accent">Accent</option><option value="background">Background</option>
-                            <option value="text">Text</option><option value="border">Border</option>
-                            <option value="status">Status</option><option value="header">Header</option>
-                            <option value="footer">Footer</option><option value="other">Other</option>
+                            <option value="primary"    data-i18n="theme_manager_settings.categories.primary">Primary</option>
+                            <option value="secondary"  data-i18n="theme_manager_settings.categories.secondary">Secondary</option>
+                            <option value="accent"     data-i18n="theme_manager_settings.categories.accent">Accent</option>
+                            <option value="background" data-i18n="theme_manager_settings.categories.background">Background</option>
+                            <option value="text"       data-i18n="theme_manager_settings.categories.text">Text</option>
+                            <option value="border"     data-i18n="theme_manager_settings.categories.border">Border</option>
+                            <option value="status"     data-i18n="theme_manager_settings.categories.status">Status</option>
+                            <option value="header"     data-i18n="theme_manager_settings.categories.header">Header</option>
+                            <option value="footer"     data-i18n="theme_manager_settings.categories.footer">Footer</option>
+                            <option value="other"      data-i18n="theme_manager_settings.categories.other">Other</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Active</label>
-                        <select id="colorIsActive" class="form-control"><option value="1">Yes</option><option value="0">No</option></select>
+                        <label data-i18n="theme_manager_settings.form.active">Active</label>
+                        <select id="colorIsActive" class="form-control">
+                            <option value="1" data-i18n="theme_manager_settings.form.yes">Yes</option>
+                            <option value="0" data-i18n="theme_manager_settings.form.no">No</option>
+                        </select>
                     </div>
-                    <div class="form-group"><label>Sort Order</label><input type="number" id="colorSortOrder" class="form-control" value="0"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.sort_order">Sort Order</label><input type="number" id="colorSortOrder" class="form-control" value="0"></div>
                 </div>
                 <div class="inline-form-actions">
-                    <button class="btn btn-primary btn-sm" id="btnSaveColor">Save</button>
-                    <button class="btn btn-secondary btn-sm" id="btnCancelColor">Cancel</button>
+                    <button class="btn btn-primary btn-sm" id="btnSaveColor" data-i18n="theme_manager_settings.form.save">Save</button>
+                    <button class="btn btn-secondary btn-sm" id="btnCancelColor" data-i18n="theme_manager_settings.form.cancel">Cancel</button>
                 </div>
             </div>
         </div>
@@ -345,42 +367,47 @@ window.THEMES_CONFIG = {
         <!-- TAB: Font Settings -->
         <div class="tab-content" id="tab-fonts" style="display:none">
             <div class="settings-header">
-                <h3 data-i18n="tabs.fonts">Font Settings</h3>
+                <h3 data-i18n="theme_manager_settings.fonts.title">Font Settings</h3>
                 <button class="btn btn-sm btn-primary" id="btnAddFont">
-                    <i class="fas fa-plus"></i> Add Font
+                    <i class="fas fa-plus"></i> <span data-i18n="theme_manager_settings.fonts.add">Add Font</span>
                 </button>
             </div>
             <div id="fontSettingsList" class="settings-list"></div>
             <div id="fontForm" class="inline-form" style="display:none">
                 <input type="hidden" id="fontId">
                 <div class="form-row">
-                    <div class="form-group"><label>Key</label><input type="text" id="fontKey" class="form-control"></div>
-                    <div class="form-group"><label>Name</label><input type="text" id="fontName" class="form-control"></div>
-                    <div class="form-group"><label>Font Family</label><input type="text" id="fontFamily" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.key">Key</label><input type="text" id="fontKey" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.name">Name</label><input type="text" id="fontName" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.font_family">Font Family</label><input type="text" id="fontFamily" class="form-control"></div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>Size</label><input type="text" id="fontSize" class="form-control" placeholder="16px"></div>
-                    <div class="form-group"><label>Weight</label><input type="text" id="fontWeight" class="form-control" placeholder="400"></div>
-                    <div class="form-group"><label>Line Height</label><input type="text" id="fontLineHeight" class="form-control" placeholder="1.5"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.size">Size</label><input type="text" id="fontSize" class="form-control" placeholder="16px"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.weight">Weight</label><input type="text" id="fontWeight" class="form-control" placeholder="400"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.line_height">Line Height</label><input type="text" id="fontLineHeight" class="form-control" placeholder="1.5"></div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Category</label>
+                        <label data-i18n="theme_manager_settings.form.category">Category</label>
                         <select id="fontCategory" class="form-control">
-                            <option value="heading">Heading</option><option value="body">Body</option>
-                            <option value="button">Button</option><option value="navigation">Navigation</option>
-                            <option value="other">Other</option>
+                            <option value="heading"    data-i18n="theme_manager_settings.categories.heading">Heading</option>
+                            <option value="body"       data-i18n="theme_manager_settings.categories.body">Body</option>
+                            <option value="button"     data-i18n="theme_manager_settings.categories.button">Button</option>
+                            <option value="navigation" data-i18n="theme_manager_settings.categories.navigation">Navigation</option>
+                            <option value="other"      data-i18n="theme_manager_settings.categories.other">Other</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Active</label>
-                        <select id="fontIsActive" class="form-control"><option value="1">Yes</option><option value="0">No</option></select>
+                        <label data-i18n="theme_manager_settings.form.active">Active</label>
+                        <select id="fontIsActive" class="form-control">
+                            <option value="1" data-i18n="theme_manager_settings.form.yes">Yes</option>
+                            <option value="0" data-i18n="theme_manager_settings.form.no">No</option>
+                        </select>
                     </div>
-                    <div class="form-group"><label>Sort Order</label><input type="number" id="fontSortOrder" class="form-control" value="0"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.sort_order">Sort Order</label><input type="number" id="fontSortOrder" class="form-control" value="0"></div>
                 </div>
                 <div class="inline-form-actions">
-                    <button class="btn btn-primary btn-sm" id="btnSaveFont">Save</button>
-                    <button class="btn btn-secondary btn-sm" id="btnCancelFont">Cancel</button>
+                    <button class="btn btn-primary btn-sm" id="btnSaveFont" data-i18n="theme_manager_settings.form.save">Save</button>
+                    <button class="btn btn-secondary btn-sm" id="btnCancelFont" data-i18n="theme_manager_settings.form.cancel">Cancel</button>
                 </div>
             </div>
         </div>
@@ -388,55 +415,62 @@ window.THEMES_CONFIG = {
         <!-- TAB: Button Styles -->
         <div class="tab-content" id="tab-buttons" style="display:none">
             <div class="settings-header">
-                <h3 data-i18n="tabs.buttons">Button Styles</h3>
+                <h3 data-i18n="theme_manager_settings.buttons.title">Button Styles</h3>
                 <button class="btn btn-sm btn-primary" id="btnAddButton">
-                    <i class="fas fa-plus"></i> Add Button Style
+                    <i class="fas fa-plus"></i> <span data-i18n="theme_manager_settings.buttons.add">Add Button Style</span>
                 </button>
             </div>
             <div id="buttonStylesList" class="settings-list"></div>
             <div id="buttonForm" class="inline-form" style="display:none">
                 <input type="hidden" id="buttonId">
                 <div class="form-row">
-                    <div class="form-group"><label>Name</label><input type="text" id="buttonName" class="form-control"></div>
-                    <div class="form-group"><label>Slug</label><input type="text" id="buttonSlug" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.name">Name</label><input type="text" id="buttonName" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.slug">Slug</label><input type="text" id="buttonSlug" class="form-control"></div>
                     <div class="form-group">
-                        <label>Type</label>
+                        <label data-i18n="theme_manager_settings.form.type">Type</label>
                         <select id="buttonType" class="form-control">
-                            <option value="primary">Primary</option><option value="secondary">Secondary</option>
-                            <option value="success">Success</option><option value="danger">Danger</option>
-                            <option value="warning">Warning</option><option value="info">Info</option>
-                            <option value="outline">Outline</option><option value="link">Link</option>
+                            <option value="primary"   data-i18n="theme_manager_settings.button_types.primary">Primary</option>
+                            <option value="secondary" data-i18n="theme_manager_settings.button_types.secondary">Secondary</option>
+                            <option value="success"   data-i18n="theme_manager_settings.button_types.success">Success</option>
+                            <option value="danger"    data-i18n="theme_manager_settings.button_types.danger">Danger</option>
+                            <option value="warning"   data-i18n="theme_manager_settings.button_types.warning">Warning</option>
+                            <option value="info"      data-i18n="theme_manager_settings.button_types.info">Info</option>
+                            <option value="outline"   data-i18n="theme_manager_settings.button_types.outline">Outline</option>
+                            <option value="link"      data-i18n="theme_manager_settings.button_types.link">Link</option>
                         </select>
                     </div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>BG Color</label><input type="color" id="buttonBgColor" class="form-control" value="#007bff"></div>
-                    <div class="form-group"><label>Text Color</label><input type="color" id="buttonTextColor" class="form-control" value="#ffffff"></div>
-                    <div class="form-group"><label>Border Color</label><input type="color" id="buttonBorderColor" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.bg_color">BG Color</label><input type="color" id="buttonBgColor" class="form-control" value="#007bff"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.text_color">Text Color</label><input type="color" id="buttonTextColor" class="form-control" value="#ffffff"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.border_color">Border Color</label><input type="color" id="buttonBorderColor" class="form-control"></div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>Border Width</label><input type="number" id="buttonBorderWidth" class="form-control" value="0"></div>
-                    <div class="form-group"><label>Border Radius</label><input type="number" id="buttonBorderRadius" class="form-control" value="4"></div>
-                    <div class="form-group"><label>Padding</label><input type="text" id="buttonPadding" class="form-control" value="10px 20px"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.border_width">Border Width</label><input type="number" id="buttonBorderWidth" class="form-control" value="0"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.border_radius">Border Radius</label><input type="number" id="buttonBorderRadius" class="form-control" value="4"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.padding">Padding</label><input type="text" id="buttonPadding" class="form-control" value="10px 20px"></div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>Font Size</label><input type="text" id="buttonFontSize" class="form-control" value="14px"></div>
-                    <div class="form-group"><label>Font Weight</label><input type="text" id="buttonFontWeight" class="form-control" value="normal"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.font_size">Font Size</label><input type="text" id="buttonFontSize" class="form-control" value="14px"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.font_weight">Font Weight</label><input type="text" id="buttonFontWeight" class="form-control" value="normal"></div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>Hover BG</label><input type="color" id="buttonHoverBg" class="form-control"></div>
-                    <div class="form-group"><label>Hover Text</label><input type="color" id="buttonHoverText" class="form-control"></div>
-                    <div class="form-group"><label>Hover Border</label><input type="color" id="buttonHoverBorder" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.hover_bg">Hover BG</label><input type="color" id="buttonHoverBg" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.hover_text">Hover Text</label><input type="color" id="buttonHoverText" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.hover_border">Hover Border</label><input type="color" id="buttonHoverBorder" class="form-control"></div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Active</label>
-                        <select id="buttonIsActive" class="form-control"><option value="1">Yes</option><option value="0">No</option></select>
+                        <label data-i18n="theme_manager_settings.form.active">Active</label>
+                        <select id="buttonIsActive" class="form-control">
+                            <option value="1" data-i18n="theme_manager_settings.form.yes">Yes</option>
+                            <option value="0" data-i18n="theme_manager_settings.form.no">No</option>
+                        </select>
                     </div>
                 </div>
                 <div class="inline-form-actions">
-                    <button class="btn btn-primary btn-sm" id="btnSaveButton">Save</button>
-                    <button class="btn btn-secondary btn-sm" id="btnCancelButton">Cancel</button>
+                    <button class="btn btn-primary btn-sm" id="btnSaveButton" data-i18n="theme_manager_settings.form.save">Save</button>
+                    <button class="btn btn-secondary btn-sm" id="btnCancelButton" data-i18n="theme_manager_settings.form.cancel">Cancel</button>
                 </div>
             </div>
         </div>
@@ -444,65 +478,77 @@ window.THEMES_CONFIG = {
         <!-- TAB: Card Styles -->
         <div class="tab-content" id="tab-cards" style="display:none">
             <div class="settings-header">
-                <h3 data-i18n="tabs.cards">Card Styles</h3>
+                <h3 data-i18n="theme_manager_settings.cards.title">Card Styles</h3>
                 <button class="btn btn-sm btn-primary" id="btnAddCard">
-                    <i class="fas fa-plus"></i> Add Card Style
+                    <i class="fas fa-plus"></i> <span data-i18n="theme_manager_settings.cards.add">Add Card Style</span>
                 </button>
             </div>
             <div id="cardStylesList" class="settings-list"></div>
             <div id="cardForm" class="inline-form" style="display:none">
                 <input type="hidden" id="cardId">
                 <div class="form-row">
-                    <div class="form-group"><label>Name</label><input type="text" id="cardName" class="form-control"></div>
-                    <div class="form-group"><label>Slug</label><input type="text" id="cardSlug" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.name">Name</label><input type="text" id="cardName" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.slug">Slug</label><input type="text" id="cardSlug" class="form-control"></div>
                     <div class="form-group">
-                        <label>Type</label>
+                        <label data-i18n="theme_manager_settings.form.type">Type</label>
                         <select id="cardType" class="form-control">
-                            <option value="product">Product</option><option value="category">Category</option>
-                            <option value="vendor">Vendor</option><option value="blog">Blog</option>
-                            <option value="feature">Feature</option><option value="testimonial">Testimonial</option>
-                            <option value="auction">Auction</option><option value="notification">Notification</option>
-                            <option value="discount">Discount</option><option value="jobs">Jobs</option>
-                            <option value="plan">Plan</option>
-                            <option value="other">Other</option>
+                            <option value="product"      data-i18n="theme_manager_settings.card_types.product">Product</option>
+                            <option value="category"     data-i18n="theme_manager_settings.card_types.category">Category</option>
+                            <option value="vendor"       data-i18n="theme_manager_settings.card_types.vendor">Vendor</option>
+                            <option value="blog"         data-i18n="theme_manager_settings.card_types.blog">Blog</option>
+                            <option value="feature"      data-i18n="theme_manager_settings.card_types.feature">Feature</option>
+                            <option value="testimonial"  data-i18n="theme_manager_settings.card_types.testimonial">Testimonial</option>
+                            <option value="auction"      data-i18n="theme_manager_settings.card_types.auction">Auction</option>
+                            <option value="notification" data-i18n="theme_manager_settings.card_types.notification">Notification</option>
+                            <option value="discount"     data-i18n="theme_manager_settings.card_types.discount">Discount</option>
+                            <option value="jobs"         data-i18n="theme_manager_settings.card_types.jobs">Jobs</option>
+                            <option value="plan"         data-i18n="theme_manager_settings.card_types.plan">Plan</option>
+                            <option value="other"        data-i18n="theme_manager_settings.card_types.other">Other</option>
                         </select>
                     </div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>BG Color</label><input type="color" id="cardBgColor" class="form-control" value="#FFFFFF"></div>
-                    <div class="form-group"><label>Border Color</label><input type="color" id="cardBorderColor" class="form-control" value="#E0E0E0"></div>
-                    <div class="form-group"><label>Border Width</label><input type="number" id="cardBorderWidth" class="form-control" value="1"></div>
-                    <div class="form-group"><label>Border Radius</label><input type="number" id="cardBorderRadius" class="form-control" value="8"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.bg_color">BG Color</label><input type="color" id="cardBgColor" class="form-control" value="#FFFFFF"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.border_color">Border Color</label><input type="color" id="cardBorderColor" class="form-control" value="#E0E0E0"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.border_width">Border Width</label><input type="number" id="cardBorderWidth" class="form-control" value="1"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.border_radius">Border Radius</label><input type="number" id="cardBorderRadius" class="form-control" value="8"></div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>Shadow</label><input type="text" id="cardShadow" class="form-control" value="none" placeholder="0 2px 4px rgba(0,0,0,.1)"></div>
-                    <div class="form-group"><label>Padding</label><input type="text" id="cardPadding" class="form-control" value="16px"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.shadow">Shadow</label><input type="text" id="cardShadow" class="form-control" value="none" placeholder="0 2px 4px rgba(0,0,0,.1)"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.padding">Padding</label><input type="text" id="cardPadding" class="form-control" value="16px"></div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Hover Effect</label>
+                        <label data-i18n="theme_manager_settings.form.hover_effect">Hover Effect</label>
                         <select id="cardHoverEffect" class="form-control">
-                            <option value="none">None</option><option value="lift">Lift</option>
-                            <option value="zoom">Zoom</option><option value="shadow">Shadow</option>
-                            <option value="border">Border</option><option value="brightness">Brightness</option>
+                            <option value="none"       data-i18n="theme_manager_settings.hover_effects.none">None</option>
+                            <option value="lift"       data-i18n="theme_manager_settings.hover_effects.lift">Lift</option>
+                            <option value="zoom"       data-i18n="theme_manager_settings.hover_effects.zoom">Zoom</option>
+                            <option value="shadow"     data-i18n="theme_manager_settings.hover_effects.shadow">Shadow</option>
+                            <option value="border"     data-i18n="theme_manager_settings.hover_effects.border">Border</option>
+                            <option value="brightness" data-i18n="theme_manager_settings.hover_effects.brightness">Brightness</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Text Align</label>
+                        <label data-i18n="theme_manager_settings.form.text_align">Text Align</label>
                         <select id="cardTextAlign" class="form-control">
-                            <option value="left">Left</option><option value="center">Center</option>
-                            <option value="right">Right</option>
+                            <option value="left"   data-i18n="theme_manager_settings.text_aligns.left">Left</option>
+                            <option value="center" data-i18n="theme_manager_settings.text_aligns.center">Center</option>
+                            <option value="right"  data-i18n="theme_manager_settings.text_aligns.right">Right</option>
                         </select>
                     </div>
-                    <div class="form-group"><label>Image Ratio</label><input type="text" id="cardImageRatio" class="form-control" value="1:1"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.image_ratio">Image Ratio</label><input type="text" id="cardImageRatio" class="form-control" value="1:1"></div>
                     <div class="form-group">
-                        <label>Active</label>
-                        <select id="cardIsActive" class="form-control"><option value="1">Yes</option><option value="0">No</option></select>
+                        <label data-i18n="theme_manager_settings.form.active">Active</label>
+                        <select id="cardIsActive" class="form-control">
+                            <option value="1" data-i18n="theme_manager_settings.form.yes">Yes</option>
+                            <option value="0" data-i18n="theme_manager_settings.form.no">No</option>
+                        </select>
                     </div>
                 </div>
                 <div class="inline-form-actions">
-                    <button class="btn btn-primary btn-sm" id="btnSaveCard">Save</button>
-                    <button class="btn btn-secondary btn-sm" id="btnCancelCard">Cancel</button>
+                    <button class="btn btn-primary btn-sm" id="btnSaveCard" data-i18n="theme_manager_settings.form.save">Save</button>
+                    <button class="btn btn-secondary btn-sm" id="btnCancelCard" data-i18n="theme_manager_settings.form.cancel">Cancel</button>
                 </div>
             </div>
         </div>
@@ -510,9 +556,9 @@ window.THEMES_CONFIG = {
         <!-- TAB: Homepage Sections -->
         <div class="tab-content" id="tab-homepage" style="display:none">
             <div class="settings-header">
-                <h3 data-i18n="tabs.homepage">Homepage Sections</h3>
+                <h3 data-i18n="theme_manager_settings.homepage.title">Homepage Sections</h3>
                 <button class="btn btn-sm btn-primary" id="btnAddSection">
-                    <i class="fas fa-plus"></i> Add Section
+                    <i class="fas fa-plus"></i> <span data-i18n="theme_manager_settings.homepage.add">Add Section</span>
                 </button>
             </div>
             <div id="homepageSectionsList" class="settings-list"></div>
@@ -520,45 +566,52 @@ window.THEMES_CONFIG = {
                 <input type="hidden" id="sectionId">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Section Type</label>
+                        <label data-i18n="theme_manager_settings.form.section_type">Section Type</label>
                         <select id="sectionType" class="form-control">
-                            <option value="slider">Slider</option><option value="categories">Categories</option>
-                            <option value="featured_products">Featured Products</option><option value="new_products">New Products</option>
-                            <option value="deals">Deals</option><option value="brands">Brands</option>
-                            <option value="vendors">Vendors</option><option value="banners">Banners</option>
-                            <option value="testimonials">Testimonials</option><option value="custom_html">Custom HTML</option>
-                            <option value="other">Other</option>
+                            <option value="slider"            data-i18n="theme_manager_settings.section_types.slider">Slider</option>
+                            <option value="categories"        data-i18n="theme_manager_settings.section_types.categories">Categories</option>
+                            <option value="featured_products" data-i18n="theme_manager_settings.section_types.featured_products">Featured Products</option>
+                            <option value="new_products"      data-i18n="theme_manager_settings.section_types.new_products">New Products</option>
+                            <option value="deals"             data-i18n="theme_manager_settings.section_types.deals">Deals</option>
+                            <option value="brands"            data-i18n="theme_manager_settings.section_types.brands">Brands</option>
+                            <option value="vendors"           data-i18n="theme_manager_settings.section_types.vendors">Vendors</option>
+                            <option value="banners"           data-i18n="theme_manager_settings.section_types.banners">Banners</option>
+                            <option value="testimonials"      data-i18n="theme_manager_settings.section_types.testimonials">Testimonials</option>
+                            <option value="custom_html"       data-i18n="theme_manager_settings.section_types.custom_html">Custom HTML</option>
+                            <option value="other"             data-i18n="theme_manager_settings.section_types.other">Other</option>
                         </select>
                     </div>
-                    <div class="form-group"><label>Title</label><input type="text" id="sectionTitle" class="form-control"></div>
-                    <div class="form-group"><label>Subtitle</label><input type="text" id="sectionSubtitle" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.title">Title</label><input type="text" id="sectionTitle" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.subtitle">Subtitle</label><input type="text" id="sectionSubtitle" class="form-control"></div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Layout</label>
+                        <label data-i18n="theme_manager_settings.form.layout">Layout</label>
                         <select id="sectionLayout" class="form-control">
-                            <option value="grid">Grid</option><option value="slider">Slider</option>
-                            <option value="list">List</option><option value="carousel">Carousel</option>
-                            <option value="masonry">Masonry</option>
+                            <option value="grid"     data-i18n="theme_manager_settings.layouts.grid">Grid</option>
+                            <option value="slider"   data-i18n="theme_manager_settings.layouts.slider">Slider</option>
+                            <option value="list"     data-i18n="theme_manager_settings.layouts.list">List</option>
+                            <option value="carousel" data-i18n="theme_manager_settings.layouts.carousel">Carousel</option>
+                            <option value="masonry"  data-i18n="theme_manager_settings.layouts.masonry">Masonry</option>
                         </select>
                     </div>
-                    <div class="form-group"><label>Items/Row</label><input type="number" id="sectionItemsPerRow" class="form-control" value="4"></div>
-                    <div class="form-group"><label>Sort Order</label><input type="number" id="sectionSortOrder" class="form-control" value="0"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.items_per_row">Items/Row</label><input type="number" id="sectionItemsPerRow" class="form-control" value="4"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.sort_order">Sort Order</label><input type="number" id="sectionSortOrder" class="form-control" value="0"></div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>BG Color</label><input type="color" id="sectionBgColor" class="form-control" value="#FFFFFF"></div>
-                    <div class="form-group"><label>Text Color</label><input type="color" id="sectionTextColor" class="form-control" value="#000000"></div>
-                    <div class="form-group"><label>Padding</label><input type="text" id="sectionPadding" class="form-control" value="40px 0"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.bg_color">BG Color</label><input type="color" id="sectionBgColor" class="form-control" value="#FFFFFF"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.text_color">Text Color</label><input type="color" id="sectionTextColor" class="form-control" value="#000000"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.padding">Padding</label><input type="text" id="sectionPadding" class="form-control" value="40px 0"></div>
                 </div>
-                <div class="form-group"><label>Data Source</label><input type="text" id="sectionDataSource" class="form-control" placeholder="e.g. /api/products?is_featured=1"></div>
-                <div class="form-group"><label>Custom CSS</label><textarea id="sectionCustomCss" class="form-control" rows="2"></textarea></div>
-                <div class="form-group"><label>Custom HTML</label><textarea id="sectionCustomHtml" class="form-control" rows="3"></textarea></div>
+                <div class="form-group"><label data-i18n="theme_manager_settings.form.data_source">Data Source</label><input type="text" id="sectionDataSource" class="form-control" placeholder="e.g. /api/products?is_featured=1"></div>
+                <div class="form-group"><label data-i18n="theme_manager_settings.form.custom_css">Custom CSS</label><textarea id="sectionCustomCss" class="form-control" rows="2"></textarea></div>
+                <div class="form-group"><label data-i18n="theme_manager_settings.form.custom_html">Custom HTML</label><textarea id="sectionCustomHtml" class="form-control" rows="3"></textarea></div>
                 <div class="form-group">
-                    <label><input type="checkbox" id="sectionIsActive" checked> Active</label>
+                    <label><input type="checkbox" id="sectionIsActive" checked> <span data-i18n="theme_manager_settings.form.active">Active</span></label>
                 </div>
                 <div class="inline-form-actions">
-                    <button class="btn btn-primary btn-sm" id="btnSaveSection">Save</button>
-                    <button class="btn btn-secondary btn-sm" id="btnCancelSection">Cancel</button>
+                    <button class="btn btn-primary btn-sm" id="btnSaveSection" data-i18n="theme_manager_settings.form.save">Save</button>
+                    <button class="btn btn-secondary btn-sm" id="btnCancelSection" data-i18n="theme_manager_settings.form.cancel">Cancel</button>
                 </div>
             </div>
         </div>
@@ -566,41 +619,50 @@ window.THEMES_CONFIG = {
         <!-- TAB: System Settings -->
         <div class="tab-content" id="tab-system" style="display:none">
             <div class="settings-header">
-                <h3 data-i18n="tabs.system">System Settings</h3>
+                <h3 data-i18n="theme_manager_settings.system.title">System Settings</h3>
                 <button class="btn btn-sm btn-primary" id="btnAddSystem">
-                    <i class="fas fa-plus"></i> Add Setting
+                    <i class="fas fa-plus"></i> <span data-i18n="theme_manager_settings.system.add">Add Setting</span>
                 </button>
             </div>
             <div id="systemSettingsList" class="settings-list"></div>
             <div id="systemForm" class="inline-form" style="display:none">
                 <input type="hidden" id="systemId">
                 <div class="form-row">
-                    <div class="form-group"><label>Key</label><input type="text" id="systemKey" class="form-control"></div>
-                    <div class="form-group"><label>Category</label><input type="text" id="systemCategory" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.key">Key</label><input type="text" id="systemKey" class="form-control"></div>
+                    <div class="form-group"><label data-i18n="theme_manager_settings.form.category">Category</label><input type="text" id="systemCategory" class="form-control"></div>
                     <div class="form-group">
-                        <label>Type</label>
+                        <label data-i18n="theme_manager_settings.form.type">Type</label>
                         <select id="systemType" class="form-control">
-                            <option value="text">Text</option><option value="number">Number</option>
-                            <option value="boolean">Boolean</option><option value="json">JSON</option>
-                            <option value="file">File</option><option value="email">Email</option>
+                            <option value="text"    data-i18n="theme_manager_settings.types.text">Text</option>
+                            <option value="number"  data-i18n="theme_manager_settings.types.number">Number</option>
+                            <option value="boolean" data-i18n="theme_manager_settings.types.boolean">Boolean</option>
+                            <option value="json"    data-i18n="theme_manager_settings.types.json">JSON</option>
+                            <option value="file"    data-i18n="theme_manager_settings.types.file">File</option>
+                            <option value="email"   data-i18n="theme_manager_settings.types.email">Email</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group"><label>Value</label><textarea id="systemValue" class="form-control" rows="2"></textarea></div>
-                <div class="form-group"><label>Description</label><textarea id="systemDescription" class="form-control" rows="2"></textarea></div>
+                <div class="form-group"><label data-i18n="theme_manager_settings.form.value">Value</label><textarea id="systemValue" class="form-control" rows="2"></textarea></div>
+                <div class="form-group"><label data-i18n="theme_manager_settings.form.description">Description</label><textarea id="systemDescription" class="form-control" rows="2"></textarea></div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Public</label>
-                        <select id="systemIsPublic" class="form-control"><option value="0">No</option><option value="1">Yes</option></select>
+                        <label data-i18n="theme_manager_settings.form.public">Public</label>
+                        <select id="systemIsPublic" class="form-control">
+                            <option value="0" data-i18n="theme_manager_settings.form.no">No</option>
+                            <option value="1" data-i18n="theme_manager_settings.form.yes">Yes</option>
+                        </select>
                     </div>
                     <div class="form-group">
-                        <label>Editable</label>
-                        <select id="systemIsEditable" class="form-control"><option value="1">Yes</option><option value="0">No</option></select>
+                        <label data-i18n="theme_manager_settings.form.editable">Editable</label>
+                        <select id="systemIsEditable" class="form-control">
+                            <option value="1" data-i18n="theme_manager_settings.form.yes">Yes</option>
+                            <option value="0" data-i18n="theme_manager_settings.form.no">No</option>
+                        </select>
                     </div>
                 </div>
                 <div class="inline-form-actions">
-                    <button class="btn btn-primary btn-sm" id="btnSaveSystem">Save</button>
-                    <button class="btn btn-secondary btn-sm" id="btnCancelSystem">Cancel</button>
+                    <button class="btn btn-primary btn-sm" id="btnSaveSystem" data-i18n="theme_manager_settings.form.save">Save</button>
+                    <button class="btn btn-secondary btn-sm" id="btnCancelSystem" data-i18n="theme_manager_settings.form.cancel">Cancel</button>
                 </div>
             </div>
         </div>

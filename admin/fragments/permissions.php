@@ -135,6 +135,7 @@ $apiBase = '/api';
 <!-- Page Meta -->
 <meta data-page="permissions"
       data-assets-css="/admin/assets/css/permissions-system.css"
+      data-assets-js="/admin/assets/js/permissions-system.js"
       data-i18n-files="/languages/Permissions/<?= rawurlencode($lang) ?>.json">
 
 <!-- Page Container -->
@@ -533,53 +534,6 @@ window.PAGE_PERMISSIONS = <?= json_encode([
     'canDeleteOwn' => $canDeleteOwn,
     'isSuperAdmin' => $isSuperAdmin
 ], JSON_UNESCAPED_UNICODE) ?>;
-</script>
-
-<!-- Translation loader (runs early) -->
-<script type="text/javascript">
-(function(){
-    async function applyTranslations() {
-        try {
-            const lang = window.APP_CONFIG.USER_LANG || 'en';
-            const url = `/languages/Permissions/${encodeURIComponent(lang)}.json`;
-            console.log('[Permissions] Loading translations from', url);
-            const res = await fetch(url, { credentials: 'same-origin' });
-            if (!res.ok) throw new Error('Translation fetch failed: ' + res.status);
-            const data = await res.json();
-            const translations = data.strings || data;
-            window.PERMISSIONS_TRANSLATIONS = translations;
-            
-            // apply translations to elements with data-i18n
-            const container = document.getElementById('permissionsPageContainer');
-            if (!container) return;
-            container.querySelectorAll('[data-i18n]').forEach(el => {
-                const key = el.getAttribute('data-i18n');
-                const txt = key.split('.').reduce((o,k) => (o && o[k] !== undefined) ? o[k] : null, translations);
-                if (txt !== null && txt !== undefined) {
-                    if (el.tagName === 'INPUT' && el.hasAttribute('placeholder')) {
-                        el.placeholder = txt;
-                    } else {
-                        el.textContent = txt;
-                    }
-                }
-            });
-            // placeholders
-            container.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{
-                const key = el.getAttribute('data-i18n-placeholder');
-                const txt = key.split('.').reduce((o,k) => (o && o[k] !== undefined) ? o[k] : null, translations);
-                if (txt !== null && txt !== undefined) el.placeholder = txt;
-            });
-            console.log('[Permissions] Translations applied');
-        } catch (err) {
-            console.warn('[Permissions] Translation load/apply failed:', err);
-        }
-    }
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', applyTranslations);
-    } else {
-        setTimeout(applyTranslations, 50);
-    }
-})();
 </script>
 
 <script src="/admin/assets/js/permissions-system.js?v=<?= time() ?>"></script>
