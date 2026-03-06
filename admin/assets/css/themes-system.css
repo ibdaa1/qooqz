@@ -227,7 +227,9 @@
 
 .themes-page .table-card {
     border-radius: 12px;
-    overflow: hidden;
+    /* overflow: visible allows the inner #themesTableContainer to
+       scroll horizontally on iOS without being clipped */
+    overflow: visible;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -399,8 +401,9 @@
     display: flex;
     gap: 0;
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: visible;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
     /* Hide scrollbar while keeping functionality */
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -1054,8 +1057,9 @@
     .themes-page .tabs-nav,
     .themes-page .form-tabs {
         border-radius: 6px 6px 0 0;
-        /* Ensure scrolling is enabled on touch */
-        touch-action: pan-x;
+        /* Allow BOTH horizontal tab-swipe AND vertical page-scroll on touch */
+        touch-action: pan-x pan-y;
+        overscroll-behavior-x: contain;
     }
 
     .themes-page .tab-btn,

@@ -161,8 +161,8 @@ window.THEMES_CONFIG = {
         <!-- Themes Table -->
         <div class="card table-card">
             <div class="card-body" style="padding:0">
-                <!-- Loading -->
-                <div id="themesLoading" class="loading-state" style="display:none">
+                <!-- Loading — visible by default; JS hides it when data loads -->
+                <div id="themesLoading" class="loading-state" style="display:flex">
                     <div class="spinner"></div>
                     <p data-i18n="theme_manager.loading">Loading themes...</p>
                 </div>
