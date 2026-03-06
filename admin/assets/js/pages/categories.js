@@ -755,8 +755,8 @@
             if (linksContainer) {
                 if (item.image_id || (item.image_url && item.image_url !== '/assets/images/no-image.png')) {
                     linksContainer.innerHTML = `
-                        <a href="${esc(imageUrl)}" target="_blank" style="text-decoration:none; color:#3b82f6;"><i class="fas fa-expand"></i> Large</a>
-                        <a href="${esc(thumbUrl)}" target="_blank" style="text-decoration:none; color:#64748b;"><i class="fas fa-compress"></i> Thumbnail</a>
+                        <a href="${esc(imageUrl)}" target="_blank" style="text-decoration:none; color:var(--primary-color,#3b82f6);"><i class="fas fa-expand"></i> Large</a>
+                        <a href="${esc(thumbUrl)}" target="_blank" style="text-decoration:none; color:var(--text-secondary,#64748b);"><i class="fas fa-compress"></i> Thumbnail</a>
                     `;
                 } else {
                     linksContainer.innerHTML = '';
@@ -910,9 +910,13 @@
                     console.log('[Categories] Fetching images for items...');
                     items = await Promise.all(items.map(async (item) => {
                         try {
-                            const res = await fetch(`/api/images?tenant_id=${tenantId}&owner_id=${item.id}&image_type_id=${imageTypeId}`);
+                            // Use /by_owner endpoint (same as products.js) — returns data.data as a
+                            // direct array, avoiding the nested {data:{data:[...]}} from /api/images list.
+                            const res = await fetch(`/api/images/by_owner?owner_id=${item.id}&image_type_id=${imageTypeId}`);
                             const data = await res.json();
-                            let imageUrl = data?.data?.length ? data.data[0].url : null;
+                            // data.data is a direct array of image objects
+                            const images = Array.isArray(data?.data) ? data.data : [];
+                            let imageUrl = images.length ? images[0].url : null;
                             // Fallback to item.image_url if fetch returns nothing but item has one
                             if (!imageUrl && item.image_url) imageUrl = item.image_url;
                             return { ...item, image_url: imageUrl }; // Normalize to image_url
@@ -1161,8 +1165,8 @@
                         const linksContainer = document.getElementById('catImageLinks');
                         if (linksContainer) {
                             linksContainer.innerHTML = `
-                                <a href="${esc(img.url)}" target="_blank" style="text-decoration:none; color:#3b82f6;"><i class="fas fa-expand"></i> Large</a>
-                                <a href="${esc(img.thumb_url || img.url)}" target="_blank" style="text-decoration:none; color:#64748b;"><i class="fas fa-compress"></i> Thumbnail</a>
+                                <a href="${esc(img.url)}" target="_blank" style="text-decoration:none; color:var(--primary-color,#3b82f6);"><i class="fas fa-expand"></i> Large</a>
+                                <a href="${esc(img.thumb_url || img.url)}" target="_blank" style="text-decoration:none; color:var(--text-secondary,#64748b);"><i class="fas fa-compress"></i> Thumbnail</a>
                             `;
                         }
                     });
@@ -1179,7 +1183,7 @@
                         const typeSelect = studioWin.document.querySelector('select[name="image_type_id"]');
                         if (typeSelect) {
                             typeSelect.style.pointerEvents = 'none';
-                            typeSelect.style.background = '#eee';
+                            typeSelect.style.background = 'var(--background-secondary,#eee)';
                         }
                         const ownerInput = studioWin.document.querySelector('input[name="owner_id"]');
                         if (ownerInput) {
@@ -1187,7 +1191,7 @@
                             const ownerFilter = studioWin.document.getElementById('ownerIdFilter');
                             if (ownerFilter) {
                                 ownerFilter.readOnly = true;
-                                ownerFilter.style.background = '#eee';
+                                ownerFilter.style.background = 'var(--background-secondary,#eee)';
                             }
                         }
                     }
@@ -1251,6 +1255,20 @@
                     root.style.setProperty('--' + c.setting_key, c.color_value);
                     root.style.setProperty('--' + key, c.color_value);
                 });
+
+                // Create stable aliases used throughout CSS and inline styles
+                const alias = (target, ...sources) => {
+                    for (const src of sources) {
+                        const v = root.style.getPropertyValue(src).trim();
+                        if (v) { root.style.setProperty(target, v); return; }
+                    }
+                };
+                alias('--danger-color', '--error-color', '--error_color');
+                alias('--card-bg', '--background-secondary', '--background_secondary');
+                const secBg = root.style.getPropertyValue('--background-secondary').trim();
+                if (secBg && !root.style.getPropertyValue('--background-tertiary').trim()) {
+                    root.style.setProperty('--background-tertiary', secBg);
+                }
             }
 
             // Apply font settings
