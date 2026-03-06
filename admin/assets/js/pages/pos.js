@@ -48,6 +48,9 @@
         salesHistory:  [],
     };
 
+    // Barcode hardware scanner: gap in ms above which typed chars are considered stale (user typing vs scanner)
+    const BARCODE_STALE_TIMEOUT_MS = 500;
+
     let translations = {};
 
     // ─────────────────────────────────────────────
@@ -541,7 +544,7 @@
             // Accumulate characters quickly typed (< 100 ms gap = likely scanner)
             if (e.key.length === 1) {
                 const gap = now - state.barcodeLastKey;
-                if (gap > 500) state.barcodeBuffer = ''; // stale, reset
+                if (gap > BARCODE_STALE_TIMEOUT_MS) state.barcodeBuffer = ''; // stale, reset
                 state.barcodeBuffer += e.key;
                 state.barcodeLastKey = now;
                 // Prevent going to search input (silent mode)
@@ -605,6 +608,8 @@
             cameraOverlay.style.display = 'flex';
             state.cameraActive = true;
 
+            // BarcodeDetector is natively supported in Chromium-based browsers (Chrome 83+, Edge 83+).
+            // Firefox and Safari users will see the manual-entry fallback message below.
             if ('BarcodeDetector' in window) {
                 const detector = new window.BarcodeDetector({
                     formats: ['ean_13','ean_8','code_128','code_39','qr_code','upc_a','upc_e','itf','codabar']
@@ -765,8 +770,9 @@
     }
 
     window.posApplyPriceEdit = function (productId) {
-        const newPrice = parseFloat(document.getElementById('editPriceInput')?.value ?? 0);
-        if (isNaN(newPrice) || newPrice < 0) {
+        const input    = document.getElementById('editPriceInput');
+        const newPrice = input ? parseFloat(input.value) : NaN;
+        if (!input || isNaN(newPrice) || newPrice < 0) {
             showAlert(t('pos.error.invalid_price','Invalid price'), 'error');
             return;
         }
@@ -1038,7 +1044,6 @@
                     <div class="rc-value">${formatCurrency(s?.opening_balance || 0)}</div>
                 </div>
             </div>
-            ${totalOrders > 0 ? renderTopProducts() : ''}
             ${totalOrders > 0 ? `
             <h3 style="color:var(--text-primary,#e2e8f0);margin:20px 0 12px;font-size:1rem">${t('pos.reports.orders_breakdown','Orders Breakdown')}</h3>
             <div style="overflow-x:auto">
@@ -1063,12 +1068,6 @@
             </table>
             </div>` : ''}
         `;
-    }
-
-    function renderTopProducts() {
-        // Aggregate from cart history is not trivial here (we only have order totals, not items)
-        // Show a placeholder – in a real system you'd call a separate endpoint
-        return '';
     }
 
     // ─────────────────────────────────────────────
