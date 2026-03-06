@@ -827,6 +827,15 @@
       target.innerHTML = html;
       Admin.log('✓ HTML inserted');
 
+      // Load CSS files from <link rel="stylesheet"> elements found in the fragment.
+      // Browsers do NOT fetch external stylesheets when elements are created via innerHTML,
+      // so we must load them explicitly via Admin.asset.loadCss().
+      const links = [...target.querySelectorAll('link[rel="stylesheet"]')];
+      if (links.length > 0) {
+        Admin.log('📎 Loading', links.length, 'CSS file(s) from fragment');
+        await Promise.all(links.map(l => Admin.asset.loadCss(l.getAttribute('href'))));
+      }
+
       // Run scripts FIRST
       Admin.runScripts(target);
 

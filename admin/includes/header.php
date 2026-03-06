@@ -174,15 +174,19 @@ foreach ($theme['design_settings'] ?? [] as $d) {
     <!-- CSS Variables — DB-driven (both underscore and hyphen forms for full compatibility) -->
     <style id="dynamic-theme-vars">
 :root {
-<?php foreach ($theme['color_settings'] ?? [] as $c):
+<?php
+// ── Color settings (both underscore and hyphenated) ──────────────────────────
+$_emittedVars = [];
+foreach ($theme['color_settings'] ?? [] as $c):
     $k = htmlspecialchars($c['setting_key']);
     $h = htmlspecialchars(str_replace('_', '-', $c['setting_key']));
     $v = htmlspecialchars($c['color_value']);
+    $_emittedVars['--' . $k] = $v;
+    $_emittedVars['--' . $h] = $v;
 ?>
     --<?= $k ?>: <?= $v ?>;
 <?php if ($h !== $k): ?>    --<?= $h ?>: <?= $v ?>;
-<?php endif; ?>
-<?php endforeach; ?>
+<?php endif; endforeach; ?>
 <?php foreach ($theme['font_settings'] ?? [] as $f):
     $sk = htmlspecialchars($f['setting_key']);
     $sh = htmlspecialchars(str_replace('_', '-', $f['setting_key']));
@@ -209,6 +213,28 @@ foreach ($theme['design_settings'] ?? [] as $d) {
     --<?= $dk ?>: <?= $dv ?>;
 <?php if ($dh !== $dk): ?>    --<?= $dh ?>: <?= $dv ?>;
 <?php endif; ?>
+<?php endforeach; ?>
+<?php
+// ── Alias vars — provide the stable names used by CSS files ─────────────────
+// These map framework-level CSS var names to values from the DB so that
+// CSS var() references work before admin_core.js runs.
+$backgroundSecondary = $_emittedVars['--background-secondary'] ?? $_emittedVars['--background_secondary'] ?? null;
+$backgroundPrimary   = $_emittedVars['--background-primary']   ?? $_emittedVars['--background_primary']   ?? null;
+$backgroundMain      = $_emittedVars['--background-main']      ?? $_emittedVars['--background_main']      ?? null;
+$backgroundFallback  = $backgroundSecondary ?? $backgroundPrimary ?? $backgroundMain;
+$errorColor          = $_emittedVars['--error-color']  ?? $_emittedVars['--error_color']  ?? null;
+
+// Map: CSS-var-name => resolved value (only emit if not already set from DB)
+$themeAliasVars = [
+    '--card-bg'          => $_emittedVars['--card-bg']          ?? $_emittedVars['--card_bg']          ?? $backgroundFallback,
+    '--input-bg'         => $_emittedVars['--input-bg']         ?? $_emittedVars['--input_bg']         ?? $backgroundFallback,
+    '--input-background' => $_emittedVars['--input-background'] ?? $_emittedVars['--input_background'] ?? $backgroundFallback,
+    '--thead-bg'         => $_emittedVars['--thead-bg']         ?? $_emittedVars['--thead_bg']         ?? $backgroundFallback,
+    '--danger-color'     => $_emittedVars['--danger-color']     ?? $_emittedVars['--danger_color']     ?? $errorColor,
+];
+foreach ($themeAliasVars as $varName => $varValue):
+    if (!$varValue || !empty($_emittedVars[$varName])) continue; // skip if already emitted or no value
+?>    <?= $varName ?>: <?= $varValue ?>;
 <?php endforeach; ?>
 }
 

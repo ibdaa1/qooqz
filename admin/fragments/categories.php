@@ -220,6 +220,7 @@ if (!function_exists('renderFragmentThemeVars')) {
 
 <!-- Page Meta -->
 <meta data-page="categories"
+      data-assets-css="/admin/assets/css/pages/categories.css"
       data-i18n-files="/admin/languages/Categories/<?= rawurlencode($lang) ?>.json">
 
 <!-- Page Container -->

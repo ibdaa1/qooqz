@@ -125,14 +125,18 @@ $brand = $payload['strings']['brand'] ?? 'Admin';
     }
   })();
 
-  // fetchAndInsert: simple fragment loader
-  window.Admin.fetchAndInsert = function(url, targetSelector) {
-    const target = document.querySelector(targetSelector);
-    if (!target) return Promise.reject(new Error('Target not found'));
-    return fetch(url, { credentials: 'same-origin' })
-      .then(res => res.ok ? res.text() : Promise.reject(new Error('HTTP ' + res.status)))
-      .then(html => { target.innerHTML = html; return html; });
-  };
+  // fetchAndInsert: guard — admin_core.js (defer) provides the full version with CSS loading,
+  // script execution, theme, and translations. Only set a minimal fallback here if it hasn't
+  // been defined yet (i.e., when admin_core.js is not loaded on the page).
+  if (!window.Admin.__installed) {
+    window.Admin.fetchAndInsert = function(url, targetSelector) {
+      const target = document.querySelector(targetSelector);
+      if (!target) return Promise.reject(new Error('Target not found'));
+      return fetch(url, { credentials: 'same-origin' })
+        .then(res => res.ok ? res.text() : Promise.reject(new Error('HTTP ' + res.status)))
+        .then(html => { target.innerHTML = html; return html; });
+    };
+  }
 
   // AJAX helper
   window.Admin.ajax = function(url, opts = {}) {
@@ -147,7 +151,11 @@ $brand = $payload['strings']['brand'] ?? 'Admin';
     const root = document.documentElement;
     theme.colors.forEach(c => {
       if (c.setting_key && c.color_value) {
+        // Set both underscore and hyphenated forms so CSS var() references work regardless
+        // of which naming convention was used (DB stores underscores, CSS uses hyphens)
         root.style.setProperty('--' + c.setting_key, c.color_value);
+        const hk = c.setting_key.replace(/_/g, '-');
+        if (hk !== c.setting_key) root.style.setProperty('--' + hk, c.color_value);
       }
     });
   };
