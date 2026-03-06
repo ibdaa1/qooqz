@@ -53,6 +53,10 @@ if (!$canManage) {
 <link rel="stylesheet" href="/admin/assets/css/themes-system.css?v=<?= time() ?>">
 <?php endif; ?>
 
+<!-- Page Meta -->
+<meta data-page="themes"
+      data-assets-css="/admin/assets/css/themes-system.css">
+
 <script>
 window.THEMES_CONFIG = {
     TENANT_ID: <?= (int)$tenantId ?>,

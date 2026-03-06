@@ -253,13 +253,17 @@
     if (modal) modal.classList.remove('active');
   }
 
+  let saveRoleInFlight = false;
+
   async function saveRole() {
+    if (saveRoleInFlight) { console.warn('saveRole already running, skipping'); return; }
     const btn = document.getElementById('btnSaveRole');
     if (!btn) return;
     const id = document.getElementById('roleId').value || null;
     const display_name = document.getElementById('roleDisplayName').value.trim();
     const key_name = document.getElementById('roleKeyName').value.trim();
     if (!display_name || !key_name) { showAlert('warning', t('fill_required')); return; }
+    saveRoleInFlight = true;
     btn.disabled = true;
     btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${t('saving')}`;
     try {
@@ -280,6 +284,7 @@
     } finally {
       btn.disabled = false;
       btn.innerHTML = `<i class="fas fa-save"></i> ${LANG === 'ar' ? 'حفظ' : 'Save'}`;
+      saveRoleInFlight = false;
     }
   }
 
@@ -354,7 +359,10 @@
 
   function closePermissionModal() { const modal = document.getElementById('permissionModal'); if (modal) modal.classList.remove('active'); }
 
+  let savePermissionInFlight = false;
+
   async function savePermission() {
+    if (savePermissionInFlight) { console.warn('savePermission already running, skipping'); return; }
     const btn = document.getElementById('btnSavePermission');
     if (!btn) return;
     const id = document.getElementById('permissionId').value || null;
@@ -362,13 +370,21 @@
     const key_name = document.getElementById('permissionKeyName').value.trim();
     const description = document.getElementById('permissionDescription').value.trim();
     if (!display_name || !key_name) { showAlert('warning', t('fill_required')); return; }
+    savePermissionInFlight = true;
     btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${t('saving')}`;
     try {
       const payload = { tenant_id: payloadTenantValue(STATE.tenantId), display_name, key_name, description };
       if (id) { payload.id = Number(id); await apiCall('/permissions', { method: 'PUT', body: payload }); }
       else await apiCall('/permissions', { method: 'POST', body: payload });
       cacheDel('permissions:'); await renderPermissionsTable(); closePermissionModal(); showAlert('success', t('saved'));
-    } catch (err) { console.error('savePermission', err); showAlert('error', `${t('save_failed')}: ${err.message}`); } finally { btn.disabled = false; btn.innerHTML = `<i class="fas fa-save"></i> ${LANG === 'ar' ? 'حفظ' : 'Save'}`; }
+    } catch (err) {
+      console.error('savePermission', err);
+      showAlert('error', `${t('save_failed')}: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = `<i class="fas fa-save"></i> ${LANG === 'ar' ? 'حفظ' : 'Save'}`;
+      savePermissionInFlight = false;
+    }
   }
 
   async function deletePermission(id, name) {
@@ -424,17 +440,28 @@
     }
   }
 
+  let saveAssignInFlight = false;
+
   async function saveAssign() {
     if (!STATE.selectedRoleId) { showAlert('warning', t('select_role_first')); return; }
+    if (saveAssignInFlight) { console.warn('saveAssign already running, skipping'); return; }
     const btn = document.getElementById('btnSaveAssign');
     if (!btn) return;
+    saveAssignInFlight = true;
     btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${t('saving')}`;
     try {
       const selected = Array.from(document.querySelectorAll('.assign-cb:checked')).map(cb => Number(cb.dataset.id));
       const payload = selected.map(pid => ({ tenant_id: payloadTenantValue(STATE.tenantId), role_id: STATE.selectedRoleId, permission_id: pid }));
       await apiCall('/role_permissions', { method: 'POST', body: payload });
       cacheDel('role_permissions:'); showAlert('success', t('saved'));
-    } catch (err) { console.error('saveAssign', err); showAlert('error', `${t('save_failed')}: ${err.message}`); } finally { btn.disabled = false; btn.innerHTML = `<i class="fas fa-save"></i> ${LANG === 'ar' ? 'حفظ' : 'Save'}`; }
+    } catch (err) {
+      console.error('saveAssign', err);
+      showAlert('error', `${t('save_failed')}: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = `<i class="fas fa-save"></i> ${LANG === 'ar' ? 'حفظ' : 'Save'}`;
+      saveAssignInFlight = false;
+    }
   }
 
   // ----------------------------
@@ -541,16 +568,20 @@
 
   function closeResourcePermModal() { const m = document.getElementById('resourcePermModal'); if (m) m.classList.remove('active'); }
 
+  let saveResourcePermInFlight = false;
+
   async function saveResourcePerm() {
+    if (saveResourcePermInFlight) { console.warn('saveResourcePerm already running, skipping'); return; }
     const btn = document.getElementById('btnSaveResourcePerm'); if (!btn) return;
+    const id = document.getElementById('rpId').value || null;
+    const resource_type = document.getElementById('rpResourceType').value.trim();
+    const permission_id = Number(document.getElementById('rpPermissionId').value || 0);
+    const roleVal = document.getElementById('rpRoleId').value; const role_id = roleVal === '' ? null : Number(roleVal);
+    const tenantVal = document.getElementById('rpTenantId').value; const tenant_id = tenantVal === '0' ? null : Number(tenantVal);
+    if (!resource_type || !permission_id) { showAlert('warning', t('fill_required')); return; }
+    saveResourcePermInFlight = true;
     btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${t('saving')}`;
     try {
-      const id = document.getElementById('rpId').value || null;
-      const resource_type = document.getElementById('rpResourceType').value.trim();
-      const permission_id = Number(document.getElementById('rpPermissionId').value || 0);
-      const roleVal = document.getElementById('rpRoleId').value; const role_id = roleVal === '' ? null : Number(roleVal);
-      const tenantVal = document.getElementById('rpTenantId').value; const tenant_id = tenantVal === '0' ? null : Number(tenantVal);
-      if (!resource_type || !permission_id) { showAlert('warning', t('fill_required')); return; }
       const payload = { resource_type, permission_id, role_id, tenant_id,
         can_view_all: document.getElementById('rp_can_view_all').checked ? 1 : 0,
         can_view_own: document.getElementById('rp_can_view_own').checked ? 1 : 0,
@@ -571,7 +602,14 @@
       }
       // Show success message AFTER table refresh completes
       showAlert('success', t('saved'));
-    } catch (err) { console.error('saveResourcePerm', err); showAlert('error', `${t('save_failed')}: ${err.message}`); } finally { btn.disabled = false; btn.innerHTML = `<i class="fas fa-save"></i> ${LANG === 'ar' ? 'حفظ' : 'Save'}`; }
+    } catch (err) {
+      console.error('saveResourcePerm', err);
+      showAlert('error', `${t('save_failed')}: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = `<i class="fas fa-save"></i> ${LANG === 'ar' ? 'حفظ' : 'Save'}`;
+      saveResourcePermInFlight = false;
+    }
   }
 
   async function deleteResourcePerm(id) {

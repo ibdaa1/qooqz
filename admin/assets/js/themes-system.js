@@ -129,7 +129,7 @@
         if (btnCancel) btnCancel.onclick = () => {
             if (form) form.style.display = 'none';
         };
-        if (btnSave) btnSave.onclick = () => saveSetting(prefix);
+        if (btnSave) btnSave.onclick = () => saveSetting(prefix, btnSave);
     }
 
     // ════════════════════════════════════════
@@ -323,7 +323,10 @@
     // ════════════════════════════════════════
     // SAVE / DELETE THEME
     // ════════════════════════════════════════
+    let saveThemeInFlight = false;
+
     async function saveTheme() {
+        if (saveThemeInFlight) { console.warn('[ThemesSystem] saveTheme already running, skipping'); return; }
         const name = (el.themeName && el.themeName.value || '').trim();
         let slug = (el.themeSlug && el.themeSlug.value || '').trim();
         if (!name) {
@@ -353,6 +356,10 @@
 
         if (isEdit) payload.id = parseInt(themeId);
 
+        const btn = el.btnSave;
+        saveThemeInFlight = true;
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ...'; }
+
         try {
             const url = isEdit ? API.themes + '?id=' + themeId : API.themes;
             const res = await fetch(url, {
@@ -362,7 +369,6 @@
             });
             const json = await res.json();
             if (json.success) {
-                const savedId = isEdit ? parseInt(themeId) : (json.data && json.data.id);
                 showAlert('success', t('theme_manager.messages.success.save', 'Theme saved successfully'));
                 await loadThemes();
                 hideForm();
@@ -372,6 +378,9 @@
         } catch (e) {
             console.error('[ThemesSystem] saveTheme error:', e);
             showAlert('error', t('theme_manager.messages.error.save_failed', 'Failed to save'));
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> ' + t('theme_manager.form.buttons.save', 'Save'); }
+            saveThemeInFlight = false;
         }
     }
 
@@ -776,7 +785,10 @@
         }
     }
 
-    async function saveSetting(prefix) {
+    let saveSettingInFlight = false;
+
+    async function saveSetting(prefix, btn) {
+        if (saveSettingInFlight) { console.warn('[ThemesSystem] saveSetting already running, skipping'); return; }
         const apiUrl = getApiForType(prefix);
         if (!apiUrl) return;
 
@@ -786,6 +798,9 @@
         const data = collectSettingData(prefix);
 
         if (isEdit) data.id = parseInt(itemId);
+
+        saveSettingInFlight = true;
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ...'; }
 
         try {
             const url = isEdit ? apiUrl + '?id=' + itemId : apiUrl;
@@ -808,6 +823,9 @@
         } catch (e) {
             console.error('[ThemesSystem] saveSetting(' + prefix + ') error:', e);
             showAlert('error', 'Failed to save');
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = 'Save'; }
+            saveSettingInFlight = false;
         }
     }
 
