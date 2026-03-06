@@ -160,14 +160,16 @@
         const metaDescPlaceholder = 'Meta Description (' + langUpper + ')';
         const metaKeywordsPlaceholder = 'Meta Keywords (' + langUpper + ')';
         const removeText = t('form.translations.remove');
+        // English is the required default language — its panel cannot be removed
+        const isDefault = (code === 'en');
 
         const div = document.createElement('div');
         div.className = 'translation-panel';
         div.dataset.lang = code;
         div.innerHTML = `
             <div class="translation-panel-header">
-                <h5><i class="fas fa-globe"></i> ${langUpper}</h5>
-                <button type="button" class="remove btn btn-sm btn-danger">${removeText}</button>
+                <h5><i class="fas fa-globe"></i> ${langUpper}${isDefault ? ' <small style="color:var(--success-color,#22c55e);font-size:0.75rem;">(default)</small>' : ''}</h5>
+                ${isDefault ? '' : `<button type="button" class="remove btn btn-sm btn-danger">${removeText}</button>`}
             </div>
             <div class="translation-panel-body">
                 <div class="form-row">
@@ -177,7 +179,7 @@
                     </div>
                     <div class="form-group">
                         <label>Slug *</label>
-                        <input class="form-control" name="translations[${code}][slug]" value="${esc(data.slug || '')}" placeholder="${slugPlaceholder}" required>
+                        <input class="form-control" name="translations[${code}][slug]" value="${esc(data.slug || '')}" placeholder="${slugPlaceholder}" ${isDefault ? 'required' : ''}>
                     </div>
                 </div>
                 <div class="form-group">
@@ -201,23 +203,22 @@
             </div>
         `;
 
-        // إضافة حدث الحذف بشكل صحيح
-        div.querySelector('.remove').onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
+        // Add remove handler only for non-default languages
+        if (!isDefault) {
+            div.querySelector('.remove').onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
 
-            // تسجيل اللغة للحذف
-            const categoryId = el.formId?.value ? parseInt(el.formId.value) : null;
-            deletedTranslations.push({
-                language_code: code,
-                category_id: categoryId
-            });
+                const categoryId = el.formId?.value ? parseInt(el.formId.value) : null;
+                deletedTranslations.push({
+                    language_code: code,
+                    category_id: categoryId
+                });
 
-            console.log(`[Categories] Translation marked for deletion: ${code}, category: ${categoryId}`);
-
-            // إزالة اللوحة من DOM
-            div.remove();
-        };
+                console.log(`[Categories] Translation marked for deletion: ${code}, category: ${categoryId}`);
+                div.remove();
+            };
+        }
 
         el.translations.appendChild(div);
         console.log(`[Categories] Translation panel created for: ${code}`);
@@ -559,26 +560,27 @@
             const statusText = item.is_active ? t('table.status.active') : t('table.status.inactive');
             const statusClass = item.is_active ? 'badge-success' : 'badge-danger';
             const featuredText = item.is_featured ? t('form.fields.featured.yes') : t('form.fields.featured.no');
+            const isSuperAdmin = window.PAGE_PERMISSIONS?.isSuperAdmin || window.ADMIN_UI?.is_super_admin;
 
             html += `
                 <tr>
                     <td>${item.id}</td>
-                    <td>${item.tenant_id}</td>
+                    ${isSuperAdmin ? `<td>${item.tenant_id}</td>` : ''}
                     <td>${image}</td>
                     <td><strong>${esc(name)}</strong></td>
                     <td>${esc(slug)}</td>
                     <td>${esc(parent)}</td>
                     <td>${sortOrder}</td>
                     <td>
-                        <span class="badge ${statusClass}" style="background-color: ${item.is_active ? '#10b981' : '#ef4444'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
+                        <span class="badge ${statusClass}" style="background-color: ${item.is_active ? 'var(--success-color,#22c55e)' : 'var(--danger-color,#ef4444)'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
                             ${statusText}
                         </span>
                     </td>
                     <td>${featuredText}</td>
                     <td>
                         <div class="table-actions" style="display: flex; gap: 8px;">
-                            ${state.permissions.canEdit ? `<button class="btn btn-sm btn-outline" onclick="Categories.edit(${item.id})" style="padding: 4px 8px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 4px; font-size: 12px;">${t('table.actions.edit')}</button>` : ''}
-                            ${state.permissions.canDelete ? `<button class="btn btn-sm btn-danger" onclick="Categories.remove(${item.id})" style="padding: 4px 8px; background-color: #ef4444; color: white; border: none; border-radius: 4px; font-size: 12px;">${t('table.actions.delete')}</button>` : ''}
+                            ${state.permissions.canEdit ? `<button class="btn btn-sm btn-outline" onclick="Categories.edit(${item.id})">${t('table.actions.edit')}</button>` : ''}
+                            ${state.permissions.canDelete ? `<button class="btn btn-sm btn-danger" onclick="Categories.remove(${item.id})">${t('table.actions.delete')}</button>` : ''}
                         </div>
                     </td>
                 </tr>
@@ -775,6 +777,11 @@
                 }
             }
 
+            // Always ensure English translation panel is present
+            if (el.translations && !el.translations.querySelector('[data-lang="en"]')) {
+                createTranslationPanel('en', {});
+            }
+
             // تمرير الـ scroll للنموذج
             setTimeout(() => {
                 const container = AF.$('categoryFormContainer');
@@ -812,8 +819,9 @@
         // إعادة تهيئة مصفوفة الترجمات المحذوفة
         deletedTranslations = [];
 
-        // Clear translation panels
+        // Clear translation panels and auto-add English by default
         if (el.translations) el.translations.innerHTML = '';
+        createTranslationPanel('en', {});
 
         // Reset image type to category
         if (el.imageTypeSelect) {
@@ -930,18 +938,52 @@
             console.log('[Categories] Final items with items:', items.length, 'meta:', finalMeta);
 
             // Update Pagination
-            if (el.pagination && typeof AF.Table !== 'undefined' && typeof AF.Table.renderPagination === 'function') {
-                AF.Table.renderPagination(el.pagination, el.paginationInfo, finalMeta);
+            if (el.pagination) {
+                const total = finalMeta.total || items.length || 0;
+                const perPage = finalMeta.per_page || state.perPage;
+                const totalPages = finalMeta.last_page || finalMeta.total_pages || Math.ceil(total / perPage) || 1;
+
+                // Update info text
+                if (el.paginationInfo) {
+                    const start = total > 0 ? ((page - 1) * perPage) + 1 : 0;
+                    const end = Math.min(page * perPage, total);
+                    el.paginationInfo.textContent = `${start}–${end} of ${total}`;
+                }
+
+                // Build pagination buttons with inline onclick
+                let pgHtml = `<button class="pagination-btn" ${page <= 1 ? 'disabled' : ''} onclick="Categories.load(${page - 1})">
+                    <i class="fas fa-chevron-left"></i> Previous
+                </button>`;
+
+                const maxVisible = 7;
+                let startPage = Math.max(1, page - Math.floor(maxVisible / 2));
+                let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+                if (endPage - startPage < maxVisible - 1) startPage = Math.max(1, endPage - maxVisible + 1);
+
+                if (startPage > 1) {
+                    pgHtml += `<button class="pagination-btn" onclick="Categories.load(1)">1</button>`;
+                    if (startPage > 2) pgHtml += `<span class="pagination-dots">...</span>`;
+                }
+                for (let i = startPage; i <= endPage; i++) {
+                    pgHtml += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="Categories.load(${i})" ${i === page ? 'aria-current="page"' : ''}>${i}</button>`;
+                }
+                if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) pgHtml += `<span class="pagination-dots">...</span>`;
+                    pgHtml += `<button class="pagination-btn" onclick="Categories.load(${totalPages})">${totalPages}</button>`;
+                }
+
+                pgHtml += `<button class="pagination-btn" ${page >= totalPages ? 'disabled' : ''} onclick="Categories.load(${page + 1})">
+                    Next <i class="fas fa-chevron-right"></i>
+                </button>`;
+
+                el.pagination.innerHTML = pgHtml;
             } else if (el.paginationInfo) {
                 // Manual fallback for pagination info
                 const total = finalMeta.total || 0;
                 const from = items.length ? ((finalMeta.page - 1) * (finalMeta.per_page || state.perPage)) + 1 : 0;
                 const to = items.length ? Math.min(finalMeta.page * (finalMeta.per_page || state.perPage), total) : 0;
-
-                // Fix "Showing 0 to 0 of 0" if data exists but meta is wrong
                 const displayFrom = total > 0 && from === 0 ? 1 : from;
                 const displayTo = total > 0 && to === 0 ? items.length : to;
-
                 el.paginationInfo.textContent = `Showing ${displayFrom} to ${displayTo} of ${total} results`;
             }
 
