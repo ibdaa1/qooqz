@@ -264,7 +264,8 @@
             const params = { limit: 200, page: 1, is_active: 1, lang: state.lang };
             if (state.entityId) params.entity_id = state.entityId;
             const res = await apiGet(API.products, params);
-            state.products = res.items || res.data || [];
+            const rawItems = res.data?.items ?? res.items ?? [];
+            state.products = Array.isArray(rawItems) ? rawItems : [];
             // Build category list
             const cats = new Set();
             state.products.forEach(p => {
@@ -321,6 +322,7 @@
         }
         productsGrid.innerHTML = prods.map(p => {
             const price = parseFloat(p.sale_price || p.price || 0);
+            const currency = p.currency_code || CFG.CURRENCY || 'SAR';
             const img = p.image_url || p.image_thumb_url || '';
             return `
             <div class="pos-product-card" data-id="${p.id}" title="${escHtml(p.name || '')}">
@@ -329,7 +331,7 @@
                     : `<div class="pos-product-img-placeholder">📦</div>`
                 }
                 <div class="pos-product-name">${escHtml(p.name || p.slug || '')}</div>
-                <div class="pos-product-price">${formatCurrency(price)}</div>
+                <div class="pos-product-price">${formatCurrency(price, currency)}</div>
                 ${p.sku ? `<div class="pos-product-sku">${escHtml(p.sku)}</div>` : ''}
             </div>`;
         }).join('');
@@ -642,8 +644,8 @@
                 sel.value = CFG.ENTITY_ID;
             }
 
-            // Add search/filter for super admin when there are many entities
-            if (CFG.IS_SUPER_ADMIN && entities.length > 5) {
+            // Add search/filter for super admin
+            if (CFG.IS_SUPER_ADMIN) {
                 addEntitySearch(sel, entities);
             }
         } catch {
@@ -674,9 +676,9 @@
     // ─────────────────────────────────────────────
     // Utilities
     // ─────────────────────────────────────────────
-    function formatCurrency(val) {
+    function formatCurrency(val, currencyCode) {
         const n = parseFloat(val) || 0;
-        return n.toFixed(2) + ' ' + (CFG.CURRENCY || 'SAR');
+        return n.toFixed(2) + ' ' + (currencyCode || CFG.CURRENCY || 'SAR');
     }
 
     // ─────────────────────────────────────────────
