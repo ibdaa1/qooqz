@@ -604,24 +604,71 @@
     // Entities select (load in open session form)
     // ─────────────────────────────────────────────
     async function loadEntitiesSelect() {
-        const sel = document.getElementById('posEntitySelect');
+        const wrapper = document.getElementById('posEntitySelectWrapper');
+        const sel     = document.getElementById('posEntitySelect');
+
+        // Non-super-admin with a preset entity_id: skip the entity selector entirely
+        if (!CFG.IS_SUPER_ADMIN && CFG.ENTITY_ID) {
+            state.entityId = CFG.ENTITY_ID;
+            if (wrapper) wrapper.style.display = 'none';
+            // Ensure the select still carries the value so the form submit reads it correctly
+            if (sel) {
+                sel.innerHTML = `<option value="${CFG.ENTITY_ID}" selected></option>`;
+                sel.removeAttribute('required');
+            }
+            return;
+        }
+
         if (!sel) return;
+
         try {
             const res = await apiGet(API.entities, { limit: 200 });
-            const entities = res.items || res.data || [];
+            // API returns { success, data: { items: [...], meta: {...} } }
+            let entities = [];
+            if (res.data && Array.isArray(res.data.items)) {
+                entities = res.data.items;
+            } else if (Array.isArray(res.items)) {
+                entities = res.items;
+            }
+
             sel.innerHTML = `<option value="">${t('pos.select_entity','Select Entity/Branch')}</option>` +
                 entities.map(e => `<option value="${e.id}">${escHtml(e.store_name || '')}</option>`).join('');
 
-            // Pre-select if only one
+            // Pre-select if only one entity available
             if (entities.length === 1) {
                 sel.value = entities[0].id;
                 state.entityId = entities[0].id;
             } else if (CFG.ENTITY_ID) {
                 sel.value = CFG.ENTITY_ID;
             }
+
+            // Add search/filter for super admin when there are many entities
+            if (CFG.IS_SUPER_ADMIN && entities.length > 5) {
+                addEntitySearch(sel, entities);
+            }
         } catch {
             // leave empty
         }
+    }
+
+    function addEntitySearch(sel, entities) {
+        const wrapper = sel.parentElement;
+        if (!wrapper || wrapper.querySelector('.pos-entity-search')) return;
+
+        const searchBox = document.createElement('input');
+        searchBox.type = 'text';
+        searchBox.className = 'form-control pos-entity-search';
+        searchBox.placeholder = t('pos.search_entity', 'Search entity…');
+        searchBox.style.cssText = 'margin-bottom:6px;';
+        wrapper.insertBefore(searchBox, sel);
+
+        searchBox.addEventListener('input', () => {
+            const q = searchBox.value.toLowerCase();
+            Array.from(sel.options).forEach(opt => {
+                if (!opt.value) return; // keep placeholder
+                opt.hidden = !opt.text.toLowerCase().includes(q);
+            });
+        });
     }
 
     // ─────────────────────────────────────────────

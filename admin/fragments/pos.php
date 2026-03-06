@@ -155,13 +155,14 @@ if (!function_exists('renderFragmentThemeVars')) {
 <!-- POS Config -->
 <script>
 window.POS_CONFIG = {
-    TENANT_ID: <?= (int)$tenantId ?>,
-    ENTITY_ID: <?= $userEntityId ? (int)$userEntityId : 'null' ?>,
-    USER_ID:   <?= (int)($user['id'] ?? 0) ?>,
-    LANG:      '<?= htmlspecialchars($lang, ENT_QUOTES) ?>',
-    DIR:       '<?= htmlspecialchars($dir, ENT_QUOTES) ?>',
-    CSRF:      '<?= htmlspecialchars($csrf, ENT_QUOTES) ?>',
-    CURRENCY:  'SAR',
+    TENANT_ID:      <?= (int)$tenantId ?>,
+    ENTITY_ID:      <?= $userEntityId ? (int)$userEntityId : 'null' ?>,
+    USER_ID:        <?= (int)($user['id'] ?? 0) ?>,
+    IS_SUPER_ADMIN: <?= $isSuperAdmin ? 'true' : 'false' ?>,
+    LANG:           '<?= htmlspecialchars($lang, ENT_QUOTES) ?>',
+    DIR:            '<?= htmlspecialchars($dir, ENT_QUOTES) ?>',
+    CSRF:           '<?= htmlspecialchars($csrf, ENT_QUOTES) ?>',
+    CURRENCY:       'SAR',
 };
 </script>
 
@@ -189,8 +190,8 @@ window.POS_CONFIG = {
             <p><?= __pos_t('pos.session.open_subtitle', 'Start the workday by opening a new session') ?></p>
 
             <form id="posOpenSessionForm" style="text-align:right">
-                <!-- Entity / Branch -->
-                <div style="margin-bottom:14px">
+                <!-- Entity / Branch (shown for super admin or users without a preset entity) -->
+                <div id="posEntitySelectWrapper" style="margin-bottom:14px">
                     <label style="display:block;font-size:.82rem;margin-bottom:4px;color:var(--text-secondary,#94a3b8)">
                         <?= __pos_t('pos.session.entity_label', 'Branch / Entity') ?>
                     </label>
