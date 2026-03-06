@@ -135,7 +135,13 @@ if ($pdo) {
         $pWhere  = 'WHERE p.is_active = 1 AND p.tenant_id = ?';
         $pParams = [$entityTenantId];
         if ($selectedCat) {
-            $pWhere .= ' AND EXISTS (SELECT 1 FROM product_categories pc2 WHERE pc2.product_id = p.id AND pc2.category_id = ?)';
+            // Include products in the selected category AND its direct child categories
+            $pWhere .= ' AND EXISTS (
+                SELECT 1 FROM product_categories pc2
+                 JOIN categories cc ON cc.id = pc2.category_id
+                WHERE pc2.product_id = p.id
+                  AND (cc.id = ? OR cc.parent_id = ?))';
+            $pParams[] = $selectedCat;
             $pParams[] = $selectedCat;
         }
         if ($productSearch !== '') {
@@ -172,20 +178,51 @@ if (empty($products) && !$selectedCat) {
     $productMeta = $rp['data']['meta'] ?? ['total' => count($products), 'total_pages' => 1];
 }
 
-/* Fetch categories for this entity */
-$categories = [];
+/* Fetch categories for this entity — with parent_id for hierarchical menus */
+$categories     = [];   // flat list of categories linked to this entity's products
+$categoryTree   = [];   // parent categories → children
 if ($pdo) {
     try {
+        // Fetch every category (with parent_id) that has active products for this tenant
         $catStmt = $pdo->prepare(
-            "SELECT DISTINCT c.id, COALESCE(ct.name, c.name) AS name, c.slug
+            "SELECT DISTINCT c.id, c.parent_id, COALESCE(ct.name, c.name) AS name, c.slug,
+                    c.sort_order
                FROM product_categories pc
                JOIN categories c ON c.id = pc.category_id AND c.is_active = 1
           LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
                JOIN products p ON p.id = pc.product_id AND p.tenant_id = ? AND p.is_active = 1
-              ORDER BY c.sort_order ASC, c.id ASC LIMIT 50"
+              ORDER BY c.sort_order ASC, c.id ASC LIMIT 100"
         );
         $catStmt->execute([$lang, $entityTenantId]);
         $categories = $catStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Build a map for quick lookup
+        $catById = [];
+        foreach ($categories as &$cat) {
+            $cat['children'] = [];
+            $catById[$cat['id']] = &$cat;
+        }
+        unset($cat);
+
+        // Organise into parent → children tree
+        foreach ($categories as &$cat) {
+            $pid = (int)($cat['parent_id'] ?? 0);
+            if ($pid && isset($catById[$pid])) {
+                $catById[$pid]['children'][] = &$cat;
+            }
+        }
+        unset($cat);
+
+        // Top-level (root) categories only
+        foreach ($categories as $cat) {
+            if (empty($cat['parent_id'])) {
+                $categoryTree[] = $cat;
+            }
+        }
+        // If all categories are leaf nodes (no parent_id column or no hierarchy), fall back to flat list
+        if (empty($categoryTree)) {
+            $categoryTree = $categories;
+        }
     } catch (Throwable $_) {}
 }
 
@@ -465,23 +502,63 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
 
     <!-- TAB: Products -->
     <div class="pub-tab-panel active" id="tabProducts">
-        <!-- Category filter tabs + search -->
-        <?php if (!empty($categories)): ?>
-        <div class="pub-cat-tabs" style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;overflow-x:auto;padding-bottom:4px;">
+        <!-- Hierarchical category menus + search -->
+        <?php if (!empty($categoryTree)):
+            // Pre-compute which parent category (if any) contains the selected category
+            $activePrimaryId = 0;
+            foreach ($categoryTree as $mainCat) {
+                $mId = (int)($mainCat['id'] ?? 0);
+                if ($selectedCat === $mId) { $activePrimaryId = $mId; break; }
+                foreach (($mainCat['children'] ?? []) as $ch) {
+                    if ($selectedCat === (int)($ch['id'] ?? 0)) { $activePrimaryId = $mId; break 2; }
+                }
+            }
+        ?>
+        <!-- Main category tabs (parent categories) -->
+        <div class="pub-cat-tabs pub-cat-tabs--main" style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;overflow-x:auto;padding-bottom:4px;" role="tablist">
             <a href="?id=<?= $entityId ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
-               class="pub-cat-tab-btn <?= !$selectedCat ? 'active' : '' ?>">
+               class="pub-cat-tab-btn <?= !$selectedCat ? 'active' : '' ?>" role="tab"
+               aria-selected="<?= !$selectedCat ? 'true' : 'false' ?>">
                 <?= e(t('entity.all_categories')) ?>
             </a>
-            <?php foreach ($categories as $cat): ?>
-            <a href="?id=<?= $entityId ?>&cat=<?= (int)($cat['id'] ?? 0) ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
-               class="pub-cat-tab-btn <?= $selectedCat === (int)($cat['id'] ?? 0) ? 'active' : '' ?>">
-                <?= e($cat['name'] ?? '') ?>
+            <?php foreach ($categoryTree as $mainCat):
+                $mainId      = (int)($mainCat['id'] ?? 0);
+                $parentActive = ($activePrimaryId === $mainId);
+            ?>
+            <a href="?id=<?= $entityId ?>&cat=<?= $mainId ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
+               class="pub-cat-tab-btn <?= $parentActive ? 'active' : '' ?>" role="tab"
+               aria-selected="<?= $parentActive ? 'true' : 'false' ?>">
+                <?= e($mainCat['name'] ?? '') ?>
             </a>
             <?php endforeach; ?>
         </div>
+        <?php if ($activePrimaryId):
+            // Find the active parent and render its sub-category tabs
+            foreach ($categoryTree as $mainCat):
+                if ((int)($mainCat['id'] ?? 0) !== $activePrimaryId) continue;
+                $children = $mainCat['children'] ?? [];
+                if (empty($children)) break;
+        ?>
+        <!-- Sub-category tabs -->
+        <div class="pub-cat-tabs pub-cat-tabs--sub" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;overflow-x:auto;padding-bottom:4px;padding-inline-start:16px;" role="tablist">
+            <a href="?id=<?= $entityId ?>&cat=<?= $activePrimaryId ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
+               class="pub-cat-tab-btn pub-cat-tab-btn--sub <?= ($selectedCat === $activePrimaryId) ? 'active' : '' ?>">
+                <?= e(t('entity.all_in_category', 'All items')) ?>
+            </a>
+            <?php foreach ($children as $subCat):
+                $subId = (int)($subCat['id'] ?? 0);
+            ?>
+            <a href="?id=<?= $entityId ?>&cat=<?= $subId ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
+               class="pub-cat-tab-btn pub-cat-tab-btn--sub <?= $selectedCat === $subId ? 'active' : '' ?>">
+                <?= e($subCat['name'] ?? '') ?>
+            </a>
+            <?php endforeach; ?>
+        </div>
+        <?php endforeach; endif; ?>
         <?php endif; ?>
+
         <!-- Product search within entity -->
-        <form method="get" style="margin-top:12px;display:flex;gap:8px;align-items:center;">
+        <form method="get" style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <input type="hidden" name="id" value="<?= $entityId ?>">
             <?php if ($selectedCat): ?><input type="hidden" name="cat" value="<?= $selectedCat ?>"><?php endif; ?>
             <input type="search" name="q" class="pub-search-input"
@@ -517,7 +594,7 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
                     <?php endif; ?>
                     <p class="pub-product-name"><?= e($p['name'] ?? '') ?></p>
                     <?php if (!empty($p['price'])): ?>
-                        <p class="pub-product-price"><?= number_format((float)$p['price'], 2) ?> <?= e(t('common.currency')) ?></p>
+                        <p class="pub-product-price"><?= number_format((float)$p['price'], 2) ?> <?= e($p['currency_code'] ?? t('common.currency')) ?></p>
                     <?php endif; ?>
                 </div>
                 </a>
@@ -950,6 +1027,10 @@ echo '<style>
 .pub-cat-tab-btn:hover { background:var(--pub-surface); color:var(--pub-text); }
 .pub-cat-tab-btn.active { background:var(--pub-bg); color:var(--pub-primary); border-color:var(--pub-border);
   border-bottom-color:var(--pub-bg); margin-bottom:-1px; }
+/* Sub-category tabs */
+.pub-cat-tabs--sub { border-bottom:1px dashed var(--pub-border); margin-top:2px; background:var(--pub-surface,#f8f9fa); border-radius:0 0 4px 4px; }
+.pub-cat-tab-btn--sub { font-size:0.78rem; font-weight:500; padding:5px 12px;
+  border-radius:var(--pub-radius) var(--pub-radius) 0 0; }
 /* Cart add button on product card */
 .pub-cart-add-btn { width:100%; margin-top:6px; padding:7px 0; background:var(--pub-primary,#03874e); color:#fff;
   border:none; border-radius:0 0 var(--pub-radius) var(--pub-radius); font-size:0.82rem; font-weight:600;

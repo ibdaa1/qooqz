@@ -283,7 +283,7 @@ final class PdoPosSessionsRepository implements PosSessionsRepositoryInterface
                     'completed', 'paid', :sub, :tax, :disc,
                     :tot, :grand, 'SAR',
                     :notes, :sid, :cuid,
-                    :eid, 'pos', NOW()
+                    :beid, 'pos', NOW()
                 )
             ");
             $stmt->execute([
@@ -299,6 +299,7 @@ final class PdoPosSessionsRepository implements PosSessionsRepositoryInterface
                 ':notes' => $notes,
                 ':sid'   => $sessionId,
                 ':cuid'  => $cashierUserId,
+                ':beid'  => $entityId,
             ]);
             $orderId = (int)$this->pdo->lastInsertId();
 
