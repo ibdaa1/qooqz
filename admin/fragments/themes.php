@@ -158,35 +158,39 @@ window.THEMES_CONFIG = {
             </select>
         </div>
 
-        <!-- Loading -->
-        <div id="themesLoading" class="loading-state" style="display:none">
-            <div class="spinner"></div>
-            <p data-i18n="theme_manager.loading">Loading themes...</p>
-        </div>
-
         <!-- Themes Table -->
-        <div id="themesTableContainer" style="display:none">
-            <table class="data-table" id="themesTable">
-                <thead>
-                    <tr>
-                        <th data-i18n="theme_manager.table.id">ID</th>
-                        <th data-i18n="theme_manager.form.fields.name.label">Name</th>
-                        <th data-i18n="theme_manager.form.fields.slug.label">Slug</th>
-                        <th data-i18n="theme_manager.form.fields.version.label">Version</th>
-                        <th data-i18n="theme_manager.form.fields.status.label">Status</th>
-                        <th data-i18n="theme_manager.form.fields.is_default">Default</th>
-                        <th data-i18n="theme_manager.table.actions_label">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="themesTableBody"></tbody>
-            </table>
-        </div>
+        <div class="card table-card">
+            <div class="card-body" style="padding:0">
+                <!-- Loading -->
+                <div id="themesLoading" class="loading-state" style="display:none">
+                    <div class="spinner"></div>
+                    <p data-i18n="theme_manager.loading">Loading themes...</p>
+                </div>
 
-        <!-- Empty State -->
-        <div id="themesEmpty" class="empty-state" style="display:none">
-            <i class="fas fa-palette fa-3x"></i>
-            <h3 data-i18n="theme_manager.table.empty.title">No Themes Found</h3>
-            <p data-i18n="theme_manager.table.empty.message">Start by creating your first theme</p>
+                <div id="themesTableContainer" style="display:none">
+                    <table class="data-table" id="themesTable">
+                        <thead>
+                            <tr>
+                                <th data-i18n="theme_manager.table.id">ID</th>
+                                <th data-i18n="theme_manager.form.fields.name.label">Name</th>
+                                <th data-i18n="theme_manager.form.fields.slug.label">Slug</th>
+                                <th data-i18n="theme_manager.form.fields.version.label">Version</th>
+                                <th data-i18n="theme_manager.form.fields.status.label">Status</th>
+                                <th data-i18n="theme_manager.form.fields.is_default">Default</th>
+                                <th data-i18n="theme_manager.table.actions_label">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="themesTableBody"></tbody>
+                    </table>
+                </div>
+
+                <!-- Empty State -->
+                <div id="themesEmpty" class="empty-state" style="display:none">
+                    <i class="fas fa-palette fa-3x"></i>
+                    <h3 data-i18n="theme_manager.table.empty.title">No Themes Found</h3>
+                    <p data-i18n="theme_manager.table.empty.message">Start by creating your first theme</p>
+                </div>
+            </div>
         </div>
     </div>
 

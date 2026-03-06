@@ -23,8 +23,8 @@
 .themes-page .btn:hover { opacity:.85; }
 
 /* ── Card ── */
-.themes-page .card { background:var(--card-bg,#081127); border:1px solid var(--border-color,#263044); border-radius:12px; margin-bottom:16px; overflow:hidden; }
-.themes-page .card-header { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border-color,#263044); }
+.themes-page .card { background:var(--card-bg,var(--background-secondary,#1e293b)); border:1px solid var(--border-color,#334155); border-radius:12px; margin-bottom:16px; overflow:hidden; }
+.themes-page .card-header { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border-color,#334155); background:var(--background-tertiary,var(--thead-bg,#0f172a)); }
 .themes-page .card-header h3 { margin:0; font-size:1rem; color:var(--text-primary,#fff); }
 .themes-page .card-body { padding:16px; }
 
@@ -49,9 +49,9 @@
 /* ── Table ── */
 .themes-page .table-responsive { overflow-x:auto; }
 .themes-page .data-table { width:100%; border-collapse:collapse; }
-.themes-page .data-table thead { background:var(--thead-bg,#061021); border-bottom:1px solid var(--border-color,#263044); }
+.themes-page .data-table thead { background:var(--thead-bg,var(--background-tertiary,#0f172a)); border-bottom:1px solid var(--border-color,#334155); }
 .themes-page .data-table th { padding:12px; text-align:left; font-size:0.8rem; color:var(--text-secondary,#94a3b8); text-transform:uppercase; }
-.themes-page .data-table td { padding:12px; font-size:0.95rem; color:var(--text-primary,#fff); border-bottom:1px solid var(--border-color,#263044); }
+.themes-page .data-table td { padding:12px; font-size:0.95rem; color:var(--text-primary,#fff); border-bottom:1px solid var(--border-color,#334155); }
 .themes-page .data-table tr:hover { background:rgba(255,255,255,0.02); }
 .themes-page .actions-cell { display:flex; gap:4px; }
 
@@ -65,7 +65,7 @@
 
 /* ── Tabs ── */
 .themes-page .tabs-nav,
-.themes-page .form-tabs { display:flex; gap:0; margin-bottom:0; overflow-x:auto; background:var(--card-bg, var(--background-secondary, #081127)); border-radius:8px 8px 0 0; border:1px solid var(--border-color,#263044); border-bottom:1px solid var(--border-color,#263044); }
+.themes-page .form-tabs { display:flex; gap:0; margin-bottom:0; overflow-x:auto; background:var(--card-bg,var(--background-secondary,#1e293b)); border-radius:8px 8px 0 0; border:1px solid var(--border-color,#334155); border-bottom:1px solid var(--border-color,#334155); }
 .themes-page .tab-btn,
 .themes-page .form-tab { padding:10px 16px; background:transparent; border:none; color:var(--text-secondary,#94a3b8); cursor:pointer; font-size:0.85rem; border-bottom:2px solid transparent; white-space:nowrap; transition:all .2s; }
 .themes-page .tab-btn:hover,
@@ -77,8 +77,8 @@
 .themes-page .tab-content { display:none; }
 .themes-page .tab-content.active {
     display: block;
-    background: var(--card-bg, var(--background-secondary, #081127));
-    border: 1px solid var(--border-color, #263044);
+    background: var(--card-bg, var(--background-secondary, #1e293b));
+    border: 1px solid var(--border-color, #334155);
     border-top: none;
     border-radius: 0 0 8px 8px;
     padding: 16px;
@@ -89,7 +89,7 @@
 .themes-page .settings-header h4 { margin:0; font-size:0.95rem; color:var(--text-primary,#fff); }
 .themes-page .settings-list { display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
 .themes-page .setting-item,
-.themes-page .settings-item { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:var(--input-bg,#0b1220); border:1px solid var(--border-color,#263044); border-radius:8px; }
+.themes-page .settings-item { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:var(--input-bg,var(--background-tertiary,#0f172a)); border:1px solid var(--border-color,#334155); border-radius:8px; }
 .themes-page .setting-item-info,
 .themes-page .settings-item-content { flex:1; }
 .themes-page .setting-item-name { font-weight:600; color:var(--text-primary,#fff); font-size:0.9rem; }
@@ -102,7 +102,7 @@
 .themes-page .status-inactive { color:var(--danger-color,#ef4444); font-size:0.7rem; margin-left:6px; }
 
 /* ── Inline Add/Edit Form ── */
-.themes-page .inline-form { background:var(--card-bg,#081127); border:1px solid var(--border-color,#263044); border-radius:8px; padding:12px; margin-top:8px; display:none; }
+.themes-page .inline-form { background:var(--card-bg,var(--background-secondary,#1e293b)); border:1px solid var(--border-color,#334155); border-radius:8px; padding:12px; margin-top:8px; display:none; }
 .themes-page .inline-form.show { display:block; }
 .themes-page .inline-form-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
 .themes-page .inline-form-header h4 { margin:0; font-size:0.9rem; color:var(--text-primary,#fff); }
