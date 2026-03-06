@@ -339,6 +339,8 @@
         if (secBg && !root.style.getPropertyValue('--background-tertiary').trim()) {
           root.style.setProperty('--background-tertiary', secBg);
         }
+        // --thead-bg: table header background — maps to DB's background-tertiary/secondary
+        alias('--thead-bg', '--background-tertiary', '--background-secondary', '--background-primary');
         // --input-background: inputs/selects/search fields use DB surface color
         alias('--input-background', '--background-secondary', '--background-primary', '--surface-color');
         // --border-color: if DB uses a different key name

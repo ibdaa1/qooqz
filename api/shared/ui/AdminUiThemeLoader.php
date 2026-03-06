@@ -244,7 +244,10 @@ final class AdminUiThemeLoader
 
         $css = ":root {\n";
 
-        // Colors — emit both underscore AND hyphenated form for maximum compatibility
+        // Colors — emit both underscore AND hyphenated form for maximum compatibility.
+        // We also track specific background values to emit stable aliases after the loop.
+        $bgTertiary = null;
+        $bgSecondary = null;
         foreach ($themeData['color_settings'] ?? [] as $color) {
             if (empty($color['setting_key']) || empty($color['color_value'])) continue;
             $hyphen = $hyphenateKey($color['setting_key']);
@@ -252,6 +255,55 @@ final class AdminUiThemeLoader
             // Also emit the original underscore form in case anything references it
             if ($color['setting_key'] !== $hyphen) {
                 $css .= "  --{$color['setting_key']}: {$color['color_value']};\n";
+            }
+            // Track background colors so we can emit aliases below
+            if ($hyphen === 'background-tertiary') {
+                $bgTertiary = $color['color_value'];
+            } elseif ($hyphen === 'background-secondary') {
+                $bgSecondary = $color['color_value'];
+            }
+        }
+
+        // Emit stable CSS variable aliases so page CSS files using these names get DB values.
+        //
+        // --thead-bg: prefer background-tertiary (darkest background, used for table headers),
+        //   fallback to background-secondary if tertiary is not defined in the DB.
+        $theadBg = $bgTertiary ?? $bgSecondary;
+        if ($theadBg) {
+            $css .= "  --thead-bg: {$theadBg};\n";
+        }
+        // --input-background: form inputs/selects use the secondary (surface) background
+        if ($bgSecondary) {
+            $css .= "  --input-background: {$bgSecondary};\n";
+        }
+        // Emit cross-key aliases (only if the target key wasn't provided directly by the DB)
+        $aliasMap = [
+            '--danger-color'  => '--error-color',      // DB may use error_color instead
+            '--card-bg'       => '--background-secondary',
+        ];
+        foreach ($aliasMap as $target => $source) {
+            $sourceVal = null;
+            $sourceKey = ltrim($source, '-');
+            foreach ($themeData['color_settings'] ?? [] as $color) {
+                if (empty($color['setting_key']) || empty($color['color_value'])) continue;
+                if ($hyphenateKey($color['setting_key']) === $sourceKey || $color['setting_key'] === $sourceKey) {
+                    $sourceVal = $color['color_value'];
+                    break;
+                }
+            }
+            if ($sourceVal) {
+                $targetKey = ltrim($target, '-');
+                // Only emit the alias if the DB does not already provide the target key
+                $alreadySet = false;
+                foreach ($themeData['color_settings'] ?? [] as $color) {
+                    if (!empty($color['setting_key']) && $hyphenateKey($color['setting_key']) === $targetKey) {
+                        $alreadySet = true;
+                        break;
+                    }
+                }
+                if (!$alreadySet) {
+                    $css .= "  {$target}: {$sourceVal};\n";
+                }
             }
         }
 

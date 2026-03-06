@@ -357,7 +357,7 @@
 }
 
 .data-table thead {
-    background: var(--background-tertiary, #0f172a);
+    background: var(--thead-bg, var(--background-tertiary, #0f172a));
 }
 
 .data-table th {
@@ -536,5 +536,18 @@
         right: 10px;
         left: 10px;
         min-width: auto;
+    }
+
+    /* Table actions stack on mobile */
+    .table-actions {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    /* Data table cells reduce padding on mobile */
+    .data-table th,
+    .data-table td {
+        padding: 0.625rem 0.75rem;
+        font-size: 0.875rem;
     }
 }

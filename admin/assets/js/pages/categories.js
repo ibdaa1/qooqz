@@ -1271,6 +1271,10 @@
                 if (secBg && !root.style.getPropertyValue('--background-tertiary').trim()) {
                     root.style.setProperty('--background-tertiary', secBg);
                 }
+                // --thead-bg: table header rows use DB background-tertiary/secondary.
+                // Both hyphen and underscore forms are checked because the DB may store
+                // the key as either background-tertiary or background_tertiary.
+                alias('--thead-bg', '--background-tertiary', '--background_tertiary', '--background-secondary', '--background_secondary');
                 // Inputs/search fields/filter selects use the surface/secondary background
                 alias('--input-background', '--background-secondary', '--background_secondary', '--background-primary', '--background_primary');
                 // Border color aliases
