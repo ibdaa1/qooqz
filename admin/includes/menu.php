@@ -160,6 +160,7 @@ $ADMIN_MENU = [
     ['id'=>'delivery','i18n'=>'nav.delivery','icon'=>'🗺️','url'=>'/admin/fragments/delivery.php','load'=>'/admin/fragments/delivery.php'],
     ['id'=>'delivery_companies','i18n'=>'menu.delivery_companies','icon'=>'🚚','url'=>'/admin/fragments/IndependentDriver.php','load'=>'/admin/fragments/IndependentDriver.php'],
     ['id'=>'orders','i18n'=>'nav.orders','icon'=>'🧾','url'=>'/admin/orders.php','load'=>'/admin/orders.php'],
+    ['id'=>'pos','i18n'=>'nav.pos','icon'=>'🏧','url'=>'/admin/fragments/pos.php','load'=>'/admin/fragments/pos.php'],
     ['id'=>'payments','i18n'=>'menu.payments','icon'=>'💳','url'=>'/admin/payments.php','load'=>'/admin/payments.php'],
     ['id'=>'shipping','i18n'=>'menu.shipping','icon'=>'🚛','url'=>'/admin/shipping.php','load'=>'/admin/shipping.php'],
     ['id'=>'users','i18n'=>'nav.users','icon'=>'👥','url'=>'/admin/fragments/users.php','load'=>'/admin/fragments/users.php'],

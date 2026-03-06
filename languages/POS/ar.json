@@ -1,0 +1,72 @@
+{
+  "direction": "rtl",
+  "pos": {
+    "title": "نظام الكاشير",
+    "subtitle": "إدارة المبيعات وعمليات الصندوق",
+    "select_entity": "اختر الفرع",
+    "subtotal": "المجموع الجزئي",
+    "tax": "الضريبة",
+    "discount": "خصم",
+    "total": "الإجمالي",
+    "grand_total": "الإجمالي الكلي",
+    "paid": "المدفوع",
+    "change": "الباقي",
+    "remaining": "المتبقي",
+    "new_sale": "بيع جديد",
+    "clear_confirm": "هل تريد تفريغ السلة؟",
+    "session": {
+      "open": "جلسة مفتوحة",
+      "closed": "لا توجد جلسة",
+      "open_title": "فتح جلسة صندوق",
+      "open_subtitle": "ابدأ يوم العمل بفتح جلسة جديدة",
+      "open_btn": "فتح الجلسة",
+      "close": "إغلاق الجلسة",
+      "close_confirm": "هل أنت متأكد من إغلاق الجلسة الحالية؟",
+      "opening_balance": "رصيد الافتتاح",
+      "closing_balance": "رصيد الإغلاق النقدي",
+      "cashier": "الكاشير",
+      "cash": "نقداً",
+      "card": "بطاقة",
+      "opened_msg": "تم فتح الجلسة بنجاح",
+      "closed_msg": "تم إغلاق الجلسة بنجاح",
+      "entity_label": "الفرع / المنفذ"
+    },
+    "products": {
+      "title": "المنتجات",
+      "all": "الكل",
+      "search": "بحث عن منتج...",
+      "empty": "لا توجد منتجات",
+      "out_of_stock": "نفد المخزون"
+    },
+    "cart": {
+      "title": "السلة",
+      "empty": "السلة فارغة",
+      "empty_hint": "انقر على منتج لإضافته",
+      "clear": "تفريغ السلة",
+      "checkout": "إتمام البيع",
+      "discount_placeholder": "مبلغ الخصم"
+    },
+    "payment": {
+      "title": "طريقة الدفع",
+      "cash": "نقداً",
+      "card": "بطاقة",
+      "amount_paid": "المبلغ المدفوع"
+    },
+    "receipt": {
+      "title": "فاتورة المبيعات",
+      "print": "طباعة",
+      "thank_you": "شكراً لتسوقك معنا"
+    },
+    "error": {
+      "entity_required": "الرجاء اختيار الفرع",
+      "insufficient_payment": "المبلغ المدفوع أقل من الإجمالي"
+    }
+  },
+  "common": {
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "close": "إغلاق",
+    "confirm": "تأكيد",
+    "loading": "جارٍ التحميل..."
+  }
+}
