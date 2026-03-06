@@ -64,8 +64,8 @@
 
 #permissionsPageContainer {
     font-family: var(--body_font-family, var(--body-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif));
-    background: var(--bg-primary);
-    color: var(--text-primary);
+    background: transparent;
+    color: var(--text-primary, #e2e8f0);
     line-height: 1.6;
     font-size: 14px;
 }
@@ -211,18 +211,18 @@
    ════════════════════════════════════════════════════════════ */
 
 #permissionsPageContainer .card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+    background: var(--background-secondary, var(--card_bg, var(--card-bg, #1e293b)));
+    border: 1px solid var(--border-color, var(--border_color, #334155));
+    border-radius: var(--radius-lg, 12px);
     margin-bottom: 1.5rem;
     overflow: hidden;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.3));
 }
 
 #permissionsPageContainer .card-header {
     padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--border);
-    background: rgba(59, 130, 246, 0.03);
+    border-bottom: 1px solid var(--border-color, var(--border_color, #334155));
+    background: var(--background-tertiary, var(--thead-bg, #0f172a));
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -360,8 +360,8 @@
 }
 
 #permissionsPageContainer .data-table th {
-    background: var(--bg-primary);
-    color: var(--primary);
+    background: var(--thead-bg, var(--background-tertiary, #0f172a));
+    color: var(--text-secondary, #94a3b8);
     font-weight: 600;
     position: sticky;
     top: 0;
@@ -382,11 +382,11 @@
 }
 
 #permissionsPageContainer .data-table code {
-    background: var(--bg-primary);
+    background: var(--background-tertiary, var(--thead-bg, #0f172a));
     padding: 0.25rem 0.5rem;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm, 6px);
     font-size: 0.8125rem;
-    color: var(--primary);
+    color: var(--primary-color, var(--primary, #3b82f6));
 }
 
 /* Resource Table */
@@ -407,7 +407,7 @@
 }
 
 #permissionsPageContainer .resource-table th.sticky-col {
-    background: var(--bg-primary);
+    background: var(--thead-bg, var(--background-tertiary, #0f172a));
     z-index: 12;
 }
 
@@ -434,17 +434,17 @@
 #permissionsPageContainer .form-control {
     width: 100%;
     padding: 0.75rem;
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    color: var(--text-primary);
+    background: var(--input-background, var(--input-bg, #0f172a));
+    border: 1px solid var(--border-color, var(--border_color, #334155));
+    border-radius: var(--radius-md, 8px);
+    color: var(--text-primary, #e2e8f0);
     font-size: 0.875rem;
-    transition: var(--transition);
+    transition: var(--transition, all 0.2s ease);
 }
 
 #permissionsPageContainer .form-control:focus {
     outline: none;
-    border-color: var(--primary);
+    border-color: var(--primary-color, var(--primary, #3b82f6));
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
@@ -951,25 +951,25 @@
 }
 
 /* ════════════════════════════════════════════════════════════
-   SCROLLBAR STYLING
+   SCROLLBAR STYLING (scoped to permissions container)
    ════════════════════════════════════════════════════════════ */
 
-::-webkit-scrollbar {
+#permissionsPageContainer ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
 }
 
-::-webkit-scrollbar-track {
-    background: var(--bg-secondary);
+#permissionsPageContainer ::-webkit-scrollbar-track {
+    background: var(--background-secondary, #1e293b);
 }
 
-::-webkit-scrollbar-thumb {
-    background: var(--bg-tertiary);
+#permissionsPageContainer ::-webkit-scrollbar-thumb {
+    background: var(--background-tertiary, #334155);
     border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-    background: var(--bg-hover);
+#permissionsPageContainer ::-webkit-scrollbar-thumb:hover {
+    background: var(--border-color, #475569);
 }
 
 /* ════════════════════════════════════════════════════════════

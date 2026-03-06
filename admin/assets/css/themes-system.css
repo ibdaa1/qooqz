@@ -65,7 +65,7 @@
 
 /* ── Tabs ── */
 .themes-page .tabs-nav,
-.themes-page .form-tabs { display:flex; gap:0; border-bottom:1px solid var(--border-color,#263044); margin-bottom:16px; overflow-x:auto; }
+.themes-page .form-tabs { display:flex; gap:0; margin-bottom:0; overflow-x:auto; background:var(--card-bg, var(--background-secondary, #081127)); border-radius:8px 8px 0 0; border:1px solid var(--border-color,#263044); border-bottom:1px solid var(--border-color,#263044); }
 .themes-page .tab-btn,
 .themes-page .form-tab { padding:10px 16px; background:transparent; border:none; color:var(--text-secondary,#94a3b8); cursor:pointer; font-size:0.85rem; border-bottom:2px solid transparent; white-space:nowrap; transition:all .2s; }
 .themes-page .tab-btn:hover,
@@ -75,7 +75,14 @@
 .themes-page .tab-panel { display:none; }
 .themes-page .tab-panel.active { display:block; }
 .themes-page .tab-content { display:none; }
-.themes-page .tab-content.active { display:block; }
+.themes-page .tab-content.active {
+    display: block;
+    background: var(--card-bg, var(--background-secondary, #081127));
+    border: 1px solid var(--border-color, #263044);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 16px;
+}
 
 /* ── Settings Items List ── */
 .themes-page .settings-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
@@ -136,8 +143,17 @@
 @media(max-width:768px) {
     .themes-page .form-row { grid-template-columns:1fr; }
     .themes-page .page-header { flex-direction:column; align-items:flex-start; }
-    .themes-page .filters-bar { flex-direction:column; }
-    .themes-page .form-tabs { flex-wrap:wrap; }
+    .themes-page .page-header-actions { flex-wrap:wrap; gap:6px; }
+    .themes-page .filters-bar { flex-direction:column; gap:8px; }
+    .themes-page .form-tabs { flex-wrap:wrap; border-radius:8px 8px 0 0; }
+    .themes-page .form-tab { flex:1 0 auto; justify-content:center; min-width:80px; }
+    .themes-page .tab-content.active { padding:12px; border-radius:0 0 6px 6px; }
     .themes-page .settings-item { flex-direction:column; align-items:flex-start; gap:8px; }
     .themes-page .settings-item-actions { align-self:flex-end; }
+    .themes-page .inline-form { padding:10px; }
+    .themes-page .card-body { padding:12px; }
+    .themes-page .card-header { padding:10px 12px; flex-wrap:wrap; gap:8px; }
+    .themes-page .data-table th,
+    .themes-page .data-table td { padding:8px; font-size:0.8rem; }
+    .themes-page .btn { padding:6px 12px; font-size:0.85rem; }
 }
