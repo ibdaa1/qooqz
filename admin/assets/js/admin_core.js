@@ -317,37 +317,49 @@
         themeData.color_settings.forEach(c => {
           if (!c?.setting_key || !c?.color_value) return;
           const key = '--' + safeSlug(c.setting_key);
+          // Also set the hyphenated version so CSS var() references using hyphens work
+          // e.g. DB key "background_secondary" → sets both --background_secondary AND --background-secondary
+          const keyH = '--' + safeSlug(c.setting_key).replace(/_/g, '-');
           const val = normalizeExplicitColor(c.color_value) || c.color_value;
           root.style.setProperty(key, String(val));
+          if (keyH !== key) root.style.setProperty(keyH, String(val));
         });
 
         // Create CSS variable aliases so CSS files can use stable names
         // regardless of which key name the DB stores them under.
+        // Checks both hyphen and underscore variants of each source.
+        const getProp = name => {
+          return root.style.getPropertyValue(name).trim() ||
+                 root.style.getPropertyValue(name.replace(/-/g, '_')).trim() ||
+                 root.style.getPropertyValue(name.replace(/_/g, '-')).trim();
+        };
         const alias = (target, ...sources) => {
-          if (root.style.getPropertyValue(target).trim()) return; // already set by DB
+          if (getProp(target)) return; // already set by DB
           for (const src of sources) {
-            const v = root.style.getPropertyValue(src).trim();
+            const v = getProp(src);
             if (v) { root.style.setProperty(target, v); return; }
           }
         };
         // --danger-color mirrors --error-color (DB key: error_color)
-        alias('--danger-color', '--error-color');
+        alias('--danger-color', '--error-color', '--error_color');
         // --card-bg mirrors --background-secondary
-        alias('--card-bg', '--background-secondary');
+        alias('--card-bg', '--card_bg', '--background-secondary', '--background_secondary');
+        // --input-bg: CSS files use this name; JS previously only set --input-background
+        alias('--input-bg', '--input_bg', '--input-background', '--background-secondary', '--background_secondary', '--background-primary');
+        // --input-background: keep for backward-compat with any code using this name
+        alias('--input-background', '--input-bg', '--background-secondary', '--background_secondary', '--background-primary');
         // --background-tertiary: use secondary if not explicitly set
-        const secBg = root.style.getPropertyValue('--background-secondary').trim();
-        if (secBg && !root.style.getPropertyValue('--background-tertiary').trim()) {
+        const secBg = getProp('--background-secondary');
+        if (secBg && !getProp('--background-tertiary')) {
           root.style.setProperty('--background-tertiary', secBg);
         }
         // --thead-bg: table header background — maps to DB's background-tertiary/secondary
-        alias('--thead-bg', '--background-tertiary', '--background-secondary', '--background-primary');
-        // --input-background: inputs/selects/search fields use DB surface color
-        alias('--input-background', '--background-secondary', '--background-primary', '--surface-color');
+        alias('--thead-bg', '--thead_bg', '--background-tertiary', '--background_tertiary', '--background-secondary', '--background_secondary', '--background-primary');
         // --border-color: if DB uses a different key name
         alias('--border-color', '--border', '--divider-color', '--line-color');
         // --text-secondary/tertiary: placeholders and muted text
-        alias('--text-secondary', '--text-muted', '--text-light');
-        alias('--text-tertiary', '--text-secondary', '--text-muted');
+        alias('--text-secondary', '--text_secondary', '--text-muted', '--text-light');
+        alias('--text-tertiary', '--text_tertiary', '--text-secondary', '--text_secondary', '--text-muted');
         Admin.log('✓ Color aliases applied');
       }
 

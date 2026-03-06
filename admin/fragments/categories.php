@@ -611,31 +611,35 @@ if (!function_exists('renderFragmentThemeVars')) {
     <div id="catExcelImportModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;">
         <div style="background:var(--card-bg,#081127); border:1px solid var(--border-color,#263044); border-radius:12px; width:min(700px,95vw); max-height:90vh; overflow-y:auto; padding:0;">
             <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid var(--border-color,#263044);">
-                <h3 style="margin:0; color:var(--text-primary,#fff); font-size:1.1rem;"><i class="fas fa-file-excel" style="color:#22c55e; margin-right:8px;"></i> Import Categories from Excel</h3>
+                <h3 style="margin:0; color:var(--text-primary,#fff); font-size:1.1rem;">
+                    <i class="fas fa-file-excel" style="color:#22c55e; margin-right:8px;"></i>
+                    <span data-i18n="excel.title"><?= __t('excel.title', 'Import Categories from Excel / CSV') ?></span>
+                </h3>
                 <button type="button" id="catExcelImportClose" style="background:none; border:none; color:var(--text-secondary,#94a3b8); cursor:pointer; font-size:1.2rem;">&times;</button>
             </div>
             <div style="padding:20px;">
                 <!-- Instructions -->
                 <div style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.3); border-radius:8px; padding:12px; margin-bottom:16px; font-size:0.85rem; color:var(--text-secondary,#94a3b8);">
-                    <strong style="color:var(--text-primary,#fff);"><i class="fas fa-info-circle"></i> Excel Column Format:</strong><br>
+                    <strong style="color:var(--text-primary,#fff);"><i class="fas fa-info-circle"></i> <span data-i18n="excel.columns_info_label"><?= __t('excel.columns_info_label', 'Excel Column Format:') ?></span></strong><br>
                     <code style="color:#60a5fa;">name</code> (required) &nbsp;|&nbsp;
-                    <code style="color:#60a5fa;">parent_name</code> (optional, e.g. "Electronics") &nbsp;|&nbsp;
-                    <code style="color:#60a5fa;">level</code> (1=root, 2=sub, 3=sub-sub, 4=sub-sub-sub) &nbsp;|&nbsp;
+                    <code style="color:#60a5fa;">parent_name</code> &nbsp;|&nbsp;
+                    <code style="color:#60a5fa;">level</code> &nbsp;|&nbsp;
                     <code style="color:#60a5fa;">slug</code> &nbsp;|&nbsp;
                     <code style="color:#60a5fa;">description</code> &nbsp;|&nbsp;
                     <code style="color:#60a5fa;">sort_order</code> &nbsp;|&nbsp;
-                    <code style="color:#60a5fa;">is_active</code> (0/1) &nbsp;|&nbsp;
-                    <code style="color:#60a5fa;">is_featured</code> (0/1)<br>
-                    <small>English is the default language. First row = headers.</small>
+                    <code style="color:#60a5fa;">is_active</code> &nbsp;|&nbsp;
+                    <code style="color:#60a5fa;">is_featured</code><br>
+                    <small data-i18n="excel.columns_info"><?= __t('excel.columns_info', 'Supported columns: name, parent_name, level, slug, description, sort_order, is_active, is_featured — plus language columns: en_name, en_slug, en_description, en_meta_title, en_meta_description, en_meta_keywords, ar_name, ar_slug, ar_description, ar_meta_title, ar_meta_description, ar_meta_keywords') ?></small>
                 </div>
 
                 <!-- File Upload -->
                 <div style="margin-bottom:16px;">
-                    <label style="display:block; margin-bottom:6px; color:var(--text-secondary,#94a3b8); font-size:0.85rem;">Select .xlsx or .csv file:</label>
+                    <label style="display:block; margin-bottom:6px; color:var(--text-secondary,#94a3b8); font-size:0.85rem;" data-i18n="excel.choose_file"><?= __t('excel.choose_file', 'Choose File (CSV or XLSX)') ?></label>
                     <div style="display:flex; gap:10px; align-items:center;">
                         <input type="file" id="catExcelFileInput" accept=".xlsx,.xls,.csv" style="flex:1; padding:8px; background:var(--input-bg,#0b1220); border:1px solid var(--border-color,#263044); border-radius:8px; color:var(--text-primary,#fff);">
                         <button type="button" id="catExcelDownloadSample" class="btn btn-outline" style="white-space:nowrap;">
-                            <i class="fas fa-download"></i> Sample
+                            <i class="fas fa-download"></i>
+                            <span data-i18n="excel.download_sample"><?= __t('excel.download_sample', 'Download Sample') ?></span>
                         </button>
                     </div>
                 </div>
@@ -648,7 +652,7 @@ if (!function_exists('renderFragmentThemeVars')) {
                 <!-- Progress -->
                 <div id="catExcelProgressArea" style="display:none; margin-bottom:12px;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:0.85rem; color:var(--text-secondary,#94a3b8);">
-                        <span id="catExcelProgressLabel">Importing...</span>
+                        <span id="catExcelProgressLabel" data-i18n="excel.importing"><?= __t('excel.importing', 'Importing…') ?></span>
                         <span id="catExcelProgressPct">0%</span>
                     </div>
                     <div style="background:var(--border-color,#263044); border-radius:4px; height:8px; overflow:hidden;">
@@ -662,9 +666,12 @@ if (!function_exists('renderFragmentThemeVars')) {
 
                 <!-- Actions -->
                 <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
-                    <button type="button" id="catExcelImportCancel" class="btn btn-outline">Cancel</button>
+                    <button type="button" id="catExcelImportCancel" class="btn btn-outline">
+                        <span data-i18n="excel.cancel"><?= __t('excel.cancel', 'Cancel') ?></span>
+                    </button>
                     <button type="button" id="catExcelImportStart" class="btn btn-primary" disabled>
-                        <i class="fas fa-upload"></i> Start Import
+                        <i class="fas fa-upload"></i>
+                        <span data-i18n="excel.import"><?= __t('excel.import', 'Start Import') ?></span>
                     </button>
                 </div>
             </div>
