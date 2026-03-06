@@ -134,6 +134,7 @@ $apiBase = '/api';
 
 <!-- Page Meta -->
 <meta data-page="permissions"
+      data-assets-css="/admin/assets/css/permissions-system.css"
       data-i18n-files="/languages/Permissions/<?= rawurlencode($lang) ?>.json">
 
 <!-- Page Container -->
@@ -311,7 +312,7 @@ $apiBase = '/api';
                         <i class="fas fa-times"></i> <span data-i18n="permissions.clear"><?= __t('permissions.clear', 'Clear') ?></span>
                     </button>
                     <?php if ($canEdit): ?>
-                    <button class="btn btn-success" id="btnSaveAssign" onclick="PermissionsApp.saveAssign()">
+                    <button class="btn btn-success" id="btnSaveAssign">
                         <i class="fas fa-save"></i> <span data-i18n="permissions.save"><?= __t('permissions.save', 'Save') ?></span>
                     </button>
                     <?php endif; ?>
@@ -345,7 +346,7 @@ $apiBase = '/api';
                     </button>
                     <?php endif; ?>
                     <?php if ($canEdit): ?>
-                    <button class="btn btn-success" id="btnSaveResource" onclick="PermissionsApp.saveResources()">
+                    <button class="btn btn-success" id="btnSaveResource">
                         <i class="fas fa-save"></i> <span data-i18n="permissions.save_changes"><?= __t('permissions.save_changes', 'Save Changes') ?></span>
                     </button>
                     <?php endif; ?>
@@ -410,7 +411,7 @@ $apiBase = '/api';
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="PermissionsApp.closeRoleModal()" data-i18n="permissions.cancel"><?= __t('permissions.cancel', 'Cancel') ?></button>
-            <button class="btn btn-primary" id="btnSaveRole" onclick="PermissionsApp.saveRole()">
+            <button class="btn btn-primary" id="btnSaveRole">
                 <i class="fas fa-save"></i> <span data-i18n="permissions.save"><?= __t('permissions.save', 'Save') ?></span>
             </button>
         </div>
@@ -443,7 +444,7 @@ $apiBase = '/api';
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="PermissionsApp.closePermissionModal()" data-i18n="permissions.cancel"><?= __t('permissions.cancel', 'Cancel') ?></button>
-            <button class="btn btn-primary" id="btnSavePermission" onclick="PermissionsApp.savePermission()">
+            <button class="btn btn-primary" id="btnSavePermission">
                 <i class="fas fa-save"></i> <span data-i18n="permissions.save"><?= __t('permissions.save', 'Save') ?></span>
             </button>
         </div>
@@ -503,7 +504,7 @@ $apiBase = '/api';
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="PermissionsApp.closeResourcePermModal()" data-i18n="permissions.cancel"><?= __t('permissions.cancel', 'Cancel') ?></button>
-            <button class="btn btn-primary" id="btnSaveResourcePerm" onclick="PermissionsApp.saveResourcePerm()">
+            <button class="btn btn-primary" id="btnSaveResourcePerm">
                 <i class="fas fa-save"></i> <span data-i18n="permissions.save"><?= __t('permissions.save', 'Save') ?></span>
             </button>
         </div>
