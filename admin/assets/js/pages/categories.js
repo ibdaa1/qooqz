@@ -1378,14 +1378,28 @@
     }
 
     function downloadExcelSample() {
-        const header = 'name,parent_name,level,slug,description,sort_order,is_active,is_featured';
+        // Columns cover both DB tables:
+        //   categories: name, parent_name, level, slug, description, sort_order, is_active, is_featured
+        //   category_translations (EN): en_name, en_slug, en_description, en_meta_title, en_meta_description, en_meta_keywords
+        //   category_translations (AR): ar_name, ar_slug, ar_description, ar_meta_title, ar_meta_description, ar_meta_keywords
+        const header = [
+            'name', 'parent_name', 'level', 'slug', 'description', 'sort_order', 'is_active', 'is_featured',
+            'en_name', 'en_slug', 'en_description', 'en_meta_title', 'en_meta_description', 'en_meta_keywords',
+            'ar_name', 'ar_slug', 'ar_description', 'ar_meta_title', 'ar_meta_description', 'ar_meta_keywords'
+        ].join(',');
         const rows = [
-            'Electronics,,1,electronics,Electronic products and gadgets,0,1,0',
-            'Smartphones,Electronics,2,smartphones,Mobile phones and smartphones,0,1,1',
-            'Android Phones,Smartphones,3,android-phones,Android smartphones,0,1,0',
-            'Samsung Galaxy,Android Phones,4,samsung-galaxy,Samsung Galaxy series,0,1,0',
-            'Laptops,Electronics,2,laptops,Portable computers,1,1,0',
-            'Clothing,,1,clothing,Fashion and apparel,1,1,0',
+            'Electronics,,1,electronics,Electronic products and gadgets,0,1,0,' +
+                'Electronics,electronics,Electronic products and gadgets,Electronics - Best Deals,Buy electronics online,electronics gadgets,' +
+                'الإلكترونيات,,الإلكترونيات ومستلزماتها,أفضل الإلكترونيات,اشتر الإلكترونيات أونلاين,إلكترونيات أجهزة',
+            'Smartphones,Electronics,2,smartphones,Mobile phones and smartphones,0,1,1,' +
+                'Smartphones,smartphones,Mobile phones and smartphones,Best Smartphones,Buy smartphones online,smartphones mobile,' +
+                'الهواتف الذكية,al-hawatif-al-dhakiyya,الهواتف الذكية ومستلزماتها,أفضل الهواتف الذكية,اشتر هاتفاً ذكياً,هواتف ذكية موبايل',
+            'Laptops,Electronics,2,laptops,Portable computers,1,1,0,' +
+                'Laptops,laptops,Portable computers and notebooks,Best Laptops,Buy laptops online,laptops notebooks,' +
+                'اللابتوب,al-laptop,أجهزة الكمبيوتر المحمول,أفضل اللابتوب,اشتر لابتوب,لابتوب كمبيوتر محمول',
+            'Clothing,,1,clothing,Fashion and apparel,1,1,0,' +
+                'Clothing,clothing,Fashion clothing and apparel,Best Fashion,Buy clothes online,clothing fashion apparel,' +
+                'الملابس,al-malabis,أزياء وملابس,أفضل الملابس,اشتر الملابس أونلاين,ملابس أزياء',
         ];
         const csv = header + '\n' + rows.join('\n');
         const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -1560,6 +1574,53 @@
             }
 
             const slug = (row.slug || '').trim() || slugify(name);
+
+            // Build translations from per-language columns (e.g. en_name, ar_name, ar_description …).
+            // Supported columns: {lang}_name, {lang}_slug, {lang}_description,
+            //                    {lang}_meta_title, {lang}_meta_description, {lang}_meta_keywords
+            const translations = {};
+
+            // Detect all language prefixes present in this row.
+            // Standard ISO 639-1 (2-char) and ISO 639-2/3 (3-char) codes are supported.
+            const langPrefixes = new Set();
+            Object.keys(row).forEach(col => {
+                const m = col.match(/^([a-z]{2,3})_(name|slug|description|meta_title|meta_description|meta_keywords)$/);
+                if (m) langPrefixes.add(m[1]);
+            });
+
+            // Build a translation entry for each detected language
+            langPrefixes.forEach(lang => {
+                const tName = (row[`${lang}_name`] || '').trim();
+                const tSlug = (row[`${lang}_slug`] || '').trim();
+                const tDesc = (row[`${lang}_description`] || '').trim();
+                // Only add translation if at least a name is supplied
+                if (tName || lang === 'en') {
+                    // Slug priority: explicit translated slug → slugified translated name →
+                    //                slugified base English name → base category slug
+                    const computedSlug = tSlug || slugify(tName) || slugify(name) || slug;
+                    translations[lang] = {
+                        name: tName || name,
+                        slug: computedSlug,
+                        description: tDesc,
+                        meta_title: (row[`${lang}_meta_title`] || '').trim(),
+                        meta_description: (row[`${lang}_meta_description`] || '').trim(),
+                        meta_keywords: (row[`${lang}_meta_keywords`] || '').trim()
+                    };
+                }
+            });
+
+            // Always ensure English translation exists (required by the API)
+            if (!translations.en) {
+                translations.en = {
+                    name: name,
+                    slug: slug,
+                    description: (row.description || '').trim(),
+                    meta_title: '',
+                    meta_description: '',
+                    meta_keywords: ''
+                };
+            }
+
             const payload = {
                 tenant_id: tenantId,
                 name: name,
@@ -1569,16 +1630,7 @@
                 is_active: row.is_active === '' ? 1 : (row.is_active === '1' ? 1 : 0),
                 is_featured: row.is_featured === '1' ? 1 : 0,
                 description: (row.description || '').trim(),
-                translations: {
-                    en: {
-                        name: name,
-                        slug: slug,
-                        description: (row.description || '').trim(),
-                        meta_title: '',
-                        meta_description: '',
-                        meta_keywords: ''
-                    }
-                }
+                translations
             };
 
             try {

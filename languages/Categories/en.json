@@ -145,5 +145,19 @@
   },
   "pagination": {
     "showing": "Showing"
+  },
+  "excel": {
+    "title": "Import Categories from Excel / CSV",
+    "download_sample": "Download Sample",
+    "choose_file": "Choose File (CSV or XLSX)",
+    "import": "Start Import",
+    "cancel": "Cancel",
+    "importing": "Importing…",
+    "preview_found": "Found {count} rows ready to import",
+    "import_complete": "Import Complete",
+    "created": "Created",
+    "failed": "Failed",
+    "skipped": "Skipped",
+    "columns_info": "Supported columns: name, parent_name, level, slug, description, sort_order, is_active, is_featured — plus language columns: en_name, en_slug, en_description, en_meta_title, en_meta_description, en_meta_keywords, ar_name, ar_slug, ar_description, ar_meta_title, ar_meta_description, ar_meta_keywords"
   }
 }

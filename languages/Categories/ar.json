@@ -145,5 +145,19 @@
   },
   "pagination": {
     "showing": "عرض"
+  },
+  "excel": {
+    "title": "استيراد الفئات من Excel / CSV",
+    "download_sample": "تنزيل النموذج",
+    "choose_file": "اختر ملفاً (CSV أو XLSX)",
+    "import": "بدء الاستيراد",
+    "cancel": "إلغاء",
+    "importing": "جارٍ الاستيراد…",
+    "preview_found": "تم العثور على {count} صف جاهز للاستيراد",
+    "import_complete": "اكتمل الاستيراد",
+    "created": "تم الإنشاء",
+    "failed": "فشل",
+    "skipped": "تم التخطي",
+    "columns_info": "الأعمدة المدعومة: name، parent_name، level، slug، description، sort_order، is_active، is_featured — وأعمدة اللغات: en_name، en_slug، en_description، en_meta_title، en_meta_description، en_meta_keywords، ar_name، ar_slug، ar_description، ar_meta_title، ar_meta_description، ar_meta_keywords"
   }
 }
