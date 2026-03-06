@@ -308,6 +308,23 @@
           const val = normalizeExplicitColor(c.color_value) || c.color_value;
           root.style.setProperty(key, String(val));
         });
+
+        // Create CSS variable aliases so CSS files can use stable names
+        // regardless of which key name the DB stores them under.
+        const alias = (target, source) => {
+          const v = root.style.getPropertyValue(source).trim();
+          if (v) root.style.setProperty(target, v);
+        };
+        // --danger-color mirrors --error-color (DB key: error_color)
+        alias('--danger-color', '--error-color');
+        // --card-bg mirrors --background-secondary
+        alias('--card-bg', '--background-secondary');
+        // --background-tertiary: slightly darker than secondary; use secondary as base
+        const secBg = root.style.getPropertyValue('--background-secondary').trim();
+        if (secBg && !root.style.getPropertyValue('--background-tertiary').trim()) {
+          root.style.setProperty('--background-tertiary', secBg);
+        }
+        Admin.log('✓ Color aliases applied');
       }
 
       // 3. Apply font_settings

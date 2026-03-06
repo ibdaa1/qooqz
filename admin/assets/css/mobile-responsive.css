@@ -261,7 +261,7 @@
     }
 
     .dash-card {
-        border: 1px solid #ccc !important;
+        border: 1px solid var(--border-color, #ccc) !important;
         page-break-inside: avoid !important;
     }
 }
