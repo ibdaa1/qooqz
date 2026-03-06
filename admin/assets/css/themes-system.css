@@ -86,6 +86,7 @@
 
 /* ── Settings Items List ── */
 .themes-page .settings-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.themes-page .settings-header h3,
 .themes-page .settings-header h4 { margin:0; font-size:0.95rem; color:var(--text-primary,#fff); }
 .themes-page .settings-list { display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
 .themes-page .setting-item,
