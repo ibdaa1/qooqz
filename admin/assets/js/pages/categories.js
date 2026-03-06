@@ -1257,7 +1257,9 @@
                 });
 
                 // Create stable aliases used throughout CSS and inline styles
+                // Only set alias if the target isn't already provided directly by the DB
                 const alias = (target, ...sources) => {
+                    if (root.style.getPropertyValue(target).trim()) return;
                     for (const src of sources) {
                         const v = root.style.getPropertyValue(src).trim();
                         if (v) { root.style.setProperty(target, v); return; }
@@ -1269,6 +1271,13 @@
                 if (secBg && !root.style.getPropertyValue('--background-tertiary').trim()) {
                     root.style.setProperty('--background-tertiary', secBg);
                 }
+                // Inputs/search fields/filter selects use the surface/secondary background
+                alias('--input-background', '--background-secondary', '--background_secondary', '--background-primary', '--background_primary');
+                // Border color aliases
+                alias('--border-color', '--border', '--divider-color', '--divider_color');
+                // Text muted/tertiary for placeholders
+                alias('--text-secondary', '--text-muted', '--text_muted', '--text-light');
+                alias('--text-tertiary', '--text-secondary', '--text_secondary', '--text-muted');
             }
 
             // Apply font settings

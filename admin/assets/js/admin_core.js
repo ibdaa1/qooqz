@@ -68,6 +68,18 @@
     return dest;
   }
 
+  // System / generic font names that do NOT exist on Google Fonts.
+  // Used to skip unnecessary Google Fonts requests.
+  const SYSTEM_FONT_NAMES = new Set([
+    'system-ui', 'ui-sans-serif', 'ui-serif', 'ui-monospace',
+    'sans-serif', 'serif', 'monospace', 'cursive', 'fantasy', 'math',
+    'inherit', 'initial', 'unset',
+    'arial', 'verdana', 'helvetica', 'helvetica neue', 'georgia',
+    'times', 'times new roman', 'courier', 'courier new',
+    'impact', 'trebuchet ms', 'comic sans ms', 'tahoma',
+    'lucida', 'palatino', 'garamond',
+  ]);
+
   function normalizeExplicitColor(v) {
     if (v === undefined || v === null) return null;
     const s = String(v).trim();
@@ -311,19 +323,29 @@
 
         // Create CSS variable aliases so CSS files can use stable names
         // regardless of which key name the DB stores them under.
-        const alias = (target, source) => {
-          const v = root.style.getPropertyValue(source).trim();
-          if (v) root.style.setProperty(target, v);
+        const alias = (target, ...sources) => {
+          if (root.style.getPropertyValue(target).trim()) return; // already set by DB
+          for (const src of sources) {
+            const v = root.style.getPropertyValue(src).trim();
+            if (v) { root.style.setProperty(target, v); return; }
+          }
         };
         // --danger-color mirrors --error-color (DB key: error_color)
         alias('--danger-color', '--error-color');
         // --card-bg mirrors --background-secondary
         alias('--card-bg', '--background-secondary');
-        // --background-tertiary: slightly darker than secondary; use secondary as base
+        // --background-tertiary: use secondary if not explicitly set
         const secBg = root.style.getPropertyValue('--background-secondary').trim();
         if (secBg && !root.style.getPropertyValue('--background-tertiary').trim()) {
           root.style.setProperty('--background-tertiary', secBg);
         }
+        // --input-background: inputs/selects/search fields use DB surface color
+        alias('--input-background', '--background-secondary', '--background-primary', '--surface-color');
+        // --border-color: if DB uses a different key name
+        alias('--border-color', '--border', '--divider-color', '--line-color');
+        // --text-secondary/tertiary: placeholders and muted text
+        alias('--text-secondary', '--text-muted', '--text-light');
+        alias('--text-tertiary', '--text-secondary', '--text-muted');
         Admin.log('✓ Color aliases applied');
       }
 
@@ -337,14 +359,20 @@
           if (f.font_family) {
             root.style.setProperty(base + '-family', f.font_family);
 
-            // Load Google Font
+            // Load Google Font — extract only the first font name from the CSS stack
+            // e.g. "Courier New, monospace" → "Courier New" (not "Courier New, monospace")
             if (f.font_url) {
               Admin.asset.loadCss(f.font_url);
-            } else if (!/system|arial|verdana|sans-serif/i.test(f.font_family)) {
-              const gurl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(
-                f.font_family.replace(/\s+/g, '+')
-              )}&display=swap`;
-              Admin.asset.loadCss(gurl);
+            } else {
+              // Strip quotes and take only the first family from the comma-separated stack
+              const primaryFont = f.font_family.split(',')[0].trim().replace(/['"]/g, '');
+              // Skip generic and known system fonts — they don't exist on Google Fonts
+              if (primaryFont && !SYSTEM_FONT_NAMES.has(primaryFont.toLowerCase())) {
+                const gurl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(
+                  primaryFont.replace(/\s+/g, '+')
+                )}&display=swap`;
+                Admin.asset.loadCss(gurl);
+              }
             }
           }
 

@@ -233,47 +233,68 @@ final class AdminUiThemeLoader
     }
 
     /**
-     * Generate CSS from theme data
+     * Generate CSS from theme data.
+     * CSS variable names are hyphenated (--primary-color) so they match
+     * the CSS framework which always uses hyphen-format var() references.
      */
     public function generateCss(array $themeData): string
     {
+        // Helper: convert snake_case key to hyphenated CSS var name
+        $hyphenateKey = static fn(string $key): string => str_replace('_', '-', strtolower($key));
+
         $css = ":root {\n";
 
-        // Colors
+        // Colors — emit both underscore AND hyphenated form for maximum compatibility
         foreach ($themeData['color_settings'] ?? [] as $color) {
-            $css .= "  --{$color['setting_key']}: {$color['color_value']};\n";
+            if (empty($color['setting_key']) || empty($color['color_value'])) continue;
+            $hyphen = $hyphenateKey($color['setting_key']);
+            $css .= "  --{$hyphen}: {$color['color_value']};\n";
+            // Also emit the original underscore form in case anything references it
+            if ($color['setting_key'] !== $hyphen) {
+                $css .= "  --{$color['setting_key']}: {$color['color_value']};\n";
+            }
         }
 
-        // Fonts
+        // Fonts — emit hyphenated var names
         foreach ($themeData['font_settings'] ?? [] as $font) {
-            $css .= "  --{$font['setting_key']}-family: {$font['font_family']};\n";
-            $css .= "  --{$font['setting_key']}-size: {$font['font_size']};\n";
-            $css .= "  --{$font['setting_key']}-weight: {$font['font_weight']};\n";
+            if (empty($font['setting_key'])) continue;
+            $hyphen = $hyphenateKey($font['setting_key']);
+            if (!empty($font['font_family'])) {
+                $css .= "  --{$hyphen}-family: {$font['font_family']};\n";
+            }
+            if (!empty($font['font_size'])) {
+                $css .= "  --{$hyphen}-size: {$font['font_size']};\n";
+            }
+            if (!empty($font['font_weight'])) {
+                $css .= "  --{$hyphen}-weight: {$font['font_weight']};\n";
+            }
         }
 
         $css .= "}\n";
 
         // Buttons
         foreach ($themeData['button_styles'] ?? [] as $button) {
+            if (empty($button['slug'])) continue;
             $css .= ".btn-{$button['slug']} {\n";
-            $css .= "  background-color: {$button['background_color']};\n";
-            $css .= "  color: {$button['text_color']};\n";
-            if ($button['border_color']) $css .= "  border: {$button['border_width']}px solid {$button['border_color']};\n";
-            $css .= "  border-radius: {$button['border_radius']}px;\n";
-            $css .= "  padding: {$button['padding']};\n";
-            $css .= "  font-size: {$button['font_size']};\n";
-            $css .= "  font-weight: {$button['font_weight']};\n";
+            if (!empty($button['background_color'])) $css .= "  background-color: {$button['background_color']};\n";
+            if (!empty($button['text_color'])) $css .= "  color: {$button['text_color']};\n";
+            if (!empty($button['border_color'])) $css .= "  border: " . ($button['border_width'] ?? 1) . "px solid {$button['border_color']};\n";
+            if (!empty($button['border_radius'])) $css .= "  border-radius: {$button['border_radius']}px;\n";
+            if (!empty($button['padding'])) $css .= "  padding: {$button['padding']};\n";
+            if (!empty($button['font_size'])) $css .= "  font-size: {$button['font_size']};\n";
+            if (!empty($button['font_weight'])) $css .= "  font-weight: {$button['font_weight']};\n";
             $css .= "}\n";
         }
 
         // Cards
         foreach ($themeData['card_styles'] ?? [] as $card) {
+            if (empty($card['slug'])) continue;
             $css .= ".card-{$card['slug']} {\n";
-            if ($card['background_color']) $css .= "  background-color: {$card['background_color']};\n";
-            if ($card['border_color']) $css .= "  border: {$card['border_width']}px solid {$card['border_color']};\n";
-            $css .= "  border-radius: {$card['border_radius']}px;\n";
-            $css .= "  box-shadow: {$card['shadow_style']};\n";
-            $css .= "  padding: {$card['padding']};\n";
+            if (!empty($card['background_color'])) $css .= "  background-color: {$card['background_color']};\n";
+            if (!empty($card['border_color'])) $css .= "  border: " . ($card['border_width'] ?? 1) . "px solid {$card['border_color']};\n";
+            if (!empty($card['border_radius'])) $css .= "  border-radius: {$card['border_radius']}px;\n";
+            if (!empty($card['shadow_style'])) $css .= "  box-shadow: {$card['shadow_style']};\n";
+            if (!empty($card['padding'])) $css .= "  padding: {$card['padding']};\n";
             $css .= "}\n";
         }
 
