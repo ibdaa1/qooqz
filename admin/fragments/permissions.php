@@ -96,20 +96,65 @@ if (!$canView && !$isSuperAdmin) {
 // ════════════════════════════════════════════════════════════
 // TRANSLATION HELPERS
 // ════════════════════════════════════════════════════════════
-function __t($key, $fallback = '') {
-    if (function_exists('i18n_get')) {
-        $v = i18n_get($key);
-        return $v ?? ($fallback ?? $key);
+if (!function_exists('__t')) {
+    function __t($key, $fallback = '') {
+        if (function_exists('i18n_get')) {
+            $v = i18n_get($key);
+            return $v ?? ($fallback ?? $key);
+        }
+        return $fallback ?? $key;
     }
-    return $fallback ?? $key;
 }
 
-function __tr($key, $replacements = []) {
-    $text = __t($key, $key);
-    foreach ($replacements as $ph => $val) {
-        $text = str_replace("{" . $ph . "}", (string)$val, $text);
+if (!function_exists('__tr')) {
+    function __tr($key, $replacements = []) {
+        $text = __t($key, $key);
+        foreach ($replacements as $ph => $val) {
+            $text = str_replace("{" . $ph . "}", (string)$val, $text);
+        }
+        return $text;
     }
-    return $text;
+}
+
+// ════════════════════════════════════════════════════════════
+// DB-DRIVEN CSS VARS HELPER (Permissions)
+// ════════════════════════════════════════════════════════════
+if (!function_exists('renderFragmentThemeVars')) {
+    function renderFragmentThemeVars(array $theme): void {
+        echo ':root {' . PHP_EOL;
+        foreach ($theme['color_settings'] ?? [] as $c) {
+            if (empty($c['setting_key']) || !isset($c['color_value'])) continue;
+            $k = htmlspecialchars($c['setting_key'], ENT_QUOTES);
+            $h = htmlspecialchars(str_replace('_', '-', $c['setting_key']), ENT_QUOTES);
+            $v = htmlspecialchars($c['color_value'], ENT_QUOTES);
+            echo "    --{$k}: {$v};" . PHP_EOL;
+            if ($h !== $k) echo "    --{$h}: {$v};" . PHP_EOL;
+        }
+        foreach ($theme['font_settings'] ?? [] as $f) {
+            if (empty($f['setting_key'])) continue;
+            $sk = htmlspecialchars($f['setting_key'], ENT_QUOTES);
+            $sh = htmlspecialchars(str_replace('_', '-', $f['setting_key']), ENT_QUOTES);
+            if (!empty($f['font_family'])) {
+                $ff = htmlspecialchars($f['font_family'], ENT_QUOTES);
+                echo "    --{$sk}-family: {$ff};" . PHP_EOL;
+                if ($sh !== $sk) echo "    --{$sh}-family: {$ff};" . PHP_EOL;
+            }
+            if (!empty($f['font_size'])) {
+                $fs = htmlspecialchars($f['font_size'], ENT_QUOTES);
+                echo "    --{$sk}-size: {$fs};" . PHP_EOL;
+                if ($sh !== $sk) echo "    --{$sh}-size: {$fs};" . PHP_EOL;
+            }
+        }
+        foreach ($theme['design_settings'] ?? [] as $d) {
+            if (empty($d['setting_key']) || !isset($d['setting_value'])) continue;
+            $dk = htmlspecialchars($d['setting_key'], ENT_QUOTES);
+            $dh = htmlspecialchars(str_replace('_', '-', $d['setting_key']), ENT_QUOTES);
+            $dv = htmlspecialchars($d['setting_value'], ENT_QUOTES);
+            echo "    --{$dk}: {$dv};" . PHP_EOL;
+            if ($dh !== $dk) echo "    --{$dh}: {$dv};" . PHP_EOL;
+        }
+        echo '}' . PHP_EOL;
+    }
 }
 
 // ════════════════════════════════════════════════════════════
@@ -127,9 +172,17 @@ if ($isSuperAdmin && $pdo instanceof PDO) {
 $apiBase = '/api';
 
 ?>
+<!-- DB-driven CSS vars (all settings, colors, fonts from database) -->
+<style id="db-theme-vars-permissions">
+<?php renderFragmentThemeVars($GLOBALS['ADMIN_UI']['theme'] ?? []); ?>
+<?php if (!empty($GLOBALS['ADMIN_UI']['theme']['generated_css'])): ?>
+<?= $GLOBALS['ADMIN_UI']['theme']['generated_css'] ?>
+<?php endif; ?>
+</style>
+
 <!-- Force load CSS if embedded -->
 <?php if ($isFragment): ?>
-<link rel="stylesheet" href="/admin/assets/css/permissions-system.css?v=<?= time() ?>">
+<link rel="stylesheet" href="/admin/assets/css/permissions-system.css">
 <?php endif; ?>
 
 <!-- Page Meta -->
