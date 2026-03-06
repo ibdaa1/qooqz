@@ -72,6 +72,8 @@ if (!function_exists('__pos_t')) {
 // Get current user's entity_id if set
 $userEntityId = $user['entity_id'] ?? null;
 
+$canEditOrders = $isSuperAdmin || can('pos.edit_orders') || can('manage_pos');
+
 // ════════════════════════════════════════════════════════════
 // THEME VARS INJECTION (DB-driven CSS variables)
 // ════════════════════════════════════════════════════════════
@@ -155,14 +157,15 @@ if (!function_exists('renderFragmentThemeVars')) {
 <!-- POS Config -->
 <script>
 window.POS_CONFIG = {
-    TENANT_ID:      <?= (int)$tenantId ?>,
-    ENTITY_ID:      <?= $userEntityId ? (int)$userEntityId : 'null' ?>,
-    USER_ID:        <?= (int)($user['id'] ?? 0) ?>,
-    IS_SUPER_ADMIN: <?= $isSuperAdmin ? 'true' : 'false' ?>,
-    LANG:           '<?= htmlspecialchars($lang, ENT_QUOTES) ?>',
-    DIR:            '<?= htmlspecialchars($dir, ENT_QUOTES) ?>',
-    CSRF:           '<?= htmlspecialchars($csrf, ENT_QUOTES) ?>',
-    CURRENCY:       'SAR',
+    TENANT_ID:        <?= (int)$tenantId ?>,
+    ENTITY_ID:        <?= $userEntityId ? (int)$userEntityId : 'null' ?>,
+    USER_ID:          <?= (int)($user['id'] ?? 0) ?>,
+    IS_SUPER_ADMIN:   <?= $isSuperAdmin ? 'true' : 'false' ?>,
+    CAN_EDIT_ORDERS:  <?= $canEditOrders ? 'true' : 'false' ?>,
+    LANG:             '<?= htmlspecialchars($lang, ENT_QUOTES) ?>',
+    DIR:              '<?= htmlspecialchars($dir, ENT_QUOTES) ?>',
+    CSRF:             '<?= htmlspecialchars($csrf, ENT_QUOTES) ?>',
+    CURRENCY:         'SAR',
 };
 </script>
 
@@ -221,25 +224,56 @@ window.POS_CONFIG = {
     </div>
 
     <!-- ════════════════════════════════════
-         MAIN POS LAYOUT
-         (shown when session is active)
+         TAB NAVIGATION (visible when session active)
+         ════════════════════════════════════ -->
+    <div class="pos-tab-nav" id="posTabNav" style="display:none">
+        <button class="pos-tab-btn active" data-tab="pos">
+            🏪 <?= __pos_t('pos.tab.pos', 'Point of Sale') ?>
+        </button>
+        <button class="pos-tab-btn" data-tab="history">
+            📋 <?= __pos_t('pos.tab.history', 'Sales History') ?>
+        </button>
+        <?php if ($isSuperAdmin || can('manage_pos') || can('pos.reports')): ?>
+        <button class="pos-tab-btn" data-tab="reports">
+            📊 <?= __pos_t('pos.tab.reports', 'Reports') ?>
+        </button>
+        <?php endif; ?>
+    </div>
+
+    <!-- ════════════════════════════════════
+         MAIN POS LAYOUT  (tab: pos)
          ════════════════════════════════════ -->
     <div class="pos-layout" id="posMainLayout" style="display:none">
 
         <!-- ── Left Panel: Products ── -->
         <div class="pos-products-panel">
 
-            <!-- Search -->
+            <!-- Search + Barcode Button -->
             <div class="pos-search-bar">
                 <input type="search" id="posSearch"
-                       placeholder="<?= __pos_t('pos.products.search', 'Search products...') ?>"
+                       placeholder="<?= __pos_t('pos.products.search', 'Search or scan barcode...') ?>"
                        autocomplete="off">
+                <button class="pos-barcode-btn" id="posBarcodeBtn" title="<?= __pos_t('pos.barcode.toggle', 'Barcode Scanner') ?>">
+                    <span id="posBarcodeIcon">📷</span>
+                </button>
             </div>
 
-            <!-- Category Tabs -->
-            <div class="pos-category-tabs" id="posCategoryTabs">
-                <button class="pos-cat-tab active" data-cat="all"><?= __pos_t('pos.products.all', 'All') ?></button>
+            <!-- Barcode Mode Banner -->
+            <div class="pos-barcode-banner" id="posBarcodeBanner" style="display:none">
+                <span>🔍 <?= __pos_t('pos.barcode.hardware_mode', 'Barcode Reader Mode – scan now') ?></span>
+                <button class="pos-barcode-mode-btn" id="posBarcodeCameraBtn" title="<?= __pos_t('pos.barcode.camera', 'Camera') ?>">
+                    📷 <?= __pos_t('pos.barcode.use_camera', 'Use Camera') ?>
+                </button>
+                <button class="pos-barcode-close" id="posBarcodeClose">✕</button>
             </div>
+
+            <!-- Parent Category Tabs (from API) -->
+            <div class="pos-category-tabs pos-parent-cats" id="posParentCats">
+                <button class="pos-cat-tab active" data-parent-id="0"><?= __pos_t('pos.products.all', 'All') ?></button>
+            </div>
+
+            <!-- Sub Category Tabs (shown when parent selected) -->
+            <div class="pos-sub-cat-tabs" id="posSubCats" style="display:none"></div>
 
             <!-- Products Grid -->
             <div class="pos-products-grid" id="posProductsGrid">
@@ -328,6 +362,63 @@ window.POS_CONFIG = {
                 <!-- Clear cart -->
                 <button class="pos-clear-btn" id="posClearBtn">
                     🗑 <?= __pos_t('pos.cart.clear', 'Clear Cart') ?>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         SALES HISTORY PANEL  (tab: history)
+         ════════════════════════════════════ -->
+    <div class="pos-panel" id="posHistoryPanel" style="display:none">
+        <div class="pos-panel-header">
+            <h2>📋 <?= __pos_t('pos.tab.history', 'Sales History') ?></h2>
+            <button class="btn btn-sm btn-outline" id="posRefreshHistory">
+                🔄 <?= __pos_t('common.refresh', 'Refresh') ?>
+            </button>
+        </div>
+        <div id="posHistoryContent">
+            <div class="pos-loading"><div class="pos-spinner"></div></div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         REPORTS PANEL  (tab: reports)
+         ════════════════════════════════════ -->
+    <?php if ($isSuperAdmin || can('manage_pos') || can('pos.reports')): ?>
+    <div class="pos-panel" id="posReportsPanel" style="display:none">
+        <div class="pos-panel-header">
+            <h2>📊 <?= __pos_t('pos.tab.reports', 'Session Reports') ?></h2>
+            <button class="btn btn-sm btn-outline" id="posRefreshReports">
+                🔄 <?= __pos_t('common.refresh', 'Refresh') ?>
+            </button>
+        </div>
+        <div id="posReportsContent">
+            <div class="pos-loading"><div class="pos-spinner"></div></div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- ════════════════════════════════════
+         CAMERA SCANNER OVERLAY
+         ════════════════════════════════════ -->
+    <div class="pos-camera-overlay" id="posCameraOverlay" style="display:none">
+        <div class="pos-camera-box">
+            <div class="pos-camera-header">
+                <span>📷 <?= __pos_t('pos.barcode.camera_title', 'Camera Barcode Scanner') ?></span>
+                <button class="pos-camera-close" id="posCameraClose">✕</button>
+            </div>
+            <video id="posCameraVideo" autoplay playsinline muted
+                   style="width:100%;border-radius:8px;background:#000"></video>
+            <div class="pos-camera-guide">
+                <div class="pos-scan-line"></div>
+            </div>
+            <p class="pos-camera-status" id="posCameraStatus">
+                <?= __pos_t('pos.barcode.camera_hint', 'Point camera at barcode') ?>
+            </p>
+            <div style="text-align:center;margin-top:8px">
+                <button class="btn btn-outline btn-sm" id="posCameraStop">
+                    ⏹ <?= __pos_t('pos.barcode.stop_camera', 'Stop Camera') ?>
                 </button>
             </div>
         </div>
