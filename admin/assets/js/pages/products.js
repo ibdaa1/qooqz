@@ -90,6 +90,7 @@
         const tr = s.translations || {};
         const val = s.validation || {};
         const msg = s.messages || {};
+        const csv = s.csv || {};
         return {
             // products.* keys
             products: {
@@ -199,6 +200,22 @@
                 save_success: s.save_success, update_success: s.update_success,
                 delete_confirm: s.delete_confirm, delete_success: s.delete_success,
                 saving: s.saving, loading: s.loading
+            },
+            // csv.* keys used in CSV import modal
+            csv: {
+                import_button: csv.import_button,
+                title: csv.title,
+                instructions: csv.instructions,
+                download_sample: csv.download_sample,
+                choose_file: csv.choose_file,
+                importing: csv.importing,
+                import: csv.import,
+                cancel: csv.cancel,
+                preview_found: csv.preview_found,
+                import_complete: csv.import_complete,
+                created: csv.created,
+                failed: csv.failed,
+                columns_info_label: csv.columns_info_label
             }
         };
     }
@@ -2163,7 +2180,7 @@
             const pct = Math.round(((i) / total) * 100);
             progressBar.style.width = pct + '%';
             progressPct.textContent = pct + '%';
-            progressLabel.textContent = `Importing row ${i + 1} of ${total}...`;
+            progressLabel.textContent = t('csv.importing', 'Importing…') + ` (${i + 1}/${total})`;
 
             try {
                 // Build product payload
@@ -2261,7 +2278,7 @@
         // Done
         progressBar.style.width = '100%';
         progressPct.textContent = '100%';
-        progressLabel.textContent = 'Import complete!';
+        progressLabel.textContent = t('csv.import_complete', 'Import complete!');
 
         const ok = failCount === 0;
         resultDiv.style.display = 'block';
@@ -2269,9 +2286,9 @@
         resultDiv.style.border = `1px solid ${ok ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`;
         resultDiv.style.color = 'var(--text-primary,#fff)';
         resultDiv.innerHTML = `
-            <strong>${ok ? '✅' : '⚠️'} Import Finished</strong><br>
-            <span style="color:#4ade80;">✓ ${successCount} products imported successfully</span>
-            ${failCount > 0 ? `<br><span style="color:#f87171;">✗ ${failCount} rows failed (see log above)</span>` : ''}
+            <strong>${ok ? '✅' : '⚠️'} ${t('csv.import_complete', 'Import Finished')}</strong><br>
+            <span style="color:#4ade80;">✓ ${t('csv.created', 'Created')}: ${successCount}</span>
+            ${failCount > 0 ? `  <span style="color:#f87171;">✗ ${t('csv.failed', 'Failed')}: ${failCount}</span>` : ''}
         `;
 
         cancelBtn.disabled = false;
@@ -2489,7 +2506,8 @@
                     const infoEl = $id('csvPreviewInfo');
                     const countEl = $id('csvRowCount');
                     if (infoEl && countEl) {
-                        countEl.textContent = `📄 ${_csvParsedRows.length} product row(s) detected in file`;
+                        const found = (t('csv.preview_found', 'Found {count} rows ready to import') || 'Found {count} rows ready to import').replace('{count}', _csvParsedRows.length);
+                        countEl.textContent = `📄 ${found}`;
                         infoEl.style.display = 'block';
                     }
                     $id('csvImportStart').disabled = _csvParsedRows.length === 0;

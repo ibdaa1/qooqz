@@ -134,7 +134,7 @@ $apiBase = '/api';
 
 <!-- Page Meta -->
 <meta data-page="permissions"
-      data-i18n-files="/admin/languages/Permissions/<?= rawurlencode($lang) ?>.json">
+      data-i18n-files="/languages/Permissions/<?= rawurlencode($lang) ?>.json">
 
 <!-- Page Container -->
 <div class="page-container" id="permissionsPageContainer" dir="<?= htmlspecialchars($dir) ?>">

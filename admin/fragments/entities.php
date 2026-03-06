@@ -113,7 +113,7 @@ $apiBase = '/api';
 
 <!-- Page Meta -->
 <meta data-page="entities"
-      data-i18n-files="/admin/languages/Entities/<?= rawurlencode($lang) ?>.json">
+      data-i18n-files="/languages/Entities/<?= rawurlencode($lang) ?>.json">
 
 <!-- Page Container -->
 <div class="page-container" id="entitiesPageContainer" dir="<?= htmlspecialchars($dir) ?>">

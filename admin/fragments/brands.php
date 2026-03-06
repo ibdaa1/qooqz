@@ -106,7 +106,7 @@ $imageTypeId = 12; // brand image type (from image_types table)
 
 <!-- Page Meta -->
 <meta data-page="brands"
-      data-i18n-files="/admin/languages/Brands/<?= rawurlencode($lang) ?>.json">
+      data-i18n-files="/languages/Brands/<?= rawurlencode($lang) ?>.json">
 
 <!-- Page Container -->
 <div class="page-container" id="brandsPageContainer" dir="<?= htmlspecialchars($dir) ?>">

@@ -188,7 +188,8 @@ if (!function_exists('renderFragmentThemeVars')) {
 
 <!-- Page Meta -->
 <meta data-page="products"
-      data-i18n-files="/admin/languages/Products/<?= rawurlencode($lang) ?>.json">
+      data-assets-css="/admin/assets/css/pages/products.css"
+      data-i18n-files="/languages/Product/<?= rawurlencode($lang) ?>.json">
 
 <!-- Page Container -->
 <div class="page-container" id="productsPageContainer" dir="<?= htmlspecialchars($dir) ?>">
@@ -203,7 +204,7 @@ if (!function_exists('renderFragmentThemeVars')) {
             <?php if ($canCreate): ?>
             <button id="btnImportCsv" class="btn btn-secondary">
                 <i class="fas fa-file-csv"></i>
-                <span>Import CSV</span>
+                <span data-i18n="csv.import_button"><?= __t('csv.import_button', 'Import CSV') ?></span>
             </button>
             <button id="btnAddProduct" class="btn btn-primary">
                 <i class="fas fa-plus"></i>
@@ -851,7 +852,7 @@ if (!function_exists('renderFragmentThemeVars')) {
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                 <h3 style="color:var(--text-primary,#fff); margin:0;">
                     <i class="fas fa-file-csv" style="color:var(--primary-color,#3b82f6);"></i>
-                    Import Products via CSV
+                    <span data-i18n="csv.title"><?= __t('csv.title', 'Import Products via CSV') ?></span>
                 </h3>
                 <button type="button" id="csvImportClose" style="background:none; border:none; color:var(--text-secondary,#94a3b8); font-size:1.4rem; cursor:pointer; padding:4px;">&times;</button>
             </div>
@@ -860,21 +861,21 @@ if (!function_exists('renderFragmentThemeVars')) {
             <div style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.25); border-radius:8px; padding:14px; margin-bottom:18px;">
                 <p style="color:var(--text-secondary,#94a3b8); margin:0; font-size:0.88rem; line-height:1.6;">
                     <i class="fas fa-info-circle" style="color:#3b82f6;"></i>
-                    Upload a CSV file to bulk-import products with English translations. Each row = one product.
-                    Max recommended: <strong style="color:#fff;">1000 rows</strong> per file.
+                    <span data-i18n="csv.instructions"><?= __t('csv.instructions', 'Upload a CSV file to bulk-import products with English translations. Each row = one product. Max recommended: 1000 rows per file.') ?></span>
                 </p>
             </div>
 
             <!-- Download Sample -->
             <div style="margin-bottom:18px;">
                 <button type="button" id="btnDownloadSample" class="btn btn-outline" style="width:100%;">
-                    <i class="fas fa-download"></i> Download Sample CSV Template
+                    <i class="fas fa-download"></i>
+                    <span data-i18n="csv.download_sample"><?= __t('csv.download_sample', 'Download Sample CSV Template') ?></span>
                 </button>
             </div>
 
             <!-- File Input -->
             <div class="form-group" style="margin-bottom:18px;">
-                <label style="color:var(--text-primary,#fff); margin-bottom:8px; display:block;">Select CSV File</label>
+                <label data-i18n="csv.choose_file" style="color:var(--text-primary,#fff); margin-bottom:8px; display:block;"><?= __t('csv.choose_file', 'Select CSV File') ?></label>
                 <input type="file" id="csvFileInput" accept=".csv,text/csv" class="form-control"
                        style="color:var(--text-secondary,#94a3b8); padding:10px;">
             </div>
@@ -887,7 +888,7 @@ if (!function_exists('renderFragmentThemeVars')) {
             <!-- Progress -->
             <div id="csvProgressArea" style="display:none; margin-bottom:16px;">
                 <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
-                    <span id="csvProgressLabel" style="color:var(--text-secondary,#94a3b8); font-size:0.85rem;">Importing...</span>
+                    <span id="csvProgressLabel" data-i18n="csv.importing" style="color:var(--text-secondary,#94a3b8); font-size:0.85rem;"><?= __t('csv.importing', 'Importing…') ?></span>
                     <span id="csvProgressPct" style="color:var(--text-primary,#fff); font-size:0.85rem; font-weight:600;">0%</span>
                 </div>
                 <div style="background:rgba(255,255,255,0.1); border-radius:20px; height:8px; overflow:hidden;">
@@ -901,9 +902,10 @@ if (!function_exists('renderFragmentThemeVars')) {
 
             <!-- Actions -->
             <div style="display:flex; gap:10px; justify-content:flex-end;">
-                <button type="button" id="csvImportCancel" class="btn btn-outline">Cancel</button>
+                <button type="button" id="csvImportCancel" class="btn btn-outline" data-i18n="csv.cancel"><?= __t('csv.cancel', 'Cancel') ?></button>
                 <button type="button" id="csvImportStart" class="btn btn-primary" disabled>
-                    <i class="fas fa-upload"></i> Start Import
+                    <i class="fas fa-upload"></i>
+                    <span data-i18n="csv.import"><?= __t('csv.import', 'Start Import') ?></span>
                 </button>
             </div>
         </div>
@@ -968,12 +970,14 @@ window.PRODUCTS_CONFIG = {
 (function(){
     async function applyTranslations() {
         try {
-            const lang = window.USER_LANGUAGE || 'en';
-            const url = `/languages/Products/${encodeURIComponent(lang)}.json`;
+            const lang = window.USER_LANGUAGE || '<?= $lang ?>';
+            const url = `/languages/Product/${encodeURIComponent(lang)}.json`;
             console.log('[Products] Loading translations from', url);
             const res = await fetch(url, { credentials: 'same-origin' });
             if (!res.ok) throw new Error('Translation fetch failed: ' + res.status);
-            const translations = await res.json();
+            const data = await res.json();
+            // Support both flat and nested (strings key) format
+            const translations = data.strings || data;
             window.PRODUCTS_TRANSLATIONS = translations;
             // apply translations to elements with data-i18n
             const container = document.getElementById('productsPageContainer');
