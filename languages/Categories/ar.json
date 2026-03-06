@@ -105,6 +105,7 @@
     "translations": {
       "select_lang": "اختر اللغة",
       "choose_lang": "اختر اللغة",
+      "translations_title": "الترجمات",
       "name_in_lang": "الاسم في {lang}",
       "slug_in_lang": "الرابط في {lang}",
       "description_in_lang": "الوصف في {lang}",

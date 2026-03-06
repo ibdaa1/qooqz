@@ -105,6 +105,7 @@
     "translations": {
       "select_lang": "Select Language",
       "choose_lang": "Choose language",
+      "translations_title": "Translations",
       "name_in_lang": "Name in {lang}",
       "slug_in_lang": "Slug in {lang}",
       "description_in_lang": "Description in {lang}",

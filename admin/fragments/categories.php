@@ -118,67 +118,93 @@ $apiBase = '/api';
 // ════════════════════════════════════════════════════════════
 if (!function_exists('renderFragmentThemeVars')) {
     function renderFragmentThemeVars(array $theme): void {
-        echo ':root {' . PHP_EOL;
-    // Color settings
-    foreach ($theme['color_settings'] ?? [] as $c) {
-        if (empty($c['setting_key']) || !isset($c['color_value'])) continue;
-        $k = htmlspecialchars($c['setting_key'], ENT_QUOTES);
-        $h = htmlspecialchars(str_replace('_', '-', $c['setting_key']), ENT_QUOTES);
-        $v = htmlspecialchars($c['color_value'], ENT_QUOTES);
-        echo "    --{$k}: {$v};" . PHP_EOL;
-        if ($h !== $k) echo "    --{$h}: {$v};" . PHP_EOL;
-    }
-    // Font settings
-    foreach ($theme['font_settings'] ?? [] as $f) {
-        if (empty($f['setting_key'])) continue;
-        $sk = htmlspecialchars($f['setting_key'], ENT_QUOTES);
-        $sh = htmlspecialchars(str_replace('_', '-', $f['setting_key']), ENT_QUOTES);
-        if (!empty($f['font_family'])) {
-            $ff = htmlspecialchars($f['font_family'], ENT_QUOTES);
-            echo "    --{$sk}-family: {$ff};" . PHP_EOL;
-            if ($sh !== $sk) echo "    --{$sh}-family: {$ff};" . PHP_EOL;
+        // Collect every emitted variable so we can fill in aliases at the end
+        $emitted = [];
+        $lines   = [':root {'];
+
+        $emit = function(string $k, string $v) use (&$emitted, &$lines): void {
+            $ke = htmlspecialchars($k, ENT_QUOTES);
+            $ve = htmlspecialchars($v, ENT_QUOTES);
+            $lines[]         = "    --{$ke}: {$ve};";
+            $emitted["--{$k}"] = $v;
+        };
+
+        // Color settings
+        foreach ($theme['color_settings'] ?? [] as $c) {
+            if (empty($c['setting_key']) || !isset($c['color_value'])) continue;
+            $k = $c['setting_key'];
+            $h = str_replace('_', '-', $k);
+            $v = $c['color_value'];
+            $emit($k, $v);
+            if ($h !== $k) $emit($h, $v);
         }
-        if (!empty($f['font_size'])) {
-            $fs = htmlspecialchars($f['font_size'], ENT_QUOTES);
-            echo "    --{$sk}-size: {$fs};" . PHP_EOL;
-            if ($sh !== $sk) echo "    --{$sh}-size: {$fs};" . PHP_EOL;
+        // Font settings
+        foreach ($theme['font_settings'] ?? [] as $f) {
+            if (empty($f['setting_key'])) continue;
+            $sk = $f['setting_key'];
+            $sh = str_replace('_', '-', $sk);
+            if (!empty($f['font_family'])) {
+                $emit("{$sk}-family", $f['font_family']);
+                if ($sh !== $sk) $emit("{$sh}-family", $f['font_family']);
+            }
+            if (!empty($f['font_size'])) {
+                $emit("{$sk}-size", $f['font_size']);
+                if ($sh !== $sk) $emit("{$sh}-size", $f['font_size']);
+            }
+            if (!empty($f['font_weight'])) {
+                $emit("{$sk}-weight", $f['font_weight']);
+                if ($sh !== $sk) $emit("{$sh}-weight", $f['font_weight']);
+            }
         }
-        if (!empty($f['font_weight'])) {
-            $fw = htmlspecialchars($f['font_weight'], ENT_QUOTES);
-            echo "    --{$sk}-weight: {$fw};" . PHP_EOL;
-            if ($sh !== $sk) echo "    --{$sh}-weight: {$fw};" . PHP_EOL;
+        // Design settings (border-radius, padding, spacing, shadows…)
+        foreach ($theme['design_settings'] ?? [] as $d) {
+            if (empty($d['setting_key']) || !isset($d['setting_value'])) continue;
+            $dk = $d['setting_key'];
+            $dh = str_replace('_', '-', $dk);
+            $emit($dk, $d['setting_value']);
+            if ($dh !== $dk) $emit($dh, $d['setting_value']);
         }
+        // Button styles exposed as CSS vars
+        foreach ($theme['button_styles'] ?? [] as $b) {
+            if (empty($b['slug'])) continue;
+            $slug = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$b['slug']));
+            if (!empty($b['background_color'])) $emit("btn-{$slug}-bg",     $b['background_color']);
+            if (!empty($b['text_color']))        $emit("btn-{$slug}-color",  $b['text_color']);
+            if (!empty($b['border_color']))      $emit("btn-{$slug}-border", $b['border_color']);
+            if (!empty($b['border_radius']))     $emit("btn-{$slug}-radius", $b['border_radius'] . 'px');
+        }
+        // Card styles exposed as CSS vars
+        foreach ($theme['card_styles'] ?? [] as $cs) {
+            if (empty($cs['slug'])) continue;
+            $slug = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$cs['slug']));
+            if (!empty($cs['background_color'])) $emit("card-{$slug}-bg",      $cs['background_color']);
+            if (!empty($cs['border_color']))      $emit("card-{$slug}-border",  $cs['border_color']);
+            if (!empty($cs['border_radius']))     $emit("card-{$slug}-radius",  $cs['border_radius'] . 'px');
+            if (!empty($cs['shadow_style']))      $emit("card-{$slug}-shadow",  $cs['shadow_style']);
+            if (!empty($cs['padding']))           $emit("card-{$slug}-padding", $cs['padding']);
+        }
+
+        // Shorthand alias defaults — ensure that --input-bg, --card-bg and --thead-bg
+        // are always present even when the DB theme doesn't have explicit entries for
+        // them.  We derive from the nearest available variable or use a safe fallback.
+        $bgSec = $emitted['--background-secondary'] ?? $emitted['--background_secondary'] ?? null;
+        $aliasDefaults = [
+            '--card-bg'       => $emitted['--card-bg']       ?? $emitted['--card_bg']       ?? $bgSec ?? '#081127',
+            '--input-bg'      => $emitted['--input-bg']      ?? $emitted['--input_bg']       ?? $bgSec ?? '#0b1220',
+            '--thead-bg'      => $emitted['--thead-bg']      ?? $emitted['--thead_bg']       ?? $bgSec ?? '#061021',
+            '--danger-color'  => $emitted['--danger-color']  ?? $emitted['--danger_color']   ?? $emitted['--error-color']  ?? '#ef4444',
+            '--success-color' => $emitted['--success-color'] ?? $emitted['--success_color']  ?? '#22c55e',
+        ];
+        foreach ($aliasDefaults as $cssVar => $val) {
+            if (!isset($emitted[$cssVar])) {
+                $lines[]        = '    ' . htmlspecialchars($cssVar, ENT_QUOTES) . ': ' . htmlspecialchars($val, ENT_QUOTES) . ';';
+                $emitted[$cssVar] = $val;
+            }
+        }
+
+        $lines[] = '}';
+        echo implode(PHP_EOL, $lines) . PHP_EOL;
     }
-    // Design settings (border-radius, padding, spacing, shadows…)
-    foreach ($theme['design_settings'] ?? [] as $d) {
-        if (empty($d['setting_key']) || !isset($d['setting_value'])) continue;
-        $dk = htmlspecialchars($d['setting_key'], ENT_QUOTES);
-        $dh = htmlspecialchars(str_replace('_', '-', $d['setting_key']), ENT_QUOTES);
-        $dv = htmlspecialchars($d['setting_value'], ENT_QUOTES);
-        echo "    --{$dk}: {$dv};" . PHP_EOL;
-        if ($dh !== $dk) echo "    --{$dh}: {$dv};" . PHP_EOL;
-    }
-    // Button styles exposed as CSS vars
-    foreach ($theme['button_styles'] ?? [] as $b) {
-        if (empty($b['slug'])) continue;
-        $slug = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$b['slug']));
-        if (!empty($b['background_color'])) echo "    --btn-{$slug}-bg: " . htmlspecialchars($b['background_color'], ENT_QUOTES) . ';' . PHP_EOL;
-        if (!empty($b['text_color']))       echo "    --btn-{$slug}-color: " . htmlspecialchars($b['text_color'], ENT_QUOTES) . ';' . PHP_EOL;
-        if (!empty($b['border_color']))     echo "    --btn-{$slug}-border: " . htmlspecialchars($b['border_color'], ENT_QUOTES) . ';' . PHP_EOL;
-        if (!empty($b['border_radius']))    echo "    --btn-{$slug}-radius: " . htmlspecialchars((string)$b['border_radius'], ENT_QUOTES) . 'px;' . PHP_EOL;
-    }
-    // Card styles exposed as CSS vars
-    foreach ($theme['card_styles'] ?? [] as $cs) {
-        if (empty($cs['slug'])) continue;
-        $slug = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$cs['slug']));
-        if (!empty($cs['background_color'])) echo "    --card-{$slug}-bg: " . htmlspecialchars($cs['background_color'], ENT_QUOTES) . ';' . PHP_EOL;
-        if (!empty($cs['border_color']))     echo "    --card-{$slug}-border: " . htmlspecialchars($cs['border_color'], ENT_QUOTES) . ';' . PHP_EOL;
-        if (!empty($cs['border_radius']))    echo "    --card-{$slug}-radius: " . htmlspecialchars((string)$cs['border_radius'], ENT_QUOTES) . 'px;' . PHP_EOL;
-        if (!empty($cs['shadow_style']))     echo "    --card-{$slug}-shadow: " . htmlspecialchars($cs['shadow_style'], ENT_QUOTES) . ';' . PHP_EOL;
-        if (!empty($cs['padding']))          echo "    --card-{$slug}-padding: " . htmlspecialchars($cs['padding'], ENT_QUOTES) . ';' . PHP_EOL;
-    }
-    echo '}' . PHP_EOL;
-}
 }
 
 ?>
@@ -369,7 +395,7 @@ if (!function_exists('renderFragmentThemeVars')) {
                                 <select id="catImageType" class="form-control" style="font-size:0.85rem; display:none;">
                                     <option value="">Loading image types...</option>
                                 </select>
-                                <small id="catImageTypeDesc" style="color:#94a3b8; display:none; margin-top:4px;"></small>
+                                <small id="catImageTypeDesc" style="color:var(--text-secondary,#94a3b8); display:none; margin-top:4px;"></small>
                                 <div id="catImageLinks" style="margin-top:5px; font-size:0.8rem; display:flex; gap:10px;"></div>
                             </div>
                         </div>
@@ -379,17 +405,19 @@ if (!function_exists('renderFragmentThemeVars')) {
                 <!-- Translations -->
                 <div class="translations-section" style="margin-top:20px;">
                     <h4 style="margin-bottom:12px; color:var(--text-primary,#fff); border-bottom:1px solid var(--border-color,#263044); padding-bottom:8px;">
-                        <i class="fas fa-language"></i> Translations
+                        <i class="fas fa-language"></i>
+                        <span data-i18n="form.translations.translations_title"><?= __t('form.translations.translations_title', 'Translations') ?></span>
                     </h4>
                     <div id="catTranslations" class="translation-panels"></div>
                     <div class="form-group" style="margin-top:12px;">
-                        <label for="catLangSelect" data-i18n="form.translations.select_lang">Select Language</label>
+                        <label for="catLangSelect" data-i18n="form.translations.select_lang"><?= __t('form.translations.select_lang', 'Select Language') ?></label>
                         <div style="display:flex; gap:8px; align-items:flex-end;">
                             <select id="catLangSelect" class="form-control" style="flex:1;">
-                                <option value="">Choose language</option>
+                                <option value="" data-i18n="form.translations.choose_lang"><?= __t('form.translations.choose_lang', 'Choose language') ?></option>
                             </select>
                             <button type="button" id="catAddLangBtn" class="btn btn-primary">
-                                <i class="fas fa-plus"></i> Add Translation
+                                <i class="fas fa-plus"></i>
+                                <span data-i18n="form.translations.add_translation"><?= __t('form.translations.add_translation', 'Add Translation') ?></span>
                             </button>
                         </div>
                     </div>
