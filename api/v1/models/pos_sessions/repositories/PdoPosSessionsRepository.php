@@ -22,7 +22,8 @@ final class PdoPosSessionsRepository implements PosSessionsRepositoryInterface
     {
         return "SELECT ps.*,
                        u.username AS cashier_name,
-                       e.store_name
+                       e.store_name,
+                       e.tenant_id AS entity_tenant_id
                 FROM pos_sessions ps
                 LEFT JOIN users u ON ps.cashier_user_id = u.id
                 LEFT JOIN entities e ON ps.entity_id = e.id";

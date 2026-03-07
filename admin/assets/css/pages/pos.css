@@ -15,7 +15,7 @@
 .pos-page {
     font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     color: var(--text-primary, #e2e8f0);
-    background: var(--background-primary, #0f172a);
+    background: var(--background-main, #0f172a);
     width: 100%;
     min-height: 100vh;
 }
@@ -197,7 +197,7 @@
 .pos-page .pos-products-grid::-webkit-scrollbar-thumb { background: var(--border-color, #334155); border-radius: 3px; }
 
 .pos-page .pos-product-card {
-    background: var(--card-product-bg, var(--background-secondary, #1e293b));
+    background: var(--card-product-bg, var(--card-bg, var(--background-secondary, #1e293b)));
     border: 1px solid var(--card-product-border, var(--border-color, #334155));
     border-radius: var(--card-product-radius, 10px);
     padding: var(--card-product-padding, 12px 10px);
@@ -942,7 +942,7 @@
 .pos-page .pos-sub-cat-tabs {
     display: flex; gap: 4px; flex-wrap: wrap;
     padding: 6px 12px;
-    background: var(--background-primary, #0f172a);
+    background: var(--background-main, #0f172a);
     border-bottom: 1px solid var(--border-color, #334155);
 }
 .pos-page .pos-sub-cat-tab {
@@ -1167,7 +1167,7 @@
 }
 
 .pos-page .pos-filter-input {
-    background: var(--background-primary, #0f172a);
+    background: var(--background-main, #0f172a);
     border: 1px solid var(--border-color, #334155);
     border-radius: 6px;
     color: var(--text-primary, #e2e8f0);

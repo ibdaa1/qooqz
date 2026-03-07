@@ -61,6 +61,8 @@
         // Active filters for history/reports
         historyFilters: { dateFrom: '', dateTo: '', paymentMethod: '' },
         reportsFilters: { dateFrom: '', dateTo: '', paymentMethod: '' },
+        // Entity → tenantId map (populated from entities API, for super-admin support)
+        entityTenantMap: {},
     };
 
     // Barcode hardware scanner: gap in ms above which typed chars are considered stale (user typing vs scanner)
@@ -214,6 +216,18 @@
     // ─────────────────────────────────────────────
     // Session Management
     // ─────────────────────────────────────────────
+    /**
+     * Resolve the correct tenant_id for a given entity+session combination.
+     * Prefers entityTenantMap (populated from entities API), then session's entity_tenant_id,
+     * then session's tenant_id as last resort.
+     */
+    function resolveEntityTenantId(entityId, session) {
+        return state.entityTenantMap[entityId]
+            || (session?.entity_tenant_id ? parseInt(session.entity_tenant_id, 10) : null)
+            || (session?.tenant_id ? parseInt(session.tenant_id, 10) : null)
+            || null;
+    }
+
     async function loadCurrentSession() {
         try {
             const params = {};
@@ -274,6 +288,8 @@
             });
             state.session = res.session;
             state.entityId = entityId;
+            const resolvedTenant = resolveEntityTenantId(entityId, state.session);
+            if (resolvedTenant) state.tenantId = resolvedTenant;
             updateSessionBar();
             showMainLayout();
             await Promise.all([loadCategories(), loadDiscounts()]);
@@ -1455,6 +1471,11 @@
             sel.innerHTML = `<option value="">${t('pos.select_entity','Select Entity/Branch')}</option>` +
                 entities.map(e => `<option value="${e.id}">${escHtml(e.store_name || '')}</option>`).join('');
 
+            // Build entity→tenant map so openSession can use correct tenant
+            entities.forEach(e => {
+                if (e.id && e.tenant_id) state.entityTenantMap[e.id] = parseInt(e.tenant_id, 10);
+            });
+
             if (entities.length === 1) {
                 sel.value = entities[0].id;
                 state.entityId = entities[0].id;
@@ -1760,6 +1781,8 @@
 
         if (state.session) {
             state.entityId = state.session.entity_id;
+            const resolvedTenant = resolveEntityTenantId(state.session.entity_id, state.session);
+            if (resolvedTenant) state.tenantId = resolvedTenant;
             await Promise.all([loadCategories(), loadDiscounts()]);
             showMainLayout();
             await loadProducts();
