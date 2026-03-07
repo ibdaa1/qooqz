@@ -652,7 +652,7 @@
             if (el.formTitle) el.formTitle.textContent = t('form.edit_title', 'Edit Entity');
             if (el.formId) el.formId.value = entity.id || '';
 
-            if (el.entityStoreName) el.entityStoreName.value = entity.original_store_name || entity.store_name || '';
+            if (el.enEntityName && !el.enEntityName.value) el.enEntityName.value = entity.original_store_name || entity.store_name || '';
             if (el.entitySlug) el.entitySlug.value = entity.slug || '';
             if (el.entityType) {
                 const hasParent = entity.parent_id && entity.parent_id !== '0' && entity.parent_id !== 0;
@@ -861,8 +861,8 @@
             }
 
             const entityData = {
-                store_name: formData.get('store_name'),
-                slug: formData.get('slug') || generateSlug(formData.get('store_name')),
+                store_name: formData.get('en_store_name') || formData.get('store_name') || '',
+                slug: formData.get('slug') || generateSlug(formData.get('en_store_name') || formData.get('store_name')),
                 parent_id: (formData.get('entity_type') === 'branch' && formData.get('parent_id')) ? parseInt(formData.get('parent_id'), 10) : null,
                 branch_code: formData.get('branch_code') || null,
                 vendor_type: formData.get('vendor_type') || 'product_seller',

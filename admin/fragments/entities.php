@@ -199,18 +199,6 @@ $apiBase = '/api';
                 <div class="tab-content active" id="tab-basic">
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="entityStoreName" class="required" data-i18n="form.fields.store_name.label">
-                                <?= __t('form.fields.store_name.label', 'Store Name') ?>
-                            </label>
-                            <input type="text" id="entityStoreName" name="store_name" class="form-control" required
-                                   data-i18n-placeholder="form.fields.store_name.placeholder"
-                                   placeholder="<?= __t('form.fields.store_name.placeholder', 'Enter store name') ?>">
-                            <div class="invalid-feedback" data-i18n="form.fields.store_name.required">
-                                <?= __t('form.fields.store_name.required', 'Store name is required') ?>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
                             <label for="entitySlug" data-i18n="form.fields.slug.label">
                                 <?= __t('form.fields.slug.label', 'Slug') ?>
                             </label>
