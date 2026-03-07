@@ -333,7 +333,9 @@
     // ─────────────────────────────────────────────
     async function loadCategories() {
         try {
-            const res = await apiGet(API.categories, { limit: 500, is_active: 1 });
+            const params = { limit: 500, is_active: 1, lang: state.lang };
+            if (state.entityId) params.entity_id = state.entityId;
+            const res = await apiGet(API.categories, params);
             const items = res.data?.items ?? res.items ?? (Array.isArray(res) ? res : []);
             state.categoryTree = buildCategoryTree(items);
         } catch {

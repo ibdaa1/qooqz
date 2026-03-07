@@ -51,21 +51,21 @@ try {
 
     /* ===================== GET ACTIVE ===================== */
     if ($method === 'GET' && str_contains($uri, '/categories/active')) {
-        $data = $controller->getActive($tenantId);
+        $data = $controller->getActive($tenantId, $lang);
         ResponseFormatter::success($data);
         return;
     }
 
     /* ===================== GET FEATURED ===================== */
     if ($method === 'GET' && str_contains($uri, '/categories/featured')) {
-        $data = $controller->getFeatured($tenantId);
+        $data = $controller->getFeatured($tenantId, $lang);
         ResponseFormatter::success($data);
         return;
     }
 
     /* ===================== GET TREE ===================== */
     if ($method === 'GET' && str_contains($uri, '/categories/tree')) {
-        $data = $controller->tree($tenantId);
+        $data = $controller->tree($tenantId, $lang);
         ResponseFormatter::success($data);
         return;
     }
@@ -85,7 +85,7 @@ try {
         }
         
         try {
-            $row = $controller->getById($tenantId, $id);
+            $row = $controller->getById($tenantId, $id, $lang);
             ResponseFormatter::success($row);
         } catch (RuntimeException $e) {
             ResponseFormatter::error($e->getMessage(), 404);
@@ -103,7 +103,13 @@ try {
 
     /* ===================== GET LIST ===================== */
     if ($method === 'GET' && str_contains($uri, '/categories')) {
-        $data = $controller->list($tenantId);
+        $listLimit    = clampLimit((int)($_GET['limit'] ?? 500));
+        $listOffset   = max(0, (int)($_GET['offset'] ?? 0));
+        $listLang     = $lang;
+        $listEntityId = isset($_GET['entity_id']) && is_numeric($_GET['entity_id'])
+                        ? (int)$_GET['entity_id'] : null;
+        $listIsActive = isset($_GET['is_active']) ? (int)$_GET['is_active'] : null;
+        $data = $controller->list($tenantId, $listLimit, $listOffset, $listLang, $listEntityId, $listIsActive);
         
         if ($format === 'csv') {
             header('Content-Type: text/csv; charset=utf-8');

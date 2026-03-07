@@ -246,7 +246,7 @@ window.POS_CONFIG = {
                 <!-- Opening balance -->
                 <div style="margin-bottom:14px">
                     <label style="display:block;font-size:.82rem;margin-bottom:4px;color:var(--text-secondary,#94a3b8)">
-                        <?= __pos_t('pos.session.opening_balance', 'Opening Balance') ?> (SAR)
+                        <?= __pos_t('pos.session.opening_balance', 'Opening Balance') ?> (<?= htmlspecialchars($defaultCurrencySymbol ?: $defaultCurrency, ENT_QUOTES) ?>)
                     </label>
                     <input type="number" name="opening_balance" class="form-control"
                            step="0.01" min="0" value="0" placeholder="0.00">
@@ -352,13 +352,14 @@ window.POS_CONFIG = {
 
                 <!-- Totals -->
                 <div class="pos-totals">
+                    <?php $currLabel = htmlspecialchars($defaultCurrencySymbol ?: $defaultCurrency, ENT_QUOTES); ?>
                     <div class="pos-total-row">
                         <span><?= __pos_t('pos.subtotal', 'Subtotal') ?></span>
-                        <span id="posSubtotal">0.00 SAR</span>
+                        <span id="posSubtotal">0.00 <?= $currLabel ?></span>
                     </div>
                     <div class="pos-total-row">
                         <span><?= __pos_t('pos.tax', 'Tax') ?></span>
-                        <span id="posTax">0.00 SAR</span>
+                        <span id="posTax">0.00 <?= $currLabel ?></span>
                     </div>
                     <!-- Manual Discount -->
                     <div class="pos-discount-row">
@@ -368,15 +369,15 @@ window.POS_CONFIG = {
                     <!-- Coupon Discount Row (shown when coupon applied) -->
                     <div class="pos-total-row pos-coupon-discount-row" id="posCouponRow" style="display:none;color:var(--success-color,#10b981)">
                         <span><?= __pos_t('pos.coupon.label', 'Coupon') ?></span>
-                        <span id="posCouponDiscountAmt">0.00 SAR</span>
+                        <span id="posCouponDiscountAmt">0.00 <?= $currLabel ?></span>
                     </div>
                     <div class="pos-total-row">
                         <span><?= __pos_t('pos.total', 'Total') ?></span>
-                        <span id="posTotal">0.00 SAR</span>
+                        <span id="posTotal">0.00 <?= $currLabel ?></span>
                     </div>
                     <div class="pos-total-row grand">
                         <span><?= __pos_t('pos.grand_total', 'Grand Total') ?></span>
-                        <span class="amount" id="posGrandTotal">0.00 SAR</span>
+                        <span class="amount" id="posGrandTotal">0.00 <?= $currLabel ?></span>
                     </div>
                 </div>
 
