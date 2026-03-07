@@ -1151,7 +1151,7 @@
     function validateForm() {
         let isValid = true;
 
-        const requiredFields = [el.entityStoreName, el.entityPhone, el.entityEmail];
+        const requiredFields = [el.enEntityName, el.entityPhone, el.entityEmail];
 
         requiredFields.forEach(field => {
             if (!field || !field.value.trim()) {
@@ -2197,7 +2197,6 @@
             formId: $id('formId'),
 
             // Form fields - Basic
-            entityStoreName: $id('entityStoreName'),
             entitySlug: $id('entitySlug'),
             entityType: $id('entityType'),
             entityParentId: $id('entityParentId'),
