@@ -107,7 +107,10 @@ final class CategoriesService
 
     public function deleteTranslation(int $tenantId, int $categoryId, string $languageCode): array
     {
-        // Soft-delete via update (no-op if translations table not managed here)
+        $stmt = $this->pdo->prepare(
+            'DELETE FROM category_translations WHERE category_id = :cat_id AND language_code = :lang'
+        );
+        $stmt->execute([':cat_id' => $categoryId, ':lang' => $languageCode]);
         return ['deleted' => true, 'category_id' => $categoryId, 'language_code' => $languageCode];
     }
 }

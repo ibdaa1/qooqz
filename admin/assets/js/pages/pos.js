@@ -57,6 +57,7 @@
         cameraScanInterval: null,
         // History & Reports
         salesHistory:  [],
+        reportsOrders: [],
         // Active filters for history/reports
         historyFilters: { dateFrom: '', dateTo: '', paymentMethod: '' },
         reportsFilters: { dateFrom: '', dateTo: '', paymentMethod: '' },
@@ -1305,7 +1306,7 @@
             if (f.dateTo)   params.date_to   = f.dateTo;
             if (f.paymentMethod) params.payment_method = f.paymentMethod;
             const res = await apiGet(API.pos, params);
-            state.salesHistory = res.orders ?? [];
+            state.reportsOrders = res.orders ?? [];
         } catch { /* ignore */ }
         renderReports();
     }
@@ -1333,7 +1334,7 @@
     function renderReports() {
         const content = document.getElementById('posReportsContent');
         if (!content) return;
-        const orders  = applyReportsFilters(state.salesHistory);
+        const orders  = applyReportsFilters(state.reportsOrders);
         const s       = state.session;
 
         const totalOrders = orders.length;
@@ -1685,7 +1686,7 @@
             state.historyFilters.dateFrom      = document.getElementById('posHistoryFrom')?.value || '';
             state.historyFilters.dateTo        = document.getElementById('posHistoryTo')?.value || '';
             state.historyFilters.paymentMethod = document.getElementById('posHistoryPayMethod')?.value || '';
-            renderSalesHistory();
+            loadSalesHistory();
         });
         document.getElementById('posResetHistoryFilter')?.addEventListener('click', () => {
             state.historyFilters = { dateFrom: '', dateTo: '', paymentMethod: '' };
@@ -1695,28 +1696,28 @@
             if (fromEl) fromEl.value = '';
             if (toEl)   toEl.value   = '';
             if (pmEl)   pmEl.value   = '';
-            renderSalesHistory();
+            loadSalesHistory();
         });
 
         // Reports refresh
         document.getElementById('posRefreshReports')?.addEventListener('click', () => {
-            state.salesHistory = [];
+            state.reportsOrders = [];
             loadReports();
         });
         // Reports export CSV
         document.getElementById('posExportCSV')?.addEventListener('click', () =>
-            exportSalesCSV(applyReportsFilters(state.salesHistory))
+            exportSalesCSV(applyReportsFilters(state.reportsOrders))
         );
         // Reports export Excel
         document.getElementById('posExportExcel')?.addEventListener('click', () =>
-            exportSalesExcel(applyReportsFilters(state.salesHistory))
+            exportSalesExcel(applyReportsFilters(state.reportsOrders))
         );
         // Reports filters
         document.getElementById('posApplyReportsFilter')?.addEventListener('click', () => {
             state.reportsFilters.dateFrom      = document.getElementById('posReportsFrom')?.value || '';
             state.reportsFilters.dateTo        = document.getElementById('posReportsTo')?.value || '';
             state.reportsFilters.paymentMethod = document.getElementById('posReportsPayMethod')?.value || '';
-            renderReports();
+            loadReports();
         });
         document.getElementById('posResetReportsFilter')?.addEventListener('click', () => {
             state.reportsFilters = { dateFrom: '', dateTo: '', paymentMethod: '' };
@@ -1726,7 +1727,7 @@
             if (fromEl) fromEl.value = '';
             if (toEl)   toEl.value   = '';
             if (pmEl)   pmEl.value   = '';
-            renderReports();
+            loadReports();
         });
 
         // Coupon

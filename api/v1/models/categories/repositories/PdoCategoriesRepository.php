@@ -6,6 +6,8 @@ declare(strict_types=1);
  * Category data access layer.
  * List only returns categories that have at least one active product for the tenant,
  * matching the frontend entity.php and public API behaviour.
+ * The $entityId parameter is reserved for future use when entity-level product scoping
+ * is introduced.
  */
 final class PdoCategoriesRepository
 {
@@ -26,7 +28,7 @@ final class PdoCategoriesRepository
         int $limit = 500,
         int $offset = 0,
         string $lang = 'ar',
-        ?int $entityId = null,   // kept for API compat, currently unused (products have no entity_id)
+        ?int $entityId = null,   // reserved for future use
         ?int $isActive = null
     ): array {
         $params = [':tenant_id' => $tenantId, ':lang' => $lang];

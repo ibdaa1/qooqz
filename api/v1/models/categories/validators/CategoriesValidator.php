@@ -10,7 +10,7 @@ final class CategoriesValidator
     {
         $errors = [];
         if (empty($data['name']) && empty($data['slug'])) {
-            $errors['name'] = 'Name or slug is required';
+            $errors['name_or_slug'] = 'Name or slug is required';
         }
         return $errors;
     }
