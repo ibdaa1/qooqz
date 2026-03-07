@@ -22,38 +22,38 @@ final class CategoriesService
         array $filters = [],
         string $lang = 'ar'
     ): array {
-        $parentId = $filters['parent_id'] ?? null;
+        $parentId    = isset($filters['parent_id']) && $filters['parent_id'] !== '' ? (int)$filters['parent_id'] : null;
         $featuredOnly = isset($filters['is_featured']) && in_array($filters['is_featured'], [1, '1', true, 'true'], true);
-        $isActive = isset($filters['is_active']) ? filter_var($filters['is_active'], FILTER_VALIDATE_BOOLEAN) : null;
-        $search = $filters['search'] ?? null;
-        $page = max(1, (int)($filters['page'] ?? 1));
-        $limit = min(1000, max(1, (int)($filters['limit'] ?? 25)));
-        $offset = ($page - 1) * $limit;
+        $isActive    = isset($filters['is_active']) ? (int)(bool)filter_var($filters['is_active'], FILTER_VALIDATE_BOOLEAN) : null;
+        $search      = isset($filters['search']) && $filters['search'] !== '' ? (string)$filters['search'] : null;
+        $entityId    = isset($filters['entity_id']) && is_numeric($filters['entity_id']) ? (int)$filters['entity_id'] : null;
+        $page        = max(1, (int)($filters['page'] ?? 1));
+        $limit       = min(1000, max(1, (int)($filters['limit'] ?? 25)));
+        $offset      = ($page - 1) * $limit;
 
-        // جلب البيانات مع التصفية
-        $items = $this->repo->all(
+        $items = $this->repo->list(
             $tenantId,
+            $limit,
+            $offset,
+            $lang,
+            $entityId,
+            $isActive,
             $parentId,
             $featuredOnly,
-            $lang,
-            $search,
-            $isActive,
-            $limit,
-            $offset
+            $search
         );
 
-        // حساب العدد الإجمالي مع التصفية
-        $total = $this->repo->countAll($tenantId, $filters);
+        $total = $this->repo->count($tenantId, $isActive, $entityId, $parentId, $featuredOnly, $search, $lang);
 
         return [
             'items' => $items,
             'meta' => [
-                'total' => $total,
-                'page' => $page,
-                'per_page' => $limit,
-                'total_pages' => $total > 0 ? ceil($total / $limit) : 0,
-                'from' => $total > 0 ? $offset + 1 : 0,
-                'to' => $total > 0 ? min($offset + $limit, $total) : 0
+                'total'       => $total,
+                'page'        => $page,
+                'per_page'    => $limit,
+                'total_pages' => $total > 0 ? (int)ceil($total / $limit) : 0,
+                'from'        => $total > 0 ? $offset + 1 : 0,
+                'to'          => $total > 0 ? min($offset + $limit, $total) : 0
             ]
         ];
     }
@@ -232,7 +232,7 @@ final class CategoriesService
         int $tenantId,
         string $lang = 'ar'
     ): array {
-        return $this->repo->getActiveCategories($tenantId, $lang);
+        return $this->repo->getActive($tenantId, $lang);
     }
 
     /* ============================================================
@@ -242,7 +242,7 @@ final class CategoriesService
         int $tenantId,
         string $lang = 'ar'
     ): array {
-        return $this->repo->getFeaturedCategories($tenantId, $lang);
+        return $this->repo->getFeatured($tenantId, $lang);
     }
 
     /* ============================================================
@@ -305,27 +305,6 @@ final class CategoriesService
 
     public function getCategoryTree(int $tenantId, string $lang = 'ar'): array
     {
-        // جلب كل الفئات بدون ترقيم
-        $categories = $this->repo->all($tenantId, null, false, $lang, null, null, 0, 0);
-        
-        $tree = [];
-        $indexed = [];
-        
-        // إنشاء فهرس
-        foreach ($categories as $category) {
-            $indexed[$category['id']] = $category;
-            $indexed[$category['id']]['children'] = [];
-        }
-        
-        // بناء الشجرة
-        foreach ($indexed as $id => &$category) {
-            if ($category['parent_id'] && isset($indexed[$category['parent_id']])) {
-                $indexed[$category['parent_id']]['children'][] = &$category;
-            } else {
-                $tree[] = &$category;
-            }
-        }
-        
-        return $tree;
+        return $this->repo->tree($tenantId, $lang);
     }
 }

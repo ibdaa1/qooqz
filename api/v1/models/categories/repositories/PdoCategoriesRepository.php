@@ -64,6 +64,8 @@ final class PdoCategoriesRepository
      * are returned and ordered by tenant_categories.sort_order.
      * When $entityId is provided and the entity has category assignments in
      * entity_categories, only those categories are returned (narrowing further).
+     * Optional: $parentId filters by parent, $featuredOnly restricts to is_featured=1,
+     * $search does a LIKE search on category name/slug.
      */
     public function list(
         int $tenantId,
@@ -71,7 +73,10 @@ final class PdoCategoriesRepository
         int $offset = 0,
         string $lang = 'ar',
         ?int $entityId = null,
-        ?int $isActive = null
+        ?int $isActive = null,
+        ?int $parentId = null,
+        bool $featuredOnly = false,
+        ?string $search = null
     ): array {
         $params = [':tenant_id' => $tenantId, ':lang' => $lang];
 
@@ -107,6 +112,20 @@ final class PdoCategoriesRepository
         if ($isActive !== null) {
             $sql .= ' AND c.is_active = :is_active';
             $params[':is_active'] = $isActive;
+        }
+
+        if ($featuredOnly) {
+            $sql .= ' AND c.is_featured = 1';
+        }
+
+        if ($parentId !== null) {
+            $sql .= ' AND c.parent_id = :parent_id';
+            $params[':parent_id'] = $parentId;
+        }
+
+        if ($search !== null && $search !== '') {
+            $sql .= " AND (COALESCE(ct.name, c.name) LIKE :search OR c.slug LIKE :search)";
+            $params[':search'] = '%' . $search . '%';
         }
 
         // Only return categories that have at least one active product for this tenant
@@ -162,14 +181,40 @@ final class PdoCategoriesRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function count(int $tenantId, ?int $isActive = null, ?int $entityId = null): int
-    {
+    public function count(
+        int $tenantId,
+        ?int $isActive = null,
+        ?int $entityId = null,
+        ?int $parentId = null,
+        bool $featuredOnly = false,
+        ?string $search = null,
+        string $lang = 'ar'
+    ): int {
         $params = [':tenant_id' => $tenantId];
-        $sql = "SELECT COUNT(DISTINCT c.id) FROM categories c WHERE c.tenant_id = :tenant_id";
+        $sql = "SELECT COUNT(DISTINCT c.id)
+                  FROM categories c
+             LEFT JOIN category_translations ct
+                    ON ct.category_id = c.id AND ct.language_code = :lang
+                 WHERE c.tenant_id = :tenant_id";
+        $params[':lang'] = $lang;
 
         if ($isActive !== null) {
             $sql .= ' AND c.is_active = :is_active';
             $params[':is_active'] = $isActive;
+        }
+
+        if ($featuredOnly) {
+            $sql .= ' AND c.is_featured = 1';
+        }
+
+        if ($parentId !== null) {
+            $sql .= ' AND c.parent_id = :parent_id';
+            $params[':parent_id'] = $parentId;
+        }
+
+        if ($search !== null && $search !== '') {
+            $sql .= " AND (COALESCE(ct.name, c.name) LIKE :search OR c.slug LIKE :search)";
+            $params[':search'] = '%' . $search . '%';
         }
 
         // Count only categories that have at least one active product for this tenant
@@ -181,6 +226,23 @@ final class PdoCategoriesRepository
                      AND p.tenant_id = :tenant_id
                      AND p.is_active = 1
               )";
+
+        if ($entityId !== null && $this->entityCategoriesTableExists()) {
+            $countStmt = $this->pdo->prepare(
+                'SELECT COUNT(*) FROM entity_categories WHERE entity_id = :eid AND is_active = 1'
+            );
+            $countStmt->execute([':eid' => $entityId]);
+            if ((int)$countStmt->fetchColumn() > 0) {
+                $sql .= '
+              AND EXISTS (
+                  SELECT 1 FROM entity_categories ec
+                   WHERE ec.category_id = c.id
+                     AND ec.entity_id = :entity_id
+                     AND ec.is_active = 1
+              )';
+                $params[':entity_id'] = $entityId;
+            }
+        }
 
         $stmt = $this->pdo->prepare($sql);
         foreach ($params as $k => $v) {
@@ -299,11 +361,202 @@ final class PdoCategoriesRepository
         return $stmt->execute($params);
     }
 
-    public function delete(int $tenantId, int $id): bool
+    public function delete(int $tenantId, int $id, ?int $userId = null): bool
     {
         $stmt = $this->pdo->prepare(
             'DELETE FROM categories WHERE tenant_id = :tenant_id AND id = :id'
         );
         return $stmt->execute([':tenant_id' => $tenantId, ':id' => $id]);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Alias / compat methods used by CategoriesService
+    // ──────────────────────────────────────────────────────────────
+
+    /** Alias: all() → list() (used by CategoriesService::list() and getCategoryTree()) */
+    public function all(
+        int $tenantId,
+        ?int $parentId = null,
+        bool $featuredOnly = false,
+        string $lang = 'ar',
+        ?string $search = null,
+        $isActive = null,
+        int $limit = 500,
+        int $offset = 0
+    ): array {
+        $isActiveInt = $isActive !== null ? (int)(bool)$isActive : null;
+        return $this->list($tenantId, $limit, $offset, $lang, null, $isActiveInt, $parentId, $featuredOnly, $search);
+    }
+
+    /** Alias: countAll() → count() (used by CategoriesService::list()) */
+    public function countAll(int $tenantId, array $filters = []): int
+    {
+        $isActive    = isset($filters['is_active']) ? (int)(bool)$filters['is_active'] : null;
+        $entityId    = isset($filters['entity_id']) && is_numeric($filters['entity_id']) ? (int)$filters['entity_id'] : null;
+        $parentId    = isset($filters['parent_id']) && $filters['parent_id'] !== '' ? (int)$filters['parent_id'] : null;
+        $featuredOnly = isset($filters['is_featured']) && in_array($filters['is_featured'], [1, '1', true, 'true'], true);
+        $search      = isset($filters['search']) && $filters['search'] !== '' ? (string)$filters['search'] : null;
+        $lang        = $filters['lang'] ?? 'ar';
+        return $this->count($tenantId, $isActive, $entityId, $parentId, $featuredOnly, $search, $lang);
+    }
+
+    /** Alias: findById() → find() (used by CategoriesService) */
+    public function findById(int $tenantId, int $id, string $lang = 'ar'): ?array
+    {
+        return $this->find($tenantId, $id, $lang);
+    }
+
+    /** Alias: getActiveCategories() → getActive() */
+    public function getActiveCategories(int $tenantId, string $lang = 'ar'): array
+    {
+        return $this->getActive($tenantId, $lang);
+    }
+
+    /** Alias: getFeaturedCategories() → getFeatured() */
+    public function getFeaturedCategories(int $tenantId, string $lang = 'ar'): array
+    {
+        return $this->getFeatured($tenantId, $lang);
+    }
+
+    /** Expose PDO for service-level bulk operations */
+    public function getPdo(): PDO
+    {
+        return $this->pdo;
+    }
+
+    /** Check if a slug already exists for this tenant (optionally excluding a specific id) */
+    public function slugExists(int $tenantId, string $slug, ?int $excludeId = null): bool
+    {
+        if ($excludeId !== null) {
+            $stmt = $this->pdo->prepare(
+                'SELECT 1 FROM categories WHERE tenant_id = :t AND slug = :s AND id != :eid LIMIT 1'
+            );
+            $stmt->execute([':t' => $tenantId, ':s' => $slug, ':eid' => $excludeId]);
+        } else {
+            $stmt = $this->pdo->prepare(
+                'SELECT 1 FROM categories WHERE tenant_id = :t AND slug = :s LIMIT 1'
+            );
+            $stmt->execute([':t' => $tenantId, ':s' => $slug]);
+        }
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /** Check if a category has child categories */
+    public function hasChildren(int $id): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT 1 FROM categories WHERE parent_id = :id LIMIT 1'
+        );
+        $stmt->execute([':id' => $id]);
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /** Get translations for a category (from category_translations table if present) */
+    public function getTranslations(int $id): array
+    {
+        try {
+            $stmt = $this->pdo->prepare(
+                'SELECT language_code, name, description FROM category_translations WHERE category_id = :id'
+            );
+            $stmt->execute([':id' => $id]);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $result = [];
+            foreach ($rows as $row) {
+                $result[$row['language_code']] = [
+                    'name'        => $row['name'] ?? '',
+                    'description' => $row['description'] ?? '',
+                ];
+            }
+            return $result;
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /** Get main image for a category (stub – returns null if images table is not configured) */
+    public function getMainImage(int $tenantId, int $id): ?array
+    {
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT id, url, thumb_url FROM images
+                  WHERE entity_type = 'category' AND entity_id = :id AND tenant_id = :t
+                  ORDER BY is_primary DESC, id ASC LIMIT 1"
+            );
+            $stmt->execute([':id' => $id, ':t' => $tenantId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $row ?: null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /** Find a category with all its translations (used by service save/delete) */
+    public function findByIdWithTranslations(int $tenantId, int $id, string $lang = 'ar'): ?array
+    {
+        $row = $this->find($tenantId, $id, $lang);
+        if (!$row) return null;
+        $row['translations'] = $this->getTranslations($id);
+        return $row;
+    }
+
+    /**
+     * Save (create or update) a category.
+     * If $data contains 'id', performs an UPDATE; otherwise INSERT.
+     * Returns the saved category id.
+     */
+    public function save(int $tenantId, array $data, ?int $userId = null): int
+    {
+        if (!empty($data['id'])) {
+            $id = (int)$data['id'];
+            $this->update($tenantId, $id, $data);
+            // Save/upsert translations
+            if (!empty($data['translations']) && is_array($data['translations'])) {
+                foreach ($data['translations'] as $langCode => $trans) {
+                    $this->upsertTranslation($id, (string)$langCode, $trans);
+                }
+            }
+            return $id;
+        } else {
+            $id = $this->create($tenantId, $data);
+            if (!empty($data['translations']) && is_array($data['translations'])) {
+                foreach ($data['translations'] as $langCode => $trans) {
+                    $this->upsertTranslation($id, (string)$langCode, $trans);
+                }
+            }
+            return $id;
+        }
+    }
+
+    /** Upsert a single translation row */
+    private function upsertTranslation(int $categoryId, string $languageCode, array $data): void
+    {
+        try {
+            $stmt = $this->pdo->prepare("
+                INSERT INTO category_translations (category_id, language_code, name, description)
+                VALUES (:cid, :lang, :name, :desc)
+                ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description)
+            ");
+            $stmt->execute([
+                ':cid'  => $categoryId,
+                ':lang' => $languageCode,
+                ':name' => $data['name'] ?? '',
+                ':desc' => $data['description'] ?? '',
+            ]);
+        } catch (\Throwable $e) {
+            // Translation save failure is non-fatal
+        }
+    }
+
+    /** Delete a single translation */
+    public function deleteTranslation(int $categoryId, string $languageCode): bool
+    {
+        try {
+            $stmt = $this->pdo->prepare(
+                'DELETE FROM category_translations WHERE category_id = :cid AND language_code = :lang'
+            );
+            return $stmt->execute([':cid' => $categoryId, ':lang' => $languageCode]);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 }

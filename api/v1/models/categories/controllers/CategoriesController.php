@@ -16,14 +16,17 @@ final class CategoriesController
     public function list(int $tenantId): array
     {
         $filters = [
-            'parent_id' => isset($_GET['parent_id']) && $_GET['parent_id'] !== ''
+            'parent_id'  => isset($_GET['parent_id']) && $_GET['parent_id'] !== ''
                 ? (int) $_GET['parent_id']
                 : null,
+            'entity_id'  => isset($_GET['entity_id']) && is_numeric($_GET['entity_id'])
+                ? (int) $_GET['entity_id']
+                : null,
             'is_featured' => $_GET['is_featured'] ?? null,
-            'is_active' => $_GET['is_active'] ?? null,
-            'search' => $_GET['search'] ?? null,
-            'page' => $_GET['page'] ?? 1,
-            'limit' => $_GET['limit'] ?? 25
+            'is_active'   => $_GET['is_active'] ?? null,
+            'search'      => $_GET['search'] ?? null,
+            'page'        => $_GET['page'] ?? 1,
+            'limit'       => $_GET['limit'] ?? 25
         ];
 
         $lang = $_GET['lang'] ?? 'ar';
