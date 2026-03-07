@@ -93,14 +93,15 @@
         try {
             const fetchOptions = { credentials: 'same-origin' };
 
-            // بناء URL الفئات مع تجاهل فلتر tenant_categories
+            // بناء URL الفئات: تجاهل فلتر tenant_categories، وإظهار القوائم الرئيسية فقط
+            // لا نُمرر tenant_id حتى تظهر كافة الفئات المتاحة في النظام للاختيار منها
             const catParams = new URLSearchParams({
                 format: 'json',
                 limit: 1000,
                 lang: CONFIG.lang || 'ar',
-                skip_tc_filter: 1
+                skip_tc_filter: 1,
+                parent_id: 0
             });
-            if (CONFIG.tenantId) catParams.set('tenant_id', CONFIG.tenantId);
 
             const promises = [
                 fetch(`${CATEGORIES_API}?${catParams}`, fetchOptions)

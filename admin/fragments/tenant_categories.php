@@ -49,6 +49,11 @@ if (!$isSuperAdmin && $tenantId) {
 <!-- Notifications Container -->
 <div id="notificationsContainer" class="notifications-container"></div>
 
+<!-- Page CSS and meta (used by admin_core.js for dynamic fragment loading) -->
+<link rel="stylesheet" href="/admin/assets/css/pages/tenant_categories.css?v=<?= time() ?>">
+<meta data-page="tenant_categories"
+      data-assets-css="/admin/assets/css/pages/tenant_categories.css">
+
 <div class="page-container" id="tenantCategoriesPage" dir="<?= htmlspecialchars($dir) ?>">
     
     <!-- Page Header -->
