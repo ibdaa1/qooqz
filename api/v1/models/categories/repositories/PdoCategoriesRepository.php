@@ -98,8 +98,12 @@ final class PdoCategoriesRepository
         }
 
         if ($search) {
-            $sql .= " AND (c.name LIKE :search OR c.slug LIKE :search OR ct.name LIKE :search OR ct.slug LIKE :search)";
-            $params[':search'] = "%{$search}%";
+            $sql .= " AND (c.name LIKE :search1 OR c.slug LIKE :search2 OR ct.name LIKE :search3 OR ct.slug LIKE :search4)";
+            $searchVal = "%{$search}%";
+            $params[':search1'] = $searchVal;
+            $params[':search2'] = $searchVal;
+            $params[':search3'] = $searchVal;
+            $params[':search4'] = $searchVal;
         }
 
         $sql .= " ORDER BY c.sort_order ASC, c.id ASC";
@@ -606,8 +610,10 @@ final class PdoCategoriesRepository
         }
 
         if (!empty($filters['search'])) {
-            $sql .= " AND (c.name LIKE :search OR c.slug LIKE :search)";
-            $params[':search'] = "%{$filters['search']}%";
+            $sql .= " AND (c.name LIKE :search1 OR c.slug LIKE :search2)";
+            $searchVal = "%{$filters['search']}%";
+            $params[':search1'] = $searchVal;
+            $params[':search2'] = $searchVal;
         }
 
         $stmt = $this->pdo->prepare($sql);
