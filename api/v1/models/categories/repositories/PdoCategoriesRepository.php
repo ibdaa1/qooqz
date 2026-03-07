@@ -6,8 +6,9 @@ declare(strict_types=1);
  * Category data access layer.
  * List only returns categories that have at least one active product for the tenant,
  * matching the frontend entity.php and public API behaviour.
- * The $entityId parameter is reserved for future use when entity-level product scoping
- * is introduced.
+ * When $entityId is provided and the entity has rows in entity_categories, only
+ * those categories are returned. If the entity has no rows in entity_categories
+ * the full tenant category list is returned (graceful fallback).
  */
 final class PdoCategoriesRepository
 {
@@ -19,16 +20,31 @@ final class PdoCategoriesRepository
     }
 
     /**
+     * Check whether the entity_categories table exists (graceful fallback when
+     * the migration has not been run yet).
+     */
+    private function entityCategoriesTableExists(): bool
+    {
+        try {
+            $this->pdo->query('SELECT 1 FROM entity_categories LIMIT 1');
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * List categories for a tenant.
-     * When $filterByProducts is true (default), only returns categories that have
-     * at least one active product for the tenant (mirrors entity.php behaviour).
+     * Only returns categories that have at least one active product for the tenant.
+     * When $entityId is provided and the entity has category assignments in
+     * entity_categories, only those categories are returned.
      */
     public function list(
         int $tenantId,
         int $limit = 500,
         int $offset = 0,
         string $lang = 'ar',
-        ?int $entityId = null,   // reserved for future use
+        ?int $entityId = null,
         ?int $isActive = null
     ): array {
         $params = [':tenant_id' => $tenantId, ':lang' => $lang];
@@ -57,6 +73,25 @@ final class PdoCategoriesRepository
                      AND p.tenant_id = :tenant_id
                      AND p.is_active = 1
               )";
+
+        // Filter by entity when entity_categories assignments exist for this entity.
+        // Falls back to showing all tenant categories when no assignments are configured.
+        if ($entityId !== null && $this->entityCategoriesTableExists()) {
+            $countStmt = $this->pdo->prepare(
+                'SELECT COUNT(*) FROM entity_categories WHERE entity_id = :eid AND is_active = 1'
+            );
+            $countStmt->execute([':eid' => $entityId]);
+            if ((int)$countStmt->fetchColumn() > 0) {
+                $sql .= '
+              AND EXISTS (
+                  SELECT 1 FROM entity_categories ec
+                   WHERE ec.category_id = c.id
+                     AND ec.entity_id = :entity_id
+                     AND ec.is_active = 1
+              )';
+                $params[':entity_id'] = $entityId;
+            }
+        }
 
         $sql .= ' ORDER BY c.sort_order ASC, c.id ASC';
 

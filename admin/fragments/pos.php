@@ -219,7 +219,7 @@ window.POS_CONFIG = {
 
     <!-- ── Session Status Bar ── -->
     <div class="pos-session-bar" id="posSessionBar">
-        <span style="color:var(--text-muted,#64748b)"><?= __pos_t('common.loading', 'Loading...') ?></span>
+        <span style="color:var(--text-secondary,#64748b)"><?= __pos_t('common.loading', 'Loading...') ?></span>
     </div>
 
     <!-- ════════════════════════════════════
@@ -341,7 +341,7 @@ window.POS_CONFIG = {
                 <div class="pos-cart-empty" id="posCartEmpty">
                     <span class="pos-cart-empty-icon">🛒</span>
                     <p><?= __pos_t('pos.cart.empty', 'Cart is empty') ?></p>
-                    <small style="color:var(--text-muted,#64748b)"><?= __pos_t('pos.cart.empty_hint', 'Click a product to add it') ?></small>
+                    <small style="color:var(--text-secondary,#64748b)"><?= __pos_t('pos.cart.empty_hint', 'Click a product to add it') ?></small>
                 </div>
                 <!-- Items list -->
                 <div class="pos-cart-items" id="posCartItems"></div>
@@ -396,7 +396,7 @@ window.POS_CONFIG = {
                 </div>
 
                 <!-- Payment Method -->
-                <div style="font-size:.78rem;color:var(--text-muted,#64748b);margin-bottom:6px"><?= __pos_t('pos.payment.title', 'Payment Method') ?></div>
+                <div style="font-size:.78rem;color:var(--text-secondary,#64748b);margin-bottom:6px"><?= __pos_t('pos.payment.title', 'Payment Method') ?></div>
                 <div class="pos-payment-methods">
                     <button class="pos-pay-method-btn" data-method="cash">
                         <span class="icon">💵</span>
