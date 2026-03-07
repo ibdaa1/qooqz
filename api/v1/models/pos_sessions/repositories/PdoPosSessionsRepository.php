@@ -346,6 +346,24 @@ final class PdoPosSessionsRepository implements PosSessionsRepositoryInterface
                 ':tid'  => $tenantId,
             ]);
 
+            // Record payment in payments table so session close can compute totals correctly
+            $paymentNumber = 'PAY-POS-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(8)));
+            $this->pdo->prepare("
+                INSERT INTO payments
+                    (payment_number, entity_id, order_id, user_id, payment_method,
+                     amount, currency_code, status, payment_type, created_at, updated_at)
+                VALUES
+                    (:pnum, :eid, :oid, :uid, :pm,
+                     :amt, 'SAR', 'paid', 'pos_order', NOW(), NOW())
+            ")->execute([
+                ':pnum' => $paymentNumber,
+                ':eid'  => $entityId,
+                ':oid'  => $orderId,
+                ':uid'  => $cashierUserId,
+                ':pm'   => $paymentMethod,
+                ':amt'  => $grandTotal,
+            ]);
+
             $this->pdo->commit();
 
             return [
