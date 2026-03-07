@@ -122,10 +122,9 @@ try {
 
             $newId = $controller->create($tenantId, $data);
 
-            // حفظ الترجمة الأساسية (الاسم) في product_translations إذا تم تقديم اسم
+            // حفظ الترجمة الأساسية (الاسم الإنجليزي) في product_translations
             if (!empty($data['name']) && $newId) {
                 try {
-                    $langCode = $_GET['lang'] ?? 'ar';
                     $transStmt = $pdo->prepare("
                         INSERT INTO product_translations (product_id, language_code, name, short_description, description)
                         VALUES (:product_id, :language_code, :name, :short_desc, :description)
@@ -133,7 +132,7 @@ try {
                     ");
                     $transStmt->execute([
                         ':product_id' => $newId,
-                        ':language_code' => $langCode,
+                        ':language_code' => 'en',
                         ':name' => $data['name'],
                         ':short_desc' => $data['short_description'] ?? '',
                         ':description' => $data['description'] ?? ''
@@ -162,10 +161,9 @@ try {
         case 'PUT':
             $updatedId = $controller->update($tenantId, $data);
 
-            // تحديث الترجمة الأساسية (الاسم)
+            // تحديث الترجمة الأساسية (الاسم الإنجليزي)
             if (!empty($data['name']) && $updatedId) {
                 try {
-                    $langCode = $_GET['lang'] ?? 'ar';
                     $transStmt = $pdo->prepare("
                         INSERT INTO product_translations (product_id, language_code, name, short_description, description)
                         VALUES (:product_id, :language_code, :name, :short_desc, :description)
@@ -173,7 +171,7 @@ try {
                     ");
                     $transStmt->execute([
                         ':product_id' => $updatedId,
-                        ':language_code' => $langCode,
+                        ':language_code' => 'en',
                         ':name' => $data['name'],
                         ':short_desc' => $data['short_description'] ?? '',
                         ':description' => $data['description'] ?? ''

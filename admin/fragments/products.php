@@ -273,18 +273,6 @@ if (!function_exists('renderFragmentThemeVars')) {
                 <div class="tab-content active" id="tab-general">
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="prodName" class="required" data-i18n="form.fields.name.label">
-                                <?= __t('form.fields.name.label', 'Product Name') ?>
-                            </label>
-                            <input type="text" id="prodName" name="name" class="form-control" required
-                                   data-i18n-placeholder="form.fields.name.placeholder"
-                                   placeholder="<?= __t('form.fields.name.placeholder', 'Enter product name') ?>">
-                            <div class="invalid-feedback" data-i18n="form.fields.name.required">
-                                <?= __t('form.fields.name.required', 'Product name is required') ?>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
                             <label for="prodSku" data-i18n="form.fields.sku.label">
                                 <?= __t('form.fields.sku.label', 'SKU') ?>
                             </label>

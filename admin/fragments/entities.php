@@ -236,10 +236,14 @@ $apiBase = '/api';
                     <div id="parentIdGroup" style="display:none">
                         <div class="form-row">
                             <div class="form-group full-width">
-                                <label for="entityParentSelect" data-i18n="form.fields.parent_entity.label">
+                                <label for="entityParentSearch" data-i18n="form.fields.parent_entity.label">
                                     <?= __t('form.fields.parent_entity.label', 'Search Parent Entity') ?>
                                 </label>
-                                <select id="entityParentSelect" class="form-control">
+                                <input type="text" id="entityParentSearch" class="form-control"
+                                       style="margin-bottom:6px;"
+                                       data-i18n-placeholder="form.fields.parent_entity.search_placeholder"
+                                       placeholder="<?= __t('form.fields.parent_entity.search_placeholder', 'Type to filter entities...') ?>">
+                                <select id="entityParentSelect" class="form-control" size="5" style="height:auto;">
                                     <option value=""><?= __t('form.fields.parent_entity.placeholder', '— Select parent entity —') ?></option>
                                 </select>
                             </div>

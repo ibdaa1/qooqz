@@ -568,6 +568,20 @@
         if (currentVal) sel.value = currentVal;
     }
 
+    function filterParentEntitySelect(query) {
+        if (!state.allEntities) return;
+        const q = (query || '').toLowerCase().trim();
+        const filtered = q
+            ? state.allEntities.filter(function(ent) {
+                const name = (ent.store_name || ent.original_store_name || '').toLowerCase();
+                const code = (ent.branch_code || '').toLowerCase();
+                const id = String(ent.id);
+                return name.includes(q) || code.includes(q) || id.includes(q);
+            })
+            : state.allEntities;
+        populateParentEntitySelect(filtered);
+    }
+
     // ════════════════════════════════════════════════════════════
     // RENDERING
     // ════════════════════════════════════════════════════════════
@@ -789,12 +803,18 @@
         if (group) {
             group.style.display = showParent ? '' : 'none';
         }
-        if (!showParent && el.entityParentId) {
-            el.entityParentId.value = '';
+        if (!showParent) {
+            if (el.entityParentId) el.entityParentId.value = '';
             const result = el.parentValidationResult || document.getElementById('parentValidationResult');
             if (result) {
                 result.style.display = 'none';
                 result.innerHTML = '';
+            }
+            // Clear search filter and reset dropdown
+            const searchEl = el.entityParentSearch || document.getElementById('entityParentSearch');
+            if (searchEl) searchEl.value = '';
+            if (state.allEntities && state.allEntities.length) {
+                populateParentEntitySelect(state.allEntities);
             }
         }
     }
@@ -2246,6 +2266,7 @@
             entityType: $id('entityType'),
             entityParentId: $id('entityParentId'),
             entityParentSelect: $id('entityParentSelect'),
+            entityParentSearch: $id('entityParentSearch'),
             parentIdGroup: $id('parentIdGroup'),
             btnValidateParent: $id('btnValidateParent'),
             parentValidationResult: $id('parentValidationResult'),
@@ -2382,6 +2403,12 @@
                     el.entityParentId.value = this.value;
                     validateParentId(this.value);
                 }
+            };
+        }
+        // Filter parent entity dropdown as user types
+        if (el.entityParentSearch) {
+            el.entityParentSearch.oninput = function() {
+                filterParentEntitySelect(this.value);
             };
         }
 
