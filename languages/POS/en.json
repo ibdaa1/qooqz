@@ -38,13 +38,44 @@
       "empty": "No products found",
       "out_of_stock": "Out of stock"
     },
+    "stock": {
+      "available": "Available",
+      "out": "Out of stock",
+      "low": "Low stock",
+      "qty": "Qty"
+    },
+    "barcode": {
+      "toggle": "Barcode Scanner",
+      "hardware_mode": "Barcode Reader Mode – scan now",
+      "camera": "Camera",
+      "use_camera": "Use Camera",
+      "camera_title": "Camera Barcode Scanner",
+      "camera_hint": "Point camera at barcode",
+      "stop_camera": "Stop Camera",
+      "camera_unavailable": "Camera not available",
+      "camera_error": "Camera error",
+      "manual_scan": "BarcodeDetector not supported – use hardware scanner or type manually",
+      "found": "Found",
+      "added": "Added",
+      "not_found": "Product not found"
+    },
     "cart": {
       "title": "Cart",
       "empty": "Cart is empty",
       "empty_hint": "Click a product to add it",
       "clear": "Clear Cart",
       "checkout": "Checkout",
-      "discount_placeholder": "Discount amount"
+      "discount_placeholder": "Discount amount",
+      "edit_price": "Edit Price",
+      "unit_price": "Unit Price"
+    },
+    "coupon": {
+      "label": "Coupon",
+      "placeholder": "Enter coupon code",
+      "apply": "Apply",
+      "applied": "Coupon applied",
+      "invalid": "Invalid or expired coupon code",
+      "enter_code": "Please enter a coupon code"
     },
     "payment": {
       "title": "Payment Method",
@@ -57,16 +88,44 @@
       "print": "Print",
       "thank_you": "Thank you for your purchase!"
     },
+    "tab": {
+      "pos": "Point of Sale",
+      "history": "Sales History",
+      "reports": "Reports"
+    },
+    "history": {
+      "empty": "No sales in this session yet",
+      "total_orders": "Total Orders",
+      "total_sales": "Total Sales",
+      "order_number": "Order #",
+      "amount": "Amount",
+      "status": "Status",
+      "time": "Time",
+      "customer": "Customer"
+    },
+    "reports": {
+      "orders": "Orders",
+      "total_sales": "Total Sales",
+      "avg_order": "Avg. Order",
+      "cash": "Cash Total",
+      "card": "Card Total",
+      "opening_balance": "Opening Balance",
+      "orders_breakdown": "Orders Breakdown"
+    },
     "error": {
       "entity_required": "Please select an entity/branch",
-      "insufficient_payment": "Amount paid is less than the total"
-    }
+      "insufficient_payment": "Amount paid is less than the total",
+      "invalid_price": "Invalid price"
+    },
+    "search_entity": "Search entity…"
   },
   "common": {
     "cancel": "Cancel",
     "save": "Save",
     "close": "Close",
     "confirm": "Confirm",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "apply": "Apply",
+    "refresh": "Refresh"
   }
 }

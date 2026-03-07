@@ -317,10 +317,15 @@ window.POS_CONFIG = {
                         <span><?= __pos_t('pos.tax', 'Tax') ?></span>
                         <span id="posTax">0.00 SAR</span>
                     </div>
-                    <!-- Discount -->
+                    <!-- Manual Discount -->
                     <div class="pos-discount-row">
                         <span style="font-size:.82rem;color:var(--text-secondary,#94a3b8);white-space:nowrap"><?= __pos_t('pos.discount', 'Discount') ?>:</span>
                         <input type="number" id="posDiscount" step="0.01" min="0" placeholder="0.00">
+                    </div>
+                    <!-- Coupon Discount Row (shown when coupon applied) -->
+                    <div class="pos-total-row pos-coupon-discount-row" id="posCouponRow" style="display:none;color:var(--success-color,#10b981)">
+                        <span><?= __pos_t('pos.coupon.label', 'Coupon') ?></span>
+                        <span id="posCouponDiscountAmt">0.00 SAR</span>
                     </div>
                     <div class="pos-total-row">
                         <span><?= __pos_t('pos.total', 'Total') ?></span>
@@ -330,6 +335,20 @@ window.POS_CONFIG = {
                         <span><?= __pos_t('pos.grand_total', 'Grand Total') ?></span>
                         <span class="amount" id="posGrandTotal">0.00 SAR</span>
                     </div>
+                </div>
+
+                <!-- Coupon Code Input -->
+                <div class="pos-coupon-section">
+                    <div class="pos-coupon-input-row">
+                        <input type="text" id="posCouponInput"
+                               placeholder="<?= __pos_t('pos.coupon.placeholder', 'Enter coupon code') ?>"
+                               autocomplete="off" autocapitalize="characters">
+                        <button class="pos-coupon-apply-btn" id="posApplyCoupon">
+                            🏷 <?= __pos_t('pos.coupon.apply', 'Apply') ?>
+                        </button>
+                        <button class="pos-coupon-clear-btn" id="posClearCoupon" style="display:none">✕</button>
+                    </div>
+                    <div id="posCouponStatus" class="pos-coupon-status"></div>
                 </div>
 
                 <!-- Payment Method -->

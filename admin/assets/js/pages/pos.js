@@ -14,10 +14,13 @@
     const CFG = window.POS_CONFIG || {};
 
     const API = {
-        pos:        '/api/pos_sessions',
-        products:   '/api/products',
-        entities:   '/api/entities',
-        categories: '/api/categories',
+        pos:              '/api/pos_sessions',
+        products:         '/api/products',
+        entities:         '/api/entities',
+        categories:       '/api/categories',
+        productCategories:'/api/product_categories',
+        publicDiscounts:  '/api/public/discounts',
+        discountActions:  '/api/discount_actions',
     };
 
     const state = {
@@ -36,6 +39,12 @@
         paymentMethod: 'cash',
         searchQuery:   '',
         loading:       false,
+        // Category→Product mapping (loaded on-demand per category)
+        categoryProductIds: {},  // catId → [productId, ...]
+        // Discounts
+        discounts:     [],       // active discounts from API
+        activeCoupon:  null,     // applied coupon discount object
+        couponDiscount:0,        // computed discount amount from coupon
         // Barcode scanner
         barcodeMode:   false,  // hardware scanner input mode active
         barcodeBuffer: '',     // accumulate typed chars
@@ -114,7 +123,7 @@
     let container, alertsEl, openSessionView, mainLayout;
     let searchInput, parentCatTabs, subCatTabs, productsGrid;
     let cartItemsList, cartCount, cartEmpty;
-    let subtotalEl, taxEl, discountInput, totalEl, grandTotalEl;
+    let subtotalEl, taxEl, discountInput, couponInput, couponStatusEl, applyCouponBtn, clearCouponBtn, couponRow, totalEl, grandTotalEl;
     let amountPaidInput, changeDisplay, checkoutBtn, clearBtn;
     let payMethodBtns;
     let modalBackdrop;
@@ -137,6 +146,11 @@
         subtotalEl       = document.getElementById('posSubtotal');
         taxEl            = document.getElementById('posTax');
         discountInput    = document.getElementById('posDiscount');
+        couponInput      = document.getElementById('posCouponInput');
+        couponStatusEl   = document.getElementById('posCouponStatus');
+        applyCouponBtn   = document.getElementById('posApplyCoupon');
+        clearCouponBtn   = document.getElementById('posClearCoupon');
+        couponRow        = document.getElementById('posCouponRow');
         totalEl          = document.getElementById('posTotal');
         grandTotalEl     = document.getElementById('posGrandTotal');
         amountPaidInput  = document.getElementById('posAmountPaid');
@@ -256,7 +270,7 @@
             state.entityId = entityId;
             updateSessionBar();
             showMainLayout();
-            await loadCategories();
+            await Promise.all([loadCategories(), loadDiscounts()]);
             await loadProducts();
             showAlert(t('pos.session.opened_msg', 'Session opened successfully'), 'success');
         } catch (err) {
@@ -323,6 +337,141 @@
         renderParentCats();
     }
 
+    // ─────────────────────────────────────────────
+    // Discounts
+    // ─────────────────────────────────────────────
+    async function loadDiscounts() {
+        try {
+            const res = await apiGet(API.publicDiscounts, { lang: state.lang });
+            // Public route returns { ok: true, data: [...] }
+            const items = res.data ?? res.items ?? [];
+            state.discounts = Array.isArray(items) ? items : [];
+        } catch {
+            state.discounts = [];
+        }
+    }
+
+    /** Return active auto-apply discounts (for showing badges on all products) */
+    function getAutoApplyDiscounts() {
+        const now = Date.now();
+        return state.discounts.filter(d => {
+            if (!d.auto_apply) return false;
+            if (d.status && d.status !== 'active') return false;
+            if (d.ends_at && new Date(d.ends_at).getTime() < now) return false;
+            if (d.starts_at && new Date(d.starts_at).getTime() > now) return false;
+            if (d.max_redemptions > 0 && d.current_redemptions >= d.max_redemptions) return false;
+            return true;
+        });
+    }
+
+    /** Find a coupon discount by code (case-insensitive) */
+    function findCouponByCode(code) {
+        if (!code) return null;
+        const now = Date.now();
+        return state.discounts.find(d => {
+            if (!d.code) return false;
+            if (d.code.toLowerCase() !== code.toLowerCase()) return false;
+            if (d.status && d.status !== 'active') return false;
+            if (d.ends_at && new Date(d.ends_at).getTime() < now) return false;
+            if (d.starts_at && new Date(d.starts_at).getTime() > now) return false;
+            if (d.max_redemptions > 0 && d.current_redemptions >= d.max_redemptions) return false;
+            return true;
+        }) ?? null;
+    }
+
+    async function applyCoupon() {
+        const code = (couponInput?.value ?? '').trim();
+        if (!code) {
+            showAlert(t('pos.coupon.enter_code', 'Please enter a coupon code'), 'error');
+            return;
+        }
+        const discount = findCouponByCode(code);
+        if (!discount) {
+            showAlert(t('pos.coupon.invalid', 'Invalid or expired coupon code'), 'error');
+            if (couponStatusEl) couponStatusEl.textContent = '';
+            return;
+        }
+        // Fetch discount actions to determine the discount value
+        try {
+            const res = await apiGet(API.discountActions, { discount_id: discount.id });
+            const actions = res.data?.items ?? res.items ?? (Array.isArray(res.data) ? res.data : []);
+            state.activeCoupon = { discount, actions };
+            computeCouponDiscount();
+            renderCouponStatus();
+            updateTotals();
+            showAlert(`${t('pos.coupon.applied', 'Coupon applied')}: ${escHtml(discount.title || discount.code)}`, 'success');
+        } catch {
+            // Fallback: use discount without action details
+            state.activeCoupon = { discount, actions: [] };
+            computeCouponDiscount();
+            renderCouponStatus();
+            updateTotals();
+        }
+    }
+
+    function computeCouponDiscount() {
+        if (!state.activeCoupon) { state.couponDiscount = 0; return; }
+        const { discount, actions } = state.activeCoupon;
+        const { sub, tax } = cartSubtotals();
+        const orderTotal = sub + tax;
+        let amount = 0;
+        actions.forEach(a => {
+            const val = parseFloat(a.action_value) || 0;
+            if (a.action_type === 'percentage_discount' || a.action_type === 'percent') {
+                amount += orderTotal * (val / 100);
+            } else if (a.action_type === 'fixed_discount' || a.action_type === 'fixed') {
+                amount += val;
+            }
+        });
+        // If no actions fetched, don't guess – just leave discount at 0
+        if (actions.length === 0) {
+            state.couponDiscount = 0;
+            return;
+        }
+        state.couponDiscount = Math.max(0, Math.min(amount, orderTotal));
+    }
+
+    function clearCoupon() {
+        state.activeCoupon = null;
+        state.couponDiscount = 0;
+        if (couponInput) couponInput.value = '';
+        renderCouponStatus();
+        updateTotals();
+    }
+
+    function renderCouponStatus() {
+        if (!couponStatusEl) return;
+        if (state.activeCoupon) {
+            const { discount } = state.activeCoupon;
+            couponStatusEl.innerHTML = `<span class="pos-coupon-applied">✓ ${escHtml(discount.title || discount.code)}: -${formatCurrency(state.couponDiscount)}</span>`;
+            if (clearCouponBtn) clearCouponBtn.style.display = 'inline-flex';
+        } else {
+            couponStatusEl.textContent = '';
+            if (clearCouponBtn) clearCouponBtn.style.display = 'none';
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // Category → Product ID Mapping (on-demand)
+    // ─────────────────────────────────────────────
+    async function loadCategoryProductIds(catId) {
+        if (state.categoryProductIds[catId] !== undefined) return; // already cached
+        state.categoryProductIds[catId] = []; // mark as loading
+        try {
+            const res = await apiGet(API.productCategories, { category_id: catId, limit: 2000 });
+            const items = res.data?.items ?? res.items ?? [];
+            state.categoryProductIds[catId] = items.map(i => parseInt(i.product_id, 10)).filter(Boolean);
+        } catch {
+            state.categoryProductIds[catId] = [];
+        }
+    }
+
+    async function loadSubtreeCategoryProducts(catId) {
+        if (!catId) return;
+        const subtreeIds = getSubtreeIds(catId);
+        await Promise.all(subtreeIds.map(id => loadCategoryProductIds(id)));
+    }
+
     function buildCategoryTree(flatList) {
         const map = {};
         flatList.forEach(c => { map[c.id] = { ...c, children: [] }; });
@@ -370,12 +519,16 @@
         });
         parentCatTabs.innerHTML = html;
         parentCatTabs.querySelectorAll('.pos-cat-tab').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 const pid = parseInt(btn.dataset.parentId, 10) || null;
                 state.parentCatId = pid || null;
                 state.subCatId = null;
                 renderParentCats();
                 renderSubCats();
+                if (state.parentCatId) {
+                    productsGrid && (productsGrid.innerHTML = `<div class="pos-loading" style="grid-column:1/-1"><div class="pos-spinner"></div></div>`);
+                    await loadSubtreeCategoryProducts(state.parentCatId);
+                }
                 renderProducts();
             });
         });
@@ -401,9 +554,13 @@
         subCatTabs.innerHTML = html;
         subCatTabs.style.display = 'flex';
         subCatTabs.querySelectorAll('.pos-sub-cat-tab').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 state.subCatId = parseInt(btn.dataset.subId, 10) || null;
                 renderSubCats();
+                if (state.subCatId) {
+                    productsGrid && (productsGrid.innerHTML = `<div class="pos-loading" style="grid-column:1/-1"><div class="pos-spinner"></div></div>`);
+                    await loadSubtreeCategoryProducts(state.subCatId);
+                }
                 renderProducts();
             });
         });
@@ -436,25 +593,18 @@
     function filteredProducts() {
         let prods = state.products;
 
-        // Category filter using tree
-        if (state.subCatId) {
-            const subtreeIds = getSubtreeIds(state.subCatId);
-            prods = prods.filter(p =>
-                subtreeIds.includes(parseInt(p.category_id, 10)) ||
-                (p.category_name && subtreeIds.some(id => {
-                    const c = findCategoryById(id);
-                    return c && c.name === p.category_name;
-                }))
-            );
-        } else if (state.parentCatId) {
-            const subtreeIds = getSubtreeIds(state.parentCatId);
-            prods = prods.filter(p =>
-                subtreeIds.includes(parseInt(p.category_id, 10)) ||
-                (p.category_name && subtreeIds.some(id => {
-                    const c = findCategoryById(id);
-                    return c && c.name === p.category_name;
-                }))
-            );
+        // Category filter using on-demand loaded category→product mapping
+        const catId = state.subCatId || state.parentCatId;
+        if (catId) {
+            const subtreeIds = getSubtreeIds(catId);
+            const allowedPids = new Set();
+            subtreeIds.forEach(id => {
+                const ids = state.categoryProductIds[id];
+                if (Array.isArray(ids)) ids.forEach(pid => allowedPids.add(pid));
+            });
+            if (allowedPids.size > 0) {
+                prods = prods.filter(p => allowedPids.has(parseInt(p.id, 10)));
+            }
         }
 
         // Search / barcode filter
@@ -484,25 +634,52 @@
     function renderProducts() {
         if (!productsGrid) return;
         const prods = filteredProducts();
+        const autoBadges = getAutoApplyDiscounts();
+        const globalBadge = autoBadges.length > 0
+            ? (autoBadges[0].marketing_badge || autoBadges[0].title || null)
+            : null;
+
         if (!prods.length) {
             productsGrid.innerHTML = `<p style="grid-column:1/-1;color:var(--text-muted,#64748b);padding:30px;text-align:center">${t('pos.products.empty','No products found')}</p>`;
             return;
         }
         productsGrid.innerHTML = prods.map(p => {
-            const price    = parseFloat(p.sale_price || p.price || 0);
-            const currency = p.currency_code || CFG.CURRENCY || 'SAR';
-            const img      = p.image_url || p.image_thumb_url || '';
-            const stock    = stockInfo(p);
-            const disabledCls = stock.disabled ? ' out-of-stock' : '';
+            const price         = parseFloat(p.price || p.sale_price || 0);
+            const comparePrice  = parseFloat(p.compare_at_price || 0);
+            const currency      = p.currency_code || CFG.CURRENCY || 'SAR';
+            const img           = p.image_url || p.image_thumb_url || '';
+            const stock         = stockInfo(p);
+            const disabledCls   = stock.disabled ? ' out-of-stock' : '';
+            const hasDiscount   = comparePrice > 0 && comparePrice > price;
+            const discountPct   = hasDiscount ? Math.round((1 - price / comparePrice) * 100) : 0;
+
+            const warehouseHtml = p.warehouse_name
+                ? `<div class="pos-product-warehouse">🏭 ${escHtml(p.warehouse_name)}</div>` : '';
+
+            const priceHtml = hasDiscount ? `
+                <div class="pos-product-original-price">${formatCurrency(comparePrice, currency)}</div>
+                <div class="pos-product-price sale">${formatCurrency(price, currency)}</div>
+            ` : `
+                <div class="pos-product-price">${formatCurrency(price, currency)}</div>
+            `;
+
+            const discountBadgeHtml = hasDiscount
+                ? `<div class="pos-discount-badge">-${discountPct}%</div>`
+                : (globalBadge ? `<div class="pos-discount-badge promo">${escHtml(globalBadge)}</div>` : '');
+
             return `
             <div class="pos-product-card${disabledCls}" data-id="${p.id}" data-barcode="${escHtml(p.barcode || '')}" title="${escHtml(p.name || '')}">
-                ${img
-                    ? `<img src="${escHtml(img)}" alt="${escHtml(p.name || '')}" loading="lazy">`
-                    : `<div class="pos-product-img-placeholder">📦</div>`
-                }
+                <div class="pos-card-img-wrap">
+                    ${img
+                        ? `<img src="${escHtml(img)}" alt="${escHtml(p.name || '')}" loading="lazy">`
+                        : `<div class="pos-product-img-placeholder">📦</div>`
+                    }
+                    ${discountBadgeHtml}
+                </div>
                 <div class="pos-product-name">${escHtml(p.name || p.slug || '')}</div>
-                <div class="pos-product-price">${formatCurrency(price, currency)}</div>
+                ${priceHtml}
                 ${p.sku ? `<div class="pos-product-sku">${escHtml(p.sku)}</div>` : ''}
+                ${warehouseHtml}
                 <div class="pos-stock-badge ${stock.cls}">${escHtml(stock.label)}</div>
             </div>`;
         }).join('');
@@ -654,23 +831,28 @@
         if (existing) {
             existing.qty++;
         } else {
-            const price = parseFloat(prod.sale_price || prod.price || 0);
+            const price        = parseFloat(prod.price || prod.sale_price || 0);
+            const comparePrice = parseFloat(prod.compare_at_price || 0);
             state.cart.push({
-                product_id:   prod.id,
-                product_name: prod.name || prod.slug || '',
-                sku:          prod.sku || '',
-                unit_price:   price,
-                sale_price:   price,
-                tax_rate:     parseFloat(prod.tax_rate || 0),
-                qty:          1,
-                image:        prod.image_thumb_url || prod.image_url || '',
+                product_id:      prod.id,
+                product_name:    prod.name || prod.slug || '',
+                sku:             prod.sku || '',
+                unit_price:      price,
+                sale_price:      price,
+                original_price:  comparePrice > price ? comparePrice : 0,
+                tax_rate:        parseFloat(prod.tax_rate || 0),
+                qty:             1,
+                image:           prod.image_thumb_url || prod.image_url || '',
             });
         }
+        // Recompute coupon discount when cart changes
+        if (state.activeCoupon) computeCouponDiscount();
         renderCart();
     }
 
     function removeFromCart(productId) {
         state.cart = state.cart.filter(i => i.product_id !== productId);
+        if (state.activeCoupon) computeCouponDiscount();
         renderCart();
     }
 
@@ -678,15 +860,20 @@
         const item = state.cart.find(i => i.product_id === productId);
         if (!item) return;
         item.qty = Math.max(1, item.qty + delta);
+        if (state.activeCoupon) computeCouponDiscount();
         renderCart();
     }
 
     function clearCart() {
         state.cart = [];
+        state.couponDiscount = 0;
+        state.activeCoupon = null;
+        renderCouponStatus();
         renderCart();
     }
 
-    function cartTotals() {
+    /** Compute sub + tax without discounts (used for coupon calculation) */
+    function cartSubtotals() {
         let sub = 0, tax = 0;
         state.cart.forEach(i => {
             const lineTotal = i.sale_price * i.qty;
@@ -694,10 +881,16 @@
             sub += lineTotal;
             tax += lineTax;
         });
-        const discount   = parseFloat(discountInput?.value ?? 0) || 0;
-        const total      = sub + tax;
-        const grandTotal = Math.max(0, total - discount);
-        return { sub, tax, discount, total, grandTotal };
+        return { sub, tax };
+    }
+
+    function cartTotals() {
+        const { sub, tax } = cartSubtotals();
+        const manualDiscount = parseFloat(discountInput?.value ?? 0) || 0;
+        const couponDiscount = state.couponDiscount || 0;
+        const total          = sub + tax;
+        const grandTotal     = Math.max(0, total - manualDiscount - couponDiscount);
+        return { sub, tax, discount: manualDiscount, couponDiscount, total, grandTotal };
     }
 
     function renderCart() {
@@ -785,11 +978,16 @@
     };
 
     function updateTotals() {
-        const { sub, tax, discount, total, grandTotal } = cartTotals();
-        if (subtotalEl) subtotalEl.textContent  = formatCurrency(sub);
-        if (taxEl)      taxEl.textContent       = formatCurrency(tax);
-        if (totalEl)    totalEl.textContent     = formatCurrency(total);
+        const { sub, tax, discount, couponDiscount, total, grandTotal } = cartTotals();
+        if (subtotalEl)  subtotalEl.textContent  = formatCurrency(sub);
+        if (taxEl)       taxEl.textContent       = formatCurrency(tax);
+        if (totalEl)     totalEl.textContent     = formatCurrency(total);
         if (grandTotalEl) grandTotalEl.textContent = formatCurrency(grandTotal);
+
+        // Show/hide coupon discount row
+        if (couponRow) couponRow.style.display = couponDiscount > 0 ? 'flex' : 'none';
+        const couponDiscountEl = document.getElementById('posCouponDiscountAmt');
+        if (couponDiscountEl) couponDiscountEl.textContent = `-${formatCurrency(couponDiscount)}`;
 
         updateChange();
         const hasItems = state.cart.length > 0 && !!state.session;
@@ -819,7 +1017,7 @@
     // ─────────────────────────────────────────────
     async function checkout() {
         if (!state.session || !state.cart.length) return;
-        const { grandTotal } = cartTotals();
+        const { grandTotal, couponDiscount } = cartTotals();
         const paid = parseFloat(amountPaidInput?.value ?? 0) || 0;
         const discount = parseFloat(discountInput?.value ?? 0) || 0;
 
@@ -836,7 +1034,9 @@
                 entity_id:         state.session.entity_id,
                 payment_method:    state.paymentMethod,
                 amount_paid:       paid,
-                discount_amount:   discount,
+                discount_amount:   discount + couponDiscount,
+                coupon_code:       state.activeCoupon?.discount?.code || null,
+                coupon_discount:   couponDiscount,
                 cashier_user_id:   state.session.cashier_user_id,
                 items: state.cart.map(i => ({
                     product_id:   i.product_id,
@@ -863,7 +1063,7 @@
     // Receipt Modal
     // ─────────────────────────────────────────────
     function showReceiptModal(orderRes, paid) {
-        const { grandTotal } = cartTotals();
+        const { grandTotal, couponDiscount } = cartTotals();
         const change = Math.max(0, paid - grandTotal);
         const now = new Date().toLocaleString(state.lang === 'ar' ? 'ar-SA' : 'en');
 
@@ -873,6 +1073,7 @@
                 <span>${formatCurrency(i.sale_price * i.qty)}</span>
             </div>`).join('');
 
+        const totals = cartTotals();
         showModal(`
             <h3>🧾 ${t('pos.receipt.title','Receipt')}</h3>
             <div class="pos-receipt">
@@ -882,9 +1083,10 @@
                 <hr class="receipt-divider">
                 ${itemsHtml}
                 <hr class="receipt-divider">
-                <div class="receipt-row"><span>${t('pos.subtotal','Subtotal')}</span><span>${formatCurrency(cartTotals().sub)}</span></div>
-                ${cartTotals().tax > 0 ? `<div class="receipt-row"><span>${t('pos.tax','Tax')}</span><span>${formatCurrency(cartTotals().tax)}</span></div>` : ''}
-                ${cartTotals().discount > 0 ? `<div class="receipt-row"><span>${t('pos.discount','Discount')}</span><span>-${formatCurrency(cartTotals().discount)}</span></div>` : ''}
+                <div class="receipt-row"><span>${t('pos.subtotal','Subtotal')}</span><span>${formatCurrency(totals.sub)}</span></div>
+                ${totals.tax > 0 ? `<div class="receipt-row"><span>${t('pos.tax','Tax')}</span><span>${formatCurrency(totals.tax)}</span></div>` : ''}
+                ${totals.discount > 0 ? `<div class="receipt-row"><span>${t('pos.discount','Discount')}</span><span>-${formatCurrency(totals.discount)}</span></div>` : ''}
+                ${couponDiscount > 0 ? `<div class="receipt-row"><span>${t('pos.coupon.label','Coupon')} (${escHtml(state.activeCoupon?.discount?.code||'')})</span><span>-${formatCurrency(couponDiscount)}</span></div>` : ''}
                 <hr class="receipt-divider">
                 <div class="receipt-row total-row"><span>${t('pos.total','Total')}</span><span>${formatCurrency(grandTotal)}</span></div>
                 <div class="receipt-row"><span>${t('pos.paid','Paid')}</span><span>${formatCurrency(paid)}</span></div>
@@ -906,6 +1108,7 @@
         if (amountPaidInput) amountPaidInput.value = '';
         if (changeDisplay) changeDisplay.textContent = '';
         if (checkoutBtn) checkoutBtn.disabled = true;
+        clearCoupon();
     };
 
     // ─────────────────────────────────────────────
@@ -1188,8 +1391,7 @@
         // Amount paid → update change
         amountPaidInput?.addEventListener('input', updateChange);
 
-        // Discount → update totals
-        discountInput?.addEventListener('input', updateTotals);
+        // Discount → update totals (coupon binding is added below)
 
         // Checkout
         checkoutBtn?.addEventListener('click', checkout);
@@ -1240,6 +1442,16 @@
             state.salesHistory = [];
             loadReports();
         });
+
+        // Coupon
+        applyCouponBtn?.addEventListener('click', applyCoupon);
+        clearCouponBtn?.addEventListener('click', clearCoupon);
+        couponInput?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); applyCoupon(); }
+        });
+        discountInput?.addEventListener('input', () => {
+            updateTotals();
+        });
     }
 
     // ─────────────────────────────────────────────
@@ -1261,7 +1473,7 @@
 
         if (state.session) {
             state.entityId = state.session.entity_id;
-            await loadCategories();
+            await Promise.all([loadCategories(), loadDiscounts()]);
             showMainLayout();
             await loadProducts();
         } else {
