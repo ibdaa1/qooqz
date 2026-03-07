@@ -61,11 +61,32 @@ if (!$canAccess) {
 // ════════════════════════════════════════════════════════════
 if (!function_exists('__pos_t')) {
     function __pos_t(string $key, string $fallback = ''): string {
-        if (function_exists('i18n_get')) {
-            $v = i18n_get($key);
-            if ($v !== null) return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+        static $cache = null;
+        if ($cache === null) {
+            $lang = $GLOBALS['ADMIN_UI']['lang'] ?? ($GLOBALS['lang'] ?? 'ar');
+            $file = __DIR__ . '/../../languages/POS/' . $lang . '.json';
+            if (!is_file($file)) {
+                $file = __DIR__ . '/../../languages/POS/ar.json';
+            }
+            $cache = [];
+            if (is_file($file)) {
+                $raw = file_get_contents($file);
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) {
+                    $cache = $decoded;
+                }
+            }
         }
-        return htmlspecialchars($fallback ?: $key, ENT_QUOTES, 'UTF-8');
+        // Traverse dotted key (e.g. "pos.tab.history")
+        $parts = explode('.', $key);
+        $cur   = $cache;
+        foreach ($parts as $p) {
+            if (!is_array($cur) || !isset($cur[$p])) {
+                return htmlspecialchars($fallback ?: $key, ENT_QUOTES, 'UTF-8');
+            }
+            $cur = $cur[$p];
+        }
+        return htmlspecialchars(is_string($cur) ? $cur : ($fallback ?: $key), ENT_QUOTES, 'UTF-8');
     }
 }
 
@@ -414,14 +435,34 @@ window.POS_CONFIG = {
     <div class="pos-panel" id="posHistoryPanel" style="display:none">
         <div class="pos-panel-header">
             <h2>📋 <?= __pos_t('pos.tab.history', 'Sales History') ?></h2>
-            <div style="display:flex;gap:8px;align-items:center">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <button class="btn btn-sm btn-outline pos-export-btn" id="posExportHistoryCSV" title="<?= __pos_t('pos.reports.export_csv', 'Export CSV') ?>">
                     📥 <?= __pos_t('pos.reports.export_csv', 'Export CSV') ?>
+                </button>
+                <button class="btn btn-sm btn-outline pos-export-btn" id="posExportHistoryExcel" title="<?= __pos_t('pos.reports.export_excel', 'Export Excel') ?>">
+                    📊 <?= __pos_t('pos.reports.export_excel', 'Export Excel') ?>
                 </button>
                 <button class="btn btn-sm btn-outline" id="posRefreshHistory">
                     🔄 <?= __pos_t('common.refresh', 'Refresh') ?>
                 </button>
             </div>
+        </div>
+        <!-- History Filters Bar -->
+        <div class="pos-filters-bar" id="posHistoryFilters">
+            <input type="date" id="posHistoryFrom" class="pos-filter-input" title="<?= __pos_t('pos.reports.date_from', 'From Date') ?>" placeholder="<?= __pos_t('pos.reports.date_from', 'From Date') ?>">
+            <input type="date" id="posHistoryTo" class="pos-filter-input" title="<?= __pos_t('pos.reports.date_to', 'To Date') ?>" placeholder="<?= __pos_t('pos.reports.date_to', 'To Date') ?>">
+            <select id="posHistoryPayMethod" class="pos-filter-input">
+                <option value=""><?= __pos_t('pos.reports.all_payments', 'All Payments') ?></option>
+                <option value="cash"><?= __pos_t('pos.payment.cash', 'Cash') ?></option>
+                <option value="card"><?= __pos_t('pos.payment.card', 'Card') ?></option>
+                <option value="transfer"><?= __pos_t('pos.payment.transfer', 'Bank Transfer') ?></option>
+            </select>
+            <button class="btn btn-sm btn-primary" id="posApplyHistoryFilter">
+                🔍 <?= __pos_t('pos.reports.filter_btn', 'Filter') ?>
+            </button>
+            <button class="btn btn-sm btn-outline" id="posResetHistoryFilter">
+                ↺ <?= __pos_t('pos.reports.reset_filter', 'Reset') ?>
+            </button>
         </div>
         <div id="posHistoryContent">
             <div class="pos-loading"><div class="pos-spinner"></div></div>
@@ -435,14 +476,34 @@ window.POS_CONFIG = {
     <div class="pos-panel" id="posReportsPanel" style="display:none">
         <div class="pos-panel-header">
             <h2>📊 <?= __pos_t('pos.tab.reports', 'Session Reports') ?></h2>
-            <div style="display:flex;gap:8px;align-items:center">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <button class="btn btn-sm btn-outline pos-export-btn" id="posExportCSV" title="<?= __pos_t('pos.reports.export_csv', 'Export CSV') ?>">
                     📥 <?= __pos_t('pos.reports.export_csv', 'Export CSV') ?>
+                </button>
+                <button class="btn btn-sm btn-outline pos-export-btn" id="posExportExcel" title="<?= __pos_t('pos.reports.export_excel', 'Export Excel') ?>">
+                    📊 <?= __pos_t('pos.reports.export_excel', 'Export Excel') ?>
                 </button>
                 <button class="btn btn-sm btn-outline" id="posRefreshReports">
                     🔄 <?= __pos_t('common.refresh', 'Refresh') ?>
                 </button>
             </div>
+        </div>
+        <!-- Reports Filters Bar -->
+        <div class="pos-filters-bar" id="posReportsFilters">
+            <input type="date" id="posReportsFrom" class="pos-filter-input" title="<?= __pos_t('pos.reports.date_from', 'From Date') ?>" placeholder="<?= __pos_t('pos.reports.date_from', 'From Date') ?>">
+            <input type="date" id="posReportsTo" class="pos-filter-input" title="<?= __pos_t('pos.reports.date_to', 'To Date') ?>" placeholder="<?= __pos_t('pos.reports.date_to', 'To Date') ?>">
+            <select id="posReportsPayMethod" class="pos-filter-input">
+                <option value=""><?= __pos_t('pos.reports.all_payments', 'All Payments') ?></option>
+                <option value="cash"><?= __pos_t('pos.payment.cash', 'Cash') ?></option>
+                <option value="card"><?= __pos_t('pos.payment.card', 'Card') ?></option>
+                <option value="transfer"><?= __pos_t('pos.payment.transfer', 'Bank Transfer') ?></option>
+            </select>
+            <button class="btn btn-sm btn-primary" id="posApplyReportsFilter">
+                🔍 <?= __pos_t('pos.reports.filter_btn', 'Filter') ?>
+            </button>
+            <button class="btn btn-sm btn-outline" id="posResetReportsFilter">
+                ↺ <?= __pos_t('pos.reports.reset_filter', 'Reset') ?>
+            </button>
         </div>
         <div id="posReportsContent">
             <div class="pos-loading"><div class="pos-spinner"></div></div>

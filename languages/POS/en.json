@@ -120,7 +120,14 @@
       "export_done": "File exported successfully",
       "no_data": "No data to export",
       "session_date": "Session Date",
-      "payment_method": "Payment Method"
+      "payment_method": "Payment Method",
+      "export_excel": "Export Excel",
+      "date_from": "From Date",
+      "date_to": "To Date",
+      "filter_btn": "Filter",
+      "reset_filter": "Reset",
+      "all_payments": "All Payments",
+      "payment_filter": "Payment Method"
     },
     "error": {
       "entity_required": "Please select an entity/branch",

@@ -1151,3 +1151,44 @@
 .pos-page .pos-export-btn:hover {
     background: rgba(16,185,129,.12);
 }
+
+/* ════════════════════════════════════════
+   FILTER BAR
+   ════════════════════════════════════════ */
+.pos-page .pos-filters-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--background-secondary, #1e293b);
+    border-bottom: 1px solid var(--border-color, #334155);
+}
+
+.pos-page .pos-filter-input {
+    background: var(--background-primary, #0f172a);
+    border: 1px solid var(--border-color, #334155);
+    border-radius: 6px;
+    color: var(--text-primary, #e2e8f0);
+    font-size: .82rem;
+    padding: 5px 10px;
+    height: 32px;
+    outline: none;
+    transition: border-color .15s;
+    min-width: 0;
+}
+
+.pos-page .pos-filter-input:focus {
+    border-color: var(--primary-color, #3b82f6);
+}
+
+.pos-page .pos-filter-input option {
+    background: var(--background-secondary, #1e293b);
+    color: var(--text-primary, #e2e8f0);
+}
+
+/* Dark date input calendar icon color fix */
+.pos-page .pos-filter-input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(0.8);
+    cursor: pointer;
+}

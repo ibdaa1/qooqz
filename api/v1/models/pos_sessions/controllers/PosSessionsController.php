@@ -53,9 +53,9 @@ final class PosSessionsController
     /* ────────────────────────────────────────────────────
      * GET ?action=session_orders&session_id=N
      * ──────────────────────────────────────────────────── */
-    public function sessionOrders(int $tenantId, int $sessionId): array
+    public function sessionOrders(int $tenantId, int $sessionId, array $filters = []): array
     {
-        return ['orders' => $this->service->sessionOrders($tenantId, $sessionId)];
+        return ['orders' => $this->service->sessionOrders($tenantId, $sessionId, $filters)];
     }
 
     /* ────────────────────────────────────────────────────

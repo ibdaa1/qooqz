@@ -122,11 +122,21 @@ try {
             pos_json_ok($result);
         }
 
-        // GET ?action=session_orders&session_id=N
+        // GET ?action=session_orders&session_id=N[&date_from=Y-m-d&date_to=Y-m-d&payment_method=cash]
         if ($action === 'session_orders') {
             $sessionId = isset($_GET['session_id']) ? (int)$_GET['session_id'] : 0;
             if (!$sessionId) pos_json_error('session_id required');
-            pos_json_ok($controller->sessionOrders($tenantId, $sessionId));
+            $filters = [];
+            if (!empty($_GET['date_from'])) {
+                $filters['date_from'] = preg_replace('/[^0-9\-]/', '', $_GET['date_from']);
+            }
+            if (!empty($_GET['date_to'])) {
+                $filters['date_to'] = preg_replace('/[^0-9\-]/', '', $_GET['date_to']);
+            }
+            if (!empty($_GET['payment_method'])) {
+                $filters['payment_method'] = preg_replace('/[^a-z_]/', '', strtolower($_GET['payment_method']));
+            }
+            pos_json_ok($controller->sessionOrders($tenantId, $sessionId, $filters));
         }
 
         // GET ?id=N  – single session

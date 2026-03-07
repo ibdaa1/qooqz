@@ -57,6 +57,9 @@
         cameraScanInterval: null,
         // History & Reports
         salesHistory:  [],
+        // Active filters for history/reports
+        historyFilters: { dateFrom: '', dateTo: '', paymentMethod: '' },
+        reportsFilters: { dateFrom: '', dateTo: '', paymentMethod: '' },
     };
 
     // Barcode hardware scanner: gap in ms above which typed chars are considered stale (user typing vs scanner)
@@ -1204,7 +1207,12 @@
         const content = document.getElementById('posHistoryContent');
         if (content) content.innerHTML = '<div class="pos-loading"><div class="pos-spinner"></div></div>';
         try {
-            const res = await apiGet(API.pos, { action: 'session_orders', session_id: state.session.id });
+            const params = { action: 'session_orders', session_id: state.session.id };
+            const f = state.historyFilters;
+            if (f.dateFrom) params.date_from = f.dateFrom;
+            if (f.dateTo)   params.date_to   = f.dateTo;
+            if (f.paymentMethod) params.payment_method = f.paymentMethod;
+            const res = await apiGet(API.pos, params);
             state.salesHistory = res.orders ?? [];
             renderSalesHistory();
         } catch (err) {
@@ -1212,10 +1220,30 @@
         }
     }
 
+    /** Apply client-side filters on top of (already-fetched) salesHistory */
+    function applyHistoryFilters(orders) {
+        const f = state.historyFilters;
+        let result = orders;
+        if (f.dateFrom) {
+            const from = new Date(f.dateFrom + 'T00:00:00');
+            result = result.filter(o => new Date(o.created_at) >= from);
+        }
+        if (f.dateTo) {
+            const to = new Date(f.dateTo + 'T23:59:59');
+            result = result.filter(o => new Date(o.created_at) <= to);
+        }
+        if (f.paymentMethod) {
+            result = result.filter(o =>
+                (o.payment_method || '').toLowerCase().includes(f.paymentMethod.toLowerCase())
+            );
+        }
+        return result;
+    }
+
     function renderSalesHistory() {
         const content = document.getElementById('posHistoryContent');
         if (!content) return;
-        const orders = state.salesHistory;
+        const orders = applyHistoryFilters(state.salesHistory);
         if (!orders.length) {
             content.innerHTML = `<p style="color:var(--text-muted,#64748b);padding:20px;text-align:center">${t('pos.history.empty','No sales in this session yet')}</p>`;
             return;
@@ -1235,6 +1263,7 @@
                         <th>#</th>
                         <th>${t('pos.history.order_number','Order #')}</th>
                         <th>${t('pos.history.amount','Amount')}</th>
+                        <th>${t('pos.reports.payment_method','Payment')}</th>
                         <th>${t('pos.history.status','Status')}</th>
                         <th>${t('pos.history.time','Time')}</th>
                         <th>${t('pos.history.customer','Customer')}</th>
@@ -1242,12 +1271,13 @@
                 </thead>
                 <tbody>
                     ${orders.map((o, i) => {
-                        const t_ = new Date(o.created_at).toLocaleTimeString(state.lang === 'ar' ? 'ar-SA' : 'en');
+                        const t_ = new Date(o.created_at).toLocaleString(state.lang === 'ar' ? 'ar-SA' : 'en');
                         const badgeCls = o.payment_status === 'paid' ? 'badge-paid' : 'badge-pending';
                         return `<tr>
                             <td>${i+1}</td>
                             <td style="font-family:monospace">${escHtml(o.order_number || String(o.id))}</td>
                             <td><strong>${formatCurrency(o.grand_total)}</strong></td>
+                            <td>${escHtml(o.payment_method || '—')}</td>
                             <td><span class="${badgeCls}">${escHtml(o.payment_status || 'paid')}</span></td>
                             <td>${escHtml(t_)}</td>
                             <td>${escHtml(o.customer_name || '—')}</td>
@@ -1266,25 +1296,49 @@
         if (!state.session) return;
         const content = document.getElementById('posReportsContent');
         if (content) content.innerHTML = '<div class="pos-loading"><div class="pos-spinner"></div></div>';
-        // Re-use history data (load if not loaded yet)
-        if (!state.salesHistory.length) {
-            try {
-                const res = await apiGet(API.pos, { action: 'session_orders', session_id: state.session.id });
-                state.salesHistory = res.orders ?? [];
-            } catch { /* ignore */ }
-        }
+        try {
+            const params = { action: 'session_orders', session_id: state.session.id };
+            const f = state.reportsFilters;
+            if (f.dateFrom) params.date_from = f.dateFrom;
+            if (f.dateTo)   params.date_to   = f.dateTo;
+            if (f.paymentMethod) params.payment_method = f.paymentMethod;
+            const res = await apiGet(API.pos, params);
+            state.salesHistory = res.orders ?? [];
+        } catch { /* ignore */ }
         renderReports();
+    }
+
+    /** Apply client-side filters on top of (already-fetched) salesHistory for reports */
+    function applyReportsFilters(orders) {
+        const f = state.reportsFilters;
+        let result = orders;
+        if (f.dateFrom) {
+            const from = new Date(f.dateFrom + 'T00:00:00');
+            result = result.filter(o => new Date(o.created_at) >= from);
+        }
+        if (f.dateTo) {
+            const to = new Date(f.dateTo + 'T23:59:59');
+            result = result.filter(o => new Date(o.created_at) <= to);
+        }
+        if (f.paymentMethod) {
+            result = result.filter(o =>
+                (o.payment_method || '').toLowerCase().includes(f.paymentMethod.toLowerCase())
+            );
+        }
+        return result;
     }
 
     function renderReports() {
         const content = document.getElementById('posReportsContent');
         if (!content) return;
-        const orders = state.salesHistory;
-        const s      = state.session;
+        const orders  = applyReportsFilters(state.salesHistory);
+        const s       = state.session;
 
         const totalOrders = orders.length;
         const totalSales  = orders.reduce((acc, o) => acc + parseFloat(o.grand_total || 0), 0);
-        const cashSales   = orders.filter(o => !o.sales_channel || o.sales_channel === 'pos')
+        const cashSales   = orders.filter(o => (o.payment_method || '').toLowerCase().includes('cash'))
+                                  .reduce((acc, o) => acc + parseFloat(o.grand_total || 0), 0);
+        const cardSales   = orders.filter(o => (o.payment_method || '').toLowerCase().includes('card'))
                                   .reduce((acc, o) => acc + parseFloat(o.grand_total || 0), 0);
         const avgOrder    = totalOrders > 0 ? (totalSales / totalOrders) : 0;
 
@@ -1304,11 +1358,11 @@
                 </div>
                 <div class="pos-report-card">
                     <div class="rc-label">${t('pos.reports.cash','Cash Total')}</div>
-                    <div class="rc-value">${formatCurrency(s?.total_cash || 0)}</div>
+                    <div class="rc-value">${formatCurrency(cashSales || s?.total_cash || 0)}</div>
                 </div>
                 <div class="pos-report-card">
                     <div class="rc-label">${t('pos.reports.card','Card Total')}</div>
-                    <div class="rc-value">${formatCurrency(s?.total_card || 0)}</div>
+                    <div class="rc-value">${formatCurrency(cardSales || s?.total_card || 0)}</div>
                 </div>
                 <div class="pos-report-card">
                     <div class="rc-label">${t('pos.reports.opening_balance','Opening Balance')}</div>
@@ -1318,26 +1372,28 @@
             ${totalOrders > 0 ? `
             <h3 style="color:var(--text-primary,#e2e8f0);margin:20px 0 12px;font-size:1rem">${t('pos.reports.orders_breakdown','Orders Breakdown')}</h3>
             <div style="overflow-x:auto">
-            <table class="pos-history-table">
+            <table class="pos-history-table" id="posReportsTable">
                 <thead><tr>
                     <th>${t('pos.history.order_number','Order #')}</th>
                     <th>${t('pos.history.amount','Amount')}</th>
+                    <th>${t('pos.reports.payment_method','Payment')}</th>
                     <th>${t('pos.history.time','Time')}</th>
                     <th>${t('pos.history.customer','Customer')}</th>
                 </tr></thead>
                 <tbody>
                     ${orders.map(o => {
-                        const tm = new Date(o.created_at).toLocaleTimeString(state.lang === 'ar' ? 'ar-SA' : 'en');
+                        const tm = new Date(o.created_at).toLocaleString(state.lang === 'ar' ? 'ar-SA' : 'en');
                         return `<tr>
                             <td style="font-family:monospace">${escHtml(o.order_number || String(o.id))}</td>
                             <td><strong>${formatCurrency(o.grand_total)}</strong></td>
+                            <td>${escHtml(o.payment_method || '—')}</td>
                             <td>${escHtml(tm)}</td>
                             <td>${escHtml(o.customer_name || '—')}</td>
                         </tr>`;
                     }).join('')}
                 </tbody>
             </table>
-            </div>` : ''}
+            </div>` : `<p style="color:var(--text-muted,#64748b);padding:20px;text-align:center">${t('pos.reports.no_data','No data for selected filters')}</p>`}
         `;
     }
 
@@ -1438,35 +1494,44 @@
     // ─────────────────────────────────────────────
     // CSV / Excel Export
     // ─────────────────────────────────────────────
-    function exportSalesCSV() {
-        const orders = state.salesHistory;
-        if (!orders.length) {
-            showAlert(t('pos.reports.no_data', 'No data to export'), 'error');
-            return;
-        }
+
+    /** Build the rows array for export (shared by CSV and Excel) */
+    function buildExportData(orders) {
         const headers = [
             t('pos.history.order_number', 'Order #'),
             t('pos.history.amount', 'Amount'),
+            t('pos.reports.payment_method', 'Payment Method'),
             t('pos.history.status', 'Status'),
-            t('pos.history.time', 'Time'),
+            new Date().toLocaleDateString(state.lang === 'ar' ? 'ar-SA' : 'en') /* date col label placeholder */,
             t('pos.history.customer', 'Customer'),
-            t('pos.payment.title', 'Payment Method'),
             t('pos.subtotal', 'Subtotal'),
             t('pos.tax', 'Tax'),
             t('pos.discount', 'Discount'),
         ];
+        // Replace placeholder with actual "Date" label
+        headers[4] = t('pos.reports.session_date', 'Date');
+
         const rows = orders.map(o => [
             o.order_number || String(o.id),
             parseFloat(o.grand_total || 0).toFixed(2),
+            o.payment_method || '',
             o.payment_status || 'paid',
             new Date(o.created_at).toLocaleString(state.lang === 'ar' ? 'ar-SA' : 'en'),
             o.customer_name || '',
-            o.payment_method || '',
             parseFloat(o.subtotal || o.grand_total || 0).toFixed(2),
             parseFloat(o.tax_amount || 0).toFixed(2),
             parseFloat(o.discount_amount || 0).toFixed(2),
         ]);
+        return { headers, rows };
+    }
 
+    function exportSalesCSV(ordersOverride) {
+        const orders = ordersOverride || applyHistoryFilters(state.salesHistory);
+        if (!orders.length) {
+            showAlert(t('pos.reports.no_data', 'No data to export'), 'error');
+            return;
+        }
+        const { headers, rows } = buildExportData(orders);
         const csvContent = [headers, ...rows]
             .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
             .join('\n');
@@ -1479,6 +1544,53 @@
         const dateSource = state.session ? new Date(state.session.opened_at) : new Date();
         const sessionDate = dateSource.toISOString().split('T')[0];
         a.download = `pos-sales-${sessionDate}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showAlert(t('pos.reports.export_done', 'File exported successfully'), 'success', 3000);
+    }
+
+    /** Export as .xls (HTML table with Excel MIME type – opens natively in Excel) */
+    function exportSalesExcel(ordersOverride) {
+        const orders = ordersOverride || applyHistoryFilters(state.salesHistory);
+        if (!orders.length) {
+            showAlert(t('pos.reports.no_data', 'No data to export'), 'error');
+            return;
+        }
+        const { headers, rows } = buildExportData(orders);
+        const sessionTitle = t('pos.reports.orders_breakdown', 'Orders Breakdown');
+        const sessionDate  = state.session
+            ? new Date(state.session.opened_at).toLocaleDateString(state.lang === 'ar' ? 'ar-SA' : 'en')
+            : new Date().toLocaleDateString();
+
+        const th = headers.map(h => `<th style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;padding:6px 10px">${escHtml(String(h))}</th>`).join('');
+        const tbody = rows.map(row =>
+            '<tr>' + row.map(cell => `<td style="border:1px solid #334155;padding:5px 10px">${escHtml(String(cell))}</td>`).join('') + '</tr>'
+        ).join('');
+
+        const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+                           xmlns:x="urn:schemas-microsoft-com:office:excel"
+                           xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+  table { border-collapse: collapse; font-family: Arial, sans-serif; direction: ${state.dir}; }
+  th { background: #1e293b; color: #e2e8f0; }
+  td, th { border: 1px solid #334155; padding: 5px 10px; white-space: nowrap; }
+  h2 { font-family: Arial, sans-serif; color: #1e293b; }
+</style>
+</head><body>
+<h2>${escHtml(sessionTitle)} – ${escHtml(sessionDate)}</h2>
+<table><thead><tr>${th}</tr></thead><tbody>${tbody}</tbody></table>
+</body></html>`;
+
+        const bom  = '\uFEFF';
+        const blob = new Blob([bom + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        const fileDate = (state.session ? new Date(state.session.opened_at) : new Date()).toISOString().split('T')[0];
+        a.download = `pos-sales-${fileDate}.xls`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -1557,14 +1669,61 @@
         // History refresh
         document.getElementById('posRefreshHistory')?.addEventListener('click', loadSalesHistory);
         // History export CSV
-        document.getElementById('posExportHistoryCSV')?.addEventListener('click', exportSalesCSV);
+        document.getElementById('posExportHistoryCSV')?.addEventListener('click', () =>
+            exportSalesCSV(applyHistoryFilters(state.salesHistory))
+        );
+        // History export Excel
+        document.getElementById('posExportHistoryExcel')?.addEventListener('click', () =>
+            exportSalesExcel(applyHistoryFilters(state.salesHistory))
+        );
+        // History filters
+        document.getElementById('posApplyHistoryFilter')?.addEventListener('click', () => {
+            state.historyFilters.dateFrom      = document.getElementById('posHistoryFrom')?.value || '';
+            state.historyFilters.dateTo        = document.getElementById('posHistoryTo')?.value || '';
+            state.historyFilters.paymentMethod = document.getElementById('posHistoryPayMethod')?.value || '';
+            renderSalesHistory();
+        });
+        document.getElementById('posResetHistoryFilter')?.addEventListener('click', () => {
+            state.historyFilters = { dateFrom: '', dateTo: '', paymentMethod: '' };
+            const fromEl = document.getElementById('posHistoryFrom');
+            const toEl   = document.getElementById('posHistoryTo');
+            const pmEl   = document.getElementById('posHistoryPayMethod');
+            if (fromEl) fromEl.value = '';
+            if (toEl)   toEl.value   = '';
+            if (pmEl)   pmEl.value   = '';
+            renderSalesHistory();
+        });
+
         // Reports refresh
         document.getElementById('posRefreshReports')?.addEventListener('click', () => {
             state.salesHistory = [];
             loadReports();
         });
         // Reports export CSV
-        document.getElementById('posExportCSV')?.addEventListener('click', exportSalesCSV);
+        document.getElementById('posExportCSV')?.addEventListener('click', () =>
+            exportSalesCSV(applyReportsFilters(state.salesHistory))
+        );
+        // Reports export Excel
+        document.getElementById('posExportExcel')?.addEventListener('click', () =>
+            exportSalesExcel(applyReportsFilters(state.salesHistory))
+        );
+        // Reports filters
+        document.getElementById('posApplyReportsFilter')?.addEventListener('click', () => {
+            state.reportsFilters.dateFrom      = document.getElementById('posReportsFrom')?.value || '';
+            state.reportsFilters.dateTo        = document.getElementById('posReportsTo')?.value || '';
+            state.reportsFilters.paymentMethod = document.getElementById('posReportsPayMethod')?.value || '';
+            renderReports();
+        });
+        document.getElementById('posResetReportsFilter')?.addEventListener('click', () => {
+            state.reportsFilters = { dateFrom: '', dateTo: '', paymentMethod: '' };
+            const fromEl = document.getElementById('posReportsFrom');
+            const toEl   = document.getElementById('posReportsTo');
+            const pmEl   = document.getElementById('posReportsPayMethod');
+            if (fromEl) fromEl.value = '';
+            if (toEl)   toEl.value   = '';
+            if (pmEl)   pmEl.value   = '';
+            renderReports();
+        });
 
         // Coupon
         applyCouponBtn?.addEventListener('click', applyCoupon);

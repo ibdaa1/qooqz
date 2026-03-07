@@ -93,8 +93,8 @@ final class PosSessionsService
     /* ────────────────────────────────────────────────────
      * Get orders for a session
      * ──────────────────────────────────────────────────── */
-    public function sessionOrders(int $tenantId, int $sessionId): array
+    public function sessionOrders(int $tenantId, int $sessionId, array $filters = []): array
     {
-        return $this->repository->sessionOrders($tenantId, $sessionId);
+        return $this->repository->sessionOrders($tenantId, $sessionId, $filters);
     }
 }

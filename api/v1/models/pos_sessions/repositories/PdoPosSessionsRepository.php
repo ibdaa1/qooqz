@@ -277,13 +277,13 @@ final class PdoPosSessionsRepository implements PosSessionsRepositoryInterface
                     status, payment_status, subtotal, tax_amount, discount_amount,
                     total_amount, grand_total, currency_code,
                     customer_notes, pos_session_id, cashier_user_id,
-                    branch_entity_id, sales_channel, created_at
+                    branch_entity_id, sales_channel, payment_method, created_at
                 ) VALUES (
                     :tid, :eid, :onum, :uid, 'pos',
                     'completed', 'paid', :sub, :tax, :disc,
                     :tot, :grand, 'SAR',
                     :notes, :sid, :cuid,
-                    :beid, 'pos', NOW()
+                    :beid, 'pos', :pm, NOW()
                 )
             ");
             $stmt->execute([
@@ -300,6 +300,7 @@ final class PdoPosSessionsRepository implements PosSessionsRepositoryInterface
                 ':sid'   => $sessionId,
                 ':cuid'  => $cashierUserId,
                 ':beid'  => $entityId,
+                ':pm'    => $paymentMethod,
             ]);
             $orderId = (int)$this->pdo->lastInsertId();
 
@@ -359,18 +360,40 @@ final class PdoPosSessionsRepository implements PosSessionsRepositoryInterface
     }
 
     /* =====================================================
-     * Orders for a session
+     * Orders for a session (with optional date/payment filters)
      * ===================================================== */
-    public function sessionOrders(int $tenantId, int $sessionId): array
+    public function sessionOrders(int $tenantId, int $sessionId, array $filters = []): array
     {
+        $where  = ['o.tenant_id = :tid', 'o.pos_session_id = :sid'];
+        $params = [':tid' => $tenantId, ':sid' => $sessionId];
+
+        // Date range filter (inclusive)
+        if (!empty($filters['date_from'])) {
+            $where[]              = 'DATE(o.created_at) >= :date_from';
+            $params[':date_from'] = $filters['date_from'];
+        }
+        if (!empty($filters['date_to'])) {
+            $where[]            = 'DATE(o.created_at) <= :date_to';
+            $params[':date_to'] = $filters['date_to'];
+        }
+        // Payment method filter – join payments table for payment_method
+        if (!empty($filters['payment_method'])) {
+            $where[]                 = 'o.payment_method LIKE :payment_method';
+            $params[':payment_method'] = '%' . $filters['payment_method'] . '%';
+        }
+
+        $whereClause = 'WHERE ' . implode(' AND ', $where);
         $stmt = $this->pdo->prepare("
             SELECT o.*, u.username AS customer_name
             FROM orders o
             LEFT JOIN users u ON o.user_id = u.id
-            WHERE o.tenant_id = :tid AND o.pos_session_id = :sid
+            $whereClause
             ORDER BY o.created_at DESC
         ");
-        $stmt->execute([':tid' => $tenantId, ':sid' => $sessionId]);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v, is_int($v) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 

@@ -120,7 +120,14 @@
       "export_done": "تم تصدير الملف بنجاح",
       "no_data": "لا توجد بيانات للتصدير",
       "session_date": "تاريخ الجلسة",
-      "payment_method": "طريقة الدفع"
+      "payment_method": "طريقة الدفع",
+      "export_excel": "تصدير Excel",
+      "date_from": "من تاريخ",
+      "date_to": "إلى تاريخ",
+      "filter_btn": "تصفية",
+      "reset_filter": "إعادة تعيين",
+      "all_payments": "جميع طرق الدفع",
+      "payment_filter": "طريقة الدفع"
     },
     "error": {
       "entity_required": "الرجاء اختيار الفرع",

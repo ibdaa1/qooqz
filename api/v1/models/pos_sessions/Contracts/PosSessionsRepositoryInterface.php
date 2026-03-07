@@ -56,5 +56,5 @@ interface PosSessionsRepositoryInterface
     /**
      * Retrieve orders for a given POS session.
      */
-    public function sessionOrders(int $tenantId, int $sessionId): array;
+    public function sessionOrders(int $tenantId, int $sessionId, array $filters = []): array;
 }
