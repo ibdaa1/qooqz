@@ -23,9 +23,19 @@ final class EntitiesService
     public function save(int $tenantId,array $data,string $lang): int
     {
         $id = $this->repo->save($tenantId,$data);
-        if (!empty($data['store_name'])) {
+
+        // Save translations from the translations array if provided
+        if (!empty($data['translations']) && is_array($data['translations'])) {
+            foreach ($data['translations'] as $langCode => $transData) {
+                if (is_array($transData) && !empty($transData['store_name'])) {
+                    $this->repo->saveTranslation($id, $langCode, $transData);
+                }
+            }
+        } elseif (!empty($data['store_name'])) {
+            // Fallback: create a translation for the default language
             $this->repo->saveTranslation($id,$lang,$data);
         }
+
         return $id;
     }
 

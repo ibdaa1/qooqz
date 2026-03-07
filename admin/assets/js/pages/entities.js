@@ -862,7 +862,7 @@
 
             const entityData = {
                 store_name: formData.get('en_store_name') || formData.get('store_name') || '',
-                slug: formData.get('slug') || generateSlug(formData.get('en_store_name') || formData.get('store_name')),
+                slug: formData.get('slug') || generateSlug(formData.get('en_store_name') || formData.get('store_name')) || ('entity-' + Date.now()),
                 parent_id: (formData.get('entity_type') === 'branch' && formData.get('parent_id')) ? parseInt(formData.get('parent_id'), 10) : null,
                 branch_code: formData.get('branch_code') || null,
                 vendor_type: formData.get('vendor_type') || 'product_seller',
@@ -1150,6 +1150,7 @@
 
     function validateForm() {
         let isValid = true;
+        let firstInvalidField = null;
 
         const requiredFields = [el.enEntityName, el.entityPhone, el.entityEmail];
 
@@ -1159,9 +1160,21 @@
                 if (field) {
                     field.classList.add('is-invalid');
                     field.addEventListener('input', () => field.classList.remove('is-invalid'), { once: true });
+                    if (!firstInvalidField) firstInvalidField = field;
                 }
             }
         });
+
+        // Switch to the tab containing the first invalid field so the user can see it
+        if (firstInvalidField) {
+            const tabContent = firstInvalidField.closest('.tab-content');
+            if (tabContent && tabContent.id && tabContent.id.startsWith('tab-')) {
+                const tabId = tabContent.id.slice(4);
+                const tabBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+                if (tabBtn) tabBtn.click();
+            }
+            setTimeout(() => firstInvalidField.focus(), 50);
+        }
 
         return isValid;
     }
