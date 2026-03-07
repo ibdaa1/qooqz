@@ -75,13 +75,18 @@
       "apply": "Apply",
       "applied": "Coupon applied",
       "invalid": "Invalid or expired coupon code",
-      "enter_code": "Please enter a coupon code"
+      "enter_code": "Please enter a coupon code",
+      "discount_type_percent": "Percentage Discount",
+      "discount_type_fixed": "Fixed Discount",
+      "discount_type_bogo": "Buy & Get Free"
     },
     "payment": {
       "title": "Payment Method",
       "cash": "Cash",
       "card": "Card",
-      "amount_paid": "Amount Paid"
+      "amount_paid": "Amount Paid",
+      "transfer": "Bank Transfer",
+      "online": "Online Payment"
     },
     "receipt": {
       "title": "Sales Receipt",
@@ -110,14 +115,24 @@
       "cash": "Cash Total",
       "card": "Card Total",
       "opening_balance": "Opening Balance",
-      "orders_breakdown": "Orders Breakdown"
+      "orders_breakdown": "Orders Breakdown",
+      "export_csv": "Export CSV",
+      "export_done": "File exported successfully",
+      "no_data": "No data to export",
+      "session_date": "Session Date",
+      "payment_method": "Payment Method"
     },
     "error": {
       "entity_required": "Please select an entity/branch",
       "insufficient_payment": "Amount paid is less than the total",
       "invalid_price": "Invalid price"
     },
-    "search_entity": "Search entity…"
+    "search_entity": "Search entity…",
+    "offers": {
+      "active": "Active Offers",
+      "bogo": "Buy & Get",
+      "none": "No active offers"
+    }
   },
   "common": {
     "cancel": "Cancel",

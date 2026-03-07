@@ -29,6 +29,8 @@
         lang:          CFG.LANG || 'ar',
         dir:           CFG.DIR || 'ltr',
         csrf:          CFG.CSRF || '',
+        currency:      CFG.CURRENCY || 'SAR',
+        currencySymbol: CFG.CURRENCY_SYMBOL || '',
         session:       null,
         products:      [],
         categoryTree:  [],     // [{id, name, parent_id, children:[...]}]
@@ -343,12 +345,63 @@
     async function loadDiscounts() {
         try {
             const res = await apiGet(API.publicDiscounts, { lang: state.lang });
-            // Public route returns { ok: true, data: [...] }
-            const items = res.data ?? res.items ?? [];
-            state.discounts = Array.isArray(items) ? items : [];
+            // Public route returns ResponseFormatter::success(['ok'=>true,'data'=>[...]])
+            // ResponseFormatter wraps payload in { success, data: payload }
+            // so actual list is at res.data.data (nested)
+            let items;
+            if (Array.isArray(res.data)) {
+                items = res.data;
+            } else if (Array.isArray(res.data?.data)) {
+                items = res.data.data;
+            } else if (Array.isArray(res.items)) {
+                items = res.items;
+            } else {
+                items = [];
+            }
+            state.discounts = items;
         } catch {
             state.discounts = [];
         }
+        renderActiveDiscountsBanner();
+    }
+
+    /** Render active offers/discounts banner above the products grid */
+    function renderActiveDiscountsBanner() {
+        const banner = document.getElementById('posDiscountsBanner');
+        if (!banner) return;
+
+        const now = Date.now();
+        const activeDiscounts = state.discounts.filter(d => {
+            if (d.status && d.status !== 'active') return false;
+            if (d.ends_at && new Date(d.ends_at).getTime() < now) return false;
+            if (d.starts_at && new Date(d.starts_at).getTime() > now) return false;
+            if (d.max_redemptions > 0 && d.current_redemptions >= d.max_redemptions) return false;
+            return true;
+        });
+
+        if (!activeDiscounts.length) {
+            banner.style.display = 'none';
+            return;
+        }
+
+        const badges = activeDiscounts.map(d => {
+            const label = d.marketing_badge || d.title || '';
+            if (!label) return '';
+            const typeIcon = d.type === 'buy_x_get_y' ? '🎁' :
+                             (d.code ? '🏷' : '⚡');
+            return `<span class="pos-offer-badge">${typeIcon} ${escHtml(label)}</span>`;
+        }).filter(Boolean);
+
+        if (!badges.length) {
+            banner.style.display = 'none';
+            return;
+        }
+
+        banner.innerHTML = `
+            <span class="pos-offers-label">🎉 ${t('pos.offers.active', 'Active Offers')}:</span>
+            ${badges.join('')}
+        `;
+        banner.style.display = 'flex';
     }
 
     /** Return active auto-apply discounts (for showing badges on all products) */
@@ -598,11 +651,18 @@
         if (catId) {
             const subtreeIds = getSubtreeIds(catId);
             const allowedPids = new Set();
+            let anyCatLoaded = false;
             subtreeIds.forEach(id => {
                 const ids = state.categoryProductIds[id];
-                if (Array.isArray(ids)) ids.forEach(pid => allowedPids.add(pid));
+                if (Array.isArray(ids)) {
+                    anyCatLoaded = true;
+                    ids.forEach(pid => allowedPids.add(pid));
+                }
             });
-            if (allowedPids.size > 0) {
+            // Only filter when at least one category in the subtree has been loaded.
+            // This prevents showing all products when loading is still in progress,
+            // and correctly shows 0 products when a category has no products.
+            if (anyCatLoaded) {
                 prods = prods.filter(p => allowedPids.has(parseInt(p.id, 10)));
             }
         }
@@ -635,9 +695,6 @@
         if (!productsGrid) return;
         const prods = filteredProducts();
         const autoBadges = getAutoApplyDiscounts();
-        const globalBadge = autoBadges.length > 0
-            ? (autoBadges[0].marketing_badge || autoBadges[0].title || null)
-            : null;
 
         if (!prods.length) {
             productsGrid.innerHTML = `<p style="grid-column:1/-1;color:var(--text-muted,#64748b);padding:30px;text-align:center">${t('pos.products.empty','No products found')}</p>`;
@@ -646,7 +703,7 @@
         productsGrid.innerHTML = prods.map(p => {
             const price         = parseFloat(p.price || p.sale_price || 0);
             const comparePrice  = parseFloat(p.compare_at_price || 0);
-            const currency      = p.currency_code || CFG.CURRENCY || 'SAR';
+            const currency      = p.currency_code || state.currency || CFG.CURRENCY || 'SAR';
             const img           = p.image_url || p.image_thumb_url || '';
             const stock         = stockInfo(p);
             const disabledCls   = stock.disabled ? ' out-of-stock' : '';
@@ -663,9 +720,20 @@
                 <div class="pos-product-price">${formatCurrency(price, currency)}</div>
             `;
 
-            const discountBadgeHtml = hasDiscount
-                ? `<div class="pos-discount-badge">-${discountPct}%</div>`
-                : (globalBadge ? `<div class="pos-discount-badge promo">${escHtml(globalBadge)}</div>` : '');
+            // Determine best discount badge to show
+            let discountBadgeHtml = '';
+            if (hasDiscount) {
+                discountBadgeHtml = `<div class="pos-discount-badge">-${discountPct}%</div>`;
+            } else if (autoBadges.length > 0) {
+                // Find BOGO (buy_x_get_y) offer first, then any auto-apply offer
+                const bogoBadge = autoBadges.find(d => d.type === 'buy_x_get_y');
+                const bestBadge = bogoBadge || autoBadges[0];
+                const badgeLabel = bestBadge.marketing_badge || bestBadge.title || '';
+                const badgeIcon  = bestBadge.type === 'buy_x_get_y' ? '🎁' : '⚡';
+                if (badgeLabel) {
+                    discountBadgeHtml = `<div class="pos-discount-badge promo">${badgeIcon} ${escHtml(badgeLabel)}</div>`;
+                }
+            }
 
             return `
             <div class="pos-product-card${disabledCls}" data-id="${p.id}" data-barcode="${escHtml(p.barcode || '')}" title="${escHtml(p.name || '')}">
@@ -1364,7 +1432,58 @@
     // ─────────────────────────────────────────────
     function formatCurrency(val, currencyCode) {
         const n = parseFloat(val) || 0;
-        return n.toFixed(2) + ' ' + (currencyCode || CFG.CURRENCY || 'SAR');
+        return n.toFixed(2) + ' ' + (currencyCode || state.currency || CFG.CURRENCY || 'SAR');
+    }
+
+    // ─────────────────────────────────────────────
+    // CSV / Excel Export
+    // ─────────────────────────────────────────────
+    function exportSalesCSV() {
+        const orders = state.salesHistory;
+        if (!orders.length) {
+            showAlert(t('pos.reports.no_data', 'No data to export'), 'error');
+            return;
+        }
+        const headers = [
+            t('pos.history.order_number', 'Order #'),
+            t('pos.history.amount', 'Amount'),
+            t('pos.history.status', 'Status'),
+            t('pos.history.time', 'Time'),
+            t('pos.history.customer', 'Customer'),
+            t('pos.payment.title', 'Payment Method'),
+            t('pos.subtotal', 'Subtotal'),
+            t('pos.tax', 'Tax'),
+            t('pos.discount', 'Discount'),
+        ];
+        const rows = orders.map(o => [
+            o.order_number || String(o.id),
+            parseFloat(o.grand_total || 0).toFixed(2),
+            o.payment_status || 'paid',
+            new Date(o.created_at).toLocaleString(state.lang === 'ar' ? 'ar-SA' : 'en'),
+            o.customer_name || '',
+            o.payment_method || '',
+            parseFloat(o.subtotal || o.grand_total || 0).toFixed(2),
+            parseFloat(o.tax_amount || 0).toFixed(2),
+            parseFloat(o.discount_amount || 0).toFixed(2),
+        ]);
+
+        const csvContent = [headers, ...rows]
+            .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+            .join('\n');
+
+        const bom = '\uFEFF'; // UTF-8 BOM for Excel Arabic support
+        const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const dateSource = state.session ? new Date(state.session.opened_at) : new Date();
+        const sessionDate = dateSource.toISOString().split('T')[0];
+        a.download = `pos-sales-${sessionDate}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showAlert(t('pos.reports.export_done', 'File exported successfully'), 'success', 3000);
     }
 
     // ─────────────────────────────────────────────
@@ -1437,11 +1556,15 @@
 
         // History refresh
         document.getElementById('posRefreshHistory')?.addEventListener('click', loadSalesHistory);
+        // History export CSV
+        document.getElementById('posExportHistoryCSV')?.addEventListener('click', exportSalesCSV);
         // Reports refresh
         document.getElementById('posRefreshReports')?.addEventListener('click', () => {
             state.salesHistory = [];
             loadReports();
         });
+        // Reports export CSV
+        document.getElementById('posExportCSV')?.addEventListener('click', exportSalesCSV);
 
         // Coupon
         applyCouponBtn?.addEventListener('click', applyCoupon);

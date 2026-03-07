@@ -154,6 +154,24 @@ if (!function_exists('renderFragmentThemeVars')) {
       data-assets-css="/admin/assets/css/pages/pos.css"
       data-i18n-files="/languages/POS/<?= rawurlencode($lang) ?>.json">
 
+<?php
+// Load default active currency from DB
+$defaultCurrency = 'SAR'; // fallback
+$defaultCurrencySymbol = 'ر.س';
+if (!empty($GLOBALS['ADMIN_DB']) && $GLOBALS['ADMIN_DB'] instanceof PDO) {
+    try {
+        $currStmt = $GLOBALS['ADMIN_DB']->prepare(
+            "SELECT code, symbol FROM currencies WHERE is_active = 1 ORDER BY id ASC LIMIT 1"
+        );
+        $currStmt->execute();
+        $currRow = $currStmt->fetch(PDO::FETCH_ASSOC);
+        if ($currRow && !empty($currRow['code'])) {
+            $defaultCurrency = (string)$currRow['code'];
+            $defaultCurrencySymbol = (string)($currRow['symbol'] ?? $currRow['code']);
+        }
+    } catch (Throwable $e) { /* use fallback */ }
+}
+?>
 <!-- POS Config -->
 <script>
 window.POS_CONFIG = {
@@ -165,7 +183,8 @@ window.POS_CONFIG = {
     LANG:             '<?= htmlspecialchars($lang, ENT_QUOTES) ?>',
     DIR:              '<?= htmlspecialchars($dir, ENT_QUOTES) ?>',
     CSRF:             '<?= htmlspecialchars($csrf, ENT_QUOTES) ?>',
-    CURRENCY:         'SAR',
+    CURRENCY:         '<?= htmlspecialchars($defaultCurrency, ENT_QUOTES) ?>',
+    CURRENCY_SYMBOL:  '<?= htmlspecialchars($defaultCurrencySymbol, ENT_QUOTES) ?>',
 };
 </script>
 
@@ -274,6 +293,9 @@ window.POS_CONFIG = {
 
             <!-- Sub Category Tabs (shown when parent selected) -->
             <div class="pos-sub-cat-tabs" id="posSubCats" style="display:none"></div>
+
+            <!-- Active Offers / Discounts Banner -->
+            <div class="pos-active-discounts-banner" id="posDiscountsBanner" style="display:none"></div>
 
             <!-- Products Grid -->
             <div class="pos-products-grid" id="posProductsGrid">
@@ -392,9 +414,14 @@ window.POS_CONFIG = {
     <div class="pos-panel" id="posHistoryPanel" style="display:none">
         <div class="pos-panel-header">
             <h2>📋 <?= __pos_t('pos.tab.history', 'Sales History') ?></h2>
-            <button class="btn btn-sm btn-outline" id="posRefreshHistory">
-                🔄 <?= __pos_t('common.refresh', 'Refresh') ?>
-            </button>
+            <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn btn-sm btn-outline pos-export-btn" id="posExportHistoryCSV" title="<?= __pos_t('pos.reports.export_csv', 'Export CSV') ?>">
+                    📥 <?= __pos_t('pos.reports.export_csv', 'Export CSV') ?>
+                </button>
+                <button class="btn btn-sm btn-outline" id="posRefreshHistory">
+                    🔄 <?= __pos_t('common.refresh', 'Refresh') ?>
+                </button>
+            </div>
         </div>
         <div id="posHistoryContent">
             <div class="pos-loading"><div class="pos-spinner"></div></div>
@@ -408,9 +435,14 @@ window.POS_CONFIG = {
     <div class="pos-panel" id="posReportsPanel" style="display:none">
         <div class="pos-panel-header">
             <h2>📊 <?= __pos_t('pos.tab.reports', 'Session Reports') ?></h2>
-            <button class="btn btn-sm btn-outline" id="posRefreshReports">
-                🔄 <?= __pos_t('common.refresh', 'Refresh') ?>
-            </button>
+            <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn btn-sm btn-outline pos-export-btn" id="posExportCSV" title="<?= __pos_t('pos.reports.export_csv', 'Export CSV') ?>">
+                    📥 <?= __pos_t('pos.reports.export_csv', 'Export CSV') ?>
+                </button>
+                <button class="btn btn-sm btn-outline" id="posRefreshReports">
+                    🔄 <?= __pos_t('common.refresh', 'Refresh') ?>
+                </button>
+            </div>
         </div>
         <div id="posReportsContent">
             <div class="pos-loading"><div class="pos-spinner"></div></div>

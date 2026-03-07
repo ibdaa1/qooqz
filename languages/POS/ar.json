@@ -75,13 +75,18 @@
       "apply": "تطبيق",
       "applied": "تم تطبيق الكوبون",
       "invalid": "رمز الكوبون غير صالح أو منتهي الصلاحية",
-      "enter_code": "الرجاء إدخال رمز الكوبون"
+      "enter_code": "الرجاء إدخال رمز الكوبون",
+      "discount_type_percent": "خصم بنسبة مئوية",
+      "discount_type_fixed": "خصم بمبلغ ثابت",
+      "discount_type_bogo": "اشتري وأحصل على هدية"
     },
     "payment": {
       "title": "طريقة الدفع",
       "cash": "نقداً",
       "card": "بطاقة",
-      "amount_paid": "المبلغ المدفوع"
+      "amount_paid": "المبلغ المدفوع",
+      "transfer": "تحويل بنكي",
+      "online": "دفع إلكتروني"
     },
     "receipt": {
       "title": "فاتورة المبيعات",
@@ -110,14 +115,24 @@
       "cash": "إجمالي النقد",
       "card": "إجمالي البطاقة",
       "opening_balance": "رصيد الافتتاح",
-      "orders_breakdown": "تفصيل الطلبات"
+      "orders_breakdown": "تفصيل الطلبات",
+      "export_csv": "تصدير CSV",
+      "export_done": "تم تصدير الملف بنجاح",
+      "no_data": "لا توجد بيانات للتصدير",
+      "session_date": "تاريخ الجلسة",
+      "payment_method": "طريقة الدفع"
     },
     "error": {
       "entity_required": "الرجاء اختيار الفرع",
       "insufficient_payment": "المبلغ المدفوع أقل من الإجمالي",
       "invalid_price": "سعر غير صالح"
     },
-    "search_entity": "بحث عن فرع..."
+    "search_entity": "بحث عن فرع...",
+    "offers": {
+      "active": "العروض النشطة",
+      "bogo": "اشتري وأحصل على",
+      "none": "لا توجد عروض نشطة"
+    }
   },
   "common": {
     "cancel": "إلغاء",

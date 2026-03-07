@@ -1093,3 +1093,61 @@
     border-radius: 4px; transition: color .15s;
 }
 .pos-page .pos-item-edit-btn:hover { color: var(--primary-color, #3b82f6); }
+
+/* ════════════════════════════════════════
+   ACTIVE DISCOUNTS / OFFERS BANNER
+   ════════════════════════════════════════ */
+.pos-page .pos-active-discounts-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px;
+    background: linear-gradient(90deg, rgba(16,185,129,.12) 0%, rgba(59,130,246,.08) 100%);
+    border-bottom: 1px solid rgba(16,185,129,.25);
+    font-size: .8rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.pos-page .pos-active-discounts-banner::-webkit-scrollbar { height: 3px; }
+.pos-page .pos-active-discounts-banner::-webkit-scrollbar-thumb { background: rgba(16,185,129,.3); border-radius: 2px; }
+
+.pos-page .pos-offers-label {
+    color: var(--success-color, #10b981);
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.pos-page .pos-offer-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: rgba(16,185,129,.18);
+    color: var(--success-color, #10b981);
+    border: 1px solid rgba(16,185,129,.3);
+    font-size: .75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* ════════════════════════════════════════
+   EXPORT BUTTON
+   ════════════════════════════════════════ */
+.pos-page .pos-export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: .8rem;
+    padding: 5px 10px;
+    border-radius: 6px;
+    color: var(--success-color, #10b981);
+    border-color: var(--success-color, #10b981);
+    transition: all .15s;
+}
+.pos-page .pos-export-btn:hover {
+    background: rgba(16,185,129,.12);
+}
