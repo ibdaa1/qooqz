@@ -31,6 +31,8 @@ final class PdoCategoriesRepository
         int $limit = 50,
         int $offset = 0
     ): array {
+        $hasAssignments = $this->hasTenantCategoryAssignments($tenantId);
+
         $sql = "
             SELECT
                 c.*,
@@ -55,8 +57,18 @@ final class PdoCategoriesRepository
                    SELECT id FROM image_types WHERE name = 'category' LIMIT 1
                )
                AND i.is_main = 1
-            WHERE c.tenant_id = :tenantId
         ";
+
+        if ($hasAssignments) {
+            $sql .= "
+            INNER JOIN tenant_categories tc_assign
+                ON c.id = tc_assign.category_id
+               AND tc_assign.tenant_id = :tenantId
+               AND tc_assign.is_active = 1
+            ";
+        }
+
+        $sql .= " WHERE c.tenant_id = :tenantId";
 
         $params = [
             ':tenantId' => $tenantId,
@@ -549,30 +561,45 @@ final class PdoCategoriesRepository
 
     public function countAll(int $tenantId, array $filters = []): int
     {
-        $sql = "SELECT COUNT(*) as total FROM categories WHERE tenant_id = :tenantId";
+        $hasAssignments = $this->hasTenantCategoryAssignments($tenantId);
+
+        if ($hasAssignments) {
+            $sql = "SELECT COUNT(*) as total
+                    FROM categories c
+                    INNER JOIN tenant_categories tc_assign
+                        ON c.id = tc_assign.category_id
+                       AND tc_assign.tenant_id = :tenantId
+                       AND tc_assign.is_active = 1
+                    WHERE c.tenant_id = :tenantId";
+        } else {
+            $sql = "SELECT COUNT(*) as total
+                    FROM categories c
+                    WHERE c.tenant_id = :tenantId";
+        }
+
         $params = [':tenantId' => $tenantId];
 
         if (isset($filters['parent_id'])) {
             if ($filters['parent_id'] === 0) {
-                $sql .= " AND parent_id IS NULL";
+                $sql .= " AND c.parent_id IS NULL";
             } else {
-                $sql .= " AND parent_id = :parent_id";
+                $sql .= " AND c.parent_id = :parent_id";
                 $params[':parent_id'] = $filters['parent_id'];
             }
         }
 
         if (isset($filters['is_active']) && $filters['is_active'] !== '') {
-            $sql .= " AND is_active = :is_active";
+            $sql .= " AND c.is_active = :is_active";
             $params[':is_active'] = (int)$filters['is_active'];
         }
 
         if (isset($filters['is_featured']) && $filters['is_featured'] !== '') {
-            $sql .= " AND is_featured = :is_featured";
+            $sql .= " AND c.is_featured = :is_featured";
             $params[':is_featured'] = (int)$filters['is_featured'];
         }
 
         if (!empty($filters['search'])) {
-            $sql .= " AND (name LIKE :search OR slug LIKE :search)";
+            $sql .= " AND (c.name LIKE :search OR c.slug LIKE :search)";
             $params[':search'] = "%{$filters['search']}%";
         }
 
@@ -612,5 +639,15 @@ final class PdoCategoriesRepository
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         
         return ($result['count'] ?? 0) > 0;
+    }
+
+    private function hasTenantCategoryAssignments(int $tenantId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT COUNT(*) as cnt FROM tenant_categories WHERE tenant_id = :tenantId LIMIT 1"
+        );
+        $stmt->execute([':tenantId' => $tenantId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return ((int)($result['cnt'] ?? 0)) > 0;
     }
 }

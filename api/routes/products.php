@@ -122,26 +122,6 @@ try {
 
             $newId = $controller->create($tenantId, $data);
 
-            // حفظ الترجمة الأساسية (الاسم الإنجليزي) في product_translations
-            if (!empty($data['name']) && $newId) {
-                try {
-                    $transStmt = $pdo->prepare("
-                        INSERT INTO product_translations (product_id, language_code, name, short_description, description)
-                        VALUES (:product_id, :language_code, :name, :short_desc, :description)
-                        ON DUPLICATE KEY UPDATE name = VALUES(name), short_description = VALUES(short_description), description = VALUES(description)
-                    ");
-                    $transStmt->execute([
-                        ':product_id' => $newId,
-                        ':language_code' => 'en',
-                        ':name' => $data['name'],
-                        ':short_desc' => $data['short_description'] ?? '',
-                        ':description' => $data['description'] ?? ''
-                    ]);
-                } catch (Throwable $e) {
-                    safe_log('warning','products.translation_save', ['error'=>$e->getMessage()]);
-                }
-            }
-
             // Auto-populate SEO meta
             try {
                 SeoAutoManager::sync($pdo, 'product', (int)$newId, [
@@ -160,26 +140,6 @@ try {
 
         case 'PUT':
             $updatedId = $controller->update($tenantId, $data);
-
-            // تحديث الترجمة الأساسية (الاسم الإنجليزي)
-            if (!empty($data['name']) && $updatedId) {
-                try {
-                    $transStmt = $pdo->prepare("
-                        INSERT INTO product_translations (product_id, language_code, name, short_description, description)
-                        VALUES (:product_id, :language_code, :name, :short_desc, :description)
-                        ON DUPLICATE KEY UPDATE name = VALUES(name), short_description = VALUES(short_description), description = VALUES(description)
-                    ");
-                    $transStmt->execute([
-                        ':product_id' => $updatedId,
-                        ':language_code' => 'en',
-                        ':name' => $data['name'],
-                        ':short_desc' => $data['short_description'] ?? '',
-                        ':description' => $data['description'] ?? ''
-                    ]);
-                } catch (Throwable $e) {
-                    safe_log('warning','products.translation_update', ['error'=>$e->getMessage()]);
-                }
-            }
 
             // Auto-update SEO meta
             try {

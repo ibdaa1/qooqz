@@ -599,8 +599,6 @@
             if (el.formTitle) el.formTitle.textContent = t('form.edit_title', 'Edit Product');
             if (el.formId) el.formId.value = product.id || '';
             if (el.prodName) el.prodName.value = product.name || '';
-            // Pre-fill English name as fallback; loadProductTranslations will override with actual English translation
-            if (el.enProdName && !el.enProdName.value.trim()) el.enProdName.value = product.name || '';
             if (el.prodSku) el.prodSku.value = product.sku || '';
             if (el.prodSlug) el.prodSlug.value = product.slug || '';
             if (el.prodBarcode) el.prodBarcode.value = product.barcode || '';
@@ -1641,8 +1639,7 @@
                 items.forEach(trans => {
                     if (trans.language_code === 'en') {
                         // Populate the inline English fields instead of creating a panel
-                        // Keep fallback value (from product.name) if no translation name is available
-                        if (el.enProdName) el.enProdName.value = trans.name || el.enProdName.value || '';
+                        if (el.enProdName) el.enProdName.value = trans.name || '';
                         if (el.enProdShortDesc) el.enProdShortDesc.value = trans.short_description || '';
                         if (el.enProdDesc) el.enProdDesc.value = trans.description || '';
                         if (el.enProdSpecs) el.enProdSpecs.value = trans.specifications || '';
