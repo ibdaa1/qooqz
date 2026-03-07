@@ -63,7 +63,7 @@ final class PdoCategoriesRepository
             $sql .= "
             INNER JOIN tenant_categories tc_assign
                 ON c.id = tc_assign.category_id
-               AND tc_assign.tenant_id = :tenantId
+               AND tc_assign.tenant_id = :tenantId_tc
                AND tc_assign.is_active = 1
             ";
         }
@@ -74,6 +74,10 @@ final class PdoCategoriesRepository
             ':tenantId' => $tenantId,
             ':lang'     => $lang
         ];
+
+        if ($hasAssignments) {
+            $params[':tenantId_tc'] = $tenantId;
+        }
 
         if ($parentId !== null) {
             if ($parentId === 0) {
@@ -568,7 +572,7 @@ final class PdoCategoriesRepository
                     FROM categories c
                     INNER JOIN tenant_categories tc_assign
                         ON c.id = tc_assign.category_id
-                       AND tc_assign.tenant_id = :tenantId
+                       AND tc_assign.tenant_id = :tenantId_tc
                        AND tc_assign.is_active = 1
                     WHERE c.tenant_id = :tenantId";
         } else {
@@ -578,6 +582,9 @@ final class PdoCategoriesRepository
         }
 
         $params = [':tenantId' => $tenantId];
+        if ($hasAssignments) {
+            $params[':tenantId_tc'] = $tenantId;
+        }
 
         if (isset($filters['parent_id'])) {
             if ($filters['parent_id'] === 0) {
