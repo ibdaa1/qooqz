@@ -38,6 +38,7 @@
         tenants: [],
         entityTypes: [],
         attributes: [],
+        allEntities: [],
         filters: {},
         currentEntity: null,
         entityAttributes: [],
@@ -485,6 +486,18 @@
                 state.attributes = attrData;
                 populateAttributeSelect(state.attributes);
             }
+
+            // Load parent entities for the searchable dropdown
+            try {
+                const entitiesResult = await apiCall(`${API.entities}?limit=500&lang=${state.language}&tenant_id=${state.tenantId}`);
+                if (entitiesResult.success) {
+                    const entData = entitiesResult.data?.items || entitiesResult.data || [];
+                    state.allEntities = Array.isArray(entData) ? entData : [];
+                    populateParentEntitySelect(state.allEntities);
+                }
+            } catch (entErr) {
+                console.warn('[Entities] Failed to load parent entities list:', entErr);
+            }
         } catch (err) {
             console.warn('[Entities] Failed to load dropdown data:', err);
         }
@@ -537,6 +550,22 @@
             opt.dataset.type = attr.attribute_type || 'text';
             el.entityAttrSelect.appendChild(opt);
         });
+    }
+
+    function populateParentEntitySelect(entities) {
+        const sel = el.entityParentSelect || document.getElementById('entityParentSelect');
+        if (!sel) return;
+        const currentVal = sel.value;
+        sel.innerHTML = '<option value="">' + t('form.fields.parent_entity.placeholder', '— Select parent entity —') + '</option>';
+        entities.forEach(ent => {
+            const opt = document.createElement('option');
+            opt.value = ent.id;
+            const name = ent.store_name || ent.original_store_name || ('Entity #' + ent.id);
+            const code = ent.branch_code ? ' (' + esc(ent.branch_code) + ')' : '';
+            opt.textContent = name + code + ' — #' + ent.id;
+            sel.appendChild(opt);
+        });
+        if (currentVal) sel.value = currentVal;
     }
 
     // ════════════════════════════════════════════════════════════
@@ -660,6 +689,9 @@
                 toggleParentIdField(hasParent);
             }
             if (el.entityParentId) el.entityParentId.value = entity.parent_id || '';
+            if (el.entityParentSelect && entity.parent_id) {
+                el.entityParentSelect.value = entity.parent_id;
+            }
             if (entity.parent_id) {
                 validateParentId(entity.parent_id);
             }
@@ -2213,6 +2245,7 @@
             entitySlug: $id('entitySlug'),
             entityType: $id('entityType'),
             entityParentId: $id('entityParentId'),
+            entityParentSelect: $id('entityParentSelect'),
             parentIdGroup: $id('parentIdGroup'),
             btnValidateParent: $id('btnValidateParent'),
             parentValidationResult: $id('parentValidationResult'),
@@ -2340,6 +2373,15 @@
         if (el.entityParentId) {
             el.entityParentId.onblur = function() {
                 if (this.value) validateParentId(this.value);
+            };
+        }
+        // Sync searchable parent select → number input
+        if (el.entityParentSelect) {
+            el.entityParentSelect.onchange = function() {
+                if (this.value && el.entityParentId) {
+                    el.entityParentId.value = this.value;
+                    validateParentId(this.value);
+                }
             };
         }
 

@@ -219,6 +219,51 @@ $apiBase = '/api';
                         </div>
                     </div>
 
+                    <!-- Entity Type (Main / Branch) -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="entityType" data-i18n="form.fields.entity_type.label">
+                                <?= __t('form.fields.entity_type.label', 'Entity Type') ?>
+                            </label>
+                            <select id="entityType" name="entity_type" class="form-control">
+                                <option value="main" data-i18n="form.fields.entity_type.main"><?= __t('form.fields.entity_type.main', 'Main Entity') ?></option>
+                                <option value="branch" data-i18n="form.fields.entity_type.branch"><?= __t('form.fields.entity_type.branch', 'Branch') ?></option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Parent Entity (shown only for branches) -->
+                    <div id="parentIdGroup" style="display:none">
+                        <div class="form-row">
+                            <div class="form-group full-width">
+                                <label for="entityParentSelect" data-i18n="form.fields.parent_entity.label">
+                                    <?= __t('form.fields.parent_entity.label', 'Search Parent Entity') ?>
+                                </label>
+                                <select id="entityParentSelect" class="form-control">
+                                    <option value=""><?= __t('form.fields.parent_entity.placeholder', '— Select parent entity —') ?></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group full-width">
+                                <label for="entityParentId" data-i18n="form.fields.parent_id.label">
+                                    <?= __t('form.fields.parent_id.label', 'Parent Entity ID') ?>
+                                </label>
+                                <div style="display:flex; gap:8px; align-items:flex-start;">
+                                    <input type="number" id="entityParentId" name="parent_id" class="form-control"
+                                           min="1" style="max-width:200px;"
+                                           data-i18n-placeholder="form.fields.parent_id.placeholder"
+                                           placeholder="<?= __t('form.fields.parent_id.placeholder', 'Enter parent entity ID') ?>">
+                                    <button type="button" id="btnValidateParent" class="btn btn-outline">
+                                        <i class="fas fa-search"></i>
+                                        <?= __t('form.fields.parent_id.validate', 'Validate') ?>
+                                    </button>
+                                </div>
+                                <div id="parentValidationResult" style="display:none; margin-top:6px; font-size:0.875rem; padding:6px 10px; border-radius:4px;"></div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="entityVendorType" data-i18n="form.fields.vendor_type.label">
