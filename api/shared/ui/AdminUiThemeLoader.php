@@ -242,6 +242,10 @@ final class AdminUiThemeLoader
         // Helper: convert snake_case key to hyphenated CSS var name
         $hyphenateKey = static fn(string $key): string => str_replace('_', '-', strtolower($key));
 
+        // Sanitize a CSS value: strip characters that could break out of a property value.
+        // Removes '{', '}', and semicolons to prevent CSS injection.
+        $sanitizeCssValue = static fn(string $v): string => preg_replace('/[{};]/', '', $v);
+
         $css = ":root {\n";
 
         // Colors — emit both underscore AND hyphenated form for maximum compatibility.
@@ -320,6 +324,19 @@ final class AdminUiThemeLoader
             if (!empty($font['font_weight'])) {
                 $css .= "  --{$hyphen}-weight: {$font['font_weight']};\n";
             }
+        }
+
+        // Card styles — emit CSS variables in :root so page CSS can reference var(--card-{slug}-bg) etc.
+        foreach ($themeData['card_styles'] ?? [] as $card) {
+            if (empty($card['slug'])) continue;
+            $slug = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$card['slug']));
+            if (!empty($card['background_color'])) $css .= "  --card-{$slug}-bg: " . $sanitizeCssValue((string)$card['background_color']) . ";\n";
+            if (!empty($card['border_color']))     $css .= "  --card-{$slug}-border: " . $sanitizeCssValue((string)$card['border_color']) . ";\n";
+            if (!empty($card['border_radius']))    $css .= "  --card-{$slug}-radius: " . $sanitizeCssValue((string)$card['border_radius']) . "px;\n";
+            if (!empty($card['shadow_style']))     $css .= "  --card-{$slug}-shadow: " . $sanitizeCssValue((string)$card['shadow_style']) . ";\n";
+            if (!empty($card['padding']))          $css .= "  --card-{$slug}-padding: " . $sanitizeCssValue((string)$card['padding']) . ";\n";
+            if (!empty($card['text_color']))       $css .= "  --card-{$slug}-text: " . $sanitizeCssValue((string)$card['text_color']) . ";\n";
+            if (!empty($card['border_width']))     $css .= "  --card-{$slug}-border-width: " . $sanitizeCssValue((string)$card['border_width']) . "px;\n";
         }
 
         $css .= "}\n";
