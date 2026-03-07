@@ -1335,12 +1335,16 @@
         const s       = state.session;
 
         const totalOrders = orders.length;
-        const totalSales  = orders.reduce((acc, o) => acc + parseFloat(o.grand_total || 0), 0);
-        const cashSales   = orders.filter(o => (o.payment_method || '').toLowerCase().includes('cash'))
-                                  .reduce((acc, o) => acc + parseFloat(o.grand_total || 0), 0);
-        const cardSales   = orders.filter(o => (o.payment_method || '').toLowerCase().includes('card'))
-                                  .reduce((acc, o) => acc + parseFloat(o.grand_total || 0), 0);
-        const avgOrder    = totalOrders > 0 ? (totalSales / totalOrders) : 0;
+        // Single-pass totals calculation
+        let totalSales = 0, cashSales = 0, cardSales = 0;
+        orders.forEach(o => {
+            const amt = parseFloat(o.grand_total || 0);
+            totalSales += amt;
+            const pm = (o.payment_method || '').toLowerCase();
+            if (pm.includes('cash'))  cashSales += amt;
+            if (pm.includes('card'))  cardSales += amt;
+        });
+        const avgOrder = totalOrders > 0 ? (totalSales / totalOrders) : 0;
 
         content.innerHTML = `
             <div class="pos-report-cards">
@@ -1502,14 +1506,12 @@
             t('pos.history.amount', 'Amount'),
             t('pos.reports.payment_method', 'Payment Method'),
             t('pos.history.status', 'Status'),
-            new Date().toLocaleDateString(state.lang === 'ar' ? 'ar-SA' : 'en') /* date col label placeholder */,
+            t('pos.reports.session_date', 'Date'),
             t('pos.history.customer', 'Customer'),
             t('pos.subtotal', 'Subtotal'),
             t('pos.tax', 'Tax'),
             t('pos.discount', 'Discount'),
         ];
-        // Replace placeholder with actual "Date" label
-        headers[4] = t('pos.reports.session_date', 'Date');
 
         const rows = orders.map(o => [
             o.order_number || String(o.id),

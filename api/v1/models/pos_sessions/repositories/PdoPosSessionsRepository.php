@@ -376,10 +376,12 @@ final class PdoPosSessionsRepository implements PosSessionsRepositoryInterface
             $where[]            = 'DATE(o.created_at) <= :date_to';
             $params[':date_to'] = $filters['date_to'];
         }
-        // Payment method filter – join payments table for payment_method
+        // Payment method filter – exact match (LIKE with escaped special chars)
         if (!empty($filters['payment_method'])) {
-            $where[]                 = 'o.payment_method LIKE :payment_method';
-            $params[':payment_method'] = '%' . $filters['payment_method'] . '%';
+            // Escape LIKE special characters to prevent pattern manipulation
+            $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $filters['payment_method']);
+            $where[]                   = 'o.payment_method LIKE :payment_method ESCAPE \'\\\\\'';
+            $params[':payment_method'] = '%' . $escaped . '%';
         }
 
         $whereClause = 'WHERE ' . implode(' AND ', $where);
