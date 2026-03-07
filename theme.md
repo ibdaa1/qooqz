@@ -2517,5 +2517,985 @@ timestamp
 YES
 current_timestamp()
 on update current_timestamp()
+/////
 
+SELECT * FROM `card_styles`
+ Profiling [ Edit inline ] [ Edit ] [ Explain SQL ] [ Create PHP code ] [ Refresh ]
+
+1
+|	 Show all	|			Number of rows: 
+25
+Filter rows: 
+Search this table
+Sort by key: 
+None
+Full texts
+id
+tenant_id
+theme_id
+name
+slug
+card_type
+background_color
+border_color
+border_width
+border_radius
+shadow_style
+padding
+hover_effect
+text_align
+image_aspect_ratio
+is_active
+created_at
+updated_at
+
+Edit Edit
+Copy Copy
+Delete Delete
+1
+1
+1
+Product Card - Default
+product-default
+product
+#c455ec
+#c760b4
+1
+12
+0 4px 20px rgba(255,99,71,0.2)
+16px
+lift
+left
+1:1
+1
+2025-12-14 02:17:03
+2026-03-05 02:54:42
+
+Edit Edit
+Copy Copy
+Delete Delete
+2
+1
+1
+Product Card - Minimal
+product-minimal
+product
+#e4c31b
+#d5e21d
+1
+16
+0 4px 20px rgba(50,205,50,0.2)
+16px
+zoom
+left
+4:5
+1
+2025-12-14 02:17:03
+2026-03-03 15:34:01
+
+Edit Edit
+Copy Copy
+Delete Delete
+3
+1
+1
+Category Card
+category-default
+category
+#e3a0b7
+#ba55d3
+1
+20
+0 4px 20px rgba(186,85,211,0.2)
+16px
+shadow
+left
+16:9
+1
+2025-12-14 02:17:03
+2026-03-03 15:11:32
+
+Edit Edit
+Copy Copy
+Delete Delete
+4
+1
+1
+Entities Card
+eee
+product
+#93c8f1
+#6df66a
+1
+8
+0 4px 20px rgba(30,144,255,0.2)
+16px
+border
+left
+3:2
+1
+2025-12-14 02:17:03
+2026-03-05 15:47:36
+
+Edit Edit
+Copy Copy
+Delete Delete
+5
+1
+1
+Tenants Card - Default
+tenants-default
+#e3a0b7
+#dddddd
+1
+8
+none
+16px
+lift
+left
+1:1
+1
+2026-03-03 15:30:39
+2026-03-03 15:57:08
+
+Edit Edit
+Copy Copy
+Delete Delete
+6
+1
+1
+Blog Card - Default
+blog-default
+blog
+#273cdd
+#563ae4
+1
+8
+shadow
+16px
+zoom
+left
+16:9
+1
+2026-03-03 15:30:39
+2026-03-03 15:32:52
+
+Edit Edit
+Copy Copy
+Delete Delete
+7
+1
+1
+Feature Card - Default
+feature-default
+feature
+#6fb2ec
+#53a1f3
+1
+8
+lift
+16px
+shadow
+center
+4:3
+1
+2026-03-03 15:30:39
+2026-03-03 15:33:31
+
+Edit Edit
+Copy Copy
+Delete Delete
+8
+1
+1
+Testimonial Card - Default
+testimonial-default
+testimonial
+#f9a662
+#f0ca0f
+1
+8
+shadow
+16px
+zoom
+left
+3:2
+1
+2026-03-03 15:30:39
+2026-03-06 06:35:00
+
+Edit Edit
+Copy Copy
+Delete Delete
+9
+1
+1
+Promo Card - Default
+promo-default
+#fff0f5
+#d5e21d
+1
+8
+lift
+16px
+lift
+center
+16:9
+1
+2026-03-03 15:30:39
+2026-03-03 15:59:22
+
+Edit Edit
+Copy Copy
+Delete Delete
+10
+1
+1
+Announcement Card - Default
+announcement-default
+product
+#6c33f0
+#dc47f0
+1
+8
+none
+16px
+none
+center
+16:9
+1
+2026-03-03 15:30:39
+2026-03-05 14:59:23
+
+Edit Edit
+Copy Copy
+Delete Delete
+11
+1
+1
+Event Card - Default
+event-default
+#e0ffff
+#d5e21d
+1
+8
+shadow
+16px
+lift
+center
+4:3
+1
+2026-03-03 15:30:39
+2026-03-03 15:59:12
+
+Edit Edit
+Copy Copy
+Delete Delete
+12
+1
+1
+Service Card - Default
+service-default
+#fafad2
+#d5e21d
+1
+8
+lift
+16px
+zoom
+left
+3:2
+1
+2026-03-03 15:30:39
+2026-03-03 15:59:07
+
+Edit Edit
+Copy Copy
+Delete Delete
+13
+1
+1
+Portfolio Card - Default
+portfolio-default
+#f0fff0
+#d5e21d
+1
+8
+shadow
+16px
+shadow
+center
+16:9
+1
+2026-03-03 15:30:39
+2026-03-03 15:59:03
+
+Edit Edit
+Copy Copy
+Delete Delete
+14
+1
+1
+FAQ Card - Default
+faq-default
+#e3a0b7
+#d5e21d
+1
+8
+none
+16px
+none
+left
+16:9
+1
+2026-03-03 15:30:39
+2026-03-03 15:58:58
+
+Edit Edit
+Copy Copy
+Delete Delete
+15
+1
+1
+Banner Card - Default
+banner-default
+product
+#f94383
+#e21dad
+1
+8
+shadow
+16px
+lift
+center
+21:9
+1
+2026-03-03 15:30:39
+2026-03-05 14:59:49
+
+Edit Edit
+Copy Copy
+Delete Delete
+16
+1
+1
+Other Card - Default
+other-default
+other
+#e3a0b7
+#d5e21d
+1
+8
+none
+16px
+none
+left
+1:1
+1
+2026-03-03 15:30:39
+2026-03-03 15:58:54
+
+Edit Edit
+Copy Copy
+Delete Delete
+17
+1
+1
+Jobs Card - Default
+jobs-default
+jobs
+#eef6ff
+#3b82f6
+1
+12
+0 4px 20px rgba(59,130,246,0.2)
+16px
+lift
+left
+16:9
+1
+2026-03-05 12:50:09
+2026-03-05 14:54:30
+
+Edit Edit
+Copy Copy
+Delete Delete
+18
+1
+1
+Notification Card - Default
+notification-default
+notification
+#fffbe6
+#f59e0b
+1
+10
+0 2px 10px rgba(245,158,11,0.2)
+14px
+shadow
+left
+1:1
+1
+2026-03-05 12:50:22
+2026-03-05 14:54:30
+
+Edit Edit
+Copy Copy
+Delete Delete
+19
+1
+1
+Auction Card - Default
+auction-default
+product
+#5ef37c
+#acf37c
+1
+12
+0 6px 24px rgba(14,165,233,0.25)
+16px
+lift
+left
+1:1
+1
+2026-03-05 12:52:02
+2026-03-05 13:56:17
+
+Edit Edit
+Copy Copy
+Delete Delete
+20
+1
+1
+Discount Card - Default
+discount-default
+discount
+#fff7ed
+#f97316
+1
+12
+0 4px 20px rgba(249,115,22,0.25)
+16px
+lift
+left
+1:1
+1
+2026-03-05 12:53:55
+2026-03-05 14:54:30
+
+Edit Edit
+Copy Copy
+Delete Delete
+21
+1
+1
+Pricing Plan Card - Default
+plan-default
+plan
+#f0fdf4
+#22c55e
+1
+14
+0 6px 24px rgba(34,197,94,0.25)
+20px
+lift
+center
+1:1
+1
+2026-03-05 12:54:30
+2026-03-05 15:36:13
+
+Edit Edit
+Copy Copy
+Delete Delete
+22
+1
+1
+Auction Card - Default
+ac
+auction
+#c25b5b
+#931a1a
+1
+12
+0 4px 16px rgba(0,0,0,0.10)
+16px
+lift
+left
+4:3
+1
+2026-03-05 14:54:30
+2026-03-05 16:04:48
+
+Edit Edit
+Copy Copy
+Delete Delete
+23
+1
+NULL
+Notification Card - Default
+notification-default
+notification
+#FFFFFF
+#E0E0E0
+1
+10
+0 2px 8px rgba(0,0,0,0.08)
+14px
+shadow
+left
+1:1
+1
+2026-03-05 14:54:30
+2026-03-05 14:54:30
+
+Edit Edit
+Copy Copy
+Delete Delete
+24
+1
+NULL
+Discount Card - Default
+discount-default
+discount
+#FFFFFF
+#E0E0E0
+1
+12
+0 4px 16px rgba(0,0,0,0.10)
+16px
+lift
+left
+1:1
+1
+2026-03-05 14:54:30
+2026-03-05 14:54:30
+
+Edit Edit
+Copy Copy
+Delete Delete
+25
+1
+NULL
+Jobs Card - Default
+jobs-default
+jobs
+#FFFFFF
+#E0E0E0
+1
+10
+0 2px 8px rgba(0,0,0,0.08)
+16px
+lift
+left
+16:9
+1
+2026-03-05 14:54:30
+2026-03-05 14:54:30
+With selected:  Check all With selected:    
+
+1
+|	 Show all	|			Number of rows: 
+25
+Filter rows: 
+Search this table
+Sort by key: 
+None
+////
+Full texts
+id
+theme_id
+setting_key
+setting_name
+color_value
+category
+is_active
+sort_order
+created_at
+updated_at
+tenant_id
+
+Edit Edit
+Copy Copy
+Delete Delete
+1
+1
+primary_color
+Primary Color
+#03874e
+primary
+1
+1
+2025-12-14 02:17:03
+2026-02-26 09:17:23
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+2
+1
+primary_hover
+Primary Hover
+#2563EB
+primary
+1
+2
+2025-12-14 02:17:03
+2026-01-20 10:03:44
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+3
+1
+secondary_color
+Secondary Color
+#10B981
+secondary
+1
+3
+2025-12-14 02:17:03
+2026-01-20 10:03:44
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+4
+1
+accent_color
+Accent Color
+#098684
+accent
+1
+4
+2025-12-14 02:17:03
+2026-03-04 04:05:36
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+5
+1
+background_main
+Main Background
+#242323
+background
+1
+5
+2025-12-14 02:17:03
+2026-03-07 02:01:34
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+6
+1
+background_secondary
+Secondary Background
+#102a38
+background
+1
+6
+2025-12-14 02:17:03
+2026-03-07 02:05:14
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+7
+1
+text_primary
+Primary Text
+#FFFFFF
+text
+1
+7
+2025-12-14 02:17:03
+2026-01-20 10:03:44
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+8
+1
+text_secondary
+Text Secondary
+#94a3b8
+text
+1
+12
+2025-12-14 02:17:03
+2026-03-07 02:59:41
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+9
+1
+border_color
+Border Color
+#333333
+border
+1
+9
+2025-12-14 02:17:03
+2026-01-20 10:03:44
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+10
+1
+success_color
+Success Color
+#10b981
+1
+200
+2025-12-14 02:17:03
+2026-03-07 02:59:41
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+11
+1
+error_color
+Error
+#EF4444
+status
+1
+11
+2025-12-14 02:17:03
+2026-01-20 10:03:44
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+12
+1
+warning_color
+Warning Color
+#f59e0b
+1
+201
+2025-12-14 02:17:03
+2026-03-07 02:59:41
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+13
+1
+info_color
+Info
+#22C55E
+status
+1
+13
+2025-12-14 02:17:03
+2026-01-20 10:03:44
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+14
+1
+sidebar_background
+Sidebar Background
+#745e53
+background
+1
+200
+2025-12-31 12:24:02
+2026-03-05 02:51:57
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+15
+1
+sidebar_text
+Sidebar Text
+#e8e8e8
+text
+1
+201
+2025-12-31 12:24:02
+2026-03-05 15:58:26
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+16
+1
+sidebar_toggle_bg
+Sidebar Toggle Background
+#3B82F6
+primary
+1
+300
+2025-12-31 12:24:37
+2026-01-20 10:03:44
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+17
+1
+sidebar_toggle_bg_hover
+Sidebar Toggle Hover
+#2563EB
+primary
+1
+301
+2025-12-31 12:24:37
+2026-01-20 10:03:44
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+18
+1
+sidebar_card_background
+Sidebar Card Background
+#5c554d
+background
+1
+210
+2025-12-31 12:42:39
+2026-02-19 03:44:31
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+19
+1
+sidebar_card_text
+Sidebar Card Text
+#de1717
+text
+1
+211
+2025-12-31 12:42:39
+2026-03-05 15:56:38
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+20
+1
+input_text
+Input Text Color
+#494646
+other
+1
+400
+2026-01-01 12:13:11
+2026-02-19 00:56:02
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+21
+1
+input_placeholder
+Input Placeholder Color
+#6B7280
+1
+401
+2026-01-01 12:13:38
+2026-01-20 10:03:44
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+22
+2
+sidebar_background
+Sidebar Background
+#7e0707
+primary
+1
+0
+2026-02-19 03:51:14
+2026-03-03 12:54:28
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+23
+1
+header_background
+Header Background
+#6a503e
+other
+1
+100
+2026-03-03 14:24:52
+2026-03-06 07:31:23
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+24
+1
+header_text
+Header Text
+#998105
+other
+1
+101
+2026-03-03 14:24:52
+2026-03-05 15:55:25
+1
+
+Edit Edit
+Copy Copy
+Delete Delete
+25
+1
+footer_background
+Footer Background
+#424343
+other
+1
+500
+2026-03-03 14:24:52
+2026-03-05 15:59:31
+1
+With selected:  Check all With selected:    
+
+1
+|	 Show all	|			Number of rows: 
+25
+Filter rows: 
+Search this table
+Sort by key: 
+None
+Query results operations
+    
+Open new phpMyAdmin window
 
