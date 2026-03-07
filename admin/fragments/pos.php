@@ -90,8 +90,10 @@ if (!function_exists('__pos_t')) {
     }
 }
 
-// Get current user's entity_id if set
+// Get current user's entity_id if set (from tenant_users context)
 $userEntityId = $user['entity_id'] ?? null;
+// Get the tenant_user_id (tenant_users.id) for the cashier_user_id field
+$userTenantUserId = $user['tenant_user_id'] ?? null;
 
 $canEditOrders = $isSuperAdmin || can('pos.edit_orders') || can('manage_pos');
 
@@ -215,6 +217,7 @@ window.POS_CONFIG = {
     TENANT_ID:        <?= (int)$tenantId ?>,
     ENTITY_ID:        <?= $userEntityId ? (int)$userEntityId : 'null' ?>,
     USER_ID:          <?= (int)($user['id'] ?? 0) ?>,
+    TENANT_USER_ID:   <?= $userTenantUserId ? (int)$userTenantUserId : 'null' ?>,
     IS_SUPER_ADMIN:   <?= $isSuperAdmin ? 'true' : 'false' ?>,
     CAN_EDIT_ORDERS:  <?= $canEditOrders ? 'true' : 'false' ?>,
     LANG:             '<?= htmlspecialchars($lang, ENT_QUOTES) ?>',
@@ -276,9 +279,9 @@ window.POS_CONFIG = {
                            step="0.01" min="0" value="0" placeholder="0.00">
                 </div>
 
-                <!-- Cashier user (hidden, auto-set to current user) -->
+                <!-- Cashier user (hidden, auto-set to current tenant_user id) -->
                 <input type="hidden" name="cashier_user_id"
-                       value="<?= (int)($user['id'] ?? 0) ?>">
+                       value="<?= $userTenantUserId ? (int)$userTenantUserId : 0 ?>">
 
                 <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px">
                     🟢 <?= __pos_t('pos.session.open_btn', 'Open Session') ?>

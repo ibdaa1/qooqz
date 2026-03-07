@@ -293,6 +293,8 @@ if (!isset($GLOBALS['ADMIN_UI'])) {
                 'phone' => $currentUser['phone'] ?? null,
                 'timezone' => $currentUser['timezone'] ?? 'UTC',
                 'is_active' => $currentUser['is_active'] ?? true,
+                'tenant_user_id' => isset($tenantUser['id']) ? (int)$tenantUser['id'] : null,
+                'entity_id' => isset($tenantUser['entity_id']) ? (int)$tenantUser['entity_id'] : null,
             ],
             'lang' => $_SESSION['preferred_language'] ?? $currentUser['preferred_language'] ?? 'en',
             'direction' => in_array(

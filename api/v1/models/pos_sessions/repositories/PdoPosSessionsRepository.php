@@ -21,11 +21,13 @@ final class PdoPosSessionsRepository implements PosSessionsRepositoryInterface
     private function baseSelect(): string
     {
         return "SELECT ps.*,
+                       tu.user_id AS cashier_system_user_id,
                        u.username AS cashier_name,
                        e.store_name,
                        e.tenant_id AS entity_tenant_id
                 FROM pos_sessions ps
-                LEFT JOIN users u ON ps.cashier_user_id = u.id
+                LEFT JOIN tenant_users tu ON ps.cashier_user_id = tu.id
+                LEFT JOIN users u ON tu.user_id = u.id
                 LEFT JOIN entities e ON ps.entity_id = e.id";
     }
 
@@ -359,7 +361,7 @@ final class PdoPosSessionsRepository implements PosSessionsRepositoryInterface
                 ':pnum' => $paymentNumber,
                 ':eid'  => $entityId,
                 ':oid'  => $orderId,
-                ':uid'  => $cashierUserId,
+                ':uid'  => $customerId,
                 ':pm'   => $paymentMethod,
                 ':amt'  => $grandTotal,
             ]);
