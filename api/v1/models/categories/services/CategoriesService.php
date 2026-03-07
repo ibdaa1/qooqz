@@ -29,6 +29,7 @@ final class CategoriesService
         $page = max(1, (int)($filters['page'] ?? 1));
         $limit = min(1000, max(1, (int)($filters['limit'] ?? 25)));
         $offset = ($page - 1) * $limit;
+        $skipTcFilter = (bool)($filters['skip_tc_filter'] ?? false);
 
         // جلب البيانات مع التصفية
         $items = $this->repo->all(
@@ -39,11 +40,12 @@ final class CategoriesService
             $search,
             $isActive,
             $limit,
-            $offset
+            $offset,
+            $skipTcFilter
         );
 
         // حساب العدد الإجمالي مع التصفية
-        $total = $this->repo->countAll($tenantId, $filters);
+        $total = $this->repo->countAll($tenantId, $filters, $skipTcFilter);
 
         return [
             'items' => $items,

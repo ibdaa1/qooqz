@@ -23,7 +23,8 @@ final class CategoriesController
             'is_active' => $_GET['is_active'] ?? null,
             'search' => $_GET['search'] ?? null,
             'page' => $_GET['page'] ?? 1,
-            'limit' => $_GET['limit'] ?? 25
+            'limit' => $_GET['limit'] ?? 25,
+            'skip_tc_filter' => !empty($_GET['skip_tc_filter'])
         ];
 
         $lang = $_GET['lang'] ?? 'ar';

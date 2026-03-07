@@ -29,9 +29,10 @@ final class PdoCategoriesRepository
         ?string $search = null,
         ?bool $isActive = null,
         int $limit = 50,
-        int $offset = 0
+        int $offset = 0,
+        bool $skipTcFilter = false
     ): array {
-        $hasAssignments = $this->hasTenantCategoryAssignments($tenantId);
+        $hasAssignments = $skipTcFilter ? false : $this->hasTenantCategoryAssignments($tenantId);
 
         $sql = "
             SELECT
@@ -567,9 +568,9 @@ final class PdoCategoriesRepository
         return $result ? (int)$result['id'] : null;
     }
 
-    public function countAll(int $tenantId, array $filters = []): int
+    public function countAll(int $tenantId, array $filters = [], bool $skipTcFilter = false): int
     {
-        $hasAssignments = $this->hasTenantCategoryAssignments($tenantId);
+        $hasAssignments = $skipTcFilter ? false : $this->hasTenantCategoryAssignments($tenantId);
 
         if ($hasAssignments) {
             $sql = "SELECT COUNT(*) as total

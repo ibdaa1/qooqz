@@ -27,6 +27,23 @@ $isSuperAdmin = in_array('super_admin', $roles, true);
 $canCreate = $isSuperAdmin || in_array('manage_tenant_categories', $permissions, true);
 $canEdit = $canCreate;
 $canDelete = $canCreate;
+
+// Fetch tenant name for non-super-admin display
+$tenantName = '';
+if (!$isSuperAdmin && $tenantId) {
+    try {
+        $pdo = $GLOBALS['ADMIN_DB'] ?? null;
+        if ($pdo instanceof PDO) {
+            $stmt = $pdo->prepare("SELECT name FROM tenants WHERE id = ? LIMIT 1");
+            $stmt->execute([$tenantId]);
+            $tenantRow = $stmt->fetch(PDO::FETCH_ASSOC);
+            $tenantName = $tenantRow['name'] ?? '';
+        }
+    } catch (Throwable $e) {
+        // fallback to tenant ID
+    }
+    if (empty($tenantName)) $tenantName = ($lang === 'ar') ? "المستأجر #{$tenantId}" : "Tenant #{$tenantId}";
+}
 ?>
 
 <!-- Notifications Container -->
@@ -73,15 +90,14 @@ $canDelete = $canCreate;
                         <?php else: ?>
                         <input type="hidden" id="tenantCategoryTenantIdHidden" name="tenant_id" 
                                value="<?= $tenantId ?>">
-                        <input type="text" class="form-control" value="Current Tenant" readonly>
+                        <input type="text" class="form-control" value="<?= htmlspecialchars($tenantName) ?>" readonly disabled>
                         <?php endif; ?>
                     </div>
                     <div class="form-group">
                         <label for="tenantCategoryCategoryId" class="required" data-i18n="label_category">Category</label>
-                        <input type="text" id="tenantCategoryCategoryId" name="category_display" 
-                               class="form-control" list="categoriesList" data-i18n-placeholder="placeholder_category" placeholder="Select or search category" autocomplete="off" required>
-                        <datalist id="categoriesList"></datalist>
-                        <input type="hidden" name="category_id" id="tenantCategoryCategoryIdHidden">
+                        <select id="tenantCategoryCategoryId" name="category_id" class="form-control" required>
+                            <option value="" data-i18n-placeholder="placeholder_category">-- Select Category --</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="tenantCategorySortOrder" data-i18n="label_sort_order">Sort Order</label>
