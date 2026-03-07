@@ -90,7 +90,7 @@ if (!$isSuperAdmin && $tenantId) {
                         <?php else: ?>
                         <input type="hidden" id="tenantCategoryTenantIdHidden" name="tenant_id" 
                                value="<?= $tenantId ?>">
-                        <input type="text" class="form-control" value="<?= htmlspecialchars($tenantName) ?>" readonly disabled>
+                        <input type="text" class="form-control" value="<?= htmlspecialchars($tenantName) ?>" readonly>
                         <?php endif; ?>
                     </div>
                     <div class="form-group">
