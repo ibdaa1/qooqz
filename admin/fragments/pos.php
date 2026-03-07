@@ -145,6 +145,7 @@ if (!function_exists('renderFragmentThemeVars')) {
             if (!empty($b['border_color']))     echo "    --btn-{$slug}-border: " . htmlspecialchars($b['border_color'], ENT_QUOTES) . ';' . PHP_EOL;
             if (!empty($b['border_radius']))    echo "    --btn-{$slug}-radius: " . htmlspecialchars((string)$b['border_radius'], ENT_QUOTES) . 'px;' . PHP_EOL;
         }
+        $posCardTypesSeen = [];
         foreach ($theme['card_styles'] ?? [] as $cs) {
             if (empty($cs['slug'])) continue;
             $slug = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$cs['slug']));
@@ -155,6 +156,19 @@ if (!function_exists('renderFragmentThemeVars')) {
             if (!empty($cs['border_radius']))    echo "    --card-{$slug}-radius: "        . htmlspecialchars((string)$cs['border_radius'], ENT_QUOTES) . 'px;' . PHP_EOL;
             if (!empty($cs['shadow_style']))     echo "    --card-{$slug}-shadow: "        . htmlspecialchars($cs['shadow_style'], ENT_QUOTES)     . ';' . PHP_EOL;
             if (!empty($cs['padding']))          echo "    --card-{$slug}-padding: "       . htmlspecialchars($cs['padding'], ENT_QUOTES)          . ';' . PHP_EOL;
+            // Emit POS card_type aliases (--card-product-*, --card-category-*) for the first active entry per type
+            $cardType = $cs['card_type'] ?? '';
+            if (in_array($cardType, ['product', 'category'], true) && !isset($posCardTypesSeen[$cardType])) {
+                $posCardTypesSeen[$cardType] = true;
+                $tp = "    --card-{$cardType}";
+                if (!empty($cs['background_color'])) echo "{$tp}-bg: "           . htmlspecialchars($cs['background_color'], ENT_QUOTES) . ';' . PHP_EOL;
+                if (!empty($cs['text_color']))       echo "{$tp}-text: "          . htmlspecialchars($cs['text_color'], ENT_QUOTES)       . ';' . PHP_EOL;
+                if (!empty($cs['border_color']))     echo "{$tp}-border: "        . htmlspecialchars($cs['border_color'], ENT_QUOTES)     . ';' . PHP_EOL;
+                if (!empty($cs['border_width']))     echo "{$tp}-border-width: "  . htmlspecialchars((string)$cs['border_width'], ENT_QUOTES) . 'px;' . PHP_EOL;
+                if (!empty($cs['border_radius']))    echo "{$tp}-radius: "        . htmlspecialchars((string)$cs['border_radius'], ENT_QUOTES) . 'px;' . PHP_EOL;
+                if (!empty($cs['shadow_style']))     echo "{$tp}-shadow: "        . htmlspecialchars($cs['shadow_style'], ENT_QUOTES)     . ';' . PHP_EOL;
+                if (!empty($cs['padding']))          echo "{$tp}-padding: "       . htmlspecialchars($cs['padding'], ENT_QUOTES)          . ';' . PHP_EOL;
+            }
         }
         echo '}' . PHP_EOL;
     }
@@ -222,6 +236,14 @@ window.POS_CONFIG = {
     <!-- ── Session Status Bar ── -->
     <div class="pos-session-bar" id="posSessionBar">
         <span style="color:var(--text-secondary,#64748b)"><?= __pos_t('common.loading', 'Loading...') ?></span>
+    </div>
+
+    <!-- ── Entity / Tenant Context Nav (shown when session active, for switching entity context) ── -->
+    <div class="pos-context-nav" id="posContextNav" style="display:none">
+        <div class="pos-context-nav-inner">
+            <span class="pos-context-label" aria-label="<?= __pos_t('pos.session.entity_label', 'Branch / Entity') ?>">🏪</span>
+            <div class="pos-entity-nav-tabs" id="posEntityNavTabs"></div>
+        </div>
     </div>
 
     <!-- ════════════════════════════════════

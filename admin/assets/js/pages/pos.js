@@ -138,6 +138,7 @@
     let tabNav, historyPanel, reportsPanel;
     let barcodeBtn, barcodeBanner, barcodeCameraBtn, barcodeClose;
     let cameraOverlay, cameraVideo, cameraStatus, cameraStopBtn, cameraCloseBtn;
+    let contextNav, entityNavTabs;
 
     function cacheElements() {
         container        = document.getElementById('posPageContainer');
@@ -179,6 +180,8 @@
         cameraStatus     = document.getElementById('posCameraStatus');
         cameraStopBtn    = document.getElementById('posCameraStop');
         cameraCloseBtn   = document.getElementById('posCameraClose');
+        contextNav       = document.getElementById('posContextNav');
+        entityNavTabs    = document.getElementById('posEntityNavTabs');
     }
 
     // ─────────────────────────────────────────────
@@ -276,6 +279,8 @@
         openSessionView && (openSessionView.style.display = 'none');
         tabNav && (tabNav.style.display = 'flex');
         switchTab('pos');
+        // Render entity/tenant context navigation after session is active
+        renderEntityContextNav();
     }
 
     async function openSession(entityId, openingBalance, cashierUserId) {
@@ -1509,6 +1514,72 @@
                 opt.hidden = !opt.text.toLowerCase().includes(q);
             });
         });
+    }
+
+    /**
+     * Render entity/tenant navigation tabs in the context nav bar.
+     * Called after session is opened so the cashier can quickly switch
+     * entity context (reloads categories and products for the selected entity).
+     */
+    async function renderEntityContextNav() {
+        if (!contextNav || !entityNavTabs) return;
+
+        // Only show context nav when there is an active session
+        if (!state.session) { contextNav.style.display = 'none'; return; }
+
+        try {
+            const res = await apiGet(API.entities, { limit: 200 });
+            let entities = [];
+            if (res.data && Array.isArray(res.data.items)) entities = res.data.items;
+            else if (Array.isArray(res.items)) entities = res.items;
+
+            // Populate entity→tenant map (may already be set from open-session form)
+            entities.forEach(e => {
+                if (e.id && e.tenant_id) state.entityTenantMap[e.id] = parseInt(e.tenant_id, 10);
+            });
+
+            // Build nav tabs — always show at least the current entity
+            if (!entities.length && state.session) {
+                entities = [{
+                    id: state.session.entity_id,
+                    store_name: state.session.store_name || String(state.session.entity_id),
+                    tenant_id: state.session.tenant_id,
+                }];
+            }
+
+            if (!entities.length) { contextNav.style.display = 'none'; return; }
+
+            entityNavTabs.innerHTML = entities.map(e => {
+                const active = parseInt(e.id, 10) === parseInt(state.entityId, 10);
+                return `<button class="pos-entity-nav-tab${active ? ' active' : ''}" data-entity-id="${e.id}" data-tenant-id="${e.tenant_id || ''}">${escHtml(e.store_name || String(e.id))}</button>`;
+            }).join('');
+
+            entityNavTabs.querySelectorAll('.pos-entity-nav-tab').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const newEntityId = parseInt(btn.dataset.entityId, 10);
+                    if (newEntityId === parseInt(state.entityId, 10)) return; // already active
+                    state.entityId = newEntityId;
+                    const tid = parseInt(btn.dataset.tenantId, 10) || state.entityTenantMap[newEntityId] || state.tenantId;
+                    if (tid) state.tenantId = tid;
+                    // Mark active
+                    entityNavTabs.querySelectorAll('.pos-entity-nav-tab').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    // Reset category/product state
+                    state.categoryTree = [];
+                    state.categoryProductIds = {};
+                    state.parentCatId = null;
+                    state.subCatId = null;
+                    // Reload categories and products for the new entity
+                    await loadCategories();
+                    await loadProducts();
+                });
+            });
+
+            contextNav.style.display = 'flex';
+        } catch (err) {
+            error_log('[POS] renderEntityContextNav: ' + (err && err.message ? err.message : String(err)));
+            contextNav.style.display = 'none';
+        }
     }
 
     // ─────────────────────────────────────────────

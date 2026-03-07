@@ -5,8 +5,8 @@ declare(strict_types=1);
 
 final class AdminUiThemeLoader
 {
-    /** Card style slugs that map to POS product/category CSS variables. */
-    private const POS_CARD_SLUGS = ['product', 'category'];
+    /** Card style card_type values that map to POS product/category CSS variables. */
+    private const POS_CARD_TYPES = ['product', 'category'];
 
     private PDO $pdo;
 
@@ -185,6 +185,8 @@ final class AdminUiThemeLoader
      * Return a keyed array of POS-specific card color CSS variable maps for quick lookup.
      * Keys: 'product' and 'category' – each value is an array of CSS var => value pairs
      * that match the variables used by admin/assets/css/pages/pos.css.
+     * Matches card_styles rows by card_type ('product' / 'category') rather than slug
+     * so that slugs like 'product-default' or 'product-minimal' are picked up correctly.
      * Falls back to defaults when the card_styles rows are not configured.
      */
     public function getPosCardColors(int $tenantId, int $themeId): array
@@ -209,17 +211,21 @@ final class AdminUiThemeLoader
 
         $result = $defaults;
         $cardStyles = $this->getCardStyles($tenantId, $themeId);
+        // Use the first active card per card_type; subsequent rows are ignored
+        $seen = [];
         foreach ($cardStyles as $card) {
-            $slug = $card['slug'] ?? '';
-            if (!in_array($slug, self::POS_CARD_SLUGS, true)) continue;
-            $prefix = "--card-{$slug}";
-            if (!empty($card['background_color'])) $result[$slug]["{$prefix}-bg"]           = $card['background_color'];
-            if (!empty($card['text_color']))        $result[$slug]["{$prefix}-text"]         = $card['text_color'];
-            if (!empty($card['border_color']))      $result[$slug]["{$prefix}-border"]       = $card['border_color'];
-            if (!empty($card['border_width']))      $result[$slug]["{$prefix}-border-width"] = $card['border_width'] . 'px';
-            if (!empty($card['border_radius']))     $result[$slug]["{$prefix}-radius"]       = $card['border_radius'] . 'px';
-            if (!empty($card['shadow_style']))      $result[$slug]["{$prefix}-shadow"]       = $card['shadow_style'];
-            if (!empty($card['padding']))           $result[$slug]["{$prefix}-padding"]      = $card['padding'];
+            $type = $card['card_type'] ?? '';
+            if (!in_array($type, self::POS_CARD_TYPES, true)) continue;
+            if (isset($seen[$type])) continue; // keep first active entry
+            $seen[$type] = true;
+            $prefix = "--card-{$type}";
+            if (!empty($card['background_color'])) $result[$type]["{$prefix}-bg"]           = $card['background_color'];
+            if (!empty($card['text_color']))        $result[$type]["{$prefix}-text"]         = $card['text_color'];
+            if (!empty($card['border_color']))      $result[$type]["{$prefix}-border"]       = $card['border_color'];
+            if (!empty($card['border_width']))      $result[$type]["{$prefix}-border-width"] = $card['border_width'] . 'px';
+            if (!empty($card['border_radius']))     $result[$type]["{$prefix}-radius"]       = $card['border_radius'] . 'px';
+            if (!empty($card['shadow_style']))      $result[$type]["{$prefix}-shadow"]       = $card['shadow_style'];
+            if (!empty($card['padding']))           $result[$type]["{$prefix}-padding"]      = $card['padding'];
         }
         return $result;
     }
@@ -374,6 +380,9 @@ final class AdminUiThemeLoader
         }
 
         // Card styles — emit CSS variables in :root so page CSS can reference var(--card-{slug}-bg) etc.
+        // Also emit POS-specific aliases (--card-product-*, --card-category-*) based on card_type
+        // so pos.css variables are populated from the DB without requiring exact slug names.
+        $posCardTypesSeen = [];
         foreach ($themeData['card_styles'] ?? [] as $card) {
             if (empty($card['slug'])) continue;
             $slug = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$card['slug']));
@@ -384,6 +393,20 @@ final class AdminUiThemeLoader
             if (!empty($card['padding']))          $css .= "  --card-{$slug}-padding: " . $sanitizeCssValue((string)$card['padding']) . ";\n";
             if (!empty($card['text_color']))       $css .= "  --card-{$slug}-text: " . $sanitizeCssValue((string)$card['text_color']) . ";\n";
             if (!empty($card['border_width']))     $css .= "  --card-{$slug}-border-width: " . $sanitizeCssValue((string)$card['border_width']) . "px;\n";
+
+            // Emit POS card_type aliases for the first active card of each POS card_type
+            $cardType = $card['card_type'] ?? '';
+            if (in_array($cardType, self::POS_CARD_TYPES, true) && !isset($posCardTypesSeen[$cardType])) {
+                $posCardTypesSeen[$cardType] = true;
+                $tp = "--card-{$cardType}";
+                if (!empty($card['background_color'])) $css .= "  {$tp}-bg: " . $sanitizeCssValue((string)$card['background_color']) . ";\n";
+                if (!empty($card['text_color']))       $css .= "  {$tp}-text: " . $sanitizeCssValue((string)$card['text_color']) . ";\n";
+                if (!empty($card['border_color']))     $css .= "  {$tp}-border: " . $sanitizeCssValue((string)$card['border_color']) . ";\n";
+                if (!empty($card['border_width']))     $css .= "  {$tp}-border-width: " . $sanitizeCssValue((string)$card['border_width']) . "px;\n";
+                if (!empty($card['border_radius']))    $css .= "  {$tp}-radius: " . $sanitizeCssValue((string)$card['border_radius']) . "px;\n";
+                if (!empty($card['shadow_style']))     $css .= "  {$tp}-shadow: " . $sanitizeCssValue((string)$card['shadow_style']) . ";\n";
+                if (!empty($card['padding']))          $css .= "  {$tp}-padding: " . $sanitizeCssValue((string)$card['padding']) . ";\n";
+            }
         }
 
         $css .= "}\n";
