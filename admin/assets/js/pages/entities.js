@@ -21,6 +21,7 @@
         settings: CONFIG.settingsApi || '/api/entity_settings',
         workingHours: CONFIG.workingHoursApi || '/api/entities_working_hours',
         languages: CONFIG.languagesApi || '/api/languages',
+        timezones: CONFIG.timezonesApi || '/api/timezones',
         tenants: CONFIG.tenantsApi || '/api/tenants',
         entityTypes: CONFIG.entityTypesApi || '/api/entity_types',
         addresses: CONFIG.addressesApi || '/api/addresses',
@@ -33,6 +34,7 @@
         total: 0,
         entities: [],
         languages: [],
+        timezones: [],
         tenants: [],
         entityTypes: [],
         attributes: [],
@@ -464,6 +466,18 @@
                 populateDropdown(el.entityLangSelect, state.languages, 'code', 'name', t('form.translations.select_lang', 'Select language'));
             }
 
+            // Load timezones
+            try {
+                const tzResult = await apiCall(API.timezones);
+                if (tzResult.success) {
+                    const tzData = Array.isArray(tzResult.data) ? tzResult.data : (tzResult.data?.items || tzResult.data?.data || []);
+                    state.timezones = tzData;
+                    populateTimezoneSelect(state.timezones);
+                }
+            } catch (tzErr) {
+                console.warn('[Entities] Failed to load timezones:', tzErr);
+            }
+
             // Load attributes
             const attributesResult = await apiCall(`${API.attributes}?format=json&lang=${state.language}`);
             if (attributesResult.success) {
@@ -474,6 +488,21 @@
         } catch (err) {
             console.warn('[Entities] Failed to load dropdown data:', err);
         }
+    }
+
+    function populateTimezoneSelect(timezones) {
+        const sel = el.entityTimezoneId;
+        if (!sel) return;
+        const current = sel.value;
+        // Keep the first blank option
+        while (sel.options.length > 1) sel.remove(1);
+        timezones.forEach(function (tz) {
+            const opt = document.createElement('option');
+            opt.value = tz.id;
+            opt.textContent = (tz.label || tz.timezone) + ' (' + tz.timezone + ')';
+            sel.appendChild(opt);
+        });
+        if (current) sel.value = current;
     }
 
     function populateDropdown(selectEl, data, valueKey, textKey, placeholder = '') {
@@ -641,6 +670,11 @@
             if (el.entityTaxNumber) el.entityTaxNumber.value = entity.tax_number || '';
             if (el.entityStatus) el.entityStatus.value = entity.status || 'pending';
             if (el.entityIsVerified) el.entityIsVerified.value = entity.is_verified || '0';
+            if (el.entityTimezoneId) {
+                // Timezones may be loaded async; set after a tick if empty
+                const setTz = () => { if (el.entityTimezoneId) el.entityTimezoneId.value = entity.timezone_id || ''; };
+                if (state.timezones.length > 0) { setTz(); } else { setTimeout(setTz, 600); }
+            }
 
             if (el.entityPhone) el.entityPhone.value = entity.phone || '';
             if (el.entityMobile) el.entityMobile.value = entity.mobile || '';
@@ -666,6 +700,11 @@
 
             if (el.entityAttributesList) el.entityAttributesList.innerHTML = '';
             if (el.entityTranslations) el.entityTranslations.innerHTML = '';
+            // Clear English inline fields
+            if (el.enEntityName) el.enEntityName.value = '';
+            if (el.enEntityDescription) el.enEntityDescription.value = '';
+            if (el.enEntityMetaTitle) el.enEntityMetaTitle.value = '';
+            if (el.enEntityMetaDescription) el.enEntityMetaDescription.value = '';
             renderWorkingHours(getDefaultWorkingHours());
             clearMediaPreviews();
             clearAddress();
@@ -834,6 +873,7 @@
                 user_id: formData.get('user_id') || state.userId,
                 status: formData.get('status') || 'pending',
                 is_verified: formData.get('is_verified') || '0',
+                timezone_id: formData.get('timezone_id') ? parseInt(formData.get('timezone_id'), 10) : null,
 
                 phone: formData.get('phone'),
                 mobile: formData.get('mobile') || null,
@@ -1816,8 +1856,25 @@
     function collectTranslations() {
         const translations = {};
 
+        // ── 1. Collect from the inline English section (always present) ──
+        const enName        = el.enEntityName?.value?.trim() || '';
+        const enDesc        = el.enEntityDescription?.value?.trim() || '';
+        const enMetaTitle   = el.enEntityMetaTitle?.value?.trim() || '';
+        const enMetaDesc    = el.enEntityMetaDescription?.value?.trim() || '';
+
+        if (enName || enDesc || enMetaTitle || enMetaDesc) {
+            translations['en'] = {
+                store_name:       enName,
+                description:      enDesc,
+                meta_title:       enMetaTitle,
+                meta_description: enMetaDesc
+            };
+        }
+
+        // ── 2. Collect from dynamic translation panels (other languages) ──
         document.querySelectorAll('.translation-panel').forEach(panel => {
             const lang = panel.dataset.lang;
+            if (lang === 'en') return; // already handled above
             const storeName = panel.querySelector('.trans-store-name')?.value || '';
             const desc = panel.querySelector('.trans-desc')?.value || '';
             const metaTitle = panel.querySelector('.trans-meta-title')?.value || '';
@@ -1843,6 +1900,14 @@
                 const items = Array.isArray(result.data) ? result.data : (result.data?.items || []);
                 if (el.entityTranslations) el.entityTranslations.innerHTML = '';
                 items.forEach(trans => {
+                    // Populate the English inline fields instead of a panel
+                    if (trans.language_code === 'en') {
+                        if (el.enEntityName) el.enEntityName.value = trans.store_name || '';
+                        if (el.enEntityDescription) el.enEntityDescription.value = trans.description || '';
+                        if (el.enEntityMetaTitle) el.enEntityMetaTitle.value = trans.meta_title || '';
+                        if (el.enEntityMetaDescription) el.enEntityMetaDescription.value = trans.meta_description || '';
+                        return;
+                    }
                     const langName = state.languages.find(l => l.code === trans.language_code)?.name || trans.language_code;
                     const panel = createTranslationPanel(trans.language_code, langName, {
                         id: trans.id,
@@ -2146,8 +2211,15 @@
             entityTaxNumber: $id('entityTaxNumber'),
             entityStatus: $id('entityStatus'),
             entityIsVerified: $id('entityIsVerified'),
+            entityTimezoneId: $id('entityTimezoneId'),
             entityTenantId: $id('entityTenantId'),
             entityUserId: $id('entityUserId'),
+
+            // English content fields
+            enEntityName: $id('enEntityName'),
+            enEntityDescription: $id('enEntityDescription'),
+            enEntityMetaTitle: $id('enEntityMetaTitle'),
+            enEntityMetaDescription: $id('enEntityMetaDescription'),
 
             // Form fields - Contact
             entityPhone: $id('entityPhone'),

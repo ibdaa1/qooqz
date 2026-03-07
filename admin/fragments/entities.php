@@ -308,6 +308,61 @@ $apiBase = '/api';
                             </select>
                         </div>
                     </div>
+
+                    <!-- Timezone -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="entityTimezoneId" data-i18n="form.fields.timezone.label">
+                                <?= __t('form.fields.timezone.label', 'Timezone') ?>
+                            </label>
+                            <select id="entityTimezoneId" name="timezone_id" class="form-control">
+                                <option value=""><?= __t('form.fields.timezone.placeholder', '— Select timezone —') ?></option>
+                                <!-- populated by JS from /api/timezones -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- English Content (primary language) -->
+                    <div class="english-content-section" style="margin-top:28px;padding-top:20px;border-top:2px solid var(--primary-color,#3b82f6);">
+                        <h4 style="margin-bottom:16px;color:var(--text-primary,#fff);display:flex;align-items:center;gap:10px;">
+                            <span style="background:var(--primary-color,#3b82f6);color:#fff;padding:3px 10px;border-radius:20px;font-size:0.75rem;font-weight:700;">EN</span>
+                            <?= __t('form.sections.english_content', 'English Content') ?>
+                            <span style="color:var(--text-secondary,#94a3b8);font-size:0.8rem;font-weight:400;margin-left:6px;">(<?= __t('form.sections.english_required', 'Default language — required') ?>)</span>
+                        </h4>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enEntityName" class="required"><?= __t('form.fields.en_store_name.label', 'Store Name (English)') ?></label>
+                                <input type="text" id="enEntityName" name="en_store_name" class="form-control" required
+                                       placeholder="<?= __t('form.fields.en_store_name.placeholder', 'Enter store name in English') ?>">
+                                <div class="invalid-feedback"><?= __t('form.fields.en_store_name.required', 'English store name is required') ?></div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enEntityDescription"><?= __t('form.fields.en_description.label', 'Description (English)') ?></label>
+                                <textarea id="enEntityDescription" name="en_description" class="form-control" rows="3"
+                                          placeholder="<?= __t('form.fields.en_description.placeholder', 'Enter entity description in English') ?>"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enEntityMetaTitle"><?= __t('form.fields.en_meta_title.label', 'Meta Title (English)') ?></label>
+                                <input type="text" id="enEntityMetaTitle" name="en_meta_title" class="form-control"
+                                       placeholder="<?= __t('form.fields.en_meta_title.placeholder', 'SEO meta title in English') ?>">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enEntityMetaDescription"><?= __t('form.fields.en_meta_description.label', 'Meta Description (English)') ?></label>
+                                <textarea id="enEntityMetaDescription" name="en_meta_description" class="form-control" rows="2"
+                                          placeholder="<?= __t('form.fields.en_meta_description.placeholder', 'SEO meta description in English') ?>"></textarea>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Tab: Contact -->
@@ -570,6 +625,14 @@ $apiBase = '/api';
                         <h4 style="margin-bottom:12px; color:var(--text-primary,#fff); border-bottom:1px solid var(--border-color,#263044); padding-bottom:8px;">
                             <i class="fas fa-language"></i> <?= __t('form.sections.translations', 'Translations') ?>
                         </h4>
+                        <p style="font-size:0.88rem;color:var(--text-secondary,#94a3b8);margin-bottom:16px;padding:10px 14px;background:var(--card-bg,#081127);border-radius:6px;border:1px solid var(--border-color,#263044);">
+                            <i class="fas fa-info-circle" style="color:var(--primary-color,#3b82f6);margin-<?= $dir === 'rtl' ? 'left' : 'right' ?>:6px;"></i>
+                            <?= __t('form.translations.english_note', 'The') ?>
+                            <strong style="color:var(--text-primary,#fff);">English</strong>
+                            <?= __t('form.translations.english_in_basic', 'translation fields are in the') ?>
+                            <strong style="color:var(--text-primary,#fff);"><?= __t('tabs.basic', 'Basic Info') ?></strong>
+                            <?= __t('form.translations.tab_hint', 'tab. Use this tab to add translations for other languages (Arabic, French, etc.).') ?>
+                        </p>
                         <div id="entityTranslations" class="translation-panels"></div>
                         <div class="form-group" style="margin-top:12px;">
                             <label for="entityLangSelect" data-i18n="form.translations.select_lang">Select Language</label>
@@ -798,6 +861,7 @@ window.ENTITIES_CONFIG = {
     settingsApi: '<?= $apiBase ?>/entity_settings',
     workingHoursApi: '<?= $apiBase ?>/entities_working_hours',
     languagesApi: '<?= $apiBase ?>/languages',
+    timezonesApi: '<?= $apiBase ?>/timezones',
     tenantsApi: '<?= $apiBase ?>/tenants',
     entityTypesApi: '<?= $apiBase ?>/entity_types',
     addressesApi: '<?= $apiBase ?>/addresses',
