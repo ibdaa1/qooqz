@@ -5,6 +5,9 @@ declare(strict_types=1);
 
 final class AdminUiThemeLoader
 {
+    /** Card style slugs that map to POS product/category CSS variables. */
+    private const POS_CARD_SLUGS = ['product', 'category'];
+
     private PDO $pdo;
 
     public function __construct(PDO $pdo)
@@ -35,6 +38,7 @@ final class AdminUiThemeLoader
             'system_settings' => $this->getSystemSettings($tenantId),
             'tenant'          => $this->getTenant($tenantId),
             'tenant_users'    => $this->getTenantUsers($tenantId),
+            'pos_card_colors' => $this->getPosCardColors($tenantId, $themeId),
         ];
 
         // Generate CSS
@@ -175,6 +179,49 @@ final class AdminUiThemeLoader
             error_log('AdminUiThemeLoader: Error in getCardStyles: ' . $e->getMessage());
             return [];
         }
+    }
+
+    /**
+     * Return a keyed array of POS-specific card color CSS variable maps for quick lookup.
+     * Keys: 'product' and 'category' – each value is an array of CSS var => value pairs
+     * that match the variables used by admin/assets/css/pages/pos.css.
+     * Falls back to defaults when the card_styles rows are not configured.
+     */
+    public function getPosCardColors(int $tenantId, int $themeId): array
+    {
+        $defaults = [
+            'product'  => [
+                '--card-product-bg'           => 'var(--card-bg, var(--background-secondary, #1e293b))',
+                '--card-product-text'          => 'var(--text-primary, #e2e8f0)',
+                '--card-product-border'        => 'var(--border-color, #334155)',
+                '--card-product-border-width'  => '1px',
+                '--card-product-radius'        => '10px',
+                '--card-product-shadow'        => 'none',
+                '--card-product-padding'       => '12px 10px',
+            ],
+            'category' => [
+                '--card-category-bg'           => 'transparent',
+                '--card-category-text'         => 'var(--text-secondary, #94a3b8)',
+                '--card-category-border'       => 'var(--border-color, #334155)',
+                '--card-category-radius'       => '20px',
+            ],
+        ];
+
+        $result = $defaults;
+        $cardStyles = $this->getCardStyles($tenantId, $themeId);
+        foreach ($cardStyles as $card) {
+            $slug = $card['slug'] ?? '';
+            if (!in_array($slug, self::POS_CARD_SLUGS, true)) continue;
+            $prefix = "--card-{$slug}";
+            if (!empty($card['background_color'])) $result[$slug]["{$prefix}-bg"]           = $card['background_color'];
+            if (!empty($card['text_color']))        $result[$slug]["{$prefix}-text"]         = $card['text_color'];
+            if (!empty($card['border_color']))      $result[$slug]["{$prefix}-border"]       = $card['border_color'];
+            if (!empty($card['border_width']))      $result[$slug]["{$prefix}-border-width"] = $card['border_width'] . 'px';
+            if (!empty($card['border_radius']))     $result[$slug]["{$prefix}-radius"]       = $card['border_radius'] . 'px';
+            if (!empty($card['shadow_style']))      $result[$slug]["{$prefix}-shadow"]       = $card['shadow_style'];
+            if (!empty($card['padding']))           $result[$slug]["{$prefix}-padding"]      = $card['padding'];
+        }
+        return $result;
     }
 
     public function getSystemSettings(int $tenantId): array

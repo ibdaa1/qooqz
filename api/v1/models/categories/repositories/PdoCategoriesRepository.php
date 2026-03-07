@@ -13,6 +13,7 @@ declare(strict_types=1);
 final class PdoCategoriesRepository
 {
     private PDO $pdo;
+    private array $tenantCategoriesCache = [];
 
     public function __construct(PDO $pdo)
     {
@@ -34,10 +35,35 @@ final class PdoCategoriesRepository
     }
 
     /**
+     * Check whether the tenant_categories table exists and has active rows for the tenant.
+     * Returns true when the table is present and the tenant has at least one active assignment.
+     * Result is cached per tenant_id for the lifetime of this repository instance.
+     */
+    private function tenantCategoriesHasRows(int $tenantId): bool
+    {
+        if (array_key_exists($tenantId, $this->tenantCategoriesCache)) {
+            return $this->tenantCategoriesCache[$tenantId];
+        }
+        try {
+            $stmt = $this->pdo->prepare(
+                'SELECT 1 FROM tenant_categories WHERE tenant_id = :tid AND is_active = 1 LIMIT 1'
+            );
+            $stmt->execute([':tid' => $tenantId]);
+            $result = $stmt->fetchColumn() !== false;
+        } catch (\Throwable $e) {
+            $result = false;
+        }
+        $this->tenantCategoriesCache[$tenantId] = $result;
+        return $result;
+    }
+
+    /**
      * List categories for a tenant.
      * Only returns categories that have at least one active product for the tenant.
+     * When tenant_categories has active rows for the tenant, only those categories
+     * are returned and ordered by tenant_categories.sort_order.
      * When $entityId is provided and the entity has category assignments in
-     * entity_categories, only those categories are returned.
+     * entity_categories, only those categories are returned (narrowing further).
      */
     public function list(
         int $tenantId,
@@ -48,15 +74,35 @@ final class PdoCategoriesRepository
         ?int $isActive = null
     ): array {
         $params = [':tenant_id' => $tenantId, ':lang' => $lang];
-        $sql = "
-            SELECT DISTINCT c.id, c.tenant_id, c.parent_id, c.slug, c.image_url,
-                   c.is_active, c.is_featured, c.sort_order, c.created_at, c.updated_at,
-                   COALESCE(ct.name, c.name, c.slug) AS name,
-                   COALESCE(ct.description, c.description, '') AS description
-              FROM categories c
-         LEFT JOIN category_translations ct
-                ON ct.category_id = c.id AND ct.language_code = :lang
-             WHERE c.tenant_id = :tenant_id";
+
+        // Determine whether to use tenant_categories for filtering and ordering.
+        $useTenantCategories = $this->tenantCategoriesHasRows($tenantId);
+
+        if ($useTenantCategories) {
+            // JOIN tenant_categories so we can filter and order by its sort_order.
+            $sql = "
+                SELECT DISTINCT c.id, c.tenant_id, c.parent_id, c.slug, c.image_url,
+                       c.is_active, c.is_featured, c.sort_order, c.created_at, c.updated_at,
+                       COALESCE(ct.name, c.name, c.slug) AS name,
+                       COALESCE(ct.description, c.description, '') AS description,
+                       COALESCE(tc.sort_order, c.sort_order) AS tc_sort_order
+                  FROM categories c
+             LEFT JOIN category_translations ct
+                    ON ct.category_id = c.id AND ct.language_code = :lang
+             INNER JOIN tenant_categories tc
+                    ON tc.category_id = c.id AND tc.tenant_id = :tenant_id AND tc.is_active = 1
+                 WHERE c.tenant_id = :tenant_id";
+        } else {
+            $sql = "
+                SELECT DISTINCT c.id, c.tenant_id, c.parent_id, c.slug, c.image_url,
+                       c.is_active, c.is_featured, c.sort_order, c.created_at, c.updated_at,
+                       COALESCE(ct.name, c.name, c.slug) AS name,
+                       COALESCE(ct.description, c.description, '') AS description
+                  FROM categories c
+             LEFT JOIN category_translations ct
+                    ON ct.category_id = c.id AND ct.language_code = :lang
+                 WHERE c.tenant_id = :tenant_id";
+        }
 
         if ($isActive !== null) {
             $sql .= ' AND c.is_active = :is_active';
@@ -93,7 +139,12 @@ final class PdoCategoriesRepository
             }
         }
 
-        $sql .= ' ORDER BY c.sort_order ASC, c.id ASC';
+        // Order by tenant_categories.sort_order when available, else by categories.sort_order
+        if ($useTenantCategories) {
+            $sql .= ' ORDER BY tc_sort_order ASC, c.id ASC';
+        } else {
+            $sql .= ' ORDER BY c.sort_order ASC, c.id ASC';
+        }
 
         if ($limit > 0) {
             $sql .= ' LIMIT :limit OFFSET :offset';

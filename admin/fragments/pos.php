@@ -148,11 +148,13 @@ if (!function_exists('renderFragmentThemeVars')) {
         foreach ($theme['card_styles'] ?? [] as $cs) {
             if (empty($cs['slug'])) continue;
             $slug = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$cs['slug']));
-            if (!empty($cs['background_color'])) echo "    --card-{$slug}-bg: " . htmlspecialchars($cs['background_color'], ENT_QUOTES) . ';' . PHP_EOL;
-            if (!empty($cs['border_color']))     echo "    --card-{$slug}-border: " . htmlspecialchars($cs['border_color'], ENT_QUOTES) . ';' . PHP_EOL;
-            if (!empty($cs['border_radius']))    echo "    --card-{$slug}-radius: " . htmlspecialchars((string)$cs['border_radius'], ENT_QUOTES) . 'px;' . PHP_EOL;
-            if (!empty($cs['shadow_style']))     echo "    --card-{$slug}-shadow: " . htmlspecialchars($cs['shadow_style'], ENT_QUOTES) . ';' . PHP_EOL;
-            if (!empty($cs['padding']))          echo "    --card-{$slug}-padding: " . htmlspecialchars($cs['padding'], ENT_QUOTES) . ';' . PHP_EOL;
+            if (!empty($cs['background_color'])) echo "    --card-{$slug}-bg: "           . htmlspecialchars($cs['background_color'], ENT_QUOTES) . ';' . PHP_EOL;
+            if (!empty($cs['text_color']))       echo "    --card-{$slug}-text: "          . htmlspecialchars($cs['text_color'], ENT_QUOTES)       . ';' . PHP_EOL;
+            if (!empty($cs['border_color']))     echo "    --card-{$slug}-border: "        . htmlspecialchars($cs['border_color'], ENT_QUOTES)     . ';' . PHP_EOL;
+            if (!empty($cs['border_width']))     echo "    --card-{$slug}-border-width: "  . htmlspecialchars((string)$cs['border_width'], ENT_QUOTES) . 'px;' . PHP_EOL;
+            if (!empty($cs['border_radius']))    echo "    --card-{$slug}-radius: "        . htmlspecialchars((string)$cs['border_radius'], ENT_QUOTES) . 'px;' . PHP_EOL;
+            if (!empty($cs['shadow_style']))     echo "    --card-{$slug}-shadow: "        . htmlspecialchars($cs['shadow_style'], ENT_QUOTES)     . ';' . PHP_EOL;
+            if (!empty($cs['padding']))          echo "    --card-{$slug}-padding: "       . htmlspecialchars($cs['padding'], ENT_QUOTES)          . ';' . PHP_EOL;
         }
         echo '}' . PHP_EOL;
     }
