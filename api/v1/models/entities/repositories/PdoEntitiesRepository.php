@@ -133,7 +133,6 @@ final class PdoEntitiesRepository
                 UPDATE entities SET
                     store_name = :store_name,
                     slug = :slug,
-                    is_main = :is_main,
                     branch_code = :branch_code,
                     status = :status,
                     vendor_type = :vendor_type,
@@ -155,7 +154,6 @@ final class PdoEntitiesRepository
                 ':tenant_id'=>$tenantId,
                 ':store_name'=>$data['store_name'] ?? null,
                 ':slug'=>$data['slug'] ?? null,
-                ':is_main'=>$data['is_main'] ?? 1,
                 ':branch_code'=>$data['branch_code'] ?? null,
                 ':status'=>$data['status'] ?? 'pending',
                 ':vendor_type'=>$data['vendor_type'] ?? 'product_seller',
@@ -176,14 +174,14 @@ final class PdoEntitiesRepository
         $stmt = $this->pdo->prepare("
             INSERT INTO entities (
                 tenant_id, user_id, store_name, slug,
-                is_main, branch_code,
+                branch_code,
                 vendor_type, store_type,
                 registration_number, tax_number,
                 phone, mobile, email, website_url,
                 status, is_verified, timezone_id
             ) VALUES (
                 :tenant_id, :user_id, :store_name, :slug,
-                :is_main, :branch_code,
+                :branch_code,
                 :vendor_type, :store_type,
                 :registration_number, :tax_number,
                 :phone, :mobile, :email, :website_url,
@@ -195,7 +193,6 @@ final class PdoEntitiesRepository
             ':user_id'=>$data['user_id'],
             ':store_name'=>$data['store_name'],
             ':slug'=>$data['slug'],
-            ':is_main'=>$data['is_main'] ?? 1,
             ':branch_code'=>$data['branch_code'] ?? null,
             ':vendor_type'=>$data['vendor_type'] ?? 'product_seller',
             ':store_type'=>$data['store_type'] ?? 'individual',

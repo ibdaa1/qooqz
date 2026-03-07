@@ -222,16 +222,6 @@ $apiBase = '/api';
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="entityIsMain" data-i18n="form.fields.is_main.label">
-                                <?= __t('form.fields.is_main.label', 'Is Main Entity') ?>
-                            </label>
-                            <select id="entityIsMain" name="is_main" class="form-control">
-                                <option value="1" data-i18n="form.fields.is_main.yes">Yes</option>
-                                <option value="0" data-i18n="form.fields.is_main.no">No</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
                             <label for="entityBranchCode" data-i18n="form.fields.branch_code.label">
                                 <?= __t('form.fields.branch_code.label', 'Branch Code') ?>
                             </label>
