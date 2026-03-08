@@ -14,12 +14,14 @@
     // CONFIG
     // ═══════════════════════════════════════════════════════
     const cfg = window.BANNERS_CONFIG || {};
-    const API_URL      = cfg.apiUrl      || '/api/banners';
-    const IMAGES_API   = cfg.imagesApi   || '/api/images';
-    const IMAGE_TYPE_ID = cfg.imageTypeId || 9;
-    const CSRF_TOKEN   = cfg.csrfToken   || window.CSRF_TOKEN || '';
-    const LANG         = cfg.lang        || window.USER_LANGUAGE || 'en';
-    const ITEMS_PER_PAGE = cfg.itemsPerPage || 25;
+    const API_URL          = cfg.apiUrl          || '/api/banners';
+    const IMAGES_API       = cfg.imagesApi       || '/api/images';
+    const LANGUAGES_API    = cfg.languagesApi    || '/api/languages';
+    const BUTTON_STYLES_API = cfg.buttonStylesApi || '/api/button_styles';
+    const IMAGE_TYPE_ID    = cfg.imageTypeId || 9;
+    const CSRF_TOKEN       = cfg.csrfToken   || window.CSRF_TOKEN || '';
+    const LANG             = cfg.lang        || window.USER_LANGUAGE || 'en';
+    const ITEMS_PER_PAGE   = cfg.itemsPerPage || 25;
 
     const perms = window.PAGE_PERMISSIONS || {};
     const CAN_CREATE = !!perms.canCreate;
@@ -36,6 +38,7 @@
         totalItems:      0,
         editingId:       null,
         selectedImageId: null,
+        languages:       [],
         filters: {
             search:   '',
             position: '',
@@ -305,12 +308,14 @@
         const tc = $('bannerTextColor');
         if (tc) tc.value = '#000000';
         // reset translation fields
-        ['en', 'ar'].forEach(l => {
-            ['title', 'subtitle', 'link_text'].forEach(f => {
-                const el = $(`trans_${l}_${f}`);
-                if (el) el.value = '';
-            });
+        const enLangFields = ['title', 'subtitle', 'link_text'];
+        enLangFields.forEach(f => {
+            const el = $(`trans_en_${f}`);
+            if (el) el.value = '';
         });
+        // clear dynamic translation panels
+        const dynPanels = $('bannerTranslations');
+        if (dynPanels) dynPanels.innerHTML = '';
         // clear validation
         document.querySelectorAll('#bannerForm .is-invalid').forEach(el => el.classList.remove('is-invalid'));
     }
@@ -348,12 +353,22 @@
 
         // Translations
         const translations = banner.translations || {};
-        ['en', 'ar'].forEach(l => {
-            const lt = translations[l] || {};
-            ['title', 'subtitle', 'link_text'].forEach(f => {
-                const el = $(`trans_${l}_${f}`);
-                if (el) el.value = lt[f] || '';
-            });
+
+        // EN always in fixed fields
+        const enTrans = translations['en'] || {};
+        ['title', 'subtitle', 'link_text'].forEach(f => {
+            const el = $(`trans_en_${f}`);
+            if (el) el.value = enTrans[f] || '';
+        });
+
+        // Other languages → dynamic panels
+        const dynPanels = $('bannerTranslations');
+        if (dynPanels) dynPanels.innerHTML = '';
+        Object.entries(translations).forEach(([langCode, lt]) => {
+            if (langCode === 'en') return;
+            const langName = (state.languages.find(l => l.code === langCode) || {}).name || langCode.toUpperCase();
+            const panel = createBannerTranslationPanel(langCode, langName, lt);
+            if (dynPanels) dynPanels.appendChild(panel);
         });
 
         // Load image
@@ -437,20 +452,32 @@
 
         // Build translations object
         const translations = {};
-        ['en', 'ar'].forEach(l => {
-            const title    = get(`trans_${l}_title`);
-            const subtitle = get(`trans_${l}_subtitle`);
-            const linkText = get(`trans_${l}_link_text`);
+
+        // EN from fixed fields
+        const enTitle    = get('trans_en_title');
+        const enSubtitle = get('trans_en_subtitle');
+        const enLinkText = get('trans_en_link_text');
+        if (enTitle || enSubtitle || enLinkText) {
+            translations['en'] = { title: enTitle, subtitle: enSubtitle, link_text: enLinkText };
+        }
+
+        // Collect from dynamic translation panels
+        document.querySelectorAll('#bannerTranslations .banner-translation-panel').forEach(panel => {
+            const langCode = panel.dataset.lang;
+            if (!langCode || langCode === 'en') return;
+            const title    = (panel.querySelector('.btrans-title')    || {}).value || '';
+            const subtitle = (panel.querySelector('.btrans-subtitle') || {}).value || '';
+            const linkText = (panel.querySelector('.btrans-link-text')|| {}).value || '';
             if (title || subtitle || linkText) {
-                translations[l] = { title, subtitle, link_text: linkText };
+                translations[langCode] = { title, subtitle, link_text: linkText };
             }
         });
 
         // Use EN title as main title fallback
-        const enTitle = (translations.en && translations.en.title) || get('bannerTitle');
+        const mainTitle = (translations.en && translations.en.title) || get('bannerTitle');
 
         return {
-            title:            enTitle,
+            title:            mainTitle,
             subtitle:         (translations.en && translations.en.subtitle) || get('bannerSubtitle'),
             link_url:         get('bannerLinkUrl'),
             link_text:        (translations.en && translations.en.link_text) || get('bannerLinkText'),
@@ -552,6 +579,101 @@
     });
 
     // ═══════════════════════════════════════════════════════
+    // TRANSLATIONS
+    // ═══════════════════════════════════════════════════════
+    async function loadLanguages() {
+        try {
+            const res = await apiGet(`${LANGUAGES_API}?format=json`);
+            const items = res?.data?.items || res?.data || res || [];
+            state.languages = Array.isArray(items) ? items : [];
+            const langSelect = $('bannerLangSelect');
+            if (!langSelect) return;
+            langSelect.innerHTML = `<option value="">${t('form.translations.choose_language', 'Choose language')}</option>`;
+            state.languages.forEach(lang => {
+                if (lang.code === 'en') return; // EN is always shown as fixed panel
+                const opt = document.createElement('option');
+                opt.value = lang.code;
+                opt.textContent = lang.name || lang.code;
+                langSelect.appendChild(opt);
+            });
+        } catch (err) {
+            console.warn('[Banners] Failed to load languages:', err);
+        }
+    }
+
+    async function loadButtonStyles() {
+        const select = $('bannerButtonStyle');
+        if (!select) return;
+        // If already populated by PHP (more than 1 option), skip
+        if (select.options.length > 1) return;
+        try {
+            const res = await apiGet(`${BUTTON_STYLES_API}?format=json&is_active=1`);
+            const items = res?.data?.items || res?.data || (Array.isArray(res) ? res : []);
+            if (!Array.isArray(items) || items.length === 0) return;
+            items.forEach(bs => {
+                const slug = bs.slug || bs.id || '';
+                const name = bs.name || bs.slug || slug;
+                if (!slug) return;
+                const opt = document.createElement('option');
+                opt.value = slug;
+                opt.textContent = name;
+                select.appendChild(opt);
+            });
+        } catch (err) {
+            console.warn('[Banners] Failed to load button styles:', err);
+        }
+    }
+
+    function createBannerTranslationPanel(langCode, langName, data) {
+        const panel = document.createElement('div');
+        panel.className = 'translation-panel banner-translation-panel';
+        panel.dataset.lang = langCode;
+        const dir = (state.languages.find(l => l.code === langCode) || {}).direction || 'ltr';
+        panel.innerHTML = `
+            <div class="translation-panel-header">
+                <span class="lang-badge">${esc(langCode.toUpperCase())}</span>
+                <span>${esc(langName)}</span>
+                <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.banner-translation-panel').remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="translation-panel-body">
+                <div class="form-group">
+                    <label>${t('form.translations.title_label', 'Title')}</label>
+                    <input type="text" class="form-control btrans-title" dir="${esc(dir)}" value="${esc(data.title || '')}" placeholder="${t('form.translations.title_in_lang', 'Title in')} ${esc(langName)}">
+                </div>
+                <div class="form-group">
+                    <label>${t('form.translations.subtitle_label', 'Subtitle')}</label>
+                    <input type="text" class="form-control btrans-subtitle" dir="${esc(dir)}" value="${esc(data.subtitle || '')}">
+                </div>
+                <div class="form-group">
+                    <label>${t('form.translations.link_text_label', 'Button Text')}</label>
+                    <input type="text" class="form-control btrans-link-text" dir="${esc(dir)}" value="${esc(data.link_text || '')}">
+                </div>
+            </div>
+        `;
+        return panel;
+    }
+
+    function addBannerTranslation() {
+        const langSelect = $('bannerLangSelect');
+        if (!langSelect || !langSelect.value) return;
+        const langCode = langSelect.value;
+        const langName = langSelect.options[langSelect.selectedIndex].textContent;
+
+        // Prevent duplicates
+        if (document.querySelector(`#bannerTranslations [data-lang="${langCode}"]`)) {
+            showToast(t('messages.translation_exists', 'Translation already added'), 'warning');
+            return;
+        }
+
+        const panel = createBannerTranslationPanel(langCode, langName, {});
+        const container = $('bannerTranslations');
+        if (container) container.appendChild(panel);
+        langSelect.value = '';
+    }
+
+    // ═══════════════════════════════════════════════════════
     // FILTER / SEARCH
     // ═══════════════════════════════════════════════════════
     function bindFilters() {
@@ -595,14 +717,15 @@
     }
 
     function bindEvents() {
-        const addBtn      = $('btnAddBanner');
-        const closeBtn    = $('btnCloseForm');
-        const cancelBtn   = $('btnCancelForm');
-        const form        = $('bannerForm');
+        const addBtn       = $('btnAddBanner');
+        const closeBtn     = $('btnCloseForm');
+        const cancelBtn    = $('btnCancelForm');
+        const form         = $('bannerForm');
         const selectImgBtn = $('bannerSelectImageBtn');
         const removeImgBtn = $('bannerRemoveImageBtn');
-        const msCloseBtn  = $('bannerMediaStudioClose');
-        const msOverlay   = $('bannerMediaStudioOverlay');
+        const msCloseBtn   = $('bannerMediaStudioClose');
+        const msOverlay    = $('bannerMediaStudioOverlay');
+        const addLangBtn   = $('bannerAddLangBtn');
 
         if (addBtn)       addBtn.addEventListener('click', openAddForm);
         if (closeBtn)     closeBtn.addEventListener('click', closeForm);
@@ -610,6 +733,7 @@
         if (form)         form.addEventListener('submit', handleFormSubmit);
         if (selectImgBtn) selectImgBtn.addEventListener('click', openMediaStudio);
         if (removeImgBtn) removeImgBtn.addEventListener('click', removeImage);
+        if (addLangBtn)   addLangBtn.addEventListener('click', addBannerTranslation);
         if (msCloseBtn)   msCloseBtn.addEventListener('click', closeMediaStudio);
 
         // Click on overlay backdrop closes modal
@@ -631,7 +755,11 @@
     // ═══════════════════════════════════════════════════════
     async function init() {
         bindEvents();
-        await loadBanners();
+        await Promise.all([
+            loadBanners(),
+            loadLanguages(),
+            loadButtonStyles()
+        ]);
         console.log('[Banners] ✓ Initialized');
     }
 

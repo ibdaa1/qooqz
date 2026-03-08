@@ -421,46 +421,22 @@ if (!function_exists('renderBannerThemeVars')) {
                         </div>
                     </div>
 
-                    <!-- Arabic -->
-                    <div class="translation-panel" data-lang="ar">
-                        <div class="translation-panel-header">
-                            <span class="lang-badge">AR</span>
-                            <span data-i18n="form.translations.lang_ar"><?= __t('form.translations.lang_ar', 'Arabic') ?></span>
-                        </div>
-                        <div class="translation-panel-body">
-                            <div class="form-group">
-                                <label data-i18n-replace="form.translations.title_in_lang" data-i18n-replace-lang="Arabic">
-                                    <?= __t('form.translations.title_in_lang', 'Title in Arabic') ?>
-                                </label>
-                                <input type="text"
-                                       id="trans_ar_title"
-                                       name="trans[ar][title]"
-                                       class="form-control"
-                                       dir="rtl"
-                                       placeholder="العنوان بالعربية">
-                            </div>
-                            <div class="form-group">
-                                <label data-i18n-replace="form.translations.subtitle_in_lang" data-i18n-replace-lang="Arabic">
-                                    <?= __t('form.translations.subtitle_in_lang', 'Subtitle in Arabic') ?>
-                                </label>
-                                <input type="text"
-                                       id="trans_ar_subtitle"
-                                       name="trans[ar][subtitle]"
-                                       class="form-control"
-                                       dir="rtl"
-                                       placeholder="العنوان الفرعي بالعربية">
-                            </div>
-                            <div class="form-group">
-                                <label data-i18n-replace="form.translations.link_text_in_lang" data-i18n-replace-lang="Arabic">
-                                    <?= __t('form.translations.link_text_in_lang', 'Button Text in Arabic') ?>
-                                </label>
-                                <input type="text"
-                                       id="trans_ar_link_text"
-                                       name="trans[ar][link_text]"
-                                       class="form-control"
-                                       dir="rtl"
-                                       placeholder="نص الزر بالعربية">
-                            </div>
+                    <!-- Dynamic language panels rendered by JS -->
+                    <div id="bannerTranslations" class="translation-panels"></div>
+
+                    <!-- Add language -->
+                    <div class="form-group" style="margin-top:12px;">
+                        <label for="bannerLangSelect" data-i18n="form.translations.select_lang">
+                            <?= __t('form.translations.select_lang', 'Select Language') ?>
+                        </label>
+                        <div style="display:flex; gap:8px; align-items:flex-end;">
+                            <select id="bannerLangSelect" class="form-control" style="flex:1;">
+                                <option value=""><?= __t('form.translations.choose_language', 'Choose language') ?></option>
+                            </select>
+                            <button type="button" id="bannerAddLangBtn" class="btn btn-primary">
+                                <i class="fas fa-plus"></i>
+                                <?= __t('form.translations.add_translation', 'Add Translation') ?>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -596,8 +572,10 @@ window.PAGE_PERMISSIONS = <?= json_encode([
 ], JSON_UNESCAPED_UNICODE) ?>;
 
 window.BANNERS_CONFIG = {
-    apiUrl:       '<?= $apiBase ?>/banners',
-    imagesApi:    '<?= $apiBase ?>/images',
+    apiUrl:          '<?= $apiBase ?>/banners',
+    imagesApi:       '<?= $apiBase ?>/images',
+    languagesApi:    '<?= $apiBase ?>/languages',
+    buttonStylesApi: '<?= $apiBase ?>/button_styles',
     imageTypeId:  <?= $imageTypeId ?>,
     csrfToken:    '<?= addslashes($csrf) ?>',
     lang:         '<?= addslashes($lang) ?>',
