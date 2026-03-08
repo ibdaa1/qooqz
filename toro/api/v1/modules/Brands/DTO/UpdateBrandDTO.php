@@ -8,7 +8,6 @@ final class UpdateBrandDTO
 {
     public function __construct(
         public readonly ?string $slug       = null,
-        public readonly ?string $logo       = null,
         public readonly ?string $website    = null,
         public readonly ?int    $sortOrder  = null,
         public readonly ?bool   $isActive   = null,
@@ -20,7 +19,6 @@ final class UpdateBrandDTO
     {
         return new self(
             slug:         isset($data['slug'])       ? trim(strtolower($data['slug'])) : null,
-            logo:         $data['logo']              ?? null,
             website:      $data['website']           ?? null,
             sortOrder:    isset($data['sort_order']) ? (int)$data['sort_order']        : null,
             isActive:     isset($data['is_active'])  ? (bool)$data['is_active']        : null,

@@ -65,7 +65,6 @@ final class BrandsService
 
         $brandId = $this->repo->create([
             'slug'       => $dto->slug,
-            'logo'       => $dto->logo,
             'website'    => $dto->website,
             'sort_order' => $dto->sortOrder,
             'is_active'  => $dto->isActive,
@@ -107,7 +106,6 @@ final class BrandsService
 
         $updateData = array_filter([
             'slug'       => $dto->slug,
-            'logo'       => $dto->logo,
             'website'    => $dto->website,
             'sort_order' => $dto->sortOrder,
             'is_active'  => $dto->isActive !== null ? (int)$dto->isActive : null,

@@ -27,7 +27,7 @@ final class PdoProductsRepository implements ProductsRepositoryInterface
             SELECT
                 p.id, p.sku, p.brand_id, p.category_id, p.type,
                 p.base_price, p.sale_price, p.stock_qty, p.weight_grams,
-                p.thumbnail, p.is_featured, p.is_active, p.sort_order, p.created_at, p.updated_at,
+                p.is_featured, p.is_active, p.sort_order, p.created_at, p.updated_at,
                 pt.name, pt.short_desc, pt.description,
                 l.code AS lang_code
             FROM products p
@@ -156,7 +156,7 @@ final class PdoProductsRepository implements ProductsRepositoryInterface
             SELECT
                 p.id, p.sku, p.brand_id, p.category_id, p.type,
                 p.base_price, p.sale_price, p.stock_qty, p.weight_grams,
-                p.thumbnail, p.is_featured, p.is_active, p.sort_order, p.created_at, p.updated_at,
+                p.is_featured, p.is_active, p.sort_order, p.created_at, p.updated_at,
                 pt.name, pt.short_desc, pt.description, pt.ingredients, pt.how_to_use,
                 pt.meta_title, pt.meta_desc,
                 l.code AS lang_code
@@ -183,7 +183,7 @@ final class PdoProductsRepository implements ProductsRepositoryInterface
             SELECT
                 p.id, p.sku, p.brand_id, p.category_id, p.type,
                 p.base_price, p.sale_price, p.stock_qty, p.weight_grams,
-                p.thumbnail, p.is_featured, p.is_active, p.sort_order, p.created_at, p.updated_at,
+                p.is_featured, p.is_active, p.sort_order, p.created_at, p.updated_at,
                 pt.name, pt.short_desc, pt.description, pt.ingredients, pt.how_to_use,
                 pt.meta_title, pt.meta_desc,
                 l.code AS lang_code
@@ -206,9 +206,9 @@ final class PdoProductsRepository implements ProductsRepositoryInterface
     {
         $stmt = $this->pdo->prepare("
             INSERT INTO products
-                (sku, brand_id, category_id, type, base_price, sale_price, stock_qty, weight_grams, thumbnail, is_featured, is_active, sort_order)
+                (sku, brand_id, category_id, type, base_price, sale_price, stock_qty, weight_grams, is_featured, is_active, sort_order)
             VALUES
-                (:sku, :brand_id, :category_id, :type, :base_price, :sale_price, :stock_qty, :weight_grams, :thumbnail, :is_featured, :is_active, :sort_order)
+                (:sku, :brand_id, :category_id, :type, :base_price, :sale_price, :stock_qty, :weight_grams, :is_featured, :is_active, :sort_order)
         ");
         $stmt->execute([
             ':sku'          => $data['sku'],
@@ -219,7 +219,6 @@ final class PdoProductsRepository implements ProductsRepositoryInterface
             ':sale_price'   => $data['sale_price']    ?? null,
             ':stock_qty'    => $data['stock_qty']     ?? 0,
             ':weight_grams' => $data['weight_grams']  ?? null,
-            ':thumbnail'    => $data['thumbnail']     ?? null,
             ':is_featured'  => (int)($data['is_featured'] ?? 0),
             ':is_active'    => (int)($data['is_active']   ?? 1),
             ':sort_order'   => $data['sort_order']    ?? 0,
@@ -232,7 +231,7 @@ final class PdoProductsRepository implements ProductsRepositoryInterface
     {
         if (empty($data)) return false;
 
-        $allowed = ['sku', 'brand_id', 'category_id', 'type', 'base_price', 'sale_price', 'stock_qty', 'weight_grams', 'thumbnail', 'is_featured', 'is_active', 'sort_order'];
+        $allowed = ['sku', 'brand_id', 'category_id', 'type', 'base_price', 'sale_price', 'stock_qty', 'weight_grams', 'is_featured', 'is_active', 'sort_order'];
         $sets    = [];
         $params  = [':__id' => $id];
 

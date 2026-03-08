@@ -278,4 +278,43 @@ $router->addRoute('DELETE', '/v1/admin/products/{id}',
     array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:20,60'])
 );
 
+// ════════════════════════════════════════════════════════════
+// PRODUCT ATTRIBUTE VALUES  →  /v1/admin/products/{productId}/attribute-values/*
+// ════════════════════════════════════════════════════════════
+
+$router->addRoute('POST', '/v1/admin/products/{productId}/attribute-values',
+    'ProductAttributeValuesController@attach', $_authAdmin);
+$router->addRoute('DELETE', '/v1/admin/products/{productId}/attribute-values/{valueId}',
+    'ProductAttributeValuesController@detach', $_authAdmin);
+$router->addRoute('PUT', '/v1/admin/products/{productId}/attribute-values/sync',
+    'ProductAttributeValuesController@sync', $_authAdmin);
+
+// ════════════════════════════════════════════════════════════
+// PRODUCT VARIANTS  →  /v1/admin/variants/*
+// ════════════════════════════════════════════════════════════
+
+$router->addRoute('POST',   '/v1/admin/variants',      'ProductVariantsController@store',   $_authAdmin);
+$router->addRoute('PATCH',  '/v1/admin/variants/{id}', 'ProductVariantsController@update',  $_authAdmin);
+$router->addRoute('DELETE', '/v1/admin/variants/{id}', 'ProductVariantsController@destroy', $_authAdmin);
+
+// ════════════════════════════════════════════════════════════
+// PRODUCT REVIEWS  →  /v1/admin/reviews/*
+// ════════════════════════════════════════════════════════════
+
+$router->addRoute('PATCH',  '/v1/admin/reviews/{id}/approve', 'ProductReviewsController@approve', $_authAdmin);
+$router->addRoute('PATCH',  '/v1/admin/reviews/{id}',          'ProductReviewsController@update',  $_authAdmin);
+$router->addRoute('DELETE', '/v1/admin/reviews/{id}',          'ProductReviewsController@destroy', $_authAdmin);
+
+// ════════════════════════════════════════════════════════════
+// MENUS  →  /v1/admin/menus/*  +  /v1/admin/menu-items/*
+// ════════════════════════════════════════════════════════════
+
+$router->addRoute('POST',   '/v1/admin/menus',         'MenusController@store',        $_authAdmin);
+$router->addRoute('PATCH',  '/v1/admin/menus/{id}',    'MenusController@update',       $_authAdmin);
+$router->addRoute('DELETE', '/v1/admin/menus/{id}',    'MenusController@destroy',      $_authAdmin);
+$router->addRoute('PUT',    '/v1/admin/menus/{menuId}/items/reorder', 'MenusController@reorderItems', $_authAdmin);
+$router->addRoute('POST',   '/v1/admin/menu-items',    'MenusController@storeItem',    $_authAdmin);
+$router->addRoute('PATCH',  '/v1/admin/menu-items/{id}', 'MenusController@updateItem', $_authAdmin);
+$router->addRoute('DELETE', '/v1/admin/menu-items/{id}', 'MenusController@destroyItem', $_authAdmin);
+
 unset($_authAdmin);

@@ -20,7 +20,7 @@ final class PdoBrandsRepository implements BrandsRepositoryInterface
 
         $sql = "
             SELECT
-                b.id, b.slug, b.logo, b.website, b.sort_order, b.is_active, b.created_at,
+                b.id, b.slug, b.website, b.sort_order, b.is_active, b.created_at,
                 bt.name, bt.description,
                 l.code AS lang_code
             FROM brands b
@@ -77,7 +77,7 @@ final class PdoBrandsRepository implements BrandsRepositoryInterface
 
         $stmt = $this->pdo->prepare("
             SELECT
-                b.id, b.slug, b.logo, b.website, b.sort_order, b.is_active, b.created_at,
+                b.id, b.slug, b.website, b.sort_order, b.is_active, b.created_at,
                 bt.name, bt.description,
                 l.code AS lang_code
             FROM brands b
@@ -102,7 +102,7 @@ final class PdoBrandsRepository implements BrandsRepositoryInterface
 
         $stmt = $this->pdo->prepare("
             SELECT
-                b.id, b.slug, b.logo, b.website, b.sort_order, b.is_active, b.created_at,
+                b.id, b.slug, b.website, b.sort_order, b.is_active, b.created_at,
                 bt.name, bt.description,
                 l.code AS lang_code
             FROM brands b
@@ -124,12 +124,11 @@ final class PdoBrandsRepository implements BrandsRepositoryInterface
     public function create(array $data): int
     {
         $stmt = $this->pdo->prepare("
-            INSERT INTO brands (slug, logo, website, sort_order, is_active)
-            VALUES (:slug, :logo, :website, :sort_order, :is_active)
+            INSERT INTO brands (slug, website, sort_order, is_active)
+            VALUES (:slug, :website, :sort_order, :is_active)
         ");
         $stmt->execute([
             ':slug'       => $data['slug'],
-            ':logo'       => $data['logo']       ?? null,
             ':website'    => $data['website']     ?? null,
             ':sort_order' => $data['sort_order']  ?? 0,
             ':is_active'  => (int)($data['is_active'] ?? 1),
@@ -142,7 +141,7 @@ final class PdoBrandsRepository implements BrandsRepositoryInterface
     {
         if (empty($data)) return false;
 
-        $allowed = ['slug', 'logo', 'website', 'sort_order', 'is_active'];
+        $allowed = ['slug', 'website', 'sort_order', 'is_active'];
         $sets    = [];
         $params  = [':__id' => $id];
 

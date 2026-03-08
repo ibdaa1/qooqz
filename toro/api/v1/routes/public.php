@@ -249,4 +249,39 @@ $router->addRoute('GET', '/v1/public/products/{id}/images',
     $_publicMw
 );
 
+// ════════════════════════════════════════════════════════════
+// PRODUCT ATTRIBUTE VALUES  →  /v1/public/products/{productId}/attribute-values
+// ════════════════════════════════════════════════════════════
+
+$router->addRoute('GET', '/v1/public/products/{productId}/attribute-values',
+    'ProductAttributeValuesController@index', $_publicMw);
+
+// ════════════════════════════════════════════════════════════
+// PRODUCT VARIANTS  →  /v1/public/*
+// ════════════════════════════════════════════════════════════
+
+$router->addRoute('GET', '/v1/public/products/{productId}/variants',
+    'ProductVariantsController@indexByProduct', $_publicMw);
+$router->addRoute('GET', '/v1/public/variants/{id}',
+    'ProductVariantsController@show', $_publicMw);
+
+// ════════════════════════════════════════════════════════════
+// PRODUCT REVIEWS  →  /v1/public/*
+// ════════════════════════════════════════════════════════════
+
+$router->addRoute('GET', '/v1/public/products/{productId}/reviews',
+    'ProductReviewsController@indexByProduct', $_publicMw);
+$router->addRoute('GET', '/v1/public/reviews/{id}',
+    'ProductReviewsController@show', $_publicMw);
+
+// ════════════════════════════════════════════════════════════
+// MENUS  →  /v1/public/menus/*  +  /v1/public/menu-items/*
+// ════════════════════════════════════════════════════════════
+
+$router->addRoute('GET', '/v1/public/menus',                    'MenusController@index',      $_publicMw);
+$router->addRoute('GET', '/v1/public/menus/{id}',               'MenusController@show',       $_publicMw);
+$router->addRoute('GET', '/v1/public/menus/by-slug/{slug}',     'MenusController@showBySlug', $_publicMw);
+$router->addRoute('GET', '/v1/public/menus/{menuId}/items',     'MenusController@items',      $_publicMw);
+$router->addRoute('GET', '/v1/public/menu-items/{id}',          'MenusController@showItem',   $_publicMw);
+
 unset($_publicMw);
