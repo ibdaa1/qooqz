@@ -44,6 +44,12 @@
         gap: 0.75rem !important;
     }
 
+    /* RTL: push header-right to the correct (left) side */
+    [dir="rtl"] .header-right {
+        margin-left: 0 !important;
+        margin-right: auto !important;
+    }
+
     /* Search moves to new line */
     .header-center {
         order: 3 !important;

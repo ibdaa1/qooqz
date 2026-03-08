@@ -147,10 +147,19 @@ foreach ($theme['design_settings'] ?? [] as $d) {
 <html lang="<?= htmlspecialchars($lang) ?>" dir="<?= htmlspecialchars($dir) ?>">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="<?= $csrfToken ?>">
     <meta name="i18n-primary-file" content="<?= $translationPath . rawurlencode($lang) ?>.json">
-    
+
+    <!-- PWA / Mobile App Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" data-i18n="brand" content="Admin">
+    <meta name="application-name" data-i18n="brand" content="Admin">
+    <meta name="theme-color" content="#1e2533">
+    <link rel="manifest" href="/admin/manifest.json">
+
     <title data-i18n="brand">Admin Panel</title>
 
     <!-- Stylesheets -->
@@ -336,21 +345,6 @@ body {
                 <span class="brand-text" data-i18n="brand">Admin Panel</span>
             <?php endif; ?>
         </a>
-    </div>
-
-    <div class="header-center">
-        <div class="search-wrap">
-            <input id="adminSearch" 
-                   type="search" 
-                   placeholder="Search..."
-                   data-i18n-placeholder="search_placeholder"
-                   autocomplete="off">
-            <button id="searchBtn" 
-                    class="icon-btn" 
-                    type="button">
-                <i class="fas fa-search"></i>
-            </button>
-        </div>
     </div>
 
     <div class="header-right">
