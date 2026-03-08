@@ -13,7 +13,8 @@ class Logger
     {
         if (self::$initialized) return;
         
-        self::$logFile = BASE_DIR . '/logs/app.log';
+        $basePath = defined('BASE_PATH') ? BASE_PATH : (defined('BASE_DIR') ? BASE_DIR : sys_get_temp_dir());
+        self::$logFile = $basePath . '/logs/app.log';
         self::$initialized = true;
         
         // Create log directory if not exists
@@ -58,7 +59,7 @@ class Logger
             } else {
                 error_log($line);
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('Logger failed: ' . $e->getMessage() . ' | ' . $line);
         }
     }

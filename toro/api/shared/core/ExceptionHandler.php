@@ -30,7 +30,7 @@ final class ExceptionHandler
             string $file,
             int $line
         ): bool {
-            throw new ErrorException($message, 0, $severity, $file, $line);
+            throw new \ErrorException($message, 0, $severity, $file, $line);
         });
 
         register_shutdown_function([self::class, 'handleShutdown']);
@@ -41,7 +41,7 @@ final class ExceptionHandler
     /* =========================
      * Throwable handler
      * ========================= */
-    public static function handleThrowable(Throwable $e): void
+    public static function handleThrowable(\Throwable $e): void
     {
         self::report($e);
         self::render($e);
@@ -61,7 +61,7 @@ final class ExceptionHandler
             E_CORE_ERROR,
             E_COMPILE_ERROR,
         ], true)) {
-            $e = new ErrorException(
+            $e = new \ErrorException(
                 $error['message'],
                 0,
                 $error['type'],
