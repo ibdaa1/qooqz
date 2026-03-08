@@ -57,35 +57,32 @@ class Kernel
 
     private function loadRoutes(): void
     {
-        $context = defined('REQUEST_CONTEXT') ? REQUEST_CONTEXT : 'public';
-        $router  = $this; // pass to route files
+        $router    = $this; // passed into every route file
+        $routesDir = BASE_PATH . '/v1/routes';
 
-        $routeFiles = [
-            BASE_PATH . '/v1/routes/auth.php',
-            BASE_PATH . '/v1/routes/users.php',
-            BASE_PATH . '/v1/routes/products.php',
-            BASE_PATH . '/v1/routes/categories.php',
-            BASE_PATH . '/v1/routes/orders.php',
-            BASE_PATH . '/v1/routes/payments.php',
-            BASE_PATH . '/v1/routes/cart.php',
-            BASE_PATH . '/v1/routes/menus.php',
-            BASE_PATH . '/v1/routes/banners.php',
-            BASE_PATH . '/v1/routes/pages.php',
-            BASE_PATH . '/v1/routes/translations.php',
-            BASE_PATH . '/v1/routes/settings.php',
-            BASE_PATH . '/v1/routes/theme.php',
-        ];
+        // Files that must be loaded LAST (they use controllers defined by module files)
+        // and files that must never be auto-loaded (debug utilities)
+        $loadLast = ['admin.php', 'public.php'];
+        $skip     = ['v1.php'];
 
-        // Admin routes (/v1/admin/*) — always loaded; auth enforced per-route
-        $routeFiles[] = BASE_PATH . '/v1/routes/admin.php';
-
-        // Public routes (/v1/public/*) — always loaded; no auth required
-        $routeFiles[] = BASE_PATH . '/v1/routes/public.php';
-
-        foreach ($routeFiles as $file) {
-            if (file_exists($file)) {
-                require_once $file;
+        // Auto-discover all module route files (alphabetical order)
+        $discovered = glob($routesDir . '/*.php') ?: [];
+        foreach ($discovered as $file) {
+            $basename = basename($file);
+            if (in_array($basename, $loadLast, true) || in_array($basename, $skip, true)) {
+                continue;
             }
+            require_once $file;
+        }
+
+        // Admin routes (/v1/admin/*) — always loaded last; auth enforced per-route
+        if (file_exists($routesDir . '/admin.php')) {
+            require_once $routesDir . '/admin.php';
+        }
+
+        // Public routes (/v1/public/*) — always loaded last; no auth required
+        if (file_exists($routesDir . '/public.php')) {
+            require_once $routesDir . '/public.php';
         }
     }
 
