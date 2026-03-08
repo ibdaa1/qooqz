@@ -1,303 +1,666 @@
 <?php
-/**
- * admin/fragments/banners.php
- *
- * Banner management fragment (final)
- * - Loads bootstrap_admin_ui.php to get $ADMIN_UI_PAYLOAD
- * - Falls back to loading languages/banners/<lang>.json when translations missing
- * - Exposes window.I18N_FLAT, window.ADMIN_UI, CSRF, API paths to client JS
- * - Uses theme colors_map to inject :root CSS variables
- */
-
 declare(strict_types=1);
 
-// Load admin UI bootstrap (populates $ADMIN_UI_PAYLOAD if available)
-$bootstrap = __DIR__ . '/../../api/bootstrap_admin_ui.php';
-if (is_readable($bootstrap)) {
-    try { require_once $bootstrap; } catch (Throwable $e) { /* logged inside bootstrap_admin_ui */ }
-}
+/**
+ * /admin/fragments/banners.php
+ * Banners Management Fragment — rebuilt following products.php / brands.php pattern
+ *
+ * ✅ Uses new permission system (role-based + resource-based)
+ * ✅ Compatible with tenant_users table
+ * ✅ Images stored in unified images table (image_type_id = 9)
+ * ✅ Translations: EN required, AR optional — stored in banner_translations
+ * ✅ DB-driven theme CSS vars
+ * ✅ Production-ready
+ */
 
-// Normalize payload
-$ADMIN_UI_PAYLOAD = $ADMIN_UI_PAYLOAD ?? ($GLOBALS['ADMIN_UI'] ?? []);
-$userInfo = $ADMIN_UI_PAYLOAD['user'] ?? [];
-$lang = $ADMIN_UI_PAYLOAD['lang'] ?? 'en';
-$direction = $ADMIN_UI_PAYLOAD['direction'] ?? 'ltr';
-$strings = $ADMIN_UI_PAYLOAD['strings'] ?? [];
-$theme = $ADMIN_UI_PAYLOAD['theme'] ?? [];
+// ════════════════════════════════════════════════════════════
+// DETECT REQUEST TYPE
+// ════════════════════════════════════════════════════════════
+$isAjax     = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+              strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+$isEmbedded = isset($_GET['embedded']) || isset($_POST['embedded']);
+$isFragment = $isAjax || $isEmbedded;
 
-// Helper: flatten nested translation arrays into dot keys + short keys
-function flatten_recursive(array $arr, array &$out = [], $prefix = '') {
-    foreach ($arr as $k => $v) {
-        $key = $prefix === '' ? $k : ($prefix . '.' . $k);
-        if (is_array($v)) {
-            flatten_recursive($v, $out, $key);
-        } else {
-            $out[$key] = (string)$v;
-            $parts = explode('.', $key);
-            $short = end($parts);
-            if (!isset($out[$short])) $out[$short] = (string)$v;
-        }
-    }
-    return $out;
-}
-
-// If $strings is empty, try loading module-specific translations directly from filesystem
-$flatStrings = [];
-if (!empty($strings) && is_array($strings)) {
-    flatten_recursive($strings, $flatStrings);
+// ════════════════════════════════════════════════════════════
+// LOAD CONTEXT / HEADER
+// ════════════════════════════════════════════════════════════
+if ($isFragment) {
+    require_once __DIR__ . '/../includes/admin_context.php';
 } else {
-    // Attempt to locate languages/banners/<lang>.json or fallback to en.json
-    $langBaseCandidates = [
-        realpath(__DIR__ . '/../../languages'),
-        realpath(__DIR__ . '/../../../languages'),
-        realpath(__DIR__ . '/../../..') . '/languages'
-    ];
-    $langBase = null;
-    foreach ($langBaseCandidates as $cand) {
-        if ($cand && is_dir($cand)) { $langBase = $cand; break; }
+    require_once __DIR__ . '/../includes/header.php';
+}
+
+// ════════════════════════════════════════════════════════════
+// VERIFY USER IS LOGGED IN
+// ════════════════════════════════════════════════════════════
+if (!is_admin_logged_in()) {
+    if ($isFragment) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Not authenticated']);
+        exit;
+    } else {
+        header('Location: /admin/login.php');
+        exit;
     }
-    $moduleDir = $langBase ? rtrim($langBase, '/\\') . '/banners' : null;
-    $loaded = null;
-    if ($moduleDir && is_dir($moduleDir)) {
-        $pref = preg_replace('/[^a-z0-9_\-]/i', '', strtolower($lang ?: 'en'));
-        $tryFiles = [$moduleDir . "/{$pref}.json", $moduleDir . "/{$pref}.json", $moduleDir . '/en.json'];
-        foreach ($tryFiles as $f) {
-            if ($f && is_readable($f)) {
-                $txt = @file_get_contents($f);
-                $json = $txt ? @json_decode($txt, true) : null;
-                if (is_array($json)) { $loaded = $json; break; }
+}
+
+// ════════════════════════════════════════════════════════════
+// USER CONTEXT & PERMISSIONS
+// ════════════════════════════════════════════════════════════
+$user     = admin_user();
+$lang     = admin_lang();
+$dir      = admin_dir();
+$csrf     = admin_csrf();
+$tenantId = admin_tenant_id();
+
+$canManage    = can('banners.manage') || can('banners.create');
+$canViewAll   = can_view_all('banners');
+$canViewOwn   = can_view_own('banners');
+$canViewTenant= can_view_tenant('banners');
+$canCreate    = can_create('banners');
+$canEditAll   = can_edit_all('banners');
+$canEditOwn   = can_edit_own('banners');
+$canDeleteAll = can_delete_all('banners');
+$canDeleteOwn = can_delete_own('banners');
+
+$canView   = $canViewAll || $canViewOwn || $canViewTenant;
+$canEdit   = $canEditAll || $canEditOwn || $canManage;
+$canDelete = $canDeleteAll || $canDeleteOwn || $canManage;
+
+if (!$canView && !is_super_admin()) {
+    if ($isFragment) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Access denied']);
+        exit;
+    } else {
+        http_response_code(403);
+        die('Access denied: You do not have permission to view banners');
+    }
+}
+
+// ════════════════════════════════════════════════════════════
+// TRANSLATION HELPERS
+// ════════════════════════════════════════════════════════════
+if (!function_exists('__t_banners')) {
+    function __t_banners($key, $fallback = '') {
+        return (function_exists('i18n_get') && ($v = i18n_get($key))) ? $v : ($fallback ?: $key);
+    }
+}
+// Use non-conflicting alias for this fragment
+function __t($key, $fallback = '') {
+    return __t_banners($key, $fallback);
+}
+
+// ════════════════════════════════════════════════════════════
+// API BASE + IMAGE TYPE
+// ════════════════════════════════════════════════════════════
+$apiBase     = '/api';
+$imageTypeId = 9; // banner image type (from image_types table)
+
+// ════════════════════════════════════════════════════════════
+// DB-DRIVEN CSS VARS
+// ════════════════════════════════════════════════════════════
+if (!function_exists('renderBannerThemeVars')) {
+    function renderBannerThemeVars(array $theme): void {
+        echo ':root {' . PHP_EOL;
+        foreach ($theme['color_settings'] ?? [] as $c) {
+            if (empty($c['setting_key']) || !isset($c['color_value'])) continue;
+            $k = htmlspecialchars($c['setting_key'], ENT_QUOTES);
+            $h = htmlspecialchars(str_replace('_', '-', $c['setting_key']), ENT_QUOTES);
+            $v = htmlspecialchars($c['color_value'], ENT_QUOTES);
+            echo "    --{$k}: {$v};" . PHP_EOL;
+            if ($h !== $k) echo "    --{$h}: {$v};" . PHP_EOL;
+        }
+        foreach ($theme['font_settings'] ?? [] as $f) {
+            if (empty($f['setting_key'])) continue;
+            $sk = htmlspecialchars($f['setting_key'], ENT_QUOTES);
+            $sh = htmlspecialchars(str_replace('_', '-', $f['setting_key']), ENT_QUOTES);
+            if (!empty($f['font_family'])) {
+                $ff = htmlspecialchars($f['font_family'], ENT_QUOTES);
+                echo "    --{$sk}-family: {$ff};" . PHP_EOL;
+                if ($sh !== $sk) echo "    --{$sh}-family: {$ff};" . PHP_EOL;
             }
         }
-    }
-    if (is_array($loaded)) {
-        // loaded may contain nested "strings" root
-        if (isset($loaded['strings']) && is_array($loaded['strings'])) $loadedData = $loaded['strings'];
-        else $loadedData = $loaded;
-        flatten_recursive($loadedData, $flatStrings);
-        // Also set ADMIN_UI_PAYLOAD['strings'] so client code using ADMIN_UI.strings may find values
-        $ADMIN_UI_PAYLOAD['strings'] = $loadedData;
-    }
-}
-
-// If still empty, ensure $flatStrings has at least minimal keys (prevents undefined labels)
-if (empty($flatStrings)) {
-    $fallbacks = [
-        'banners.page_title' => 'Banners Management',
-        'banners.loading' => 'Loading...',
-        'banners.no_banners' => 'No banners found',
-        'banners.btn_new' => 'Add Banner',
-        'banners.btn_refresh' => 'Refresh',
-        'banners.btn_save' => 'Save',
-        'banners.btn_cancel' => 'Cancel',
-        'banners.btn_delete' => 'Delete',
-        'banners.btn_edit' => 'Edit',
-        'banners.btn_toggle' => 'Toggle',
-        'banners.confirm_delete' => 'Are you sure?',
-        'banners.no_permission_notice' => 'You do not have permission'
-    ];
-    foreach ($fallbacks as $k => $v) if (!isset($flatStrings[$k])) $flatStrings[$k] = $v;
-}
-
-// CSRF token
-if (empty($_SESSION['csrf_token'])) {
-    try { $_SESSION['csrf_token'] = bin2hex(random_bytes(16)); } catch (Throwable $e) { $_SESSION['csrf_token'] = bin2hex(openssl_random_pseudo_bytes(16)); }
-}
-$csrf = htmlspecialchars((string)($_SESSION['csrf_token'] ?? ''), ENT_QUOTES);
-
-// Build colors_map from theme (support list -> map fallback)
-$colorsMap = [];
-if (!empty($theme['colors_map']) && is_array($theme['colors_map'])) {
-    $colorsMap = $theme['colors_map'];
-} elseif (!empty($theme['colors']) && is_array($theme['colors'])) {
-    foreach ($theme['colors'] as $c) {
-        $k = $c['setting_key'] ?? $c['setting_name'] ?? null;
-        if ($k) $colorsMap[strtolower(preg_replace('/[^a-z0-9\-]+/i','-', $k))] = $c['color_value'] ?? null;
+        foreach ($theme['design_settings'] ?? [] as $d) {
+            if (empty($d['setting_key']) || !isset($d['setting_value'])) continue;
+            $dk = htmlspecialchars($d['setting_key'], ENT_QUOTES);
+            $dh = htmlspecialchars(str_replace('_', '-', $d['setting_key']), ENT_QUOTES);
+            $dv = htmlspecialchars($d['setting_value'], ENT_QUOTES);
+            echo "    --{$dk}: {$dv};" . PHP_EOL;
+            if ($dh !== $dk) echo "    --{$dh}: {$dv};" . PHP_EOL;
+        }
+        foreach ($theme['button_styles'] ?? [] as $b) {
+            if (empty($b['slug'])) continue;
+            $slug = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$b['slug']));
+            if (!empty($b['background_color'])) echo "    --btn-{$slug}-bg: " . htmlspecialchars($b['background_color'], ENT_QUOTES) . ';' . PHP_EOL;
+            if (!empty($b['text_color']))       echo "    --btn-{$slug}-color: " . htmlspecialchars($b['text_color'], ENT_QUOTES) . ';' . PHP_EOL;
+        }
+        foreach ($theme['card_styles'] ?? [] as $cs) {
+            if (empty($cs['slug'])) continue;
+            $slug = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$cs['slug']));
+            if (!empty($cs['background_color'])) echo "    --card-{$slug}-bg: " . htmlspecialchars($cs['background_color'], ENT_QUOTES) . ';' . PHP_EOL;
+            if (!empty($cs['border_color']))     echo "    --card-{$slug}-border: " . htmlspecialchars($cs['border_color'], ENT_QUOTES) . ';' . PHP_EOL;
+            if (!empty($cs['border_radius']))    echo "    --card-{$slug}-radius: " . htmlspecialchars((string)$cs['border_radius'], ENT_QUOTES) . 'px;' . PHP_EOL;
+        }
+        echo '}' . PHP_EOL;
     }
 }
+?>
+<!-- DB-driven CSS vars -->
+<style id="db-theme-vars-banners">
+<?php renderBannerThemeVars($GLOBALS['ADMIN_UI']['theme'] ?? []); ?>
+<?php if (!empty($GLOBALS['ADMIN_UI']['theme']['generated_css'])): ?>
+<?= $GLOBALS['ADMIN_UI']['theme']['generated_css'] ?>
+<?php endif; ?>
+</style>
+<link rel="stylesheet" href="/admin/assets/css/pages/banners.css?v=<?= time() ?>">
 
-// color lookup helper
-function color_lookup(array $map, array $keys, string $fallback = ''): string {
-    foreach ($keys as $k) if (isset($map[$k]) && trim((string)$map[$k]) !== '') return (string)$map[$k];
-    return $fallback;
+<!-- Page Meta -->
+<meta data-page="banners"
+      data-i18n-files="/languages/Banners/<?= rawurlencode($lang) ?>.json">
+
+<!-- Page Container -->
+<div class="page-container" id="bannersPageContainer" dir="<?= htmlspecialchars($dir) ?>">
+
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-header-content">
+            <h1 class="page-title" data-i18n="banners.title"><?= __t('banners.title', 'Banners') ?></h1>
+            <p class="page-subtitle" data-i18n="banners.subtitle"><?= __t('banners.subtitle', 'Manage banners and their translations') ?></p>
+        </div>
+        <div class="page-header-actions">
+            <?php if ($canCreate): ?>
+            <button id="btnAddBanner" class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                <span data-i18n="banners.add_new"><?= __t('banners.add_new', 'Add Banner') ?></span>
+            </button>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Form Container -->
+    <div id="bannerFormContainer" class="card form-card" style="display:none">
+        <div class="card-header">
+            <h3 class="card-title" id="bannerFormTitle" data-i18n="form.add_title"><?= __t('form.add_title', 'Add Banner') ?></h3>
+            <button type="button" class="btn btn-sm btn-outline" id="btnCloseForm" aria-label="<?= __t('accessibility.close', 'Close') ?>">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="card-body">
+            <form id="bannerForm" novalidate>
+                <input type="hidden" id="formId"   name="id">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
+                <input type="hidden" id="bannerImageId"     name="image_id">
+                <input type="hidden" id="bannerImageTypeId" value="<?= $imageTypeId ?>">
+
+                <!-- Row 1: Title + Subtitle -->
+                <div class="form-row">
+                    <div class="form-group form-group-wide">
+                        <label for="bannerTitle" class="required" data-i18n="form.fields.title.label">
+                            <?= __t('form.fields.title.label', 'Title') ?>
+                        </label>
+                        <input type="text"
+                               id="bannerTitle"
+                               name="title"
+                               class="form-control"
+                               required
+                               data-i18n-placeholder="form.fields.title.placeholder"
+                               placeholder="<?= __t('form.fields.title.placeholder', 'Enter banner title') ?>">
+                        <div class="invalid-feedback" data-i18n="form.fields.title.required">
+                            <?= __t('form.fields.title.required', 'Title is required') ?>
+                        </div>
+                    </div>
+
+                    <div class="form-group form-group-wide">
+                        <label for="bannerSubtitle" data-i18n="form.fields.subtitle.label">
+                            <?= __t('form.fields.subtitle.label', 'Subtitle') ?>
+                        </label>
+                        <input type="text"
+                               id="bannerSubtitle"
+                               name="subtitle"
+                               class="form-control"
+                               data-i18n-placeholder="form.fields.subtitle.placeholder"
+                               placeholder="<?= __t('form.fields.subtitle.placeholder', 'Enter subtitle (optional)') ?>">
+                    </div>
+                </div>
+
+                <!-- Row 2: Link URL + Link Text -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="bannerLinkUrl" data-i18n="form.fields.link_url.label">
+                            <?= __t('form.fields.link_url.label', 'Link URL') ?>
+                        </label>
+                        <input type="url"
+                               id="bannerLinkUrl"
+                               name="link_url"
+                               class="form-control"
+                               data-i18n-placeholder="form.fields.link_url.placeholder"
+                               placeholder="<?= __t('form.fields.link_url.placeholder', 'https://example.com') ?>">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bannerLinkText" data-i18n="form.fields.link_text.label">
+                            <?= __t('form.fields.link_text.label', 'Button Text') ?>
+                        </label>
+                        <input type="text"
+                               id="bannerLinkText"
+                               name="link_text"
+                               class="form-control"
+                               data-i18n-placeholder="form.fields.link_text.placeholder"
+                               placeholder="<?= __t('form.fields.link_text.placeholder', 'e.g. Shop Now') ?>">
+                    </div>
+                </div>
+
+                <!-- Row 3: Position + Status + Sort Order -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="bannerPosition" data-i18n="form.fields.position.label">
+                            <?= __t('form.fields.position.label', 'Position') ?>
+                        </label>
+                        <select id="bannerPosition" name="position" class="form-control">
+                            <option value="homepage_main"      data-i18n="form.fields.position.options.homepage_main"><?=      __t('form.fields.position.options.homepage_main', 'Homepage – Main') ?></option>
+                            <option value="homepage_secondary" data-i18n="form.fields.position.options.homepage_secondary"><?= __t('form.fields.position.options.homepage_secondary', 'Homepage – Secondary') ?></option>
+                            <option value="category_top"       data-i18n="form.fields.position.options.category_top"><?=       __t('form.fields.position.options.category_top', 'Category Top') ?></option>
+                            <option value="product_sidebar"    data-i18n="form.fields.position.options.product_sidebar"><?=    __t('form.fields.position.options.product_sidebar', 'Product Sidebar') ?></option>
+                            <option value="footer"             data-i18n="form.fields.position.options.footer"><?=             __t('form.fields.position.options.footer', 'Footer') ?></option>
+                            <option value="popup"              data-i18n="form.fields.position.options.popup"><?=              __t('form.fields.position.options.popup', 'Popup') ?></option>
+                            <option value="other"              data-i18n="form.fields.position.options.other"><?=              __t('form.fields.position.options.other', 'Other') ?></option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bannerIsActive" data-i18n="form.fields.status.label">
+                            <?= __t('form.fields.status.label', 'Status') ?>
+                        </label>
+                        <select id="bannerIsActive" name="is_active" class="form-control">
+                            <option value="1" data-i18n="form.fields.status.active"><?=   __t('form.fields.status.active', 'Active') ?></option>
+                            <option value="0" data-i18n="form.fields.status.inactive"><?= __t('form.fields.status.inactive', 'Inactive') ?></option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bannerSortOrder" data-i18n="form.fields.sort_order.label">
+                            <?= __t('form.fields.sort_order.label', 'Sort Order') ?>
+                        </label>
+                        <input type="number"
+                               id="bannerSortOrder"
+                               name="sort_order"
+                               class="form-control"
+                               value="0"
+                               placeholder="<?= __t('form.fields.sort_order.placeholder', '0') ?>">
+                    </div>
+                </div>
+
+                <!-- Row 4: Colors + Button Style -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="bannerBgColor" data-i18n="form.fields.background_color.label">
+                            <?= __t('form.fields.background_color.label', 'Background Color') ?>
+                        </label>
+                        <input type="color" id="bannerBgColor" name="background_color" class="form-control form-control-color" value="#FFFFFF">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bannerTextColor" data-i18n="form.fields.text_color.label">
+                            <?= __t('form.fields.text_color.label', 'Text Color') ?>
+                        </label>
+                        <input type="color" id="bannerTextColor" name="text_color" class="form-control form-control-color" value="#000000">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bannerButtonStyle" data-i18n="form.fields.button_style.label">
+                            <?= __t('form.fields.button_style.label', 'Button Style') ?>
+                        </label>
+                        <input type="text"
+                               id="bannerButtonStyle"
+                               name="button_style"
+                               class="form-control"
+                               data-i18n-placeholder="form.fields.button_style.placeholder"
+                               placeholder="<?= __t('form.fields.button_style.placeholder', 'CSS class or style') ?>">
+                    </div>
+                </div>
+
+                <!-- Row 5: Dates -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="bannerStartDate" data-i18n="form.fields.start_date.label">
+                            <?= __t('form.fields.start_date.label', 'Start Date') ?>
+                        </label>
+                        <input type="datetime-local" id="bannerStartDate" name="start_date" class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bannerEndDate" data-i18n="form.fields.end_date.label">
+                            <?= __t('form.fields.end_date.label', 'End Date') ?>
+                        </label>
+                        <input type="datetime-local" id="bannerEndDate" name="end_date" class="form-control">
+                    </div>
+                </div>
+
+                <!-- Image (via unified images table, image_type_id=9) -->
+                <div class="form-group">
+                    <label data-i18n="form.fields.image.label"><?= __t('form.fields.image.label', 'Banner Image') ?></label>
+                    <div class="image-upload-section">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                            <img id="bannerImagePreview" src="/assets/images/no-image.png"
+                                 style="width:160px; height:60px; object-fit:cover; border-radius:4px; background:#1a2332;">
+                            <div style="flex:1;">
+                                <button type="button" id="bannerSelectImageBtn" class="btn btn-secondary" data-i18n="common.select_image" style="width:100%; margin-bottom:8px;">
+                                    <?= __t('common.select_image', 'Select Image') ?>
+                                </button>
+                                <button type="button" id="bannerRemoveImageBtn" class="btn btn-outline-danger" data-i18n="common.remove_image" style="width:100%;">
+                                    <?= __t('common.remove_image', 'Remove Image') ?>
+                                </button>
+                                <div id="bannerImageLinks" style="margin-top:5px; font-size:0.8rem; display:flex; gap:10px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ TRANSLATIONS SECTION ═══ -->
+                <div class="form-section">
+                    <div class="form-section-header">
+                        <h4 class="form-section-title" data-i18n="form.translations.section_title">
+                            <?= __t('form.translations.section_title', 'Translations') ?>
+                        </h4>
+                        <p class="form-section-desc" data-i18n="form.translations.section_desc">
+                            <?= __t('form.translations.section_desc', 'English is required. Add other languages as needed.') ?>
+                        </p>
+                    </div>
+
+                    <!-- English (default, required) -->
+                    <div class="translation-panel" data-lang="en">
+                        <div class="translation-panel-header">
+                            <span class="lang-badge">EN</span>
+                            <span data-i18n="form.translations.lang_en"><?= __t('form.translations.lang_en', 'English') ?></span>
+                            <span class="badge badge-required">Required</span>
+                        </div>
+                        <div class="translation-panel-body">
+                            <div class="form-group">
+                                <label data-i18n-replace="form.translations.title_in_lang" data-i18n-replace-lang="English">
+                                    <?= __t('form.translations.title_in_lang', 'Title in English') ?>
+                                </label>
+                                <input type="text"
+                                       id="trans_en_title"
+                                       name="trans[en][title]"
+                                       class="form-control"
+                                       required
+                                       placeholder="<?= __t('form.fields.title.placeholder', 'Enter banner title') ?>">
+                                <div class="invalid-feedback" data-i18n="messages.error.en_required">
+                                    <?= __t('messages.error.en_required', 'English title is required') ?>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n-replace="form.translations.subtitle_in_lang" data-i18n-replace-lang="English">
+                                    <?= __t('form.translations.subtitle_in_lang', 'Subtitle in English') ?>
+                                </label>
+                                <input type="text"
+                                       id="trans_en_subtitle"
+                                       name="trans[en][subtitle]"
+                                       class="form-control"
+                                       placeholder="<?= __t('form.fields.subtitle.placeholder', 'Enter subtitle (optional)') ?>">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n-replace="form.translations.link_text_in_lang" data-i18n-replace-lang="English">
+                                    <?= __t('form.translations.link_text_in_lang', 'Button Text in English') ?>
+                                </label>
+                                <input type="text"
+                                       id="trans_en_link_text"
+                                       name="trans[en][link_text]"
+                                       class="form-control"
+                                       placeholder="<?= __t('form.fields.link_text.placeholder', 'e.g. Shop Now') ?>">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Arabic -->
+                    <div class="translation-panel" data-lang="ar">
+                        <div class="translation-panel-header">
+                            <span class="lang-badge">AR</span>
+                            <span data-i18n="form.translations.lang_ar"><?= __t('form.translations.lang_ar', 'Arabic') ?></span>
+                        </div>
+                        <div class="translation-panel-body">
+                            <div class="form-group">
+                                <label data-i18n-replace="form.translations.title_in_lang" data-i18n-replace-lang="Arabic">
+                                    <?= __t('form.translations.title_in_lang', 'Title in Arabic') ?>
+                                </label>
+                                <input type="text"
+                                       id="trans_ar_title"
+                                       name="trans[ar][title]"
+                                       class="form-control"
+                                       dir="rtl"
+                                       placeholder="العنوان بالعربية">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n-replace="form.translations.subtitle_in_lang" data-i18n-replace-lang="Arabic">
+                                    <?= __t('form.translations.subtitle_in_lang', 'Subtitle in Arabic') ?>
+                                </label>
+                                <input type="text"
+                                       id="trans_ar_subtitle"
+                                       name="trans[ar][subtitle]"
+                                       class="form-control"
+                                       dir="rtl"
+                                       placeholder="العنوان الفرعي بالعربية">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n-replace="form.translations.link_text_in_lang" data-i18n-replace-lang="Arabic">
+                                    <?= __t('form.translations.link_text_in_lang', 'Button Text in Arabic') ?>
+                                </label>
+                                <input type="text"
+                                       id="trans_ar_link_text"
+                                       name="trans[ar][link_text]"
+                                       class="form-control"
+                                       dir="rtl"
+                                       placeholder="نص الزر بالعربية">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- end translations -->
+
+                <!-- Form Actions -->
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" id="btnCancelForm" data-i18n="form.buttons.cancel">
+                        <?= __t('form.buttons.cancel', 'Cancel') ?>
+                    </button>
+                    <button type="submit" id="bannerSaveBtn" class="btn btn-primary">
+                        <span id="bannerSaveBtnText" data-i18n="form.buttons.save">
+                            <?= __t('form.buttons.save', 'Save') ?>
+                        </span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card filters-card">
+        <div class="card-body" style="padding:12px 16px;">
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <input type="search"
+                       id="bannerSearch"
+                       class="form-control"
+                       style="max-width:260px;"
+                       data-i18n-placeholder="filters.search_placeholder"
+                       placeholder="<?= __t('filters.search_placeholder', 'Search banners...') ?>">
+
+                <select id="bannerFilterPosition" class="form-control" style="max-width:200px;">
+                    <option value="" data-i18n="filters.position_all"><?= __t('filters.position_all', 'All Positions') ?></option>
+                    <option value="homepage_main"><?=      __t('form.fields.position.options.homepage_main', 'Homepage – Main') ?></option>
+                    <option value="homepage_secondary"><?= __t('form.fields.position.options.homepage_secondary', 'Homepage – Secondary') ?></option>
+                    <option value="category_top"><?=       __t('form.fields.position.options.category_top', 'Category Top') ?></option>
+                    <option value="product_sidebar"><?=    __t('form.fields.position.options.product_sidebar', 'Product Sidebar') ?></option>
+                    <option value="footer"><?=             __t('form.fields.position.options.footer', 'Footer') ?></option>
+                    <option value="popup"><?=              __t('form.fields.position.options.popup', 'Popup') ?></option>
+                    <option value="other"><?=              __t('form.fields.position.options.other', 'Other') ?></option>
+                </select>
+
+                <select id="bannerFilterStatus" class="form-control" style="max-width:160px;">
+                    <option value=""  data-i18n="filters.status_options.all"><?=      __t('filters.status_options.all', 'All Status') ?></option>
+                    <option value="1" data-i18n="filters.status_options.active"><?=   __t('filters.status_options.active', 'Active') ?></option>
+                    <option value="0" data-i18n="filters.status_options.inactive"><?= __t('filters.status_options.inactive', 'Inactive') ?></option>
+                </select>
+
+                <button id="btnRefresh" class="btn btn-outline" title="<?= __t('banners.retry', 'Retry') ?>">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table Card -->
+    <div class="card table-card">
+        <div class="card-body" style="padding:0; overflow:auto;">
+            <table id="bannersTable" class="data-table" style="width:100%; border-collapse:collapse;">
+                <thead>
+                    <tr>
+                        <th data-i18n="table.headers.id"><?=         __t('table.headers.id', 'ID') ?></th>
+                        <th data-i18n="table.headers.image"><?=       __t('table.headers.image', 'Image') ?></th>
+                        <th data-i18n="table.headers.title"><?=       __t('table.headers.title', 'Title') ?></th>
+                        <th data-i18n="table.headers.position"><?=    __t('table.headers.position', 'Position') ?></th>
+                        <th data-i18n="table.headers.sort_order"><?=  __t('table.headers.sort_order', 'Sort') ?></th>
+                        <th data-i18n="table.headers.status"><?=      __t('table.headers.status', 'Status') ?></th>
+                        <th data-i18n="table.headers.dates"><?=       __t('table.headers.dates', 'Dates') ?></th>
+                        <th data-i18n="table.headers.actions"><?=     __t('table.headers.actions', 'Actions') ?></th>
+                    </tr>
+                </thead>
+                <tbody id="bannersTbody">
+                    <tr>
+                        <td colspan="8" style="text-align:center; padding:24px;">
+                            <span data-i18n="banners.loading"><?= __t('banners.loading', 'Loading...') ?></span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Status/toast area -->
+    <div id="bannersToast" style="position:fixed; bottom:20px; inset-inline-end:20px; z-index:9999; display:none;"></div>
+
+</div><!-- /bannersPageContainer -->
+
+<!-- Expose globals -->
+<script type="text/javascript">
+window.APP_CONFIG = window.APP_CONFIG || {};
+window.APP_CONFIG.API_BASE    = '<?= $apiBase ?>';
+window.APP_CONFIG.TENANT_ID   = <?= $tenantId ?>;
+window.APP_CONFIG.CSRF_TOKEN  = '<?= addslashes($csrf) ?>';
+window.APP_CONFIG.USER_ID     = <?= admin_user_id() ?>;
+
+window.USER_LANGUAGE  = '<?= addslashes($lang) ?>';
+window.USER_DIRECTION = '<?= addslashes($dir) ?>';
+window.CSRF_TOKEN     = '<?= addslashes($csrf) ?>';
+
+if (!window.ADMIN_UI) {
+    window.ADMIN_UI = <?= json_encode($GLOBALS['ADMIN_UI'] ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 }
 
-// CSS variables
-$cssVars = [
-    '--theme-primary'       => color_lookup($colorsMap, ['primary','primary-color','primary_color'], '#3B82F6'),
-    '--theme-primary-hover' => color_lookup($colorsMap, ['primary-hover','primary_hover'], ''),
-    '--theme-background'    => color_lookup($colorsMap, ['background','background-main','background_main'], '#FFFFFF'),
-    '--theme-card'          => color_lookup($colorsMap, ['background-secondary','card','card_background'], '#FFFFFF'),
-    '--theme-border'        => color_lookup($colorsMap, ['border','border_color','border-color'], '#E5E7EB'),
-    '--theme-text-primary'  => color_lookup($colorsMap, ['text-primary','text_primary','text'], '#111827'),
-    '--theme-text-muted'    => color_lookup($colorsMap, ['text-secondary','text_secondary','muted'], '#6B7280'),
-    '--theme-error'         => color_lookup($colorsMap, ['error','error-color','error_color'], '#DC2626'),
-    '--theme-success'       => color_lookup($colorsMap, ['success','success-color','success_color'], '#059669'),
-];
+window.PAGE_PERMISSIONS = <?= json_encode([
+    'canCreate'    => $canCreate,
+    'canEdit'      => $canEdit,
+    'canDelete'    => $canDelete,
+    'canViewAll'   => $canViewAll,
+    'canViewOwn'   => $canViewOwn,
+    'canViewTenant'=> $canViewTenant,
+    'canEditAll'   => $canEditAll,
+    'canEditOwn'   => $canEditOwn,
+    'canDeleteAll' => $canDeleteAll,
+    'canDeleteOwn' => $canDeleteOwn,
+    'isSuperAdmin' => is_super_admin()
+], JSON_UNESCAPED_UNICODE) ?>;
 
-// Font
-$fontFamily = 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-if (!empty($theme['fonts']) && is_array($theme['fonts']) && !empty($theme['fonts'][0]['font_family'])) $fontFamily = $theme['fonts'][0]['font_family'];
-$cssVars['--theme-font-primary'] = $fontFamily;
+window.BANNERS_CONFIG = {
+    apiUrl:       '<?= $apiBase ?>/banners',
+    imagesApi:    '<?= $apiBase ?>/images',
+    imageTypeId:  <?= $imageTypeId ?>,
+    csrfToken:    '<?= addslashes($csrf) ?>',
+    lang:         '<?= addslashes($lang) ?>',
+    itemsPerPage: 25
+};
+</script>
 
-// API endpoints
-$apiBanners = $ADMIN_UI_PAYLOAD['api']['banners'] ?? '/api/banners';
-$apiUpload = $ADMIN_UI_PAYLOAD['api']['upload_image'] ?? null;
+<!-- Translation loader -->
+<script type="text/javascript">
+(function(){
+    async function applyBannerTranslations() {
+        try {
+            const lang = window.USER_LANGUAGE || '<?= $lang ?>';
+            const url  = `/languages/Banners/${encodeURIComponent(lang)}.json`;
+            const res  = await fetch(url, { credentials: 'same-origin' });
+            if (!res.ok) throw new Error('Translation fetch failed: ' + res.status);
+            const data = await res.json();
+            const translations = data.strings || data;
+            window.BANNERS_TRANSLATIONS = translations;
+            const container = document.getElementById('bannersPageContainer');
+            if (!container) return;
+            container.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                const txt = key.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : null, translations);
+                if (txt !== null && txt !== undefined) {
+                    if (el.tagName === 'INPUT' && el.hasAttribute('placeholder')) {
+                        el.placeholder = txt;
+                    } else {
+                        el.textContent = txt;
+                    }
+                }
+            });
+            container.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                const txt = key.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : null, translations);
+                if (txt !== null && txt !== undefined) el.placeholder = txt;
+            });
+        } catch (err) {
+            console.warn('[Banners] Translation load failed:', err);
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyBannerTranslations);
+    } else {
+        setTimeout(applyBannerTranslations, 50);
+    }
+})();
+</script>
 
-// Permissions
-$canManage = false;
-if (!empty($userInfo['role_id']) && (int)$userInfo['role_id'] === 1) $canManage = true;
-if (!$canManage && !empty($userInfo['roles']) && is_array($userInfo['roles'])) {
-    if (in_array('super_admin', $userInfo['roles'], true) || in_array('admin', $userInfo['roles'], true)) $canManage = true;
-}
-if (!$canManage && !empty($userInfo['permissions']) && is_array($userInfo['permissions'])) {
-    if (in_array('manage_banners', $userInfo['permissions'], true)) $canManage = true;
-}
+<?php if ($isFragment): ?>
+<script src="/admin/assets/js/admin_framework.js?v=<?= time() ?>"></script>
+<script src="/admin/assets/js/pages/banners.js?v=<?= time() ?>"></script>
+<script>
+(function(){
+    var attempts = 0, maxAttempts = 50;
+    var interval = setInterval(function(){
+        attempts++;
+        if (window.Banners && typeof window.Banners.init === 'function') {
+            clearInterval(interval);
+            try {
+                var p = window.Banners.init();
+                if (p && typeof p.then === 'function') p.catch(function(e){ console.error('[Banners] Init failed:', e); });
+            } catch(e) { console.error('[Banners] Init threw:', e); }
+        } else if (attempts > maxAttempts) {
+            clearInterval(interval);
+            console.error('[Banners] Timeout waiting for module');
+        }
+    }, 100);
+})();
+</script>
+<?php else: ?>
+<script src="/admin/assets/js/pages/banners.js?v=<?= time() ?>"></script>
+<script>
+(function(){
+    function tryInit() {
+        if (window.Banners && typeof window.Banners.init === 'function') {
+            window.Banners.init().catch(function(e){ console.error('[Banners] Init failed', e); });
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', tryInit);
+    } else {
+        tryInit();
+    }
+})();
+</script>
+<?php endif; ?>
 
-// Helper get string (uses flatStrings)
-function gs(string $key, array $flat): string {
-    if (isset($flat[$key]) && $flat[$key] !== '') return $flat[$key];
-    $parts = explode('.', $key); $short = end($parts);
-    if (isset($flat[$short]) && $flat[$short] !== '') return $flat[$short];
-    // small English fallback for safe UI
-    $fallbacks = [
-        'banners.page_title'=>'Banners Management',
-        'banners.loading'=>'Loading...',
-        'banners.no_banners'=>'No banners found',
-        'banners.btn_new'=>'Add Banner',
-        'banners.btn_refresh'=>'Refresh',
-        'banners.btn_save'=>'Save'
-    ];
-    return $fallbacks[$key] ?? $fallbacks[$short] ?? $short;
-}
-
-?><!doctype html>
-<html lang="<?php echo htmlspecialchars($lang, ENT_QUOTES); ?>" dir="<?php echo htmlspecialchars($direction, ENT_QUOTES); ?>">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title><?php echo htmlspecialchars(gs('banners.page_title', $flatStrings), ENT_QUOTES); ?></title>
-
-  <style id="db-theme-vars">:root {
-<?php foreach ($cssVars as $var => $val): ?>
-  <?php echo $var; ?>: <?php echo htmlspecialchars($val, ENT_QUOTES); ?>;
-<?php endforeach; ?>
-}</style>
-
-  <link rel="stylesheet" href="/admin/assets/css/pages/banners.css">
-</head>
-<body>
-  <div id="adminBanners" style="max-width:1200px;margin:16px auto;padding:12px;">
-    <h2><?php echo htmlspecialchars(gs('banners.page_title', $flatStrings), ENT_QUOTES); ?></h2>
-
-    <?php if (!$canManage): ?>
-      <div class="alert"><?php echo htmlspecialchars(gs('banners.no_permission_notice', $flatStrings), ENT_QUOTES); ?></div>
-    <?php else: ?>
-
-      <div class="tools" style="margin-bottom:12px;display:flex;gap:8px;align-items:center;">
-        <input id="bannerSearch" type="search" placeholder="<?php echo htmlspecialchars(gs('banners.search_placeholder', $flatStrings), ENT_QUOTES); ?>" style="flex:1;padding:8px;border:1px solid var(--theme-border);border-radius:6px;">
-        <button id="btnRefresh" class="btn primary"><?php echo htmlspecialchars(gs('banners.btn_refresh', $flatStrings), ENT_QUOTES); ?></button>
-        <button id="btnNew" class="btn primary"><?php echo htmlspecialchars(gs('banners.btn_new', $flatStrings), ENT_QUOTES); ?></button>
-        <div style="margin-left:auto;"><?php echo htmlspecialchars(gs('banners.total', $flatStrings), ENT_QUOTES); ?>: <span id="bannersCount">-</span></div>
-      </div>
-
-      <div id="bannersStatus" class="status" style="min-height:20px;margin-bottom:8px;"></div>
-
-      <div class="table-wrap" style="overflow:auto;">
-        <table id="bannersTable" style="width:100%;border-collapse:collapse;">
-          <thead>
-            <tr>
-              <th><?php echo htmlspecialchars(gs('banners.id', $flatStrings), ENT_QUOTES); ?></th>
-              <th><?php echo htmlspecialchars(gs('banners.title', $flatStrings), ENT_QUOTES); ?></th>
-              <th><?php echo htmlspecialchars(gs('banners.image', $flatStrings), ENT_QUOTES); ?></th>
-              <th><?php echo htmlspecialchars(gs('banners.position', $flatStrings), ENT_QUOTES); ?></th>
-              <th><?php echo htmlspecialchars(gs('banners.is_active', $flatStrings), ENT_QUOTES); ?></th>
-              <th><?php echo htmlspecialchars(gs('banners.actions', $flatStrings), ENT_QUOTES); ?></th>
-            </tr>
-          </thead>
-          <tbody id="bannersTbody">
-            <tr><td colspan="6" style="padding:12px;text-align:center;color:#666;"><?php echo htmlspecialchars(gs('banners.loading', $flatStrings), ENT_QUOTES); ?></td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div id="bannerFormWrap" class="form-wrap" style="display:none;margin-top:18px;">
-        <h3 id="formTitle"><?php echo htmlspecialchars(gs('banners.add_banner', $flatStrings), ENT_QUOTES); ?></h3>
-        <form id="bannerForm" autocomplete="off" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <input type="hidden" id="bannerId" name="id" value="">
-          <input type="hidden" id="banner_translations" name="translations" value="">
-          <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
-          <input type="hidden" name="action" value="save">
-
-          <div style="grid-column:1 / span 2;">
-            <label for="bannerTitle"><?php echo htmlspecialchars(gs('banners.title', $flatStrings), ENT_QUOTES); ?></label>
-            <input id="bannerTitle" name="title" type="text" required style="width:100%;padding:8px;border:1px solid var(--theme-border);border-radius:6px;">
-          </div>
-
-          <div>
-            <label for="bannerImageUrl"><?php echo htmlspecialchars(gs('banners.image_url', $flatStrings), ENT_QUOTES); ?></label>
-            <input id="bannerImageUrl" name="image_url" type="text" style="width:100%;padding:8px;border:1px solid var(--theme-border);border-radius:6px;">
-            <input id="banner_image_file" name="image_file" type="file" accept="image/*" style="margin-top:6px;">
-            <small id="imageUploadStatus" style="display:block;color:#666;"></small>
-            <div id="banner_image_preview" style="margin-top:6px;"></div>
-          </div>
-
-          <div>
-            <label for="banner_mobile_image_url"><?php echo htmlspecialchars(gs('banners.label_image_mobile', $flatStrings) ?? gs('banners.image', $flatStrings), ENT_QUOTES); ?></label>
-            <input id="banner_mobile_image_url" name="mobile_image_url" type="text" style="width:100%;padding:8px;border:1px solid var(--theme-border);border-radius:6px;">
-            <input id="banner_mobile_image_file" name="mobile_image_file" type="file" accept="image/*" style="margin-top:6px;">
-            <small id="mobileImageUploadStatus" style="display:block;color:#666;"></small>
-            <div id="banner_mobile_image_preview" style="margin-top:6px;"></div>
-          </div>
-
-          <div>
-            <label for="bannerPosition"><?php echo htmlspecialchars(gs('banners.position', $flatStrings), ENT_QUOTES); ?></label>
-            <select id="bannerPosition" name="position" style="width:100%;padding:8px;border:1px solid var(--theme-border);border-radius:6px;">
-              <option value="homepage_main"><?php echo htmlspecialchars(gs('banners.position_homepage_main', $flatStrings), ENT_QUOTES); ?></option>
-              <option value="homepage_secondary"><?php echo htmlspecialchars(gs('banners.position_homepage_secondary', $flatStrings), ENT_QUOTES); ?></option>
-              <option value="category"><?php echo htmlspecialchars(gs('banners.position_category', $flatStrings), ENT_QUOTES); ?></option>
-              <option value="product"><?php echo htmlspecialchars(gs('banners.position_product', $flatStrings), ENT_QUOTES); ?></option>
-              <option value="custom"><?php echo htmlspecialchars(gs('banners.position_custom', $flatStrings), ENT_QUOTES); ?></option>
-            </select>
-          </div>
-
-          <div>
-            <label><?php echo htmlspecialchars(gs('banners.is_active', $flatStrings), ENT_QUOTES); ?></label>
-            <select id="bannerIsActive" name="is_active" style="width:100%;padding:8px;border:1px solid var(--theme-border);border-radius:6px;">
-              <option value="1"><?php echo htmlspecialchars(gs('banners.yes', $flatStrings), ENT_QUOTES); ?></option>
-              <option value="0"><?php echo htmlspecialchars(gs('banners.no', $flatStrings), ENT_QUOTES); ?></option>
-            </select>
-          </div>
-
-          <div style="grid-column:1 / span 2;text-align:right;">
-            <button type="button" id="btnCancelForm" class="btn"><?php echo htmlspecialchars(gs('banners.btn_cancel', $flatStrings), ENT_QUOTES); ?></button>
-            <button type="submit" id="bannerSaveBtn" class="btn primary"><?php echo htmlspecialchars(gs('banners.btn_save', $flatStrings), ENT_QUOTES); ?></button>
-          </div>
-        </form>
-      </div>
-
-    <?php endif; ?>
-  </div>
-
-  <script>
-    // expose payloads
-    window.ADMIN_UI = <?php echo json_encode($ADMIN_UI_PAYLOAD, JSON_UNESCAPED_UNICODE); ?> || {};
-    window.I18N = window.ADMIN_UI.strings || {};
-    window.I18N_FLAT = <?php echo json_encode($flatStrings, JSON_UNESCAPED_UNICODE); ?> || {};
-    window.USER_INFO = window.ADMIN_UI.user || {};
-    window.THEME = window.ADMIN_UI.theme || {};
-    window.LANG = '<?php echo htmlspecialchars($lang, ENT_QUOTES); ?>';
-    window.DIRECTION = '<?php echo htmlspecialchars($direction, ENT_QUOTES); ?>';
-    window.CSRF_TOKEN = '<?php echo $csrf; ?>';
-    window.API_BANNERS = '<?php echo addslashes($apiBanners); ?>';
-    <?php if (!empty($apiUpload)): ?>
-    window.ADMIN_UI = window.ADMIN_UI || {};
-    window.ADMIN_UI.api = window.ADMIN_UI.api || {};
-    window.ADMIN_UI.api.upload_image = '<?php echo addslashes($apiUpload); ?>';
-    <?php endif; ?>
-
-    (function(){ try{ if(window.DIRECTION) document.documentElement.setAttribute('dir', window.DIRECTION); if(window.LANG) document.documentElement.setAttribute('lang', window.LANG); }catch(e){} })();
-  </script>
-
-  <script src="/admin/assets/js/pages/banners.js" defer></script>
-</body>
-</html>
+<?php if (!$isFragment): ?>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+<?php endif; ?>

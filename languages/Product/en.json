@@ -22,6 +22,9 @@
     "refresh": "Refresh",
     "active": "Active",
     "inactive": "Inactive",
+    "featured": "Featured",
+    "bestseller": "Best Seller",
+    "new_product": "New",
     "actions": "Actions",
     "total": "Total",
     "general": {
