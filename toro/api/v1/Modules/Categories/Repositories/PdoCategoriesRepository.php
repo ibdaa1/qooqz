@@ -3,10 +3,6 @@
  * TORO — v1/modules/Categories/Repositories/PdoCategoriesRepository.php
  */
 declare(strict_types=1);
-namespace V1\Modules\Categories\Repositories;
-
-use PDO;
-use V1\Modules\Categories\Contracts\CategoriesRepositoryInterface;
 
 final class PdoCategoriesRepository implements CategoriesRepositoryInterface
 {

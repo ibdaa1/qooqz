@@ -3,7 +3,6 @@
  * TORO — v1/modules/Categories/Contracts/CategoriesRepositoryInterface.php
  */
 declare(strict_types=1);
-namespace V1\Modules\Categories\Contracts;
 
 interface CategoriesRepositoryInterface
 {

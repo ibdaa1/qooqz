@@ -4,12 +4,7 @@
  * يستقبل HTTP فقط — لا منطق هنا أبداً
  */
 declare(strict_types=1);
-namespace V1\Modules\Categories\Controllers;
 
-use V1\Modules\Categories\Services\CategoriesService;
-use V1\Modules\Categories\Repositories\PdoCategoriesRepository;
-use V1\Modules\Categories\Validators\CategoriesValidator;
-use V1\Modules\Categories\DTO\{CreateCategoryDTO, UpdateCategoryDTO};
 use Shared\Core\DatabaseConnection;
 use Shared\Helpers\Response;
 

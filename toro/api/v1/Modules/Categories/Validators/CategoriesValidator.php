@@ -3,7 +3,6 @@
  * TORO — v1/modules/Categories/Validators/CategoriesValidator.php
  */
 declare(strict_types=1);
-namespace V1\Modules\Categories\Validators;
 
 use Shared\Domain\Exceptions\ValidationException;
 

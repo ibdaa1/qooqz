@@ -3,7 +3,6 @@
  * TORO — v1/modules/Categories/DTO/UpdateCategoryDTO.php
  */
 declare(strict_types=1);
-namespace V1\Modules\Categories\DTO;
 
 final class UpdateCategoryDTO
 {

@@ -4,10 +4,7 @@
  * كل منطق التصنيفات — Controller لا يعرف PDO أبداً
  */
 declare(strict_types=1);
-namespace V1\Modules\Categories\Services;
 
-use V1\Modules\Categories\Contracts\CategoriesRepositoryInterface;
-use V1\Modules\Categories\DTO\{CreateCategoryDTO, UpdateCategoryDTO};
 use Shared\Domain\Exceptions\{ValidationException, NotFoundException};
 use Shared\Helpers\AuditLogger;
 
