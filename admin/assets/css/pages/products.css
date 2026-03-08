@@ -595,16 +595,31 @@ textarea.form-control {
     height: 100%;
     overflow: auto;
     background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2vh 0;
+    box-sizing: border-box;
 }
 
 .modal-content {
     background-color: var(--card-bg, #081127);
-    margin: 5% auto;
-    padding: 20px;
+    padding: 0;
     border: 1px solid var(--border-color, #263044);
     border-radius: 12px;
-    width: 90%;
+    width: 92%;
     max-width: 1200px;
+    max-height: 94vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.modal-content iframe {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
 }
 
 .close {
@@ -613,11 +628,36 @@ textarea.form-control {
     font-size: 28px;
     font-weight: bold;
     cursor: pointer;
+    padding: 10px 16px;
+    display: block;
+    background: var(--card-bg, #081127);
+    border-radius: 12px 12px 0 0;
+    border-bottom: 1px solid var(--border-color, #263044);
 }
 
 .close:hover,
 .close:focus {
     color: var(--text-primary, #fff);
+}
+
+@media (max-width: 768px) {
+    .modal {
+        padding: 0;
+        align-items: stretch;
+    }
+
+    .modal-content {
+        width: 100%;
+        max-width: 100%;
+        max-height: 100vh;
+        border-radius: 0;
+        border: none;
+    }
+
+    .modal-content iframe {
+        height: 100% !important;
+        min-height: 0;
+    }
 }
 
 /* RTL Support */

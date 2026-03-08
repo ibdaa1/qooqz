@@ -128,6 +128,11 @@ if (!function_exists('renderFragmentThemeVars')) {
 <?= $GLOBALS['ADMIN_UI']['theme']['generated_css'] ?>
 <?php endif; ?>
 </style>
+<!-- Framework CSS (only needed in embedded/fragment mode; header.php loads it in standalone mode) -->
+<?php if ($isFragment): ?>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+<link rel="stylesheet" href="/admin/assets/css/admin_framework.css?v=<?= time() ?>">
+<?php endif; ?>
 <!-- Page CSS -->
 <link rel="stylesheet" href="/admin/assets/css/pages/media_studio.css?v=<?= time() ?>">
 
