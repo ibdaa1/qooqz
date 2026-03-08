@@ -3,10 +3,6 @@
  * TORO — v1/modules/Auth/Repositories/PdoAuthRepository.php
  */
 declare(strict_types=1);
-namespace V1\Modules\Auth\Repositories;
-
-use PDO;
-use V1\Modules\Auth\Contracts\AuthRepositoryInterface;
 
 final class PdoAuthRepository implements AuthRepositoryInterface
 {

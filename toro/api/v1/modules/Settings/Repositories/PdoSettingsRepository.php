@@ -1,8 +1,5 @@
 <?php
-namespace V1\modules\Settings\Repositories;
-
-use V1\modules\Settings\Contracts\SettingsRepositoryInterface;
-use PDO;
+declare(strict_types=1);
 
 class PdoSettingsRepository implements SettingsRepositoryInterface
 {

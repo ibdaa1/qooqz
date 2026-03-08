@@ -1,8 +1,7 @@
 <?php
-namespace V1\modules\Settings\Controllers;
+declare(strict_types=1);
 
-use V1\modules\Settings\Services\SettingsService;
-use Shared\Core\DatabaseConnection; // لاستخدام الاتصال من النظام
+use Shared\Core\DatabaseConnection;
 
 class SettingsController
 {
@@ -12,7 +11,7 @@ class SettingsController
         $pdo = DatabaseConnection::getInstance();
         
         // تأكد من أن الـ Repository يستخدم الـ Namespace الصحيح أيضاً
-        $repository = new \V1\modules\Settings\Repositories\PdoSettingsRepository($pdo);
+        $repository = new PdoSettingsRepository($pdo);
         return new SettingsService($repository);
     }
 

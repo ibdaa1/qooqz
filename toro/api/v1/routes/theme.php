@@ -1,28 +1,40 @@
 <?php
+/**
+ * TORO — v1/routes/theme.php
+ * مسارات الثيم
+ *
+ * $router هو instance من Shared\Core\Kernel
+ * يُحقن من bootstrap عبر loadRoutes()
+ */
 
-// تحميل يدوي للملفات
- $base = BASE_PATH . '/v1/modules/Theme/';
-require_once $base . 'Contracts/ThemeRepositoryInterface.php';
-require_once $base . 'Repositories/PdoThemeRepository.php';
-require_once $base . 'Services/ThemeService.php';
-require_once $base . 'Controllers/ThemeController.php';
+declare(strict_types=1);
 
-// --- Public Routes ---
+// ── تحميل ملفات Theme ────────────────────────────────────────
+$_themePath = __DIR__ . '/../modules/Theme';
+require_once $_themePath . '/Contracts/ThemeRepositoryInterface.php';
+require_once $_themePath . '/Repositories/PdoThemeRepository.php';
+require_once $_themePath . '/Services/ThemeService.php';
+require_once $_themePath . '/Controllers/ThemeController.php';
+unset($_themePath);
 
-// إرجاع CSS مباشرة (يمكن استخدامه في <link>)
- $router->addRoute('GET', '/v1/theme/css', function($params) {
-    $controller = new \V1\modules\Theme\Controllers\ThemeController();
-    $controller->getCss($params);
-});
+// ── الثيم العام (بدون مصادقة) ────────────────────────────────
 
-// --- Admin Routes ---
+// GET /v1/theme/css — CSS variables للثيم النشط
+$router->addRoute('GET', '/v1/theme/css',
+    'ThemeController@getCss',
+    ['V1\Middleware\ThrottleMiddleware:120,60']
+);
 
- $router->addRoute('GET', '/v1/theme', function($params) {
-    $controller = new \V1\modules\Theme\Controllers\ThemeController();
-    $controller->index($params);
-}, ['auth', 'admin']);
+// ── إدارة الثيم (أدمن فقط) ───────────────────────────────────
 
- $router->addRoute('PUT', '/v1/theme/{id}', function($params) {
-    $controller = new \V1\modules\Theme\Controllers\ThemeController();
-    $controller->update($params);
-}, ['auth', 'admin']);
+// GET /v1/theme — كل ألوان الثيم
+$router->addRoute('GET', '/v1/theme',
+    'ThemeController@index',
+    ['V1\Middleware\AuthMiddleware', 'V1\Middleware\AdminMiddleware', 'V1\Middleware\ThrottleMiddleware:60,60']
+);
+
+// PUT /v1/theme/{id} — تعديل لون
+$router->addRoute('PUT', '/v1/theme/{id}',
+    'ThemeController@update',
+    ['V1\Middleware\AuthMiddleware', 'V1\Middleware\AdminMiddleware', 'V1\Middleware\ThrottleMiddleware:30,60']
+);

@@ -4,7 +4,6 @@
  * التحقق من Google/Facebook tokens
  */
 declare(strict_types=1);
-namespace V1\Modules\Auth\Services;
 
 use Shared\Domain\Exceptions\AuthorizationException;
 use Shared\Domain\Exceptions\ValidationException;

@@ -1,7 +1,5 @@
 <?php
-namespace V1\modules\Settings\Services;
-
-use V1\modules\Settings\Repositories\PdoSettingsRepository;
+declare(strict_types=1);
 
 class SettingsService
 {

@@ -1,7 +1,5 @@
 <?php
-namespace V1\modules\Theme\Services;
-
-use V1\modules\Theme\Repositories\PdoThemeRepository;
+declare(strict_types=1);
 
 class ThemeService
 {

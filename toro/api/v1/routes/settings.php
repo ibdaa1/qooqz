@@ -1,35 +1,42 @@
 <?php
+/**
+ * TORO — v1/routes/settings.php
+ * مسارات الإعدادات
+ *
+ * $router هو instance من Shared\Core\Kernel
+ * يُحقن من bootstrap عبر loadRoutes()
+ */
 
-// 1. تحميل الملفات يدوياً
- $base = BASE_PATH . '/v1/modules/Settings/';
-require_once $base . 'Contracts/SettingsRepositoryInterface.php';
-require_once $base . 'Repositories/PdoSettingsRepository.php';
-require_once $base . 'Validators/SettingsValidator.php';
-require_once $base . 'Services/SettingsService.php';
-require_once $base . 'Controllers/SettingsController.php';
+declare(strict_types=1);
 
-// 2. تعريف الروتات
+// ── تحميل ملفات Settings ─────────────────────────────────────
+$_settPath = __DIR__ . '/../modules/Settings';
+require_once $_settPath . '/Contracts/SettingsRepositoryInterface.php';
+require_once $_settPath . '/DTO/SettingDTO.php';
+require_once $_settPath . '/Validators/SettingsValidator.php';
+require_once $_settPath . '/Repositories/PdoSettingsRepository.php';
+require_once $_settPath . '/Services/SettingsService.php';
+require_once $_settPath . '/Controllers/SettingsController.php';
+unset($_settPath);
 
-// اختبار
- $router->addRoute('GET', '/v1/settings/ping', function($params) {
-    header('Content-Type: application/json');
-    echo json_encode(['status' => 'success', 'message' => 'Pong!']);
-});
+// ── الإعدادات العامة (بدون مصادقة) ──────────────────────────
 
-// الرابط العام
- $router->addRoute('GET', '/v1/settings/public', function($params) {
-    // استخدام الـ Namespace الكامل
-    $controller = new \V1\modules\Settings\Controllers\SettingsController();
-    $controller->getPublic($params);
-});
+// GET /v1/settings/public — الإعدادات العامة للموقع
+$router->addRoute('GET', '/v1/settings/public',
+    'SettingsController@getPublic',
+    ['V1\Middleware\ThrottleMiddleware:120,60']
+);
 
-// روابط الأدمن
- $router->addRoute('GET', '/v1/settings', function($params) {
-    $controller = new \V1\modules\Settings\Controllers\SettingsController();
-    $controller->index($params);
-}, ['auth', 'admin']);
+// ── إدارة الإعدادات (أدمن فقط) ──────────────────────────────
 
- $router->addRoute('PUT', '/v1/settings/{id}', function($params) {
-    $controller = new \V1\modules\Settings\Controllers\SettingsController();
-    $controller->update($params);
-}, ['auth', 'admin']);
+// GET /v1/settings — كل الإعدادات
+$router->addRoute('GET', '/v1/settings',
+    'SettingsController@index',
+    ['V1\Middleware\AuthMiddleware', 'V1\Middleware\AdminMiddleware', 'V1\Middleware\ThrottleMiddleware:60,60']
+);
+
+// PUT /v1/settings/{id} — تعديل إعداد
+$router->addRoute('PUT', '/v1/settings/{id}',
+    'SettingsController@update',
+    ['V1\Middleware\AuthMiddleware', 'V1\Middleware\AdminMiddleware', 'V1\Middleware\ThrottleMiddleware:30,60']
+);

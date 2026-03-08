@@ -4,7 +4,6 @@
  * توليد والتحقق من JWT tokens
  */
 declare(strict_types=1);
-namespace V1\Modules\Auth\Services;
 
 use Shared\Domain\Exceptions\AuthorizationException;
 

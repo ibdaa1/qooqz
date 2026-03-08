@@ -3,7 +3,6 @@
  * TORO — v1/modules/Auth/Contracts/AuthRepositoryInterface.php
  */
 declare(strict_types=1);
-namespace V1\Modules\Auth\Contracts;
 
 interface AuthRepositoryInterface
 {

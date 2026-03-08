@@ -3,7 +3,6 @@
  * TORO — v1/modules/Auth/Validators/AuthValidator.php
  */
 declare(strict_types=1);
-namespace V1\Modules\Auth\Validators;
 
 use Shared\Domain\Exceptions\ValidationException;
 

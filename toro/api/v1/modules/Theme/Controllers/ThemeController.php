@@ -1,8 +1,6 @@
 <?php
-namespace V1\modules\Theme\Controllers;
+declare(strict_types=1);
 
-use V1\modules\Theme\Services\ThemeService;
-use V1\modules\Theme\Repositories\PdoThemeRepository;
 use Shared\Core\DatabaseConnection;
 
 class ThemeController

@@ -1,8 +1,5 @@
 <?php
-namespace V1\modules\Theme\Repositories;
-
-use V1\modules\Theme\Contracts\ThemeRepositoryInterface;
-use PDO;
+declare(strict_types=1);
 
 class PdoThemeRepository implements ThemeRepositoryInterface
 {

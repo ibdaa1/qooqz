@@ -9,74 +9,82 @@
 
 declare(strict_types=1);
 
-use V1\Modules\Auth\Controllers\AuthController;
-use Shared\Helpers\CSRF;
-use V1\Middleware\AuthMiddleware;
-use V1\Middleware\GuestMiddleware;
-use V1\Middleware\ThrottleMiddleware;
+// ── تحميل ملفات Auth ────────────────────────────────────────
+$_authPath = __DIR__ . '/../modules/Auth';
+require_once $_authPath . '/Contracts/AuthRepositoryInterface.php';
+require_once $_authPath . '/DTO/LoginDTO.php';
+require_once $_authPath . '/DTO/RegisterDTO.php';
+require_once $_authPath . '/DTO/OAuthDTO.php';
+require_once $_authPath . '/Validators/AuthValidator.php';
+require_once $_authPath . '/Repositories/PdoAuthRepository.php';
+require_once $_authPath . '/Services/JwtService.php';
+require_once $_authPath . '/Services/OAuthService.php';
+require_once $_authPath . '/Services/AuthService.php';
+require_once $_authPath . '/Controllers/AuthController.php';
+unset($_authPath);
 
 // ── تسجيل الدخول ─────────────────────────────────────────────
 $router->addRoute('POST', '/v1/auth/login',
-    AuthController::class . '@login',
-    [ThrottleMiddleware::class . ':10,60', GuestMiddleware::class]
+    'AuthController@login',
+    ['V1\Middleware\ThrottleMiddleware:10,60', 'V1\Middleware\GuestMiddleware']
 );
 
 // ── تسجيل حساب جديد ──────────────────────────────────────────
 $router->addRoute('POST', '/v1/auth/register',
-    AuthController::class . '@register',
-    [ThrottleMiddleware::class . ':5,60', GuestMiddleware::class]
+    'AuthController@register',
+    ['V1\Middleware\ThrottleMiddleware:5,60', 'V1\Middleware\GuestMiddleware']
 );
 
 // ── تسجيل الخروج ─────────────────────────────────────────────
 $router->addRoute('POST', '/v1/auth/logout',
-    AuthController::class . '@logout',
-    [AuthMiddleware::class]
+    'AuthController@logout',
+    ['V1\Middleware\AuthMiddleware']
 );
 
 // ── تجديد JWT ─────────────────────────────────────────────────
 $router->addRoute('POST', '/v1/auth/refresh',
-    AuthController::class . '@refresh',
-    [ThrottleMiddleware::class . ':30,60']
+    'AuthController@refresh',
+    ['V1\Middleware\ThrottleMiddleware:30,60']
 );
 
 // ── المستخدم الحالي ───────────────────────────────────────────
 $router->addRoute('GET', '/v1/auth/me',
-    AuthController::class . '@me',
-    [AuthMiddleware::class]
+    'AuthController@me',
+    ['V1\Middleware\AuthMiddleware']
 );
 
 // ── تغيير كلمة المرور ─────────────────────────────────────────
 $router->addRoute('POST', '/v1/auth/change-password',
-    AuthController::class . '@changePassword',
-    [AuthMiddleware::class, ThrottleMiddleware::class . ':5,60']
+    'AuthController@changePassword',
+    ['V1\Middleware\AuthMiddleware', 'V1\Middleware\ThrottleMiddleware:5,60']
 );
 
 // ── نسيت كلمة المرور ─────────────────────────────────────────
 $router->addRoute('POST', '/v1/auth/forgot-password',
-    AuthController::class . '@forgotPassword',
-    [ThrottleMiddleware::class . ':3,60', GuestMiddleware::class]
+    'AuthController@forgotPassword',
+    ['V1\Middleware\ThrottleMiddleware:3,60', 'V1\Middleware\GuestMiddleware']
 );
 
 // ── إعادة تعيين كلمة المرور ──────────────────────────────────
 $router->addRoute('POST', '/v1/auth/reset-password',
-    AuthController::class . '@resetPassword',
-    [ThrottleMiddleware::class . ':5,60']
+    'AuthController@resetPassword',
+    ['V1\Middleware\ThrottleMiddleware:5,60']
 );
 
 // ── OAuth: Google ─────────────────────────────────────────────
 $router->addRoute('POST', '/v1/auth/oauth/google',
-    AuthController::class . '@oauthGoogle',
-    [ThrottleMiddleware::class . ':20,60']
+    'AuthController@oauthGoogle',
+    ['V1\Middleware\ThrottleMiddleware:20,60']
 );
 
 // ── OAuth: Facebook ───────────────────────────────────────────
 $router->addRoute('POST', '/v1/auth/oauth/facebook',
-    AuthController::class . '@oauthFacebook',
-    [ThrottleMiddleware::class . ':20,60']
+    'AuthController@oauthFacebook',
+    ['V1\Middleware\ThrottleMiddleware:20,60']
 );
 
 // ── تحقق البريد الإلكتروني ────────────────────────────────────
 $router->addRoute('GET', '/v1/auth/verify-email/{token}',
-    AuthController::class . '@verifyEmail',
+    'AuthController@verifyEmail',
     []
 );

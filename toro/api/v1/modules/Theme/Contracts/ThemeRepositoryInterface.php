@@ -1,5 +1,5 @@
 <?php
-namespace V1\modules\Theme\Contracts;
+declare(strict_types=1);
 
 interface ThemeRepositoryInterface
 {

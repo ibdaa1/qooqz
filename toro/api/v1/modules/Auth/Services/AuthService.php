@@ -4,10 +4,7 @@
  * كل منطق المصادقة هنا — Controller لا يعرف PDO أبداً
  */
 declare(strict_types=1);
-namespace V1\Modules\Auth\Services;
 
-use V1\Modules\Auth\Contracts\AuthRepositoryInterface;
-use V1\Modules\Auth\DTO\{LoginDTO, RegisterDTO, OAuthDTO};
 use Shared\Domain\Exceptions\{ValidationException, AuthorizationException, NotFoundException};
 use Shared\Helpers\AuditLogger;
 

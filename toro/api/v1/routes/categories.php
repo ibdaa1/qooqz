@@ -10,7 +10,7 @@
 declare(strict_types=1);
 
 // ── تحميل ملفات التصنيفات ────────────────────────────────────
-$_catPath = __DIR__ . '/../Modules/Categories';
+$_catPath = __DIR__ . '/../modules/Categories';
 require_once $_catPath . '/Contracts/CategoriesRepositoryInterface.php';
 require_once $_catPath . '/DTO/CreateCategoryDTO.php';
 require_once $_catPath . '/DTO/UpdateCategoryDTO.php';

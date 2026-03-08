@@ -1,5 +1,5 @@
 <?php
-namespace App\Modules\Settings\DTO;
+declare(strict_types=1);
 
 class SettingDTO
 {
