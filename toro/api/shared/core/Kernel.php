@@ -65,8 +65,9 @@ class Kernel
         $loadLast = ['admin.php', 'public.php'];
         $skip     = ['v1.php'];
 
-        // Auto-discover all module route files (alphabetical order)
+        // Auto-discover all module route files (sorted alphabetically for consistency)
         $discovered = glob($routesDir . '/*.php') ?: [];
+        sort($discovered);
         foreach ($discovered as $file) {
             $basename = basename($file);
             if (in_array($basename, $loadLast, true) || in_array($basename, $skip, true)) {
