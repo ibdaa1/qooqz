@@ -51,6 +51,7 @@ spl_autoload_register(function (string $class): void {
         }
         $relative = substr($class, $len);
         $file     = $baseDir . str_replace('\\', '/', $relative) . '.php';
+        clearstatcache(true, $file);
         if (file_exists($file)) {
             require_once $file;
             return;
