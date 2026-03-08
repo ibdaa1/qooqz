@@ -5,7 +5,7 @@ namespace Shared\Core;
 
 final class DatabaseConnection
 {
-    private static ?PDO $pdo = null;
+    private static ?\PDO $pdo = null;
 
     /** Preferred entry-point (PSR/Singleton style) */
     public static function getInstance(): \PDO
