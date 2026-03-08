@@ -249,20 +249,20 @@ foreach ($themeAliasVars as $varName => $varValue):
 
 /* Apply theme immediately — these rules rely solely on DB CSS vars */
 body {
-    background: var(--background_main);
-    color: var(--text_primary);
+    background: var(--background_main, #0a0a0a);
+    color: var(--text_primary, #ffffff);
     font-family: var(--body_font-family, inherit);
 }
 
 .admin-header {
     background: var(--header_background, var(--background_secondary, #1e2533));
     color: var(--header_text, var(--text_primary, #FFFFFF));
-    border-bottom: 1px solid var(--border_color);
+    border-bottom: 1px solid var(--border_color, #334155);
 }
 
 .admin-sidebar {
-    background: var(--sidebar_background);
-    color: var(--sidebar_text);
+    background: var(--sidebar_background, #4B0082);
+    color: var(--sidebar_text, #ffffff);
 }
     </style>
 

@@ -253,6 +253,14 @@ a {
     border-left: 1px solid rgba(255,255,255,0.1);
 }
 
+/* RTL Header: keep icons in header-right and user-menu in the correct visual order.
+ * In RTL, flex items flow right-to-left by default, so we reverse them back
+ * so the notification bell and avatar icons appear in the same order as LTR. */
+[dir="rtl"] .header-right,
+[dir="rtl"] .user-menu {
+    flex-direction: row-reverse;
+}
+
 @media (max-width: 768px) {
     [dir="rtl"] .admin-sidebar {
         left: auto;
