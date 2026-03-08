@@ -354,12 +354,16 @@
         // Translations
         const translations = banner.translations || {};
 
-        // EN always in fixed fields
+        // EN always in fixed fields — if no EN translation record, fall back to
+        // the top-level banner fields so the fields are pre-filled for the user.
         const enTrans = translations['en'] || {};
-        ['title', 'subtitle', 'link_text'].forEach(f => {
-            const el = $(`trans_en_${f}`);
-            if (el) el.value = enTrans[f] || '';
-        });
+        const set_trans_en = (field, fallback) => {
+            const el = $(`trans_en_${field}`);
+            if (el) el.value = enTrans[field] || fallback || '';
+        };
+        set_trans_en('title',     banner.title);
+        set_trans_en('subtitle',  banner.subtitle);
+        set_trans_en('link_text', banner.link_text);
 
         // Other languages → dynamic panels
         const dynPanels = $('bannerTranslations');
@@ -453,10 +457,11 @@
         // Build translations object
         const translations = {};
 
-        // EN from fixed fields
-        const enTitle    = get('trans_en_title');
-        const enSubtitle = get('trans_en_subtitle');
-        const enLinkText = get('trans_en_link_text');
+        // EN from fixed translation fields — fall back to main banner fields so EN
+        // translation is always saved even when the user only fills the top fields.
+        const enTitle    = get('trans_en_title')    || get('bannerTitle');
+        const enSubtitle = get('trans_en_subtitle') || get('bannerSubtitle');
+        const enLinkText = get('trans_en_link_text') || get('bannerLinkText');
         if (enTitle || enSubtitle || enLinkText) {
             translations['en'] = { title: enTitle, subtitle: enSubtitle, link_text: enLinkText };
         }
@@ -473,7 +478,7 @@
             }
         });
 
-        // Use EN title as main title fallback
+        // Use EN translation title as main title (guaranteed above), fallback to bannerTitle
         const mainTitle = (translations.en && translations.en.title) || get('bannerTitle');
 
         return {
