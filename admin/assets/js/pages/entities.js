@@ -1476,7 +1476,7 @@
         _currentImageType = imageType;
 
         if (el.mediaModal && el.mediaFrame) {
-            el.mediaModal.style.display = 'block';
+            el.mediaModal.style.display = 'flex';
             el.mediaFrame.src = `${CONFIG.mediaStudioBase}?embedded=1&tenant_id=${state.tenantId}&lang=${state.language}&owner_id=${state.currentEntity.id}&image_type_id=${imageType}`;
 
             el.mediaFrame.dataset.imageType = imageType;

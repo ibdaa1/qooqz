@@ -844,7 +844,7 @@
             // Force image_type_id=1 (categories) and lock params
             iframe.src = `/admin/fragments/media_studio.php?embedded=1&tenant_id=${tenantId}&owner_id=${ownerId}&image_type_id=1&mode=select`;
         }
-        if (modal) modal.style.display = 'block';
+        if (modal) modal.style.display = 'flex';
 
         // Setup close button for modal (if not already handled)
         const closeBtn = document.getElementById('catMediaStudioClose');

@@ -1339,7 +1339,7 @@
             return;
         }
         if (el.mediaModal && el.mediaFrame) {
-            el.mediaModal.style.display = 'block';
+            el.mediaModal.style.display = 'flex';
             // Pass product id as owner_id and image_type_id=2 for product images
             el.mediaFrame.src = `/admin/fragments/media_studio.php?embedded=1&tenant_id=${state.tenantId}&lang=${state.language}&owner_id=${state.currentProduct.id}&image_type_id=2`;
         }
