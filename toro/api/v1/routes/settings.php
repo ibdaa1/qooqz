@@ -19,7 +19,9 @@ require_once $_settPath . '/Services/SettingsService.php';
 require_once $_settPath . '/Controllers/SettingsController.php';
 unset($_settPath);
 
-// ── الإعدادات العامة (بدون مصادقة) ──────────────────────────
+// ════════════════════════════════════════════════════════════
+// PUBLIC ROUTES (no auth required)
+// ════════════════════════════════════════════════════════════
 
 // GET /v1/settings/public — الإعدادات العامة للموقع
 $router->addRoute('GET', '/v1/settings/public',
@@ -27,16 +29,46 @@ $router->addRoute('GET', '/v1/settings/public',
     ['V1\Middleware\ThrottleMiddleware:120,60']
 );
 
-// ── إدارة الإعدادات (أدمن فقط) ──────────────────────────────
+// ════════════════════════════════════════════════════════════
+// ADMIN ROUTES (auth + admin required)
+// ════════════════════════════════════════════════════════════
 
-// GET /v1/settings — كل الإعدادات
+$_authAdmin = ['V1\Middleware\AuthMiddleware', 'V1\Middleware\AdminMiddleware'];
+
+// GET /v1/settings — قائمة الإعدادات (group, is_public, search, limit, offset)
 $router->addRoute('GET', '/v1/settings',
     'SettingsController@index',
-    ['V1\Middleware\AuthMiddleware', 'V1\Middleware\AdminMiddleware', 'V1\Middleware\ThrottleMiddleware:60,60']
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:60,60'])
 );
 
-// PUT /v1/settings/{id} — تعديل إعداد
+// GET /v1/settings/group/{group} — إعدادات مجموعة معينة
+$router->addRoute('GET', '/v1/settings/group/{group}',
+    'SettingsController@byGroup',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:60,60'])
+);
+
+// GET /v1/settings/{id} — إعداد واحد بالـ ID
+$router->addRoute('GET', '/v1/settings/{id}',
+    'SettingsController@show',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:60,60'])
+);
+
+// POST /v1/settings — إنشاء إعداد جديد
+$router->addRoute('POST', '/v1/settings',
+    'SettingsController@store',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
+);
+
+// PUT /v1/settings/{id} — تعديل قيمة إعداد
 $router->addRoute('PUT', '/v1/settings/{id}',
     'SettingsController@update',
-    ['V1\Middleware\AuthMiddleware', 'V1\Middleware\AdminMiddleware', 'V1\Middleware\ThrottleMiddleware:30,60']
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
 );
+
+// DELETE /v1/settings/{id} — حذف إعداد
+$router->addRoute('DELETE', '/v1/settings/{id}',
+    'SettingsController@destroy',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:20,60'])
+);
+
+unset($_authAdmin);
