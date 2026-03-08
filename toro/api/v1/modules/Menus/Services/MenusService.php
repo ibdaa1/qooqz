@@ -59,22 +59,27 @@ final class MenusService
     /** Returns a nested tree structure (parent → children) */
     public function getTreeForMenu(int $menuId, ?string $lang = null): array
     {
-        $flat     = $this->itemRepo->findByMenu($menuId, $lang);
-        $indexed  = [];
-        $tree     = [];
+        $flat    = $this->itemRepo->findByMenu($menuId, $lang);
+        $byId    = [];
+        $tree    = [];
 
         foreach ($flat as $item) {
             $item['children'] = [];
-            $indexed[(int)$item['id']] = $item;
+            $byId[(int)$item['id']] = $item;
         }
-        foreach ($indexed as $id => $item) {
-            $pid = $item['parent_id'];
-            if ($pid && isset($indexed[(int)$pid])) {
-                $indexed[(int)$pid]['children'][] = &$indexed[$id];
+
+        // Two-pass build: attach children by reference so mutations propagate
+        foreach (array_keys($byId) as $id) {
+            $pid = $byId[$id]['parent_id'];
+            if ($pid !== null && isset($byId[(int)$pid])) {
+                $byId[(int)$pid]['children'][] = &$byId[$id];
             } else {
-                $tree[] = &$indexed[$id];
+                $tree[] = &$byId[$id];
             }
         }
+
+        // Unset references to avoid leaking mutable state
+        unset($byId);
         return $tree;
     }
 
