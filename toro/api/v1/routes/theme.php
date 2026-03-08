@@ -3,8 +3,11 @@
  * TORO — v1/routes/theme.php
  * مسارات الثيم
  *
+ * Prefixes:
+ *   /v1/public/theme  — بدون مصادقة
+ *   /v1/admin/theme   — يتطلب Auth + Admin
+ *
  * $router هو instance من Shared\Core\Kernel
- * يُحقن من bootstrap عبر loadRoutes()
  */
 
 declare(strict_types=1);
@@ -20,50 +23,50 @@ require_once $_themePath . '/Services/ThemeService.php';
 require_once $_themePath . '/Controllers/ThemeController.php';
 unset($_themePath);
 
-// ════════════════════════════════════════════════════════════
-// PUBLIC ROUTES (no auth required)
-// ════════════════════════════════════════════════════════════
-
-// GET /v1/theme/css — CSS variables للثيم النشط
-$router->addRoute('GET', '/v1/theme/css',
-    'ThemeController@getCss',
-    ['V1\Middleware\ThrottleMiddleware:120,60']
-);
-
-// ════════════════════════════════════════════════════════════
-// ADMIN ROUTES (auth + admin required)
-// ════════════════════════════════════════════════════════════
-
+$_publicMw  = ['V1\Middleware\ThrottleMiddleware:120,60'];
 $_authAdmin = ['V1\Middleware\AuthMiddleware', 'V1\Middleware\AdminMiddleware'];
 
-// GET /v1/theme — قائمة ألوان الثيم (is_active, search, limit, offset)
-$router->addRoute('GET', '/v1/theme',
-    'ThemeController@index',
-    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:60,60'])
-);
+// ════════════════════════════════════════════════════════════
+// PUBLIC ROUTES  →  /v1/public/theme/css
+// ════════════════════════════════════════════════════════════
 
-// GET /v1/theme/{id} — لون واحد بالـ ID
-$router->addRoute('GET', '/v1/theme/{id}',
-    'ThemeController@show',
-    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:60,60'])
-);
+// CSS variables للثيم النشط
+foreach (['/v1/theme/css', '/v1/public/theme/css'] as $_path) {
+    $router->addRoute('GET', $_path, 'ThemeController@getCss', $_publicMw);
+}
 
-// POST /v1/theme — إضافة لون جديد
-$router->addRoute('POST', '/v1/theme',
-    'ThemeController@store',
-    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
-);
+// ════════════════════════════════════════════════════════════
+// ADMIN ROUTES  →  /v1/admin/theme
+// ════════════════════════════════════════════════════════════
 
-// PUT /v1/theme/{id} — تعديل لون
-$router->addRoute('PUT', '/v1/theme/{id}',
-    'ThemeController@update',
-    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
-);
+// GET — قائمة ألوان الثيم (is_active, search, limit, offset)
+foreach (['/v1/theme', '/v1/admin/theme'] as $_path) {
+    $router->addRoute('GET', $_path, 'ThemeController@index',
+        array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:60,60']));
+}
 
-// DELETE /v1/theme/{id} — حذف لون
-$router->addRoute('DELETE', '/v1/theme/{id}',
-    'ThemeController@destroy',
-    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:20,60'])
-);
+// GET — لون واحد بالـ ID
+foreach (['/v1/theme/{id}', '/v1/admin/theme/{id}'] as $_path) {
+    $router->addRoute('GET', $_path, 'ThemeController@show',
+        array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:60,60']));
+}
 
-unset($_authAdmin);
+// POST — إضافة لون جديد
+foreach (['/v1/theme', '/v1/admin/theme'] as $_path) {
+    $router->addRoute('POST', $_path, 'ThemeController@store',
+        array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60']));
+}
+
+// PUT — تعديل لون
+foreach (['/v1/theme/{id}', '/v1/admin/theme/{id}'] as $_path) {
+    $router->addRoute('PUT', $_path, 'ThemeController@update',
+        array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60']));
+}
+
+// DELETE — حذف لون
+foreach (['/v1/theme/{id}', '/v1/admin/theme/{id}'] as $_path) {
+    $router->addRoute('DELETE', $_path, 'ThemeController@destroy',
+        array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:20,60']));
+}
+
+unset($_publicMw, $_authAdmin, $_path);
