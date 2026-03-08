@@ -1,7 +1,7 @@
 <?php
 /**
  * TORO — Kernel.php
- * /public_html/toro/api/Kernel.php   (also exists in shared/core/ as base)
+ * /public_html/toro/api/shared/core/Kernel.php
  *
  * Namespace: Shared\Core
  *
