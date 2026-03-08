@@ -537,10 +537,9 @@ if (!function_exists('pub_load_theme')) {
                     $css .= '  --pub-header-text: ' . $cssEsc($theme['header_text_color'])  . ";\n";
                     $css .= '  --pub-footer-bg: '   . $cssEsc($theme['footer_bg'])          . ";\n";
                     $css .= '  --pub-footer-text: ' . $cssEsc($theme['footer_text_color'])  . ";\n";
-                    // --pub-card-bg: default card background aliases --pub-surface (secondary background).
-                    // Mirrors AdminUiThemeLoader's --card-bg → --background-secondary so that entity
-                    // cards, product cards, etc. consistently use the surface/secondary background
-                    // colour across both the frontend app and the admin dashboard.
+                    // --pub-card-bg: generic fallback used by CSS files for cards that have no
+                    // card_styles DB entry. pub_card_inline_style() uses the DB background_color
+                    // directly so per-card colours from the database are applied correctly.
                     $css .= "  --pub-card-bg: var(--pub-surface);\n";
                     $css .= "}\n";
                     // Apply font_settings variables to relevant UI elements
@@ -934,12 +933,10 @@ if (!function_exists('pub_card_inline_style')) {
             return htmlspecialchars($v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         };
         $parts = [];
-        // Use --pub-card-bg CSS variable (aliased to --pub-surface / secondary background)
-        // as the primary source of card background colour, with the DB value only as a
-        // fallback.  This mirrors AdminUiThemeLoader's --card-bg → --background-secondary
-        // alias and prevents the raw DB colour (which may be the primary brand colour)
-        // from overriding the correct surface colour set by the theme CSS.
-        if (!empty($row['background_color'])) $parts[] = 'background-color:var(--pub-card-bg,' . $esc($row['background_color']) . ')';
+        // Use the DB background_color directly so per-card colours stored in card_styles
+        // are applied correctly. --pub-card-bg (aliased to --pub-surface) remains available
+        // as a generic CSS fallback for cards that have no DB card_styles entry.
+        if (!empty($row['background_color'])) $parts[] = 'background-color:' . $esc($row['background_color']);
         if (!empty($row['border_color'])) {
             $bw = max(0, (int)($row['border_width'] ?? 1));
             $parts[] = 'border:' . $bw . 'px solid ' . $esc($row['border_color']);
