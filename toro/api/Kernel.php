@@ -29,8 +29,8 @@ class Kernel
 
     /** @var string[] Default middleware for all routes */
     private array $globalMiddleware = [
-        \Shared\Helpers\CSRF::class,          // CSRF protection
-        \Shared\Core\RateLimitMiddleware::class, // Rate limiting
+        // Global middleware intentionally kept minimal.
+        // Per-route throttling is applied via ThrottleMiddleware::class . ':limit,window'
     ];
 
     public function __construct()

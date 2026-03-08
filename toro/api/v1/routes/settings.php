@@ -1,16 +1,32 @@
 <?php
-use App\Core\Router;
-use App\Modules\Settings\Controllers\SettingsController;
+/**
+ * TORO — v1/routes/settings.php
+ * مسارات الإعدادات
+ *
+ * $router هو instance من Shared\Core\Kernel
+ * يُحقن من bootstrap عبر loadRoutes()
+ *
+ * TODO: إنشاء SettingsController عند الحاجة
+ */
 
- $router = new Router();
+declare(strict_types=1);
 
-// Public Route
- $router->get('/settings/public', [SettingsController::class, 'getPublic']);
+use V1\Middleware\AuthMiddleware;
+use V1\Middleware\AdminMiddleware;
+use V1\Middleware\ThrottleMiddleware;
 
-// Admin Routes (Requires AuthMiddleware + AdminMiddleware)
- $router->group(['middleware' => ['auth', 'admin']], function($router) {
-    $router->get('/settings', [SettingsController::class, 'index']);
-    $router->put('/settings/{id}', [SettingsController::class, 'update']);
-});
+// ── مثال: GET /v1/settings/public (TODO: تفعيل بعد إنشاء الـ Controller) ────
+// $router->addRoute('GET', '/v1/settings/public',
+//     SettingsController::class . '@getPublic',
+//     [ThrottleMiddleware::class . ':60,60']
+// );
 
-return $router;
+// $router->addRoute('GET', '/v1/settings',
+//     SettingsController::class . '@index',
+//     [AuthMiddleware::class, AdminMiddleware::class]
+// );
+
+// $router->addRoute('PUT', '/v1/settings/{id}',
+//     SettingsController::class . '@update',
+//     [AuthMiddleware::class, AdminMiddleware::class]
+// );

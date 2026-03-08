@@ -1,54 +1,80 @@
 <?php
 declare(strict_types=1);
 
+namespace Shared\Core;
+
 /**
- * Framework-grade Middleware Pipeline
+ * Middleware pipeline used by the Kernel.
+ *
+ * Usage (as expected by Kernel.php):
+ *   $pipeline = new MiddlewarePipeline($middlewareSpecs);
+ *   $pipeline->pipe(fn() => $this->dispatch(...));
+ *   $pipeline->run();
+ *
+ * Middleware specs can be:
+ *   'ClassName'           → instantiated with no args
+ *   'ClassName:arg1,arg2' → instantiated with ('arg1,arg2') as first constructor arg
  */
 final class MiddlewarePipeline
 {
-    /** @var MiddlewareBase[] */
-    private array $middlewares = [];
+    /** @var string[] */
+    private array $specs;
 
-    private array $context;
+    /** @var callable|null */
+    private $finalHandler = null;
 
-    public function __construct(array $context = [])
+    public function __construct(array $specs = [])
     {
-        $this->context = $context;
+        $this->specs = $specs;
     }
 
     /**
-     * Register middleware
+     * Register the final handler (innermost callable in the chain).
      */
-    public function pipe(string $middlewareClass): void
+    public function pipe(callable $handler): void
     {
-        if (!is_subclass_of($middlewareClass, MiddlewareBase::class)) {
-            throw new InvalidArgumentException(
-                "Middleware {$middlewareClass} must extend MiddlewareBase"
-            );
+        $this->finalHandler = $handler;
+    }
+
+    /**
+     * Execute the pipeline: run all middleware around the final handler.
+     */
+    public function run(): void
+    {
+        $handler = $this->finalHandler ?? static function (): void {};
+
+        // Build the chain inside-out (last spec wraps the final handler first)
+        $chain = $handler;
+        foreach (array_reverse($this->specs) as $spec) {
+            [$class, $args] = $this->parseSpec($spec);
+            if (!is_a($class, MiddlewareBase::class, true)) {
+                throw new \InvalidArgumentException(
+                    "Middleware class '{$class}' must extend Shared\\Core\\MiddlewareBase"
+                );
+            }
+            $next  = $chain;
+            $chain = static function () use ($class, $args, $next): void {
+                /** @var MiddlewareBase $mw */
+                $mw = new $class(...$args);
+                $mw->handle($next);
+            };
         }
 
-        $this->middlewares[] = $middlewareClass;
+        $chain();
     }
 
     /**
-     * Execute pipeline
+     * Parse 'ClassName:constructorArg' into [$class, [$arg]].
+     * Returns [$class, []] if no colon present.
+     *
+     * @return array{0: string, 1: array}
      */
-    public function handle(array $request, callable $finalHandler): mixed
+    private function parseSpec(string $spec): array
     {
-        $dispatcher = array_reduce(
-            array_reverse($this->middlewares),
-            function (callable $next, string $middlewareClass) {
-
-                return function (array $request) use ($next, $middlewareClass) {
-
-                    $middleware = new $middlewareClass($this->context);
-
-                    return $middleware->handle($request, $next);
-                };
-            },
-            $finalHandler
-        );
-
-        return $dispatcher($request);
+        if (!str_contains($spec, ':')) {
+            return [$spec, []];
+        }
+        [$class, $arg] = explode(':', $spec, 2);
+        return [$class, [$arg]];
     }
 }
