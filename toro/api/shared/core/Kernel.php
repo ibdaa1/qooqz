@@ -76,9 +76,11 @@ class Kernel
             BASE_PATH . '/v1/routes/theme.php',
         ];
 
-        if ($context === 'admin') {
-            $routeFiles[] = BASE_PATH . '/v1/routes/admin.php';
-        }
+        // Admin routes (/v1/admin/*) — always loaded; auth enforced per-route
+        $routeFiles[] = BASE_PATH . '/v1/routes/admin.php';
+
+        // Public routes (/v1/public/*) — always loaded; no auth required
+        $routeFiles[] = BASE_PATH . '/v1/routes/public.php';
 
         foreach ($routeFiles as $file) {
             if (file_exists($file)) {
