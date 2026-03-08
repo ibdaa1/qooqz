@@ -194,4 +194,88 @@ $router->addRoute('DELETE', '/v1/admin/attribute-values/{id}',
     array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:20,60'])
 );
 
+// ════════════════════════════════════════════════════════════
+// IMAGE TYPES  →  /v1/admin/image-types/*
+// ════════════════════════════════════════════════════════════
+
+// POST — إنشاء نوع صورة
+$router->addRoute('POST', '/v1/admin/image-types',
+    'ImageTypesController@store',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
+);
+
+// PUT — تعديل نوع صورة
+$router->addRoute('PUT', '/v1/admin/image-types/{id}',
+    'ImageTypesController@update',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
+);
+
+// DELETE — حذف نوع صورة
+$router->addRoute('DELETE', '/v1/admin/image-types/{id}',
+    'ImageTypesController@destroy',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:20,60'])
+);
+
+// ════════════════════════════════════════════════════════════
+// IMAGES  →  /v1/admin/images/*
+// ════════════════════════════════════════════════════════════
+
+// GET — قائمة الصور (أدمن)
+$router->addRoute('GET', '/v1/admin/images',
+    'ImagesController@index',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:60,60'])
+);
+
+// POST — رفع صورة (multipart)
+$router->addRoute('POST', '/v1/admin/images/upload',
+    'ImagesController@upload',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
+);
+
+// POST — إنشاء سجل صورة بالرابط
+$router->addRoute('POST', '/v1/admin/images',
+    'ImagesController@store',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
+);
+
+// PUT — تعديل صورة
+$router->addRoute('PUT', '/v1/admin/images/{id}',
+    'ImagesController@update',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
+);
+
+// DELETE — حذف صورة
+$router->addRoute('DELETE', '/v1/admin/images/{id}',
+    'ImagesController@destroy',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:20,60'])
+);
+
+// PATCH — تعيين صورة رئيسية
+$router->addRoute('PATCH', '/v1/admin/images/{id}/set-main',
+    'ImagesController@setMain',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
+);
+
+// ════════════════════════════════════════════════════════════
+// PRODUCTS  →  /v1/admin/products/*
+// ════════════════════════════════════════════════════════════
+
+// POST — إنشاء منتج
+$router->addRoute('POST', '/v1/admin/products',
+    'ProductsController@store',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
+);
+
+// PUT — تعديل منتج
+$router->addRoute('PUT', '/v1/admin/products/{id}',
+    'ProductsController@update',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
+);
+
+// DELETE — حذف منتج
+$router->addRoute('DELETE', '/v1/admin/products/{id}',
+    'ProductsController@destroy',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:20,60'])
+);
+
 unset($_authAdmin);

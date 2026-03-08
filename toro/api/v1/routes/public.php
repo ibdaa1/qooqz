@@ -183,4 +183,70 @@ $router->addRoute('GET', '/v1/public/attribute-values/{id}/translations',
     $_publicMw
 );
 
+// ════════════════════════════════════════════════════════════
+// IMAGE TYPES  →  /v1/public/image-types/*
+// ════════════════════════════════════════════════════════════
+
+// GET — قائمة أنواع الصور
+$router->addRoute('GET', '/v1/public/image-types',
+    'ImageTypesController@index',
+    $_publicMw
+);
+
+// GET — نوع صورة بالـ ID
+$router->addRoute('GET', '/v1/public/image-types/{id}',
+    'ImageTypesController@show',
+    $_publicMw
+);
+
+// ════════════════════════════════════════════════════════════
+// IMAGES  →  /v1/public/images/*
+// ════════════════════════════════════════════════════════════
+
+// GET — صور مالك معين (عام)
+$router->addRoute('GET', '/v1/public/images/owner/{owner_id}',
+    'ImagesController@byOwner',
+    $_publicMw
+);
+
+// GET — صورة بالـ ID (عام)
+$router->addRoute('GET', '/v1/public/images/{id}',
+    'ImagesController@show',
+    $_publicMw
+);
+
+// ════════════════════════════════════════════════════════════
+// PRODUCTS  →  /v1/public/products/*
+// ════════════════════════════════════════════════════════════
+
+// GET — قائمة المنتجات
+$router->addRoute('GET', '/v1/public/products',
+    'ProductsController@index',
+    $_publicMw
+);
+
+// GET — منتج بالـ ID
+$router->addRoute('GET', '/v1/public/products/{id}',
+    'ProductsController@show',
+    $_publicMw
+);
+
+// GET — منتج بالـ SKU
+$router->addRoute('GET', '/v1/public/products/sku/{sku}',
+    'ProductsController@showBySku',
+    $_publicMw
+);
+
+// GET — ترجمات المنتج
+$router->addRoute('GET', '/v1/public/products/{id}/translations',
+    'ProductsController@translations',
+    $_publicMw
+);
+
+// GET — صور المنتج
+$router->addRoute('GET', '/v1/public/products/{id}/images',
+    'ProductsController@images',
+    $_publicMw
+);
+
 unset($_publicMw);
