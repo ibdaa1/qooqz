@@ -311,12 +311,16 @@ if (!function_exists('renderBannerThemeVars')) {
                         <label for="bannerButtonStyle" data-i18n="form.fields.button_style.label">
                             <?= __t('form.fields.button_style.label', 'Button Style') ?>
                         </label>
-                        <input type="text"
-                               id="bannerButtonStyle"
-                               name="button_style"
-                               class="form-control"
-                               data-i18n-placeholder="form.fields.button_style.placeholder"
-                               placeholder="<?= __t('form.fields.button_style.placeholder', 'CSS class or style') ?>">
+                        <select id="bannerButtonStyle" name="button_style" class="form-control">
+                            <option value="" data-i18n="form.fields.button_style.none"><?= __t('form.fields.button_style.none', '— None —') ?></option>
+                            <?php foreach ($GLOBALS['ADMIN_UI']['theme']['button_styles'] ?? [] as $bs): ?>
+                            <?php
+                                $bsSlug = htmlspecialchars($bs['slug'] ?? '', ENT_QUOTES);
+                                $bsName = htmlspecialchars($bs['name'] ?? $bs['slug'] ?? '', ENT_QUOTES);
+                            ?>
+                            <option value="<?= $bsSlug ?>"><?= $bsName ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                 </div>
 
@@ -341,18 +345,22 @@ if (!function_exists('renderBannerThemeVars')) {
                 <div class="form-group">
                     <label data-i18n="form.fields.image.label"><?= __t('form.fields.image.label', 'Banner Image') ?></label>
                     <div class="image-upload-section">
-                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                            <img id="bannerImagePreview" src="/assets/images/no-image.png"
-                                 style="width:160px; height:60px; object-fit:cover; border-radius:4px; background:#1a2332;">
-                            <div style="flex:1;">
-                                <button type="button" id="bannerSelectImageBtn" class="btn btn-secondary" data-i18n="common.select_image" style="width:100%; margin-bottom:8px;">
+                        <div style="display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+                            <img id="bannerImagePreview"
+                                 src=""
+                                 alt=""
+                                 style="display:none; max-width:200px; max-height:80px; object-fit:cover; border-radius:6px; border:1px solid var(--border-color,#263044);">
+                            <div style="display:flex; flex-direction:column; gap:8px; min-width:140px;">
+                                <button type="button" id="bannerSelectImageBtn" class="btn btn-secondary" data-i18n="common.select_image">
+                                    <i class="fas fa-images"></i>
                                     <?= __t('common.select_image', 'Select Image') ?>
                                 </button>
-                                <button type="button" id="bannerRemoveImageBtn" class="btn btn-outline-danger" data-i18n="common.remove_image" style="width:100%;">
+                                <button type="button" id="bannerRemoveImageBtn" class="btn btn-outline-danger" data-i18n="common.remove_image">
+                                    <i class="fas fa-times"></i>
                                     <?= __t('common.remove_image', 'Remove Image') ?>
                                 </button>
-                                <div id="bannerImageLinks" style="margin-top:5px; font-size:0.8rem; display:flex; gap:10px;"></div>
                             </div>
+                            <div id="bannerImageLinks" style="font-size:0.8rem; display:flex; gap:10px; align-items:center;"></div>
                         </div>
                     </div>
                 </div>
@@ -539,6 +547,23 @@ if (!function_exists('renderBannerThemeVars')) {
     <div id="bannersToast" style="position:fixed; bottom:20px; inset-inline-end:20px; z-index:9999; display:none;"></div>
 
 </div><!-- /bannersPageContainer -->
+
+<!-- Inline Media Studio Modal -->
+<div id="bannerMediaStudioOverlay" class="media-studio-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="<?= __t('common.select_image', 'Select Image') ?>">
+    <div class="media-studio-container">
+        <div class="media-studio-header">
+            <h4><i class="fas fa-images" style="margin-inline-end:8px;color:var(--primary-color,#3b82f6);"></i><?= __t('common.select_image', 'Select Image') ?></h4>
+            <button type="button" id="bannerMediaStudioClose" class="btn btn-outline btn-sm" aria-label="<?= __t('accessibility.close', 'Close') ?>">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <iframe id="bannerMediaStudioFrame"
+                class="media-studio-frame"
+                src="about:blank"
+                title="<?= __t('common.select_image', 'Select Image') ?>">
+        </iframe>
+    </div>
+</div>
 
 <!-- Expose globals -->
 <script type="text/javascript">

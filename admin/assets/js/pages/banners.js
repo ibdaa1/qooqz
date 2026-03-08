@@ -296,7 +296,7 @@
         state.editingId        = null;
         // reset image preview
         const preview = $('bannerImagePreview');
-        if (preview) preview.src = '/assets/images/no-image.png';
+        if (preview) { preview.src = ''; preview.style.display = 'none'; }
         const links = $('bannerImageLinks');
         if (links) links.innerHTML = '';
         // reset color inputs
@@ -362,18 +362,22 @@
 
     async function loadBannerImage(bannerId) {
         try {
-            const data = await apiGet(`${IMAGES_API}/by_owner?owner_id=${bannerId}&image_type_id=${IMAGE_TYPE_ID}`);
+            const data = await apiGet(`${IMAGES_API}/by_owner?owner_id=${encodeURIComponent(bannerId)}&image_type_id=${IMAGE_TYPE_ID}`);
             const images = Array.isArray(data) ? data : (data.data || []);
             if (images.length) {
                 const img = images[0];
                 state.selectedImageId = img.id;
                 const imgIdEl = $('bannerImageId');
                 if (imgIdEl) imgIdEl.value = img.id;
+                const url = img.url || img.thumb_url || '';
                 const preview = $('bannerImagePreview');
-                if (preview && img.url) preview.src = img.url;
+                if (preview && url) {
+                    preview.src = url;
+                    preview.style.display = 'block';
+                }
                 const links = $('bannerImageLinks');
-                if (links && img.url) {
-                    links.innerHTML = `<a href="${esc(img.url)}" target="_blank" style="font-size:0.8rem;color:var(--primary-color,#3b82f6);">View</a>`;
+                if (links && url) {
+                    links.innerHTML = `<a href="${esc(url)}" target="_blank" style="font-size:0.8rem;color:var(--primary-color,#3b82f6);">View</a>`;
                 }
             }
         } catch (_) { /* no image found, that's ok */ }
@@ -481,14 +485,28 @@
     }
 
     // ═══════════════════════════════════════════════════════
-    // IMAGE SELECT (Media Studio)
+    // IMAGE SELECT (Inline Media Studio iframe)
     // ═══════════════════════════════════════════════════════
     function openMediaStudio() {
-        const tenantId  = (window.APP_CONFIG && window.APP_CONFIG.TENANT_ID) || 1;
-        const ownerId   = state.editingId || 0;
-        const src       = `/admin/fragments/media_studio.php?embedded=1&tenant_id=${tenantId}&owner_id=${ownerId}&image_type_id=${IMAGE_TYPE_ID}&mode=select`;
-        const popup     = window.open(src, 'mediaStudio', 'width=900,height=650,scrollbars=yes,resizable=yes');
-        if (popup) popup.focus();
+        const tenantId = (window.APP_CONFIG && window.APP_CONFIG.TENANT_ID) || 1;
+        const ownerId  = state.editingId || 0;
+        const lang     = LANG || 'en';
+        const src      = `/admin/fragments/media_studio.php?embedded=1&tenant_id=${encodeURIComponent(tenantId)}&owner_id=${encodeURIComponent(ownerId)}&image_type_id=${IMAGE_TYPE_ID}&lang=${encodeURIComponent(lang)}&mode=select&limit=1`;
+
+        const overlay = $('bannerMediaStudioOverlay');
+        const frame   = $('bannerMediaStudioFrame');
+        if (!overlay || !frame) return;
+
+        frame.src = src;
+        overlay.style.display = 'flex';
+    }
+
+    function closeMediaStudio() {
+        const overlay = $('bannerMediaStudioOverlay');
+        const frame   = $('bannerMediaStudioFrame');
+        if (overlay) overlay.style.display = 'none';
+        // Reset src to stop any pending requests
+        if (frame) frame.src = 'about:blank';
     }
 
     function removeImage() {
@@ -496,25 +514,41 @@
         const imgIdEl  = $('bannerImageId');
         if (imgIdEl)  imgIdEl.value = '';
         const preview = $('bannerImagePreview');
-        if (preview)  preview.src = '/assets/images/no-image.png';
+        if (preview)  { preview.src = ''; preview.style.display = 'none'; }
         const links   = $('bannerImageLinks');
         if (links)    links.innerHTML = '';
     }
 
-    // Listen for media studio postMessage
-    window.addEventListener('message', function (ev) {
-        if (!ev.data || ev.data.type !== 'imageSelected') return;
-        const img = ev.data.image;
+    // Listen for media studio ImageStudio:selected CustomEvent (dispatched to window.parent)
+    window.addEventListener('ImageStudio:selected', function (ev) {
+        const img = ev.detail;
         if (!img) return;
-        state.selectedImageId = img.id;
+        // media_studio.js dispatches a single object when selectionLimit=1, but can dispatch
+        // an array when multi-select is allowed. We handle both defensively.
+        const selected = Array.isArray(img) ? img[0] : img;
+        if (!selected) return;
+
+        state.selectedImageId = selected.id;
         const imgIdEl = $('bannerImageId');
-        if (imgIdEl) imgIdEl.value = img.id;
+        if (imgIdEl) imgIdEl.value = selected.id;
+
+        const url = selected.url || selected.thumb_url || '';
         const preview = $('bannerImagePreview');
-        if (preview && img.url) preview.src = img.url;
-        const links = $('bannerImageLinks');
-        if (links && img.url) {
-            links.innerHTML = `<a href="${esc(img.url)}" target="_blank" style="font-size:0.8rem;color:var(--primary-color,#3b82f6);">View</a>`;
+        if (preview && url) {
+            preview.src = url;
+            preview.style.display = 'block';
         }
+
+        const links = $('bannerImageLinks');
+        if (links && url) {
+            links.innerHTML = `<a href="${esc(url)}" target="_blank" style="font-size:0.8rem;color:var(--primary-color,#3b82f6);">View</a>`;
+        }
+        closeMediaStudio();
+    });
+
+    // Listen for media studio close event
+    window.addEventListener('ImageStudio:close', function () {
+        closeMediaStudio();
     });
 
     // ═══════════════════════════════════════════════════════
@@ -552,6 +586,14 @@
     // ═══════════════════════════════════════════════════════
     // BIND UI EVENTS
     // ═══════════════════════════════════════════════════════
+    // Shared escape-key handler (hoisted outside bindEvents to avoid multiple registrations)
+    function handleEscapeKey(e) {
+        if (e.key === 'Escape') {
+            const overlay = $('bannerMediaStudioOverlay');
+            if (overlay && overlay.style.display !== 'none') closeMediaStudio();
+        }
+    }
+
     function bindEvents() {
         const addBtn      = $('btnAddBanner');
         const closeBtn    = $('btnCloseForm');
@@ -559,6 +601,8 @@
         const form        = $('bannerForm');
         const selectImgBtn = $('bannerSelectImageBtn');
         const removeImgBtn = $('bannerRemoveImageBtn');
+        const msCloseBtn  = $('bannerMediaStudioClose');
+        const msOverlay   = $('bannerMediaStudioOverlay');
 
         if (addBtn)       addBtn.addEventListener('click', openAddForm);
         if (closeBtn)     closeBtn.addEventListener('click', closeForm);
@@ -566,6 +610,18 @@
         if (form)         form.addEventListener('submit', handleFormSubmit);
         if (selectImgBtn) selectImgBtn.addEventListener('click', openMediaStudio);
         if (removeImgBtn) removeImgBtn.addEventListener('click', removeImage);
+        if (msCloseBtn)   msCloseBtn.addEventListener('click', closeMediaStudio);
+
+        // Click on overlay backdrop closes modal
+        if (msOverlay) {
+            msOverlay.addEventListener('click', function (e) {
+                if (e.target === msOverlay) closeMediaStudio();
+            });
+        }
+
+        // Escape key closes media studio modal (registered once via named function)
+        document.removeEventListener('keydown', handleEscapeKey);
+        document.addEventListener('keydown', handleEscapeKey);
 
         bindFilters();
     }
