@@ -105,4 +105,32 @@ $router->addRoute('GET', '/v1/public/categories/{id}/translations',
     $_publicMw
 );
 
+// ════════════════════════════════════════════════════════════
+// BRANDS  →  /v1/public/brands/*
+// ════════════════════════════════════════════════════════════
+
+// GET — قائمة الماركات
+$router->addRoute('GET', '/v1/public/brands',
+    'BrandsController@index',
+    $_publicMw
+);
+
+// GET — ماركة بالـ ID
+$router->addRoute('GET', '/v1/public/brands/{id}',
+    'BrandsController@show',
+    $_publicMw
+);
+
+// GET — ماركة بالـ slug
+$router->addRoute('GET', '/v1/public/brands/slug/{slug}',
+    'BrandsController@showBySlug',
+    $_publicMw
+);
+
+// GET — كل ترجمات الماركة
+$router->addRoute('GET', '/v1/public/brands/{id}/translations',
+    'BrandsController@translations',
+    $_publicMw
+);
+
 unset($_publicMw);

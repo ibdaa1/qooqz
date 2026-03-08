@@ -128,4 +128,26 @@ $router->addRoute('DELETE', '/v1/admin/categories/{id}',
     array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:20,60'])
 );
 
+// ════════════════════════════════════════════════════════════
+// BRANDS  →  /v1/admin/brands/*
+// ════════════════════════════════════════════════════════════
+
+// POST — إنشاء ماركة
+$router->addRoute('POST', '/v1/admin/brands',
+    'BrandsController@store',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
+);
+
+// PUT — تعديل ماركة
+$router->addRoute('PUT', '/v1/admin/brands/{id}',
+    'BrandsController@update',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
+);
+
+// DELETE — حذف ماركة
+$router->addRoute('DELETE', '/v1/admin/brands/{id}',
+    'BrandsController@destroy',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:20,60'])
+);
+
 unset($_authAdmin);
