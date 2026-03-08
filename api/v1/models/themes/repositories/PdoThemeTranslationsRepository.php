@@ -30,21 +30,17 @@ final class PdoThemeTranslationsRepository
     {
         $themeId  = (int)($data['theme_id'] ?? 0);
         $langCode = $data['language_code'] ?? '';
-        $tenantId = isset($data['tenant_id']) ? (int)$data['tenant_id'] : null;
+        $tenantId = isset($data['tenant_id']) ? (int)$data['tenant_id'] : 0;
 
         if (isset($data['id']) && $data['id']) {
             return $this->update((int)$data['id'], $data);
         }
 
         // Upsert: check existing by (theme_id, language_code, tenant_id)
-        $sql = "SELECT id FROM theme_translations WHERE theme_id = :theme_id AND language_code = :lang";
-        $p   = [':theme_id' => $themeId, ':lang' => $langCode];
-        if ($tenantId !== null) {
-            $sql .= " AND tenant_id = :tenant_id";
-            $p[':tenant_id'] = $tenantId;
-        }
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($p);
+        $stmt = $this->pdo->prepare(
+            "SELECT id FROM theme_translations WHERE theme_id = :theme_id AND language_code = :lang AND tenant_id = :tenant_id"
+        );
+        $stmt->execute([':theme_id' => $themeId, ':lang' => $langCode, ':tenant_id' => $tenantId]);
         $existingId = $stmt->fetchColumn();
 
         if ($existingId) {
@@ -63,7 +59,7 @@ final class PdoThemeTranslationsRepository
         $stmt->execute([
             ':theme_id'      => (int)($data['theme_id'] ?? 0),
             ':language_code' => $data['language_code'] ?? '',
-            ':tenant_id'     => isset($data['tenant_id']) ? (int)$data['tenant_id'] : null,
+            ':tenant_id'     => isset($data['tenant_id']) ? (int)$data['tenant_id'] : 0,
             ':name'          => $data['name'] ?? '',
             ':description'   => $data['description'] ?? null,
         ]);

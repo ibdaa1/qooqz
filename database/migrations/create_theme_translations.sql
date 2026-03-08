@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS `theme_translations` (
     `id`            INT UNSIGNED    NOT NULL AUTO_INCREMENT,
     `theme_id`      INT UNSIGNED    NOT NULL,
-    `tenant_id`     INT UNSIGNED    NULL,
+    `tenant_id`     INT UNSIGNED    NOT NULL DEFAULT 0,
     `language_code` VARCHAR(10)     NOT NULL,
     `name`          VARCHAR(255)    NOT NULL DEFAULT '',
     `description`   TEXT            NULL,

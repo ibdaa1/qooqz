@@ -252,12 +252,13 @@
     function openMediaStudio(target) {
         state._activeImageTarget = target;
         if (!el.mediaStudioFrame || !el.mediaStudioPanel) return;
-        const tenantId = TENANT_ID;
-        const lang = LANG;
-        el.mediaStudioFrame.src =
-            '/admin/fragments/media_studio.php?embedded=1&limit=1' +
-            '&tenant_id=' + encodeURIComponent(tenantId) +
-            '&lang=' + encodeURIComponent(lang);
+        const params = new URLSearchParams({
+            embedded: '1',
+            limit: '1',
+            tenant_id: String(TENANT_ID),
+            lang: LANG
+        });
+        el.mediaStudioFrame.src = '/admin/fragments/media_studio.php?' + params.toString();
         el.mediaStudioPanel.style.display = 'block';
         el.mediaStudioPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
@@ -370,7 +371,8 @@
 
         for (const [langCode, data] of Object.entries(translations)) {
             const existingEntry = existing.find(e => e.language_code === langCode);
-            const payload = { theme_id: themeId, language_code: langCode, tenant_id: TENANT_ID, ...data };
+            // Ensure tenant_id and base keys override any data keys
+            const payload = { ...data, theme_id: themeId, language_code: langCode, tenant_id: TENANT_ID };
             try {
                 if (existingEntry) {
                     await fetch(API.themeTranslations + '?id=' + existingEntry.id, {
@@ -602,7 +604,7 @@
             });
             const json = await res.json();
             if (json.success) {
-                const savedId = json.data?.id || parseInt(themeId) || null;
+                const savedId = json.data?.id || parseInt(themeId, 10) || null;
                 if (savedId) await saveThemeTranslations(savedId);
                 showAlert('success', t('theme_manager.messages.success.save', 'Theme saved successfully'));
                 await loadThemes();
