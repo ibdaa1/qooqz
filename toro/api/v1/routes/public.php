@@ -133,4 +133,54 @@ $router->addRoute('GET', '/v1/public/brands/{id}/translations',
     $_publicMw
 );
 
+// ════════════════════════════════════════════════════════════
+// ATTRIBUTES  →  /v1/public/attributes/*
+// ════════════════════════════════════════════════════════════
+
+// GET — قائمة السمات
+$router->addRoute('GET', '/v1/public/attributes',
+    'AttributesController@index',
+    $_publicMw
+);
+
+// GET — سمة بالـ ID
+$router->addRoute('GET', '/v1/public/attributes/{id}',
+    'AttributesController@show',
+    $_publicMw
+);
+
+// GET — سمة بالـ slug
+$router->addRoute('GET', '/v1/public/attributes/slug/{slug}',
+    'AttributesController@showBySlug',
+    $_publicMw
+);
+
+// GET — ترجمات السمة
+$router->addRoute('GET', '/v1/public/attributes/{id}/translations',
+    'AttributesController@translations',
+    $_publicMw
+);
+
+// GET — قيم السمة
+$router->addRoute('GET', '/v1/public/attributes/{id}/values',
+    'AttributesController@values',
+    $_publicMw
+);
+
+// ════════════════════════════════════════════════════════════
+// ATTRIBUTE VALUES  →  /v1/public/attribute-values/*
+// ════════════════════════════════════════════════════════════
+
+// GET — قيمة بالـ ID
+$router->addRoute('GET', '/v1/public/attribute-values/{id}',
+    'AttributeValuesController@show',
+    $_publicMw
+);
+
+// GET — ترجمات قيمة السمة
+$router->addRoute('GET', '/v1/public/attribute-values/{id}/translations',
+    'AttributeValuesController@translations',
+    $_publicMw
+);
+
 unset($_publicMw);

@@ -150,4 +150,48 @@ $router->addRoute('DELETE', '/v1/admin/brands/{id}',
     array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:20,60'])
 );
 
+// ════════════════════════════════════════════════════════════
+// ATTRIBUTES  →  /v1/admin/attributes/*
+// ════════════════════════════════════════════════════════════
+
+// POST — إنشاء سمة
+$router->addRoute('POST', '/v1/admin/attributes',
+    'AttributesController@store',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
+);
+
+// PUT — تعديل سمة
+$router->addRoute('PUT', '/v1/admin/attributes/{id}',
+    'AttributesController@update',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
+);
+
+// DELETE — حذف سمة
+$router->addRoute('DELETE', '/v1/admin/attributes/{id}',
+    'AttributesController@destroy',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:20,60'])
+);
+
+// ════════════════════════════════════════════════════════════
+// ATTRIBUTE VALUES  →  /v1/admin/attribute-values/*
+// ════════════════════════════════════════════════════════════
+
+// POST — إنشاء قيمة سمة
+$router->addRoute('POST', '/v1/admin/attribute-values',
+    'AttributeValuesController@store',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
+);
+
+// PUT — تعديل قيمة سمة
+$router->addRoute('PUT', '/v1/admin/attribute-values/{id}',
+    'AttributeValuesController@update',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:30,60'])
+);
+
+// DELETE — حذف قيمة سمة
+$router->addRoute('DELETE', '/v1/admin/attribute-values/{id}',
+    'AttributeValuesController@destroy',
+    array_merge($_authAdmin, ['V1\Middleware\ThrottleMiddleware:20,60'])
+);
+
 unset($_authAdmin);
