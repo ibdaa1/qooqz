@@ -422,6 +422,7 @@ if (!function_exists('renderFragmentThemeVars')) {
 
             <!-- Grid -->
             <div id="imageGridContainer" style="display:none;">
+                <div class="table-responsive">
                 <table class="data-table" id="imagesTable">
                     <thead>
                         <tr>
@@ -440,6 +441,7 @@ if (!function_exists('renderFragmentThemeVars')) {
                     </thead>
                     <tbody id="imageTableBody"></tbody>
                 </table>
+                </div>
             </div>
 
             <!-- Pagination -->

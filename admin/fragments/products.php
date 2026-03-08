@@ -824,10 +824,15 @@ if (!function_exists('renderFragmentThemeVars')) {
     </div>
 
     <!-- Media Studio Modal -->
-    <div id="prodMediaStudioModal" class="modal" style="display:none">
-        <div class="modal-content">
-            <span class="close" id="prodMediaStudioClose">&times;</span>
-            <iframe id="prodMediaStudioFrame" src="/admin/fragments/media_studio.php?embedded=1&tenant_id=<?= $tenantId ?>&lang=<?= $lang ?>" style="width:100%; height:75vh; min-height:400px; border:none; display:block;"></iframe>
+    <div id="prodMediaStudioModal" class="media-studio-overlay" style="display:none" role="dialog" aria-modal="true">
+        <div class="media-studio-container">
+            <div class="media-studio-header">
+                <h4><i class="fas fa-images" style="margin-inline-end:8px; color:var(--primary-color,#3b82f6);"></i><?= __t('common.select_image', 'استديو الصور') ?></h4>
+                <button type="button" id="prodMediaStudioClose" class="btn btn-outline btn-sm" aria-label="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <iframe id="prodMediaStudioFrame" class="media-studio-frame" src="about:blank" title="Media Studio"></iframe>
         </div>
     </div>
 
