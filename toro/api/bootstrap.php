@@ -68,30 +68,21 @@ require_once BASE_PATH . '/shared/config/constants.php';
 // ── 5. Config ─────────────────────────────────────────────────────────────────
 require_once BASE_PATH . '/shared/config/config.php';
 
-// ── 6. Database connection (singleton via shared/core/DatabaseConnection) ────
-//   Your existing DatabaseConnection.php is already in shared/core/ ✓
-//   We just warm it up here so it fails fast on misconfiguration.
-try {
-    \Shared\Core\DatabaseConnection::getInstance();
-} catch (\Throwable $e) {
-    http_response_code(503);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
-        'success' => false,
-        'code'    => 503,
-        'message' => 'Database unavailable',
-    ]);
-    exit;
-}
-
-// ── 7. Global exception / error handler ──────────────────────────────────────
+// ── 6. Global exception / error handler ──────────────────────────────────────
+//   Registered early so all downstream errors produce proper JSON responses.
 \Shared\Core\ExceptionHandler::register();
 
-// ── 8. CORS (defined in shared/config/cors.php) ───────────────────────────────
+// ── 7. CORS (defined in shared/config/cors.php) ───────────────────────────────
 require_once BASE_PATH . '/shared/config/cors.php';
 applyCorsHeaders();
 
-// ── 9. Detect request context and load appropriate bootstrap extension ────────
+// ── NOTE: Database connection is intentionally lazy ───────────────────────────
+//   DatabaseConnection::getInstance() is a singleton that connects on first use
+//   inside a route handler.  Eager warmup here would block EVERY request when
+//   the DB is temporarily unavailable.  Kernel::handle() already catches all
+//   Throwables and returns a proper JSON error response.
+
+// ── 8. Detect request context and load appropriate bootstrap extension ────────
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $requestPath = rtrim(str_replace('/toro/api', '', $requestPath), '/') ?: '/';
 
