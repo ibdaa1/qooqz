@@ -18,6 +18,7 @@
         themes: [],
         editingThemeId: null,
         i18n: {},
+        languages: [],
         // Related data for current theme
         designSettings: [],
         colorSettings: [],
@@ -25,7 +26,9 @@
         buttonStyles: [],
         cardStyles: [],
         homepageSections: [],
-        systemSettings: []
+        systemSettings: [],
+        // media studio
+        _activeImageTarget: null // 'thumbnail' | 'preview'
     };
 
     // DOM elements cache
@@ -40,6 +43,7 @@
         bindEvents();
         loadI18n();
         loadThemes();
+        loadLanguages();
     }
 
     function cacheElements() {
@@ -79,6 +83,20 @@
         el.cardStylesList = $('cardStylesList');
         el.homepageSectionsList = $('homepageSectionsList');
         el.systemSettingsList = $('systemSettingsList');
+        // Media studio (inline)
+        el.btnSelectThumbnail    = $('btnSelectThumbnail');
+        el.btnSelectPreview      = $('btnSelectPreview');
+        el.mediaStudioPanel      = $('themeMediaStudioPanel');
+        el.mediaStudioFrame      = $('themeMediaStudioFrame');
+        el.btnCloseMediaStudio   = $('btnCloseThemeMediaStudio');
+        el.thumbnailPreviewWrap  = $('thumbnailPreviewWrap');
+        el.thumbnailPreviewImg   = $('thumbnailPreviewImg');
+        el.previewUrlPreviewWrap = $('previewUrlPreviewWrap');
+        el.previewUrlPreviewImg  = $('previewUrlPreviewImg');
+        // Translations
+        el.translationPanels      = $('themeTranslationPanels');
+        el.themeLangSelect        = $('themeLangSelect');
+        el.btnAddThemeTranslation = $('btnAddThemeTranslation');
     }
 
     function bindEvents() {
@@ -115,6 +133,22 @@
         bindSettingsButtons('Card', 'card');
         bindSettingsButtons('Section', 'section');
         bindSettingsButtons('System', 'system');
+        // Media studio (inline)
+        if (el.btnSelectThumbnail) el.btnSelectThumbnail.onclick = () => openMediaStudio('thumbnail');
+        if (el.btnSelectPreview)   el.btnSelectPreview.onclick   = () => openMediaStudio('preview');
+        if (el.btnCloseMediaStudio) el.btnCloseMediaStudio.onclick = closeMediaStudio;
+        // Listen for image selected event from the media studio iframe
+        window.addEventListener('ImageStudio:selected', onImageSelected);
+        window.addEventListener('ImageStudio:close',    closeMediaStudio);
+        // Translations
+        if (el.btnAddThemeTranslation) el.btnAddThemeTranslation.onclick = addThemeTranslation;
+        // Sync thumbnail/preview URL input → preview img
+        if (el.themeThumbnailUrl) {
+            el.themeThumbnailUrl.addEventListener('input', () => updateImagePreview('thumbnail', el.themeThumbnailUrl.value));
+        }
+        if (el.themePreviewUrl) {
+            el.themePreviewUrl.addEventListener('input', () => updateImagePreview('preview', el.themePreviewUrl.value));
+        }
     }
 
     function bindSettingsButtons(name, prefix) {
@@ -189,6 +223,192 @@
             showAlert('error', t('theme_manager.messages.error.load_failed', 'Failed to load themes'));
         } finally {
             showLoading(false);
+        }
+    }
+
+    async function loadLanguages() {
+        if (!API.languages) return;
+        try {
+            const res = await fetch(API.languages + '?format=json');
+            const json = await res.json();
+            const items = extractItems(json);
+            state.languages = Array.isArray(items) ? items : (json.data?.items || []);
+            if (el.themeLangSelect) {
+                state.languages.forEach(lang => {
+                    const opt = document.createElement('option');
+                    opt.value = lang.code || lang.language_code || '';
+                    opt.textContent = (lang.name || lang.native_name || lang.code || '');
+                    el.themeLangSelect.appendChild(opt);
+                });
+            }
+        } catch (e) {
+            console.warn('[ThemesSystem] loadLanguages error:', e);
+        }
+    }
+
+    // ════════════════════════════════════════
+    // MEDIA STUDIO (inline panel)
+    // ════════════════════════════════════════
+    function openMediaStudio(target) {
+        state._activeImageTarget = target;
+        if (!el.mediaStudioFrame || !el.mediaStudioPanel) return;
+        const tenantId = TENANT_ID;
+        const lang = LANG;
+        el.mediaStudioFrame.src =
+            '/admin/fragments/media_studio.php?embedded=1&limit=1' +
+            '&tenant_id=' + encodeURIComponent(tenantId) +
+            '&lang=' + encodeURIComponent(lang);
+        el.mediaStudioPanel.style.display = 'block';
+        el.mediaStudioPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function closeMediaStudio() {
+        if (el.mediaStudioPanel) el.mediaStudioPanel.style.display = 'none';
+        if (el.mediaStudioFrame) el.mediaStudioFrame.src = '';
+        state._activeImageTarget = null;
+    }
+
+    function onImageSelected(e) {
+        const img = e.detail;
+        if (!img) return;
+        const url = img.url || img.thumb_url || img.path || '';
+        if (state._activeImageTarget === 'thumbnail') {
+            if (el.themeThumbnailUrl) el.themeThumbnailUrl.value = url;
+            updateImagePreview('thumbnail', url);
+        } else if (state._activeImageTarget === 'preview') {
+            if (el.themePreviewUrl) el.themePreviewUrl.value = url;
+            updateImagePreview('preview', url);
+        }
+        closeMediaStudio();
+    }
+
+    function updateImagePreview(target, url) {
+        if (target === 'thumbnail') {
+            if (el.thumbnailPreviewWrap && el.thumbnailPreviewImg) {
+                if (url) {
+                    el.thumbnailPreviewImg.src = url;
+                    el.thumbnailPreviewWrap.style.display = 'block';
+                } else {
+                    el.thumbnailPreviewWrap.style.display = 'none';
+                }
+            }
+        } else if (target === 'preview') {
+            if (el.previewUrlPreviewWrap && el.previewUrlPreviewImg) {
+                if (url) {
+                    el.previewUrlPreviewImg.src = url;
+                    el.previewUrlPreviewWrap.style.display = 'block';
+                } else {
+                    el.previewUrlPreviewWrap.style.display = 'none';
+                }
+            }
+        }
+    }
+
+    // ════════════════════════════════════════
+    // TRANSLATIONS
+    // ════════════════════════════════════════
+    function addThemeTranslation() {
+        const langCode = el.themeLangSelect?.value;
+        if (!langCode) return;
+        const langName = el.themeLangSelect.options[el.themeLangSelect.selectedIndex].textContent;
+        if (document.querySelector('[data-theme-lang="' + langCode + '"]')) {
+            showAlert('warning', t('theme_manager_settings.translations.already_added', 'Translation already added'));
+            return;
+        }
+        const panel = createThemeTranslationPanel(langCode, langName, {});
+        if (el.translationPanels) el.translationPanels.appendChild(panel);
+        el.themeLangSelect.value = '';
+    }
+
+    function createThemeTranslationPanel(langCode, langName, data) {
+        const panel = document.createElement('div');
+        panel.className = 'translation-panel';
+        panel.dataset.themeLang = langCode;
+        panel.style.cssText = 'border:1px solid var(--border-color,#334155);border-radius:8px;margin-bottom:12px;overflow:hidden;';
+        panel.innerHTML =
+            '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--card-bg,#081127);border-bottom:1px solid var(--border-color,#334155);">' +
+                '<h5 style="margin:0;color:var(--text-primary,#fff);"><i class="fas fa-language"></i> ' + escapeHtml(langName) + ' (' + escapeHtml(langCode) + ')</h5>' +
+                '<button type="button" class="btn btn-sm btn-danger" onclick="this.closest(\'[data-theme-lang]\').remove()">' +
+                    '<i class="fas fa-times"></i>' +
+                '</button>' +
+            '</div>' +
+            '<div style="padding:14px;">' +
+                '<div class="form-group">' +
+                    '<label data-i18n="theme_manager.form.fields.name.label">Name</label>' +
+                    '<input type="text" class="form-control theme-trans-name" data-lang="' + escapeHtml(langCode) + '" value="' + escapeHtml(data.name || '') + '">' +
+                '</div>' +
+                '<div class="form-group">' +
+                    '<label data-i18n="theme_manager.form.fields.description.label">Description</label>' +
+                    '<textarea class="form-control theme-trans-description" rows="3" data-lang="' + escapeHtml(langCode) + '">' + escapeHtml(data.description || '') + '</textarea>' +
+                '</div>' +
+            '</div>';
+        return panel;
+    }
+
+    function collectThemeTranslations() {
+        const translations = {};
+        document.querySelectorAll('[data-theme-lang]').forEach(panel => {
+            const lang = panel.dataset.themeLang;
+            const name = (panel.querySelector('.theme-trans-name')?.value || '').trim();
+            const description = (panel.querySelector('.theme-trans-description')?.value || '').trim();
+            if (name || description) translations[lang] = { name, description };
+        });
+        return translations;
+    }
+
+    async function saveThemeTranslations(themeId) {
+        if (!API.themeTranslations) return;
+        const translations = collectThemeTranslations();
+        if (!Object.keys(translations).length) return;
+
+        let existing = [];
+        try {
+            const r = await fetch(API.themeTranslations + '?theme_id=' + themeId + '&format=json');
+            const j = await r.json();
+            existing = extractItems(j);
+        } catch (e) { /* ignore */ }
+
+        for (const [langCode, data] of Object.entries(translations)) {
+            const existingEntry = existing.find(e => e.language_code === langCode);
+            const payload = { theme_id: themeId, language_code: langCode, tenant_id: TENANT_ID, ...data };
+            try {
+                if (existingEntry) {
+                    await fetch(API.themeTranslations + '?id=' + existingEntry.id, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ...payload, id: existingEntry.id })
+                    });
+                } else {
+                    await fetch(API.themeTranslations, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+            } catch (e) { console.warn('[ThemesSystem] saveThemeTranslations error:', e); }
+        }
+    }
+
+    async function loadThemeTranslations(themeId) {
+        if (!API.themeTranslations || !el.translationPanels) return;
+        el.translationPanels.innerHTML = '';
+        try {
+            const r = await fetch(API.themeTranslations + '?theme_id=' + themeId + '&format=json');
+            const j = await r.json();
+            const items = extractItems(j);
+            items.forEach(trans => {
+                const langCode = trans.language_code || trans.lang;
+                if (!langCode) return;
+                const langObj = state.languages.find(l => (l.code || l.language_code) === langCode);
+                const langName = langObj ? (langObj.name || langObj.native_name || langCode) : langCode;
+                const panel = createThemeTranslationPanel(langCode, langName, {
+                    name: trans.name || '',
+                    description: trans.description || ''
+                });
+                el.translationPanels.appendChild(panel);
+            });
+        } catch (e) {
+            console.warn('[ThemesSystem] loadThemeTranslations error:', e);
         }
     }
 
@@ -267,6 +487,14 @@
         if (el.themeIsActive) el.themeIsActive.value = '1';
         if (el.themeIsDefault) el.themeIsDefault.checked = false;
 
+        // Reset image previews
+        updateImagePreview('thumbnail', '');
+        updateImagePreview('preview', '');
+        closeMediaStudio();
+
+        // Reset translations panel
+        if (el.translationPanels) el.translationPanels.innerHTML = '';
+
         // Reset tabs to first
         document.querySelectorAll('.themes-page .form-tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.themes-page .tab-content').forEach(c => {
@@ -288,6 +516,7 @@
             if (el.btnDelete) el.btnDelete.style.display = 'inline-block';
             populateThemeForm(themeId);
             loadAllRelatedData(themeId);
+            loadThemeTranslations(themeId);
         } else {
             // Add mode
             if (el.formTitle) el.formTitle.textContent = t('theme_manager.form.add_title', 'Add Theme');
@@ -300,6 +529,7 @@
     }
 
     function hideForm() {
+        closeMediaStudio();
         if (el.formView) el.formView.style.display = 'none';
         if (el.listView) el.listView.style.display = 'block';
         state.editingThemeId = null;
@@ -318,6 +548,9 @@
         if (el.themePreviewUrl) el.themePreviewUrl.value = theme.preview_url || '';
         if (el.themeIsActive) el.themeIsActive.value = theme.is_active ? '1' : '0';
         if (el.themeIsDefault) el.themeIsDefault.checked = !!theme.is_default;
+        // Update image previews
+        updateImagePreview('thumbnail', theme.thumbnail_url || '');
+        updateImagePreview('preview', theme.preview_url || '');
     }
 
     // ════════════════════════════════════════
@@ -369,6 +602,8 @@
             });
             const json = await res.json();
             if (json.success) {
+                const savedId = json.data?.id || parseInt(themeId) || null;
+                if (savedId) await saveThemeTranslations(savedId);
                 showAlert('success', t('theme_manager.messages.success.save', 'Theme saved successfully'));
                 await loadThemes();
                 hideForm();
@@ -500,10 +735,14 @@
                           ' <span style="font-family:' + escapeHtml(item.font_family || '') + '">' + escapeHtml(item.font_family || '') + '</span>' +
                           ' <span class="badge badge-info">' + escapeHtml(item.category || '') + '</span>';
             } else if (type === 'button') {
-                display = '<strong>' + escapeHtml(item.name || '') + '</strong>' +
+                const btnBg     = escapeHtml(item.background_color || '#007bff');
+                const btnColor  = escapeHtml(item.text_color || '#ffffff');
+                const btnBorder = escapeHtml(item.border_color || 'transparent');
+                const btnRadius = escapeHtml((item.border_radius ? item.border_radius + 'px' : '4px'));
+                const btnPad    = escapeHtml(item.padding || '6px 14px');
+                display = '<span style="display:inline-block;padding:' + btnPad + ';background:' + btnBg + ';color:' + btnColor + ';border:1px solid ' + btnBorder + ';border-radius:' + btnRadius + ';font-size:0.8rem;font-weight:600;margin-right:8px;">' + escapeHtml(item.name || 'Button') + '</span>' +
                           ' <span class="badge badge-secondary">' + escapeHtml(item.button_type || '') + '</span>' +
-                          ' <span class="color-swatch" style="background:' + escapeHtml(item.background_color || '#007bff') + '"></span>' +
-                          ' <span class="color-swatch" style="background:' + escapeHtml(item.text_color || '#fff') + ';border:1px solid #ccc"></span>';
+                          ' <code style="font-size:0.75rem;">' + escapeHtml(item.slug || '') + '</code>';
             } else if (type === 'card') {
                 display = '<strong>' + escapeHtml(item.name || '') + '</strong>' +
                           ' <span class="badge badge-secondary">' + escapeHtml(item.card_type || '') + '</span>' +

@@ -54,39 +54,93 @@ if (!$canManage) {
 // ════════════════════════════════════════════════════════════
 if (!function_exists('renderFragmentThemeVars')) {
     function renderFragmentThemeVars(array $theme): void {
-        echo ':root {' . PHP_EOL;
+        $emitted = [];
+        $lines   = [':root {'];
+
+        $emit = function(string $k, string $v) use (&$emitted, &$lines): void {
+            $ke = htmlspecialchars($k, ENT_QUOTES);
+            $ve = htmlspecialchars($v, ENT_QUOTES);
+            $lines[]           = "    --{$ke}: {$ve};";
+            $emitted["--{$k}"] = $v;
+        };
+
         foreach ($theme['color_settings'] ?? [] as $c) {
             if (empty($c['setting_key']) || !isset($c['color_value'])) continue;
-            $k = htmlspecialchars($c['setting_key'], ENT_QUOTES);
-            $h = htmlspecialchars(str_replace('_', '-', $c['setting_key']), ENT_QUOTES);
-            $v = htmlspecialchars($c['color_value'], ENT_QUOTES);
-            echo "    --{$k}: {$v};" . PHP_EOL;
-            if ($h !== $k) echo "    --{$h}: {$v};" . PHP_EOL;
+            $k = $c['setting_key'];
+            $h = str_replace('_', '-', $k);
+            $v = $c['color_value'];
+            $emit($k, $v);
+            if ($h !== $k) $emit($h, $v);
         }
         foreach ($theme['font_settings'] ?? [] as $f) {
             if (empty($f['setting_key'])) continue;
-            $sk = htmlspecialchars($f['setting_key'], ENT_QUOTES);
-            $sh = htmlspecialchars(str_replace('_', '-', $f['setting_key']), ENT_QUOTES);
+            $sk = $f['setting_key'];
+            $sh = str_replace('_', '-', $sk);
             if (!empty($f['font_family'])) {
-                $ff = htmlspecialchars($f['font_family'], ENT_QUOTES);
-                echo "    --{$sk}-family: {$ff};" . PHP_EOL;
-                if ($sh !== $sk) echo "    --{$sh}-family: {$ff};" . PHP_EOL;
+                $emit("{$sk}-family", $f['font_family']);
+                if ($sh !== $sk) $emit("{$sh}-family", $f['font_family']);
             }
             if (!empty($f['font_size'])) {
-                $fs = htmlspecialchars($f['font_size'], ENT_QUOTES);
-                echo "    --{$sk}-size: {$fs};" . PHP_EOL;
-                if ($sh !== $sk) echo "    --{$sh}-size: {$fs};" . PHP_EOL;
+                $emit("{$sk}-size", $f['font_size']);
+                if ($sh !== $sk) $emit("{$sh}-size", $f['font_size']);
+            }
+            if (!empty($f['font_weight'])) {
+                $emit("{$sk}-weight", $f['font_weight']);
+                if ($sh !== $sk) $emit("{$sh}-weight", $f['font_weight']);
             }
         }
         foreach ($theme['design_settings'] ?? [] as $d) {
             if (empty($d['setting_key']) || !isset($d['setting_value'])) continue;
-            $dk = htmlspecialchars($d['setting_key'], ENT_QUOTES);
-            $dh = htmlspecialchars(str_replace('_', '-', $d['setting_key']), ENT_QUOTES);
-            $dv = htmlspecialchars($d['setting_value'], ENT_QUOTES);
-            echo "    --{$dk}: {$dv};" . PHP_EOL;
-            if ($dh !== $dk) echo "    --{$dh}: {$dv};" . PHP_EOL;
+            $dk = $d['setting_key'];
+            $dh = str_replace('_', '-', $dk);
+            $emit($dk, $d['setting_value']);
+            if ($dh !== $dk) $emit($dh, $d['setting_value']);
         }
-        echo '}' . PHP_EOL;
+        foreach ($theme['button_styles'] ?? [] as $b) {
+            if (empty($b['slug'])) continue;
+            $slug = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$b['slug']));
+            if (!empty($b['background_color'])) $emit("btn-{$slug}-bg",     $b['background_color']);
+            if (!empty($b['text_color']))        $emit("btn-{$slug}-color",  $b['text_color']);
+            if (!empty($b['border_color']))      $emit("btn-{$slug}-border", $b['border_color']);
+            if (!empty($b['border_radius']))     $emit("btn-{$slug}-radius", $b['border_radius'] . 'px');
+        }
+        foreach ($theme['card_styles'] ?? [] as $cs) {
+            if (empty($cs['slug'])) continue;
+            $slug = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$cs['slug']));
+            if (!empty($cs['background_color'])) $emit("card-{$slug}-bg",     $cs['background_color']);
+            if (!empty($cs['border_color']))      $emit("card-{$slug}-border", $cs['border_color']);
+            if (!empty($cs['border_radius']))     $emit("card-{$slug}-radius", $cs['border_radius'] . 'px');
+            if (!empty($cs['shadow_style']))      $emit("card-{$slug}-shadow", $cs['shadow_style']);
+        }
+
+        // Emit card_type-based aliases so that CSS selectors like --card-product-bg work
+        foreach ($theme['card_styles'] ?? [] as $cs) {
+            if (empty($cs['card_type'])) continue;
+            $type = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$cs['card_type']));
+            if (!empty($cs['background_color'])) $emit("card-{$type}-bg",     $cs['background_color']);
+            if (!empty($cs['border_color']))      $emit("card-{$type}-border", $cs['border_color']);
+            if (!empty($cs['border_radius']))     $emit("card-{$type}-radius", $cs['border_radius'] . 'px');
+            if (!empty($cs['shadow_style']))      $emit("card-{$type}-shadow", $cs['shadow_style']);
+        }
+
+        // Common alias defaults
+        $bgSec = $emitted['--background-secondary'] ?? $emitted['--background_secondary'] ?? null;
+        $aliasDefaults = [
+            '--card-bg'       => $emitted['--card-bg']      ?? $bgSec ?? '#081127',
+            '--input-bg'      => $emitted['--input-bg']     ?? $bgSec ?? '#0b1220',
+            '--thead-bg'      => $emitted['--thead-bg']     ?? $bgSec ?? '#061021',
+            '--danger-color'  => $emitted['--danger-color'] ?? $emitted['--error-color'] ?? '#ef4444',
+            '--success-color' => $emitted['--success-color'] ?? '#22c55e',
+        ];
+        foreach ($aliasDefaults as $cssVar => $val) {
+            if (!isset($emitted[$cssVar])) {
+                $lines[]           = '    ' . htmlspecialchars($cssVar, ENT_QUOTES) . ': ' . htmlspecialchars($val, ENT_QUOTES) . ';';
+                $emitted[$cssVar]  = $val;
+            }
+        }
+
+        $lines[] = '}';
+        echo implode(PHP_EOL, $lines) . PHP_EOL;
     }
 }
 ?>
@@ -121,7 +175,9 @@ window.THEMES_CONFIG = {
         buttonStyles: '/api/button_styles',
         cardStyles: '/api/card_styles',
         homepageSections: '/api/homepage_sections',
-        systemSettings: '/api/system_settings'
+        systemSettings: '/api/system_settings',
+        languages: '/api/languages',
+        themeTranslations: '/api/theme_translations'
     }
 };
 </script>
@@ -242,6 +298,9 @@ window.THEMES_CONFIG = {
             <button class="form-tab" data-tab="system">
                 <i class="fas fa-cogs"></i> <span data-i18n="tabs.system">System Settings</span>
             </button>
+            <button class="form-tab" data-tab="translations">
+                <i class="fas fa-language"></i> <span data-i18n="tabs.translations">Translations</span>
+            </button>
         </div>
 
         <!-- TAB: Theme Info -->
@@ -280,14 +339,44 @@ window.THEMES_CONFIG = {
                 <div class="form-row">
                     <div class="form-group">
                         <label for="themeThumbnailUrl" data-i18n="theme_manager.form.fields.thumbnail_url.label">Thumbnail URL</label>
-                        <input type="text" id="themeThumbnailUrl" class="form-control"
-                               data-i18n-placeholder="theme_manager.form.fields.thumbnail_url.placeholder">
+                        <div style="display:flex;gap:8px;align-items:flex-end;">
+                            <input type="text" id="themeThumbnailUrl" class="form-control"
+                                   data-i18n-placeholder="theme_manager.form.fields.thumbnail_url.placeholder">
+                            <button type="button" class="btn btn-secondary btn-sm" id="btnSelectThumbnail" style="white-space:nowrap;">
+                                <i class="fas fa-images"></i> <span data-i18n="theme_manager.form.fields.select_image">Select Image</span>
+                            </button>
+                        </div>
+                        <div id="thumbnailPreviewWrap" style="margin-top:6px;display:none;">
+                            <img id="thumbnailPreviewImg" src="" alt="" style="max-width:120px;max-height:80px;border-radius:6px;border:1px solid var(--border-color,#334155);">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="themePreviewUrl" data-i18n="theme_manager.form.fields.preview_url.label">Preview URL</label>
-                        <input type="text" id="themePreviewUrl" class="form-control"
-                               data-i18n-placeholder="theme_manager.form.fields.preview_url.placeholder">
+                        <div style="display:flex;gap:8px;align-items:flex-end;">
+                            <input type="text" id="themePreviewUrl" class="form-control"
+                                   data-i18n-placeholder="theme_manager.form.fields.preview_url.placeholder">
+                            <button type="button" class="btn btn-secondary btn-sm" id="btnSelectPreview" style="white-space:nowrap;">
+                                <i class="fas fa-images"></i> <span data-i18n="theme_manager.form.fields.select_image">Select Image</span>
+                            </button>
+                        </div>
+                        <div id="previewUrlPreviewWrap" style="margin-top:6px;display:none;">
+                            <img id="previewUrlPreviewImg" src="" alt="" style="max-width:120px;max-height:80px;border-radius:6px;border:1px solid var(--border-color,#334155);">
+                        </div>
                     </div>
+                </div>
+
+                <!-- Inline Media Studio Panel -->
+                <div id="themeMediaStudioPanel" style="display:none;margin-top:16px;border:1px solid var(--border-color,#334155);border-radius:8px;overflow:hidden;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--card-bg,#0d1b2e);border-bottom:1px solid var(--border-color,#334155);">
+                        <strong data-i18n="theme_manager.form.media_studio.title"><i class="fas fa-images"></i> Media Studio</strong>
+                        <button type="button" id="btnCloseThemeMediaStudio" class="btn btn-sm btn-secondary">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <iframe id="themeMediaStudioFrame"
+                            src=""
+                            style="width:100%;height:520px;border:none;display:block;"
+                            allow="same-origin"></iframe>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
@@ -719,7 +808,31 @@ window.THEMES_CONFIG = {
             </div>
         </div>
 
+        <!-- TAB: Translations -->
+        <div class="tab-content" id="tab-translations" style="display:none">
+            <div class="settings-header">
+                <h3 data-i18n="theme_manager_settings.translations.title">Translations</h3>
+            </div>
+            <div style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.25); border-radius:8px; padding:12px; margin-bottom:16px; font-size:0.85rem; color:var(--text-secondary,#94a3b8);">
+                <i class="fas fa-info-circle" style="color:#3b82f6;"></i>
+                Add translated <strong style="color:var(--text-primary,#fff);">name</strong> and <strong style="color:var(--text-primary,#fff);">description</strong> for any language.
+            </div>
+            <div id="themeTranslationPanels" class="translation-panels"></div>
+            <div class="form-group" style="margin-top:12px;">
+                <label for="themeLangSelect" data-i18n="theme_manager_settings.translations.select_lang">Select Language</label>
+                <div style="display:flex; gap:8px; align-items:flex-end;">
+                    <select id="themeLangSelect" class="form-control" style="flex:1;">
+                        <option value="" data-i18n="theme_manager_settings.translations.choose_lang">Choose language</option>
+                    </select>
+                    <button type="button" id="btnAddThemeTranslation" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> <span data-i18n="theme_manager_settings.translations.add_btn">Add Translation</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </div><!-- end themeFormView -->
+
 </div><!-- end themes-page -->
 
 <!-- ═══════════ INIT SCRIPTS ═══════════ -->
