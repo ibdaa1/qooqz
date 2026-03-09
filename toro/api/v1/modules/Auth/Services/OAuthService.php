@@ -12,7 +12,7 @@ final class OAuthService
 {
     /**
      * يُرجع profile موحد من أي provider
-     * ['uid', 'email', 'first_name', 'last_name', 'avatar']
+     * ['uid', 'email', 'first_name', 'last_name']
      */
     public function verify(string $provider, string $token): array
     {
@@ -51,7 +51,6 @@ final class OAuthService
             'email'      => strtolower($data['email']),
             'first_name' => $data['given_name']  ?? ($nameParts[0] ?? ''),
             'last_name'  => $data['family_name'] ?? ($nameParts[1] ?? ''),
-            'avatar'     => $data['picture']     ?? null,
         ];
     }
 
@@ -85,7 +84,6 @@ final class OAuthService
             'email'      => strtolower($data['email']),
             'first_name' => $data['first_name'] ?? '',
             'last_name'  => $data['last_name']  ?? '',
-            'avatar'     => $data['picture']['data']['url'] ?? null,
         ];
     }
 

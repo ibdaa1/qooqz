@@ -27,7 +27,7 @@ final class PdoAuthRepository implements AuthRepositoryInterface
     {
         $stmt = $this->pdo->prepare("
             SELECT u.id, u.first_name, u.last_name, u.email, u.phone,
-                   u.avatar, u.is_active, u.email_verified_at, u.created_at,
+                   u.is_active, u.email_verified_at, u.created_at,
                    r.slug as role_slug, r.name as role_name,
                    l.code as lang_code
             FROM users u

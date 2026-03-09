@@ -108,7 +108,7 @@ final class AuthService
     {
         // 1. تحقق من token مع مزود الخدمة
         $profile = $this->oauth->verify($dto->provider, $dto->token);
-        // profile: ['uid', 'email', 'first_name', 'last_name', 'avatar']
+        // profile: ['uid', 'email', 'first_name', 'last_name']
 
         // 2. ابحث عن social account موجود
         $social = $this->repo->findSocialAccount($dto->provider, $profile['uid']);
@@ -128,7 +128,6 @@ final class AuthService
                     'last_name'     => $profile['last_name'],
                     'email'         => $profile['email'],
                     'password_hash' => null,
-                    'avatar'        => $profile['avatar'] ?? null,
                     'language_id'   => $langId,
                     'role_id'       => 4,
                 ]);

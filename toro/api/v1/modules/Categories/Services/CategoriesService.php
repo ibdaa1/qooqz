@@ -66,7 +66,6 @@ final class CategoriesService
         $categoryId = $this->repo->create([
             'parent_id'  => $dto->parentId,
             'slug'       => $dto->slug,
-            'image'      => $dto->image,
             'sort_order' => $dto->sortOrder,
             'is_active'  => $dto->isActive,
         ]);
@@ -108,7 +107,6 @@ final class CategoriesService
         $updateData = array_filter([
             'slug'       => $dto->slug,
             'parent_id'  => $dto->parentId,
-            'image'      => $dto->image,
             'sort_order' => $dto->sortOrder,
             'is_active'  => $dto->isActive !== null ? (int)$dto->isActive : null,
         ], fn($v) => $v !== null);

@@ -21,7 +21,7 @@ final class PdoCategoriesRepository implements CategoriesRepositoryInterface
 
         $sql = "
             SELECT
-                c.id, c.parent_id, c.slug, c.image, c.sort_order, c.is_active,
+                c.id, c.parent_id, c.slug, c.sort_order, c.is_active,
                 c.created_at, c.updated_at,
                 ct.name, ct.description, ct.meta_title, ct.meta_desc,
                 l.code AS lang_code
@@ -90,7 +90,7 @@ final class PdoCategoriesRepository implements CategoriesRepositoryInterface
 
         $stmt = $this->pdo->prepare("
             SELECT
-                c.id, c.parent_id, c.slug, c.image, c.sort_order, c.is_active,
+                c.id, c.parent_id, c.slug, c.sort_order, c.is_active,
                 c.created_at, c.updated_at,
                 ct.name, ct.description, ct.meta_title, ct.meta_desc,
                 l.code AS lang_code
@@ -116,7 +116,7 @@ final class PdoCategoriesRepository implements CategoriesRepositoryInterface
 
         $stmt = $this->pdo->prepare("
             SELECT
-                c.id, c.parent_id, c.slug, c.image, c.sort_order, c.is_active,
+                c.id, c.parent_id, c.slug, c.sort_order, c.is_active,
                 c.created_at, c.updated_at,
                 ct.name, ct.description, ct.meta_title, ct.meta_desc,
                 l.code AS lang_code
@@ -139,13 +139,12 @@ final class PdoCategoriesRepository implements CategoriesRepositoryInterface
     public function create(array $data): int
     {
         $stmt = $this->pdo->prepare("
-            INSERT INTO categories (parent_id, slug, image, sort_order, is_active)
-            VALUES (:parent_id, :slug, :image, :sort_order, :is_active)
+            INSERT INTO categories (parent_id, slug, sort_order, is_active)
+            VALUES (:parent_id, :slug, :sort_order, :is_active)
         ");
         $stmt->execute([
             ':parent_id'  => $data['parent_id']  ?? null,
             ':slug'       => $data['slug'],
-            ':image'      => $data['image']       ?? null,
             ':sort_order' => $data['sort_order']  ?? 0,
             ':is_active'  => (int)($data['is_active'] ?? 1),
         ]);
@@ -157,7 +156,7 @@ final class PdoCategoriesRepository implements CategoriesRepositoryInterface
     {
         if (empty($data)) return false;
 
-        $allowed = ['parent_id', 'slug', 'image', 'sort_order', 'is_active'];
+        $allowed = ['parent_id', 'slug', 'sort_order', 'is_active'];
         $sets    = [];
         $params  = [':__id' => $id];
 
