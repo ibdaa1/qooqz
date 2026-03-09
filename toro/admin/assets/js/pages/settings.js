@@ -325,6 +325,4 @@
   };
 
   window.SettingsModule = SettingsModule;
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => SettingsModule.init());
-  else SettingsModule.init();
 })();

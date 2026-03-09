@@ -368,6 +368,4 @@
   };
 
   window.UsersModule = UsersModule;
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => UsersModule.init());
-  else UsersModule.init();
 })();
