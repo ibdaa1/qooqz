@@ -1,15 +1,17 @@
 <?php
+/**
+ * TORO Admin — includes/header.php
+ * Shared header, sidebar and top-bar for all admin pages.
+ *
+ * Expects $ADMIN_PAGE (string) and $ADMIN_TITLE (string) to be set by the caller.
+ * Loads translations from /toro/admin/languages/admin/{lang}.json
+ */
 declare(strict_types=1);
 
 if (php_sapi_name() === 'cli') return;
 
-// ════════════════════════════════════════════════════════════
-// SESSION
-// ════════════════════════════════════════════════════════════
-$sessionConfig = $_SERVER['DOCUMENT_ROOT'] . '/api/shared/config/session.php';
-if (file_exists($sessionConfig)) {
-    require_once $sessionConfig;
-} elseif (session_status() === PHP_SESSION_NONE) {
+// ── Session ───────────────────────────────────────────────────────────────────
+if (session_status() === PHP_SESSION_NONE) {
     session_start([
         'cookie_secure'   => !empty($_SERVER['HTTPS']),
         'cookie_httponly' => true,
@@ -18,349 +20,362 @@ if (file_exists($sessionConfig)) {
     ]);
 }
 
-// Block API access
-if (strpos($_SERVER['REQUEST_URI'] ?? '', '/api/') === 0) {
-    http_response_code(403);
-    exit('Direct access denied');
+// ── Language helpers ──────────────────────────────────────────────────────────
+$_adminLang = $_SESSION['lang'] ?? ($_GET['lang'] ?? 'ar');
+if ($_GET['lang'] ?? null) {
+    $_SESSION['lang'] = $_GET['lang'];
+    $_adminLang = $_GET['lang'];
+}
+$_adminDir = in_array($_adminLang, ['ar', 'fa', 'he', 'ur'], true) ? 'rtl' : 'ltr';
+
+$_i18nFile = __DIR__ . '/../languages/admin/' . $_adminLang . '.json';
+if (!file_exists($_i18nFile)) {
+    $_i18nFile = __DIR__ . '/../languages/admin/ar.json';
+}
+$_t = json_decode(file_get_contents($_i18nFile), true) ?? [];
+
+if (!function_exists('t')) {
+    function t(string $key, array $vars = []): string {
+        global $_t;
+        $val = $_t[$key] ?? $key;
+        foreach ($vars as $k => $v) {
+            $val = str_replace('{' . $k . '}', (string)$v, $val);
+        }
+        return htmlspecialchars($val, ENT_QUOTES, 'UTF-8');
+    }
 }
 
-// ════════════════════════════════════════════════════════════
-// LOAD BOOTSTRAP
-// ════════════════════════════════════════════════════════════
-$bootstrapPath = $_SERVER['DOCUMENT_ROOT'] . '/api/bootstrap_admin_ui.php';
-$bootstrapLoaded = false;
+$_brandName = $_t['brand'] ?? 'TORO';
+$_pageTitle = $ADMIN_TITLE ?? $_brandName;
 
-if (file_exists($bootstrapPath)) {
-    require_once $bootstrapPath;
-    $bootstrapLoaded = true;
-    error_log('[header.php] bootstrap_admin_ui loaded');
-} else {
-    error_log('[header.php] bootstrap_admin_ui NOT FOUND at: ' . $bootstrapPath);
-}
-
-// ════════════════════════════════════════════════════════════
-// EXTRACT PAYLOAD
-// ════════════════════════════════════════════════════════════
-$payload = $GLOBALS['ADMIN_UI'] ?? null;
-
-if (!$payload || !is_array($payload)) {
-    error_log('[header.php] ADMIN_UI empty, creating fallback');
-    
-    $payload = [
-        'user' => [
-            'id' => $_SESSION['user_id'] ?? 0,
-            'username' => $_SESSION['username'] ?? 'guest',
-            'email' => $_SESSION['email'] ?? null,
-            'roles' => $_SESSION['roles'] ?? [],
-            'permissions' => $_SESSION['permissions'] ?? [],
-            'avatar' => '/admin/assets/img/default-avatar.png',
-            'preferred_language' => $_SESSION['preferred_language'] ?? 'en',
-        ],
-        'lang' => $_SESSION['preferred_language'] ?? 'en',
-        'direction' => in_array($_SESSION['preferred_language'] ?? 'en', ['ar','fa','he','ur']) ? 'rtl' : 'ltr',
-        'csrf_token' => '',
-        'theme' => [
-            'color_settings' => [],
-            'font_settings' => [],
-            'design_settings' => [],
-            'button_styles' => [],
-            'card_styles' => [],
-            'generated_css' => '',
-        ],
-        'strings' => [],
-        'settings' => [],
-        'translation_path' => '/languages/admin/',
-    ];
-    
-    error_log('[header.php] Fallback ADMIN_UI created');
-} else {
-    error_log('[header.php] ADMIN_UI loaded successfully');
-}
-
-// ════════════════════════════════════════════════════════════
-// DETERMINE TRANSLATION PATH DYNAMICALLY
-// ════════════════════════════════════════════════════════════
-$currentUri = $_SERVER['REQUEST_URI'] ?? '';
-$translationPath = '/languages/admin/'; // Default
-
-// Define paths based on URI
-$translationPaths = [
-    '/users' => '/languages/Users/',
-    '/tenant_users' => '/languages/TenantUsers/',
-    '/dashboard' => '/languages/Dashboard/',
-    // Add more as needed
+// ── Sidebar navigation ────────────────────────────────────────────────────────
+$_navItems = [
+    ['key' => 'nav.dashboard',    'icon' => 'grid',          'href' => '/toro/admin/index.php',             'page' => 'index'],
+    ['key' => 'nav.images',       'icon' => 'image',         'href' => '/toro/admin/pages/images.php',      'page' => 'images'],
+    ['key' => 'nav.brands',       'icon' => 'tag',           'href' => '/toro/admin/pages/brands.php',      'page' => 'brands'],
+    ['key' => 'nav.categories',   'icon' => 'folder',        'href' => '/toro/admin/pages/categories.php',  'page' => 'categories'],
+    ['key' => 'nav.products',     'icon' => 'box',           'href' => '/toro/admin/pages/products.php',    'page' => 'products'],
+    ['key' => 'nav.attributes',   'icon' => 'sliders',       'href' => '/toro/admin/pages/attributes.php',  'page' => 'attributes'],
+    ['key' => 'nav.banners',      'icon' => 'layout',        'href' => '/toro/admin/pages/banners.php',     'page' => 'banners'],
+    ['key' => 'nav.orders',       'icon' => 'shopping-cart', 'href' => '/toro/admin/pages/orders.php',      'page' => 'orders'],
+    ['key' => 'nav.coupons',      'icon' => 'percent',       'href' => '/toro/admin/pages/coupons.php',     'page' => 'coupons'],
+    ['key' => 'nav.users',        'icon' => 'users',         'href' => '/toro/admin/pages/users.php',       'page' => 'users'],
+    ['key' => 'nav.menus',        'icon' => 'menu',          'href' => '/toro/admin/pages/menus.php',       'page' => 'menus'],
+    ['key' => 'nav.pages',        'icon' => 'file-text',     'href' => '/toro/admin/pages/pages.php',       'page' => 'pages'],
+    ['key' => 'nav.translations', 'icon' => 'globe',         'href' => '/toro/admin/pages/translations.php','page' => 'translations'],
+    ['key' => 'nav.settings',     'icon' => 'settings',      'href' => '/toro/admin/pages/settings.php',   'page' => 'settings'],
+    ['key' => 'nav.roles',        'icon' => 'shield',        'href' => '/toro/admin/pages/roles.php',       'page' => 'roles'],
+    ['key' => 'nav.audit_logs',   'icon' => 'file-text',     'href' => '/toro/admin/pages/audit_logs.php',  'page' => 'audit_logs'],
 ];
 
-foreach ($translationPaths as $path => $transPath) {
-    if (strpos($currentUri, $path) !== false) {
-        $translationPath = $transPath;
-        break;
-    }
-}
-
-$payload['translation_path'] = $translationPath;
-
-// ════════════════════════════════════════════════════════════
-// CSRF TOKEN
-// ════════════════════════════════════════════════════════════
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-$csrfToken = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
-$payload['csrf_token'] = $csrfToken;
-
-// ════════════════════════════════════════════════════════════
-// EXTRACT DATA
-// ════════════════════════════════════════════════════════════
-$user = $payload['user'] ?? [];
-$lang = $payload['lang'] ?? 'en';
-$dir = $payload['direction'] ?? 'ltr';
-$theme = $payload['theme'] ?? [];
-
-// ════════════════════════════════════════════════════════════
-// SAFE JSON
-// ════════════════════════════════════════════════════════════
-function safe_json($data): string {
-    $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP);
-    if ($json === false) {
-        error_log('[header.php] JSON encoding failed: ' . json_last_error_msg());
-        return '{}';
-    }
-    return $json;
-}
-
-$jsonPayload = safe_json($payload);
-
-// ════════════════════════════════════════════════════════════
-// EXTRACT LOGO
-// ════════════════════════════════════════════════════════════
-$logo = '';
-foreach ($theme['design_settings'] ?? [] as $d) {
-    if (($d['setting_key'] ?? '') === 'logo_url') {
-        $logo = $d['setting_value'] ?? '';
-        break;
-    }
-}
-
+$_currentPage = $ADMIN_PAGE ?? 'index';
+$_isRtl = ($_adminDir === 'rtl');
+$_sidePos = $_isRtl ? 'right' : 'left';
+$_marginSide = $_isRtl ? 'margin-right' : 'margin-left';
+$_translateOff = $_isRtl ? 'translateX(100%)' : 'translateX(-100%)';
+$_textAlign = $_isRtl ? 'right' : 'left';
 ?>
 <!DOCTYPE html>
-<html lang="<?= htmlspecialchars($lang) ?>" dir="<?= htmlspecialchars($dir) ?>">
+<html lang="<?= htmlspecialchars($_adminLang) ?>" dir="<?= $_adminDir ?>">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="csrf-token" content="<?= $csrfToken ?>">
-    <meta name="i18n-primary-file" content="<?= $translationPath . rawurlencode($lang) ?>.json">
-    
-    <title data-i18n="brand">Admin Panel</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><?= htmlspecialchars($_pageTitle) ?> — <?= htmlspecialchars($_brandName) ?></title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* ═══════════════════════════════════════════════════
+   TORO Admin – Design System  (v1)
+═══════════════════════════════════════════════════ */
+:root{
+  --clr-bg:#0f172a;--clr-surface:#1e293b;--clr-border:#334155;
+  --clr-primary:#6366f1;--clr-primary-h:#4f46e5;
+  --clr-danger:#ef4444;--clr-success:#22c55e;--clr-warning:#f59e0b;
+  --clr-text:#f1f5f9;--clr-muted:#94a3b8;--clr-sidebar:#1e293b;
+  --sidebar-w:256px;--topbar-h:56px;--radius:8px;
+  --shadow:0 4px 24px rgba(0,0,0,.35);--t:.2s ease;
+  --font-ar:'IBM Plex Sans Arabic',system-ui,sans-serif;
+  --font-en:'Inter',system-ui,sans-serif;
+}
+[dir=rtl]{font-family:var(--font-ar)}
+[dir=ltr]{font-family:var(--font-en)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--clr-bg);color:var(--clr-text)}
+a{color:inherit;text-decoration:none}
+button{cursor:pointer;font-family:inherit;font-size:inherit}
+img{max-width:100%}
 
-    <!-- Stylesheets -->
-    <link rel="stylesheet" href="/admin/assets/css/admin.css?v=<?= time() ?>">
-    <link rel="stylesheet" href="/admin/assets/css/admin-overrides.css?v=<?= time() ?>">
-    <link rel="stylesheet" href="/admin/assets/css/modal.css?v=<?= time() ?>">
-    <link rel="stylesheet" href="/admin/assets/css/color-slider.css?v=<?= time() ?>">
-    <link rel="stylesheet" href="/admin/assets/css/mobile-responsive.css?v=<?= time() ?>">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
-<!-- Admin Framework -->
-    <script src="/admin/assets/js/admin_framework.js?v=<?= time() ?>"></script>
-    <link rel="stylesheet" href="/admin/assets/css/admin_framework.css?v=<?= time() ?>">
-    <!-- Dynamic Theme CSS -->
-    <?php if (!empty($theme['generated_css'])): ?>
-    <style id="dynamic-theme-db">
-/* Generated CSS from AdminUiThemeLoader */
-<?= $theme['generated_css'] ?>
-    </style>
-    <?php endif; ?>
+/* Layout */
+.admin-layout{display:flex;min-height:100vh}
 
-    <!-- CSS Variables -->
-    <style id="dynamic-theme-vars">
-:root {
-<?php foreach ($theme['color_settings'] ?? [] as $c): ?>
-    --<?= htmlspecialchars($c['setting_key']) ?>: <?= htmlspecialchars($c['color_value']) ?>;
-<?php endforeach; ?>
-<?php foreach ($theme['font_settings'] ?? [] as $f): ?>
-<?php if (!empty($f['font_family'])): ?>
-    --<?= htmlspecialchars($f['setting_key']) ?>-family: <?= htmlspecialchars($f['font_family']) ?>;
-<?php endif; ?>
-<?php if (!empty($f['font_size'])): ?>
-    --<?= htmlspecialchars($f['setting_key']) ?>-size: <?= htmlspecialchars($f['font_size']) ?>;
-<?php endif; ?>
-<?php if (!empty($f['font_weight'])): ?>
-    --<?= htmlspecialchars($f['setting_key']) ?>-weight: <?= htmlspecialchars($f['font_weight']) ?>;
-<?php endif; ?>
-<?php endforeach; ?>
-<?php foreach ($theme['design_settings'] ?? [] as $d): ?>
-<?php if (!empty($d['setting_value'])): ?>
-    --<?= htmlspecialchars($d['setting_key']) ?>: <?= htmlspecialchars($d['setting_value']) ?>;
-<?php endif; ?>
-<?php endforeach; ?>
+/* Sidebar */
+.sidebar{
+  position:fixed;top:0;<?= $_sidePos ?>:0;
+  width:var(--sidebar-w);height:100vh;
+  background:var(--clr-sidebar);
+  border-<?= $_isRtl?'left':'right' ?>:1px solid var(--clr-border);
+  display:flex;flex-direction:column;overflow-y:auto;
+  z-index:200;transition:transform var(--t);
+}
+.sidebar.collapsed{transform:<?= $_translateOff ?>}
+.sidebar-brand{
+  display:flex;align-items:center;gap:.75rem;
+  padding:1.25rem 1.25rem 1rem;
+  border-bottom:1px solid var(--clr-border);
+  font-size:1.2rem;font-weight:700;color:var(--clr-primary);letter-spacing:.04em;
+}
+.sidebar-nav{padding:.5rem 0;flex:1}
+.sidebar-nav ul{list-style:none}
+.sidebar-nav li a{
+  display:flex;align-items:center;gap:.75rem;
+  padding:.6rem 1.25rem;
+  color:var(--clr-muted);font-size:.875rem;
+  transition:background var(--t),color var(--t);
+}
+.sidebar-nav li a:hover,.sidebar-nav li.active a{
+  background:rgba(99,102,241,.12);color:var(--clr-primary);
+}
+.sidebar-nav li.active a{font-weight:600}
+.sidebar-nav li a svg{flex-shrink:0;width:15px;height:15px}
+.sidebar-footer{
+  padding:.875rem 1.25rem;border-top:1px solid var(--clr-border);
+  font-size:.75rem;color:var(--clr-muted);
 }
 
-/* Apply theme immediately */
-body {
-    background: var(--background_main);
-    color: var(--text_primary);
+/* Main wrapper */
+.main-wrapper{
+  flex:1;<?= $_marginSide ?>:var(--sidebar-w);
+  display:flex;flex-direction:column;min-height:100vh;
+  transition:<?= $_marginSide ?> var(--t);
+}
+.main-wrapper.sidebar-hidden{<?= $_marginSide ?>:0}
+
+/* Topbar */
+.topbar{
+  position:sticky;top:0;height:var(--topbar-h);
+  background:var(--clr-surface);border-bottom:1px solid var(--clr-border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 1.25rem;z-index:100;gap:1rem;
+}
+.topbar-left,.topbar-right{display:flex;align-items:center;gap:.75rem}
+.btn-icon{
+  background:none;border:none;color:var(--clr-muted);
+  padding:.375rem;border-radius:var(--radius);
+  display:flex;align-items:center;transition:color var(--t),background var(--t);
+}
+.btn-icon:hover{color:var(--clr-text);background:rgba(255,255,255,.06)}
+.topbar-search{
+  background:var(--clr-bg);border:1px solid var(--clr-border);
+  border-radius:var(--radius);color:var(--clr-text);
+  padding:.35rem .75rem;width:200px;font-size:.875rem;
+  outline:none;transition:border-color var(--t);font-family:inherit;
+}
+.topbar-search:focus{border-color:var(--clr-primary)}
+.topbar-search::placeholder{color:var(--clr-muted)}
+.topbar-page-title{font-weight:600;font-size:.9375rem}
+.topbar-avatar{
+  width:30px;height:30px;border-radius:50%;background:var(--clr-primary);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.75rem;font-weight:700;color:#fff;flex-shrink:0;
+}
+.lang-btn{
+  font-size:.7rem;font-weight:700;padding:.25rem .45rem;
+  border:1px solid var(--clr-border);border-radius:4px;
+  color:var(--clr-muted);background:none;transition:all var(--t);
+}
+.lang-btn:hover,.lang-btn.active{border-color:var(--clr-primary);color:var(--clr-primary)}
+
+/* Page content */
+.page-content{
+  flex:1;padding:1.5rem 1.75rem;
+  max-width:1440px;width:100%;
 }
 
-.admin-header {
-    background: var(--header_background, var(--sidebar_background));
-    color: var(--header_text, var(--sidebar_text));
+/* Card */
+.card{background:var(--clr-surface);border:1px solid var(--clr-border);border-radius:var(--radius);padding:1.5rem;margin-bottom:1.5rem}
+.card-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:1.25rem;padding-bottom:.875rem;border-bottom:1px solid var(--clr-border);
 }
+.card-title{font-size:1rem;font-weight:600}
 
-.admin-sidebar {
-    background: var(--sidebar_background);
-    color: var(--sidebar_text);
+/* Buttons */
+.btn{
+  display:inline-flex;align-items:center;gap:.45rem;
+  padding:.5rem 1rem;border-radius:var(--radius);border:1px solid transparent;
+  font-weight:500;font-size:.875rem;transition:all var(--t);
+  white-space:nowrap;line-height:1.4;font-family:inherit;
 }
-    </style>
+.btn-primary{background:var(--clr-primary);color:#fff}
+.btn-primary:hover{background:var(--clr-primary-h)}
+.btn-danger{background:var(--clr-danger);color:#fff}
+.btn-danger:hover{opacity:.88}
+.btn-success{background:var(--clr-success);color:#fff}
+.btn-outline{background:transparent;border-color:var(--clr-border);color:var(--clr-text)}
+.btn-outline:hover{background:rgba(255,255,255,.06)}
+.btn-sm{padding:.3rem .625rem;font-size:.8125rem}
+.btn-xs{padding:.2rem .45rem;font-size:.75rem}
 
-    <!-- Load Google Fonts -->
-    <?php 
-    $loadedFonts = [];
-    foreach ($theme['font_settings'] ?? [] as $f): 
-        if (empty($f['font_family'])) continue;
-        
-        // Extract primary font name and remove quotes
-        $fontFamilyParts = explode(',', $f['font_family']);
-        $primaryFont = trim($fontFamilyParts[0]);
-        $primaryFont = str_replace(['"', "'"], '', $primaryFont);
-        
-        if (preg_match('/system|arial|verdana|sans-serif|serif|monospace/i', $primaryFont)) continue;
-        if (in_array($primaryFont, $loadedFonts)) continue;
-        $loadedFonts[] = $primaryFont;
-    ?>
-    <?php if (!empty($f['font_url'])): ?>
-    <link rel="stylesheet" href="<?= htmlspecialchars($f['font_url']) ?>">
-    <?php else: ?>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=<?= urlencode($primaryFont) ?>:wght@300;400;500;600;700&display=swap">
-    <?php endif; ?>
-    <?php endforeach; ?>
+/* Table */
+.table-responsive{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--clr-border)}
+.table{width:100%;border-collapse:collapse;font-size:.875rem}
+.table th,.table td{
+  padding:.75rem 1rem;text-align:<?= $_textAlign ?>;
+  border-bottom:1px solid var(--clr-border);
+}
+.table th{
+  color:var(--clr-muted);font-weight:600;font-size:.75rem;
+  text-transform:uppercase;letter-spacing:.04em;
+  background:rgba(0,0,0,.15);
+}
+.table tbody tr:last-child td{border-bottom:none}
+.table tbody tr:hover{background:rgba(255,255,255,.03)}
+.table-actions{display:flex;gap:.4rem;align-items:center}
 
-    <!-- Inject ADMIN_UI -->
-    <script id="admin-ui-injection">
-(function() {
-    'use strict';
-    
-    window.ADMIN_UI = <?= $jsonPayload ?>;
-    window.ADMIN_LANG = '<?= $lang ?>';
-    window.ADMIN_DIR = '<?= $dir ?>';
-    window.CSRF_TOKEN = '<?= $csrfToken ?>';
-    window.ADMIN_USER = window.ADMIN_UI.user || {};
+/* Form */
+.form-group{margin-bottom:1rem}
+.form-label{display:block;margin-bottom:.35rem;font-size:.8125rem;color:var(--clr-muted);font-weight:500}
+.form-control{
+  width:100%;background:var(--clr-bg);border:1px solid var(--clr-border);
+  border-radius:var(--radius);color:var(--clr-text);
+  padding:.5rem .75rem;font-size:.875rem;font-family:inherit;
+  outline:none;transition:border-color var(--t);
+}
+.form-control:focus{border-color:var(--clr-primary)}
+.form-control::placeholder{color:var(--clr-muted)}
+select.form-control{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:<?= $_isRtl?'left .75rem center':'right .75rem center' ?>;
+  padding-<?= $_isRtl?'left':'right' ?>:2rem;
+}
+textarea.form-control{resize:vertical;min-height:90px}
+.form-check{display:flex;align-items:center;gap:.5rem}
+.form-check input[type=checkbox]{width:16px;height:16px;accent-color:var(--clr-primary)}
 
-    document.documentElement.lang = window.ADMIN_LANG;
-    document.documentElement.dir = window.ADMIN_DIR;
+.form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem}
+@media(max-width:768px){.form-grid-2,.form-grid-3{grid-template-columns:1fr}}
 
-    console.log('%c════════════════════════════════════', 'color: #3B82F6');
-    console.log('%c✓ ADMIN UI Loaded', 'color: #10B981; font-weight: bold');
-    console.log('%c════════════════════════════════════', 'color: #3B82F6');
-    console.log('Language:', window.ADMIN_LANG);
-    console.log('Direction:', window.ADMIN_DIR);
-    console.log('Translation Path:', window.ADMIN_UI.translation_path);
-    console.log('User:', window.ADMIN_USER.username);
-    console.log('Theme colors:', window.ADMIN_UI?.theme?.color_settings?.length || 0);
-    console.log('Bootstrap loaded:', <?= $bootstrapLoaded ? 'true' : 'false' ?>);
-})();
-    </script>
+/* Badge */
+.badge{display:inline-block;padding:.2rem .55rem;border-radius:999px;font-size:.7rem;font-weight:600}
+.badge-success{background:rgba(34,197,94,.15);color:var(--clr-success)}
+.badge-danger{background:rgba(239,68,68,.15);color:var(--clr-danger)}
+.badge-warning{background:rgba(245,158,11,.15);color:var(--clr-warning)}
 
-    <!-- Core JS -->
-    <script src="/admin/assets/js/admin_core.js" defer></script>
-    <script src="/admin/assets/js/sidebar-toggle.js" defer></script>
-    <script src="/admin/assets/js/modal.js" defer></script>
+/* Image thumb */
+.img-thumb{width:42px;height:42px;object-fit:cover;border-radius:6px;border:1px solid var(--clr-border);background:var(--clr-bg)}
+.img-thumb-lg{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--clr-border)}
+
+/* Alert */
+.alert{padding:.75rem 1rem;border-radius:var(--radius);margin-bottom:1rem;font-size:.875rem}
+.alert-success{background:rgba(34,197,94,.1);border:1px solid var(--clr-success);color:var(--clr-success)}
+.alert-danger{background:rgba(239,68,68,.1);border:1px solid var(--clr-danger);color:var(--clr-danger)}
+
+/* Modal */
+.modal-backdrop{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.65);z-index:900;
+  align-items:center;justify-content:center;
+}
+.modal-backdrop.open{display:flex}
+.modal{
+  background:var(--clr-surface);border:1px solid var(--clr-border);
+  border-radius:var(--radius);padding:1.5rem;
+  width:100%;max-width:600px;max-height:90vh;overflow-y:auto;
+  box-shadow:var(--shadow);
+}
+.modal-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:1.25rem;padding-bottom:.875rem;border-bottom:1px solid var(--clr-border);
+}
+.modal-title{font-size:1rem;font-weight:600}
+
+/* Page header */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem}
+.page-header h1{font-size:1.375rem;font-weight:700}
+
+/* Helpers */
+.d-flex{display:flex}.gap-2{gap:.5rem}.gap-3{gap:.75rem}
+.align-center{align-items:center}.justify-between{justify-content:space-between}
+.text-muted{color:var(--clr-muted);font-size:.875rem}
+.text-danger{color:var(--clr-danger)}
+.text-success{color:var(--clr-success)}
+.ms-auto{margin-<?= $_isRtl?'right':'left' ?>:auto}
+.mt-1{margin-top:.25rem}.mt-2{margin-top:.5rem}.mb-2{margin-bottom:.5rem}.mb-3{margin-bottom:.75rem}
+.p-2{padding:.5rem}.fw-600{font-weight:600}
+
+/* Drop zone */
+.drop-zone{
+  border:2px dashed var(--clr-border);border-radius:var(--radius);
+  padding:2rem;text-align:center;color:var(--clr-muted);
+  transition:border-color var(--t),background var(--t);cursor:pointer;
+}
+.drop-zone:hover,.drop-zone.over{border-color:var(--clr-primary);background:rgba(99,102,241,.04)}
+
+/* Spinner */
+.spinner{
+  display:inline-block;width:18px;height:18px;
+  border:2px solid var(--clr-border);border-top-color:var(--clr-primary);
+  border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media(max-width:1024px){
+  .sidebar{transform:<?= $_translateOff ?>}
+  .sidebar.open{transform:translateX(0)}
+  .main-wrapper{<?= $_marginSide ?>:0}
+}
+</style>
 </head>
-<body class="admin">
-
-<!-- ════════════════════════════════════════════════════════════
-     HEADER
-     ════════════════════════════════════════════════════════════ -->
-<header class="admin-header" role="banner">
-    <div class="header-left">
-        <button id="sidebarToggle" 
-                class="icon-btn" 
-                type="button"
-                aria-controls="adminSidebar" 
-                aria-expanded="false"
-                data-i18n-aria-label="toggle_sidebar">
-            <i class="fas fa-bars"></i>
-        </button>
-        <a class="brand" href="/admin/">
-            <?php if ($logo && (file_exists($_SERVER['DOCUMENT_ROOT'] . $logo) || filter_var($logo, FILTER_VALIDATE_URL))): ?>
-                <img src="<?= htmlspecialchars($logo) ?>" 
-                     alt="Logo" 
-                     class="brand-logo" 
-                     width="140" 
-                     height="40" 
-                     loading="eager">
-            <?php else: ?>
-                <span class="brand-text" data-i18n="brand">Admin Panel</span>
-            <?php endif; ?>
-        </a>
-    </div>
-
-    <div class="header-center">
-        <div class="search-wrap">
-            <input id="adminSearch" 
-                   type="search" 
-                   placeholder="Search..."
-                   data-i18n-placeholder="search_placeholder"
-                   autocomplete="off">
-            <button id="searchBtn" 
-                    class="icon-btn" 
-                    type="button">
-                <i class="fas fa-search"></i>
-            </button>
-        </div>
-    </div>
-
-    <div class="header-right">
-        <button id="notifBtn" 
-                class="icon-btn" 
-                type="button"
-                data-i18n-aria-label="notifications">
-            <i class="fas fa-bell"></i>
-            <span id="notifCount" class="badge" style="display:none;">0</span>
-        </button>
-
-        <div class="user-menu">
-            <a href="/admin/profile.php" class="user-link">
-                <img class="avatar" 
-                     src="<?= htmlspecialchars($user['avatar'] ?? '/admin/assets/img/default-avatar.png') ?>" 
-                     alt="<?= htmlspecialchars($user['username'] ?? 'User') ?>" 
-                     width="36" 
-                     height="36" 
-                     loading="lazy"
-                     onerror="this.src='/admin/assets/img/default-avatar.png'">
-            </a>
-            <div class="user-info">
-                <div class="username"><?= htmlspecialchars($user['username'] ?? 'Guest') ?></div>
-                <div class="user-role"><?= htmlspecialchars($user['roles'][0] ?? 'User') ?></div>
-            </div>
-            <form method="POST" action="/admin/logout.php" style="display:inline;">
-                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-                <button type="submit" 
-                        class="btn-logout"
-                        data-i18n-aria-label="logout">
-                    <i class="fas fa-sign-out-alt"></i>
-                </button>
-            </form>
-        </div>
-    </div>
-</header>
-
-<!-- ════════════════════════════════════════════════════════════
-     LAYOUT
-     ════════════════════════════════════════════════════════════ -->
+<body>
 <div class="admin-layout">
-    <aside id="adminSidebar" 
-           class="admin-sidebar" 
-           role="navigation">
-        <?php
-        $menuFile = __DIR__ . '/menu.php';
-        if (is_readable($menuFile)) {
-            include $menuFile;
-        } else {
-            echo '<p style="padding:1rem; color:rgba(255,255,255,0.7);" data-i18n="menu_unavailable">Menu not available</p>';
-        }
-        ?>
-    </aside>
 
-    <div class="sidebar-backdrop" aria-hidden="true"></div>
+<!-- ══ SIDEBAR ══════════════════════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <?= htmlspecialchars($_brandName) ?>
+  </div>
+  <nav class="sidebar-nav">
+    <ul>
+<?php foreach ($_navItems as $_item): ?>
+      <li class="<?= ($_currentPage === $_item['page'] ? 'active' : '') ?>">
+        <a href="<?= htmlspecialchars($_item['href']) ?>">
+          <svg data-feather="<?= htmlspecialchars($_item['icon']) ?>"></svg>
+          <?= t($_item['key']) ?>
+        </a>
+      </li>
+<?php endforeach; ?>
+    </ul>
+  </nav>
+  <div class="sidebar-footer"><?= htmlspecialchars($_brandName) ?> Admin v1</div>
+</aside>
 
-    <main id="adminMainContent" class="admin-main" role="main">
+<!-- ══ MAIN WRAPPER ═════════════════════════════════════════ -->
+<div class="main-wrapper" id="mainWrapper">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="btn-icon" id="sidebarToggle" title="<?= t('toggle_sidebar') ?>">
+        <svg data-feather="menu"></svg>
+      </button>
+      <span class="topbar-page-title"><?= htmlspecialchars($_pageTitle) ?></span>
+    </div>
+    <div class="topbar-right">
+      <input type="search" class="topbar-search" id="globalSearch" placeholder="<?= t('search_placeholder') ?>">
+      <button class="btn-icon" title="<?= t('nav.notifications') ?>">
+        <svg data-feather="bell"></svg>
+      </button>
+      <a href="?lang=ar" class="lang-btn <?= ($_adminLang==='ar'?'active':'') ?>">AR</a>
+      <a href="?lang=en" class="lang-btn <?= ($_adminLang==='en'?'active':'') ?>">EN</a>
+      <div class="topbar-avatar"><?= strtoupper(substr((string)($_SESSION['user_name'] ?? 'A'), 0, 1)) ?></div>
+      <a href="/toro/admin/logout.php" class="btn-icon" title="<?= t('logout') ?>">
+        <svg data-feather="log-out"></svg>
+      </a>
+    </div>
+  </header>
+
+  <!-- Page content (closed by footer.php) -->
+  <main class="page-content">

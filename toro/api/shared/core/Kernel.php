@@ -57,36 +57,35 @@ class Kernel
 
     private function loadRoutes(): void
     {
-        $context = defined('REQUEST_CONTEXT') ? REQUEST_CONTEXT : 'public';
-        $router  = $this; // pass to route files
+        $router = $this; // exposed to every route file via closure scope
 
-        $routeFiles = [
-            BASE_PATH . '/v1/routes/auth.php',
-            BASE_PATH . '/v1/routes/users.php',
-            BASE_PATH . '/v1/routes/products.php',
-            BASE_PATH . '/v1/routes/categories.php',
-            BASE_PATH . '/v1/routes/orders.php',
-            BASE_PATH . '/v1/routes/payments.php',
-            BASE_PATH . '/v1/routes/cart.php',
-            BASE_PATH . '/v1/routes/menus.php',
-            BASE_PATH . '/v1/routes/banners.php',
-            BASE_PATH . '/v1/routes/pages.php',
-            BASE_PATH . '/v1/routes/translations.php',
-            BASE_PATH . '/v1/routes/settings.php',
-            BASE_PATH . '/v1/routes/theme.php',
-            BASE_PATH . '/v1/routes/languages.php',
-        ];
+        $routesDir = BASE_PATH . '/v1/routes';
 
-        // Admin routes (/v1/admin/*) — always loaded; auth enforced per-route
-        $routeFiles[] = BASE_PATH . '/v1/routes/admin.php';
+        // 1. Load all module route files alphabetically (excludes admin.php, public.php, v1.php)
+        $moduleFiles = glob($routesDir . '/*.php') ?: [];
+        sort($moduleFiles);
 
-        // Public routes (/v1/public/*) — always loaded; no auth required
-        $routeFiles[] = BASE_PATH . '/v1/routes/public.php';
+        $alwaysLast = ['admin.php', 'public.php'];
 
-        foreach ($routeFiles as $file) {
-            if (file_exists($file)) {
-                require_once $file;
+        foreach ($moduleFiles as $file) {
+            $basename = basename($file);
+            // skip debug helper and the two aggregator files — loaded below in order
+            if ($basename === 'v1.php' || in_array($basename, $alwaysLast, true)) {
+                continue;
             }
+            require_once $file;
+        }
+
+        // 2. Admin aggregate (/v1/admin/*) — must come after module files
+        $adminFile = $routesDir . '/admin.php';
+        if (file_exists($adminFile)) {
+            require_once $adminFile;
+        }
+
+        // 3. Public aggregate (/v1/public/*) — must come last
+        $publicFile = $routesDir . '/public.php';
+        if (file_exists($publicFile)) {
+            require_once $publicFile;
         }
     }
 
