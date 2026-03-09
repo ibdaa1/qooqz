@@ -50,6 +50,16 @@ if (str_starts_with($_uri, '/toro/api/')) return;
       sidebar.classList.remove('open');
     }
   });
+
+  // PWA — register service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/toro/admin/sw.js', {scope: '/toro/admin/'})
+    .catch(function(err){
+        if (typeof console !== 'undefined') {
+            console.warn('[TORO SW] Registration failed:', err);
+        }
+    });
+  }
 })();
 </script>
 <?php if (isset($ADMIN_EXTRA_JS)) echo $ADMIN_EXTRA_JS; ?>

@@ -3,8 +3,10 @@
  * TORO Admin — includes/header.php
  * Shared header, sidebar and top-bar for all admin pages.
  *
- * Expects $ADMIN_PAGE (string) and $ADMIN_TITLE (string) to be set by the caller.
- * Loads translations from /toro/admin/languages/admin/{lang}.json
+ * Expects $ADMIN_PAGE (string) and $ADMIN_TITLE (string) to be set by caller.
+ * Everything visual (colors, sizes) comes from the database at runtime.
+ * Sidebar menu items come from the `menus` table (slug: admin-sidebar), with
+ * fallback to a hardcoded list when the menu row doesn't exist yet.
  */
 declare(strict_types=1);
 
@@ -19,6 +21,9 @@ if (session_status() === PHP_SESSION_NONE) {
         'use_strict_mode' => true,
     ]);
 }
+
+// ── DB helpers (theme / settings / menus from DB) ────────────────────────────
+require_once __DIR__ . '/db_helpers.php';
 
 // ── Language helpers ──────────────────────────────────────────────────────────
 $_adminLang = $_SESSION['lang'] ?? ($_GET['lang'] ?? 'ar');
@@ -45,48 +50,75 @@ if (!function_exists('t')) {
     }
 }
 
-$_brandName = $_t['brand'] ?? 'TORO';
-$_pageTitle = $ADMIN_TITLE ?? $_brandName;
+// ── Fetch everything from DB (graceful degradation on DB failure) ─────────────
+$_dbSettings   = adminGetSettings();         // ['site_name' => 'TORO', ...]
+$_dbThemeCss   = adminGetThemeCss();         // ':root { --clr-primary: ... }'
+$_dbSizesCss   = adminGetThemeSizes();       // ':root { --font-size-base: ... }'
+$_dbMenuItems  = adminGetMenuItems('admin-sidebar', $_adminLang);
 
-// ── Sidebar navigation ────────────────────────────────────────────────────────
-$_navItems = [
-    ['key' => 'nav.dashboard',    'icon' => 'grid',          'href' => '/toro/admin/index.php',             'page' => 'index'],
-    ['key' => 'nav.images',       'icon' => 'image',         'href' => '/toro/admin/pages/images.php',      'page' => 'images'],
-    ['key' => 'nav.brands',       'icon' => 'tag',           'href' => '/toro/admin/pages/brands.php',      'page' => 'brands'],
-    ['key' => 'nav.categories',   'icon' => 'folder',        'href' => '/toro/admin/pages/categories.php',  'page' => 'categories'],
-    ['key' => 'nav.products',     'icon' => 'box',           'href' => '/toro/admin/pages/products.php',    'page' => 'products'],
-    ['key' => 'nav.attributes',   'icon' => 'sliders',       'href' => '/toro/admin/pages/attributes.php',  'page' => 'attributes'],
-    ['key' => 'nav.banners',      'icon' => 'layout',        'href' => '/toro/admin/pages/banners.php',     'page' => 'banners'],
-    ['key' => 'nav.orders',       'icon' => 'shopping-cart', 'href' => '/toro/admin/pages/orders.php',      'page' => 'orders'],
-    ['key' => 'nav.coupons',      'icon' => 'percent',       'href' => '/toro/admin/pages/coupons.php',     'page' => 'coupons'],
-    ['key' => 'nav.users',        'icon' => 'users',         'href' => '/toro/admin/pages/users.php',       'page' => 'users'],
-    ['key' => 'nav.menus',        'icon' => 'menu',          'href' => '/toro/admin/pages/menus.php',       'page' => 'menus'],
-    ['key' => 'nav.pages',        'icon' => 'file-text',     'href' => '/toro/admin/pages/pages.php',       'page' => 'pages'],
-    ['key' => 'nav.translations', 'icon' => 'globe',         'href' => '/toro/admin/pages/translations.php','page' => 'translations'],
-    ['key' => 'nav.settings',     'icon' => 'settings',      'href' => '/toro/admin/pages/settings.php',   'page' => 'settings'],
-    ['key' => 'nav.roles',        'icon' => 'shield',        'href' => '/toro/admin/pages/roles.php',       'page' => 'roles'],
-    ['key' => 'nav.audit_logs',   'icon' => 'file-text',     'href' => '/toro/admin/pages/audit_logs.php',  'page' => 'audit_logs'],
+$_brandName  = $_dbSettings['site_name'] ?? ($_t['brand'] ?? 'TORO');
+$_pageTitle  = $ADMIN_TITLE ?? $_brandName;
+
+// ── Sidebar navigation ───────────────────────────────────────────────────────
+// If the DB returned menu items, use them; otherwise fall back to hardcoded defaults.
+$_useDbMenu = !empty($_dbMenuItems);
+
+$_fallbackNavItems = [
+    ['key' => 'nav.dashboard',    'icon' => 'grid',          'href' => '/toro/admin/index.php',              'page' => 'index'],
+    ['key' => 'nav.images',       'icon' => 'image',         'href' => '/toro/admin/pages/images.php',       'page' => 'images'],
+    ['key' => 'nav.brands',       'icon' => 'tag',           'href' => '/toro/admin/pages/brands.php',       'page' => 'brands'],
+    ['key' => 'nav.categories',   'icon' => 'folder',        'href' => '/toro/admin/pages/categories.php',   'page' => 'categories'],
+    ['key' => 'nav.products',     'icon' => 'box',           'href' => '/toro/admin/pages/products.php',     'page' => 'products'],
+    ['key' => 'nav.attributes',   'icon' => 'sliders',       'href' => '/toro/admin/pages/attributes.php',   'page' => 'attributes'],
+    ['key' => 'nav.banners',      'icon' => 'layout',        'href' => '/toro/admin/pages/banners.php',      'page' => 'banners'],
+    ['key' => 'nav.orders',       'icon' => 'shopping-cart', 'href' => '/toro/admin/pages/orders.php',       'page' => 'orders'],
+    ['key' => 'nav.coupons',      'icon' => 'percent',       'href' => '/toro/admin/pages/coupons.php',      'page' => 'coupons'],
+    ['key' => 'nav.users',        'icon' => 'users',         'href' => '/toro/admin/pages/users.php',        'page' => 'users'],
+    ['key' => 'nav.menus',        'icon' => 'menu',          'href' => '/toro/admin/pages/menus.php',        'page' => 'menus'],
+    ['key' => 'nav.pages',        'icon' => 'file-text',     'href' => '/toro/admin/pages/pages.php',        'page' => 'pages'],
+    ['key' => 'nav.translations', 'icon' => 'globe',         'href' => '/toro/admin/pages/translations.php', 'page' => 'translations'],
+    ['key' => 'nav.settings',     'icon' => 'settings',      'href' => '/toro/admin/pages/settings.php',    'page' => 'settings'],
+    ['key' => 'nav.roles',        'icon' => 'shield',        'href' => '/toro/admin/pages/roles.php',        'page' => 'roles'],
+    ['key' => 'nav.audit_logs',   'icon' => 'file-text',     'href' => '/toro/admin/pages/audit_logs.php',   'page' => 'audit_logs'],
 ];
 
 $_currentPage = $ADMIN_PAGE ?? 'index';
-$_isRtl = ($_adminDir === 'rtl');
-$_sidePos = $_isRtl ? 'right' : 'left';
-$_marginSide = $_isRtl ? 'margin-right' : 'margin-left';
+$_isRtl       = ($_adminDir === 'rtl');
+$_sidePos     = $_isRtl ? 'right' : 'left';
+$_marginSide  = $_isRtl ? 'margin-right' : 'margin-left';
 $_translateOff = $_isRtl ? 'translateX(100%)' : 'translateX(-100%)';
-$_textAlign = $_isRtl ? 'right' : 'left';
+$_textAlign   = $_isRtl ? 'right' : 'left';
+
+// Brand color for PWA theme-color (from DB or fallback)
+$_themeColor = '#6366f1'; // fallback
+if ($_dbThemeCss && preg_match('/--clr-primary\s*:\s*([^;]+);/', $_dbThemeCss, $_m)) {
+    $_themeColor = trim($_m[1]);
+}
 ?>
 <!DOCTYPE html>
 <html lang="<?= htmlspecialchars($_adminLang) ?>" dir="<?= $_adminDir ?>">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title><?= htmlspecialchars($_pageTitle) ?> — <?= htmlspecialchars($_brandName) ?></title>
 <meta name="robots" content="noindex,nofollow">
+
+<!-- PWA -->
+<link rel="manifest" href="/toro/admin/manifest.php">
+<meta name="theme-color" content="<?= htmlspecialchars($_themeColor) ?>">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="<?= htmlspecialchars($_brandName) ?> Admin">
+
+<!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+
 <style>
 /* ═══════════════════════════════════════════════════
-   TORO Admin – Design System  (v1)
+   TORO Admin — Design System defaults
+   (overridden at runtime by DB values below)
 ═══════════════════════════════════════════════════ */
 :root{
   --clr-bg:#0f172a;--clr-surface:#1e293b;--clr-border:#334155;
@@ -98,6 +130,17 @@ $_textAlign = $_isRtl ? 'right' : 'left';
   --font-ar:'IBM Plex Sans Arabic',system-ui,sans-serif;
   --font-en:'Inter',system-ui,sans-serif;
 }
+<?php if ($_dbThemeCss): ?>
+/* ── DB theme colors ─────── */
+<?= $_dbThemeCss ?>
+
+<?php endif; ?>
+<?php if ($_dbSizesCss): ?>
+/* ── DB theme sizes ──────── */
+<?= $_dbSizesCss ?>
+
+<?php endif; ?>
+
 [dir=rtl]{font-family:var(--font-ar)}
 [dir=ltr]{font-family:var(--font-en)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -134,10 +177,11 @@ img{max-width:100%}
   transition:background var(--t),color var(--t);
 }
 .sidebar-nav li a:hover,.sidebar-nav li.active a{
-  background:rgba(99,102,241,.12);color:var(--clr-primary);
+  background:color-mix(in srgb,var(--clr-primary) 12%,transparent);color:var(--clr-primary);
 }
 .sidebar-nav li.active a{font-weight:600}
 .sidebar-nav li a svg{flex-shrink:0;width:15px;height:15px}
+.sidebar-nav .nav-children{padding-<?= $_isRtl?'right':'left' ?>:1.5rem}
 .sidebar-footer{
   padding:.875rem 1.25rem;border-top:1px solid var(--clr-border);
   font-size:.75rem;color:var(--clr-muted);
@@ -326,6 +370,11 @@ textarea.form-control{resize:vertical;min-height:90px}
   .sidebar.open{transform:translateX(0)}
   .main-wrapper{<?= $_marginSide ?>:0}
 }
+/* Safe area insets (notch phones) */
+@supports(padding:max(0px)){
+  .topbar{padding-top:max(0px,env(safe-area-inset-top))}
+  .sidebar{padding-bottom:max(0px,env(safe-area-inset-bottom))}
+}
 </style>
 </head>
 <body>
@@ -337,9 +386,54 @@ textarea.form-control{resize:vertical;min-height:90px}
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
     <?= htmlspecialchars($_brandName) ?>
   </div>
+
   <nav class="sidebar-nav">
     <ul>
-<?php foreach ($_navItems as $_item): ?>
+<?php if ($_useDbMenu): ?>
+<?php
+  // Build tree from flat list
+  $_navById = [];
+  foreach ($_dbMenuItems as $_dbItem) {
+      $_navById[(int)$_dbItem['id']] = $_dbItem + ['children' => []];
+  }
+  $_navRoots = [];
+  foreach ($_navById as $_nid => &$_nItem) {
+      $pid = (int)($_nItem['parent_id'] ?? 0);
+      if ($pid && isset($_navById[$pid])) {
+          $_navById[$pid]['children'][] = &$_nItem;
+      } else {
+          $_navRoots[] = &$_nItem;
+      }
+  }
+  unset($_nItem);
+
+  // Recursive render helper
+  function renderNavItems(array $items, string $currentPage): void {
+      foreach ($items as $item) {
+          $href    = htmlspecialchars($item['url'] ?? '#', ENT_QUOTES, 'UTF-8');
+          $label   = htmlspecialchars($item['label'] ?? '', ENT_QUOTES, 'UTF-8');
+          $icon    = htmlspecialchars($item['icon'] ?? 'circle', ENT_QUOTES, 'UTF-8');
+          $target  = htmlspecialchars($item['target'] ?? '_self', ENT_QUOTES, 'UTF-8');
+          // Derive page key from URL basename for active detection
+          $page    = basename(parse_url($item['url'] ?? '', PHP_URL_PATH) ?? '', '.php');
+          $isActive = ($page === $currentPage || $page === rtrim($currentPage, '/'));
+          echo '<li class="' . ($isActive ? 'active' : '') . '">' . "\n";
+          echo '  <a href="' . $href . '" target="' . $target . '">' . "\n";
+          echo '    <svg data-feather="' . $icon . '"></svg>' . "\n";
+          echo '    ' . $label . "\n";
+          echo '  </a>' . "\n";
+          if (!empty($item['children'])) {
+              echo '<ul class="nav-children">' . "\n";
+              renderNavItems($item['children'], $currentPage);
+              echo '</ul>' . "\n";
+          }
+          echo '</li>' . "\n";
+      }
+  }
+  renderNavItems($_navRoots, $_currentPage);
+?>
+<?php else: ?>
+<?php foreach ($_fallbackNavItems as $_item): ?>
       <li class="<?= ($_currentPage === $_item['page'] ? 'active' : '') ?>">
         <a href="<?= htmlspecialchars($_item['href']) ?>">
           <svg data-feather="<?= htmlspecialchars($_item['icon']) ?>"></svg>
@@ -347,8 +441,10 @@ textarea.form-control{resize:vertical;min-height:90px}
         </a>
       </li>
 <?php endforeach; ?>
+<?php endif; ?>
     </ul>
   </nav>
+
   <div class="sidebar-footer"><?= htmlspecialchars($_brandName) ?> Admin v1</div>
 </aside>
 
