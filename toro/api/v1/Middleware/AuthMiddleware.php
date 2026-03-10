@@ -8,7 +8,6 @@ namespace V1\Middleware;
 
 use Shared\Core\MiddlewareBase;
 use Shared\Helpers\Response;
-use V1\Modules\Auth\Services\JwtService;
 
 final class AuthMiddleware extends MiddlewareBase
 {
@@ -22,7 +21,7 @@ final class AuthMiddleware extends MiddlewareBase
 
         $token = substr($header, 7);
         try {
-            $payload = (new JwtService())->verify($token);
+            $payload = (new \JwtService())->verify($token);
         } catch (\Throwable $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 401);
             exit;

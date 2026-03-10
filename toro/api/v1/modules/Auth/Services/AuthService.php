@@ -4,10 +4,7 @@
  * كل منطق المصادقة هنا — Controller لا يعرف PDO أبداً
  */
 declare(strict_types=1);
-namespace V1\Modules\Auth\Services;
 
-use V1\Modules\Auth\Contracts\AuthRepositoryInterface;
-use V1\Modules\Auth\DTO\{LoginDTO, RegisterDTO, OAuthDTO};
 use Shared\Domain\Exceptions\{ValidationException, AuthorizationException, NotFoundException};
 use Shared\Helpers\AuditLogger;
 
@@ -111,7 +108,7 @@ final class AuthService
     {
         // 1. تحقق من token مع مزود الخدمة
         $profile = $this->oauth->verify($dto->provider, $dto->token);
-        // profile: ['uid', 'email', 'first_name', 'last_name', 'avatar']
+        // profile: ['uid', 'email', 'first_name', 'last_name']
 
         // 2. ابحث عن social account موجود
         $social = $this->repo->findSocialAccount($dto->provider, $profile['uid']);
@@ -131,7 +128,6 @@ final class AuthService
                     'last_name'     => $profile['last_name'],
                     'email'         => $profile['email'],
                     'password_hash' => null,
-                    'avatar'        => $profile['avatar'] ?? null,
                     'language_id'   => $langId,
                     'role_id'       => 4,
                 ]);

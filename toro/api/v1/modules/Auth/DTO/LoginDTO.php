@@ -3,7 +3,6 @@
  * TORO — v1/modules/Auth/DTO/LoginDTO.php
  */
 declare(strict_types=1);
-namespace V1\Modules\Auth\DTO;
 
 final class LoginDTO
 {

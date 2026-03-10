@@ -4,12 +4,7 @@
  * يستقبل HTTP فقط — لا منطق هنا أبداً
  */
 declare(strict_types=1);
-namespace V1\Modules\Auth\Controllers;
 
-use V1\Modules\Auth\Services\{AuthService, JwtService, OAuthService};
-use V1\Modules\Auth\Repositories\PdoAuthRepository;
-use V1\Modules\Auth\Validators\AuthValidator;
-use V1\Modules\Auth\DTO\{LoginDTO, RegisterDTO, OAuthDTO};
 use Shared\Core\DatabaseConnection;
 use Shared\Helpers\Response;
 

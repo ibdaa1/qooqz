@@ -8,7 +8,6 @@ namespace V1\Middleware;
 
 use Shared\Core\MiddlewareBase;
 use Shared\Helpers\Response;
-use V1\Modules\Auth\Services\JwtService;
 
 final class GuestMiddleware extends MiddlewareBase
 {
@@ -18,7 +17,7 @@ final class GuestMiddleware extends MiddlewareBase
         if (str_starts_with($header, 'Bearer ')) {
             $token = substr($header, 7);
             try {
-                (new JwtService())->verify($token);
+                (new \JwtService())->verify($token);
                 // إذا نجح التحقق = مستخدم مسجل
                 Response::json(['success' => false, 'message' => 'أنت مسجل الدخول مسبقاً'], 403);
                 exit;
