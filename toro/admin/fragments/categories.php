@@ -93,7 +93,7 @@ if (!function_exists('__t')) {
 // ════════════════════════════════════════════════════════════
 // API BASE
 // ════════════════════════════════════════════════════════════
-$apiBase = '/api';
+$apiBase = '/toro/api/v1';
 
 // ════════════════════════════════════════════════════════════
 // DB-DRIVEN CSS VARS HELPER
@@ -562,7 +562,7 @@ window.PAGE_PERMISSIONS = <?= json_encode([
 ], JSON_UNESCAPED_UNICODE) ?>;
 
 window.CATEGORIES_CONFIG = {
-    categoriesApiUrl: '<?= $apiBase ?>/categories',
+    apiUrl: '<?= $apiBase ?>/categories',
     csrfToken:        '<?= addslashes($csrf) ?>',
     lang:             '<?= addslashes($lang) ?>',
     dir:              '<?= addslashes($dir) ?>',

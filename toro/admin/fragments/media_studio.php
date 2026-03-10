@@ -17,7 +17,7 @@ $user      = $payload['user']     ?? [];
 $tenantId  = (int)($user['tenant_id'] ?? ($_GET['tenant_id'] ?? 1));
 $lang      = $payload['lang']     ?? ($user['preferred_language'] ?? 'en');
 $dir       = ($lang === 'ar') ? 'rtl' : 'ltr';
-$apiBase   = $payload['api_base'] ?? '/api';
+$apiBase   = $payload['api_base'] ?? '/toro/api/v1';
 $csrf      = $payload['csrf_token'] ?? bin2hex(random_bytes(32));
 
 // Permissions

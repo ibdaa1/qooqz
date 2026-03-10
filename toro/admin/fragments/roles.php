@@ -72,7 +72,7 @@ $canDelete = is_super_admin(); // only super admin may delete roles
 // ════════════════════════════════════════════════════════════
 // API BASE + THEME HELPER
 // ════════════════════════════════════════════════════════════
-$apiBase = '/api';
+$apiBase = '/toro/api/v1';
 
 if (!function_exists('renderFragmentThemeVars')) {
     function renderFragmentThemeVars(array $theme): void {
