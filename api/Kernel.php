@@ -46,11 +46,20 @@ final class Kernel
     }
 
     /**
-     * Resolve route file from URI (unchanged)
+     * Resolve route file from URI.
+     * For versioned APIs (e.g. v1) the routes live inside the version
+     * subdirectory (api/v1/routes/).  For any other access pattern we fall
+     * back to a routes/ folder next to Kernel.php.
      */
     private static function resolveRouteFile(string $uri): ?string
     {
-        $base = __DIR__ . '/routes';
+        // Use the version-specific routes directory when bootstrap has
+        // detected a versioned API (defines IS_VERSIONED_API + API_VERSION_PATH).
+        if (defined('IS_VERSIONED_API') && IS_VERSIONED_API === true && defined('API_VERSION_PATH')) {
+            $base = API_VERSION_PATH . '/routes';
+        } else {
+            $base = __DIR__ . '/routes';
+        }
         if (str_starts_with($uri, '/admin/')) {
             $parts = explode('/', trim($uri, '/'));
             $name = $parts[1] ?? '';
