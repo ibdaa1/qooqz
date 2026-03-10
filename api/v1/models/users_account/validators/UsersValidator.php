@@ -24,21 +24,6 @@ final class UsersValidator
             $errors['password'] = 'Password is required for new users and must be at least 6 characters';
         }
 
-        // role_id
-        if (isset($data['role_id']) && $data['role_id'] && !is_numeric($data['role_id'])) {
-            $errors['role_id'] = 'Role ID must be numeric';
-        }
-
-        // country_id
-        if (isset($data['country_id']) && $data['country_id'] && !is_numeric($data['country_id'])) {
-            $errors['country_id'] = 'Country ID must be numeric';
-        }
-
-        // city_id
-        if (isset($data['city_id']) && $data['city_id'] && !is_numeric($data['city_id'])) {
-            $errors['city_id'] = 'City ID must be numeric';
-        }
-
         // phone
         if (isset($data['phone']) && $data['phone'] && !preg_match('/^\+?[0-9\s\-\(\)]+$/', $data['phone'])) {
             $errors['phone'] = 'Phone number format is invalid';
@@ -65,10 +50,6 @@ final class UsersValidator
     public static function validateFilters(array $filters): array
     {
         $errors = [];
-
-        if (isset($filters['role_id']) && (!is_numeric($filters['role_id']) || $filters['role_id'] < 1)) {
-            $errors['role_id'] = 'Role ID filter must be positive numeric';
-        }
 
         if (isset($filters['search']) && strlen($filters['search']) > 100) {
             $errors['search'] = 'Search filter is too long';

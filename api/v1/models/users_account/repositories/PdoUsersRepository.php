@@ -13,11 +13,8 @@ final class PdoUsersRepository
     public function all(?int $limit = null, ?int $offset = null, array $filters = []): array
     {
         $sql = "
-            SELECT u.*, c.name AS country_name, ci.name AS city_name, r.display_name AS role_name
+            SELECT u.id, u.username, u.email, u.preferred_language, u.phone, u.is_active, u.created_at, u.updated_at
             FROM users u
-            LEFT JOIN countries c ON u.country_id = c.id
-            LEFT JOIN cities ci ON u.city_id = ci.id
-            LEFT JOIN roles r ON u.role_id = r.id
             WHERE 1=1
         ";
 
@@ -27,10 +24,6 @@ final class PdoUsersRepository
         if (isset($filters['is_active'])) {
             $sql .= " AND u.is_active = :is_active";
             $params[':is_active'] = $filters['is_active'] ? 1 : 0;
-        }
-        if (isset($filters['role_id']) && $filters['role_id']) {
-            $sql .= " AND u.role_id = :role_id";
-            $params[':role_id'] = $filters['role_id'];
         }
         if (isset($filters['search']) && $filters['search']) {
             $sql .= " AND (u.username LIKE :search OR u.email LIKE :search)";
@@ -65,10 +58,6 @@ final class PdoUsersRepository
             $sql .= " AND u.is_active = :is_active";
             $params[':is_active'] = $filters['is_active'] ? 1 : 0;
         }
-        if (isset($filters['role_id']) && $filters['role_id']) {
-            $sql .= " AND u.role_id = :role_id";
-            $params[':role_id'] = $filters['role_id'];
-        }
         if (isset($filters['search']) && $filters['search']) {
             $sql .= " AND (u.username LIKE :search OR u.email LIKE :search)";
             $params[':search'] = '%' . $filters['search'] . '%';
@@ -82,11 +71,8 @@ final class PdoUsersRepository
     public function find(int $id): ?array
     {
         $stmt = $this->pdo->prepare("
-            SELECT u.*, c.name AS country_name, ci.name AS city_name, r.display_name AS role_name
+            SELECT u.id, u.username, u.email, u.preferred_language, u.phone, u.is_active, u.created_at, u.updated_at
             FROM users u
-            LEFT JOIN countries c ON u.country_id = c.id
-            LEFT JOIN cities ci ON u.city_id = ci.id
-            LEFT JOIN roles r ON u.role_id = r.id
             WHERE u.id = :id
             LIMIT 1
         ");
@@ -98,11 +84,8 @@ final class PdoUsersRepository
     public function findByUsername(string $username): ?array
     {
         $stmt = $this->pdo->prepare("
-            SELECT u.*, c.name AS country_name, ci.name AS city_name, r.display_name AS role_name
+            SELECT u.id, u.username, u.email, u.preferred_language, u.phone, u.is_active, u.created_at, u.updated_at
             FROM users u
-            LEFT JOIN countries c ON u.country_id = c.id
-            LEFT JOIN cities ci ON u.city_id = ci.id
-            LEFT JOIN roles r ON u.role_id = r.id
             WHERE u.username = :username
             LIMIT 1
         ");
@@ -114,11 +97,8 @@ final class PdoUsersRepository
     public function findByEmail(string $email): ?array
     {
         $stmt = $this->pdo->prepare("
-            SELECT u.*, c.name AS country_name, ci.name AS city_name, r.display_name AS role_name
+            SELECT u.id, u.username, u.email, u.preferred_language, u.phone, u.is_active, u.created_at, u.updated_at
             FROM users u
-            LEFT JOIN countries c ON u.country_id = c.id
-            LEFT JOIN cities ci ON u.city_id = ci.id
-            LEFT JOIN roles r ON u.role_id = r.id
             WHERE u.email = :email
             LIMIT 1
         ");
@@ -150,8 +130,8 @@ final class PdoUsersRepository
             $stmt = $this->pdo->prepare("
                 UPDATE users
                 SET username = :username, email = :email, " . ($passwordHash ? "password_hash = :password_hash, " : "") . "
-                    preferred_language = :preferred_language, country_id = :country_id, city_id = :city_id,
-                    phone = :phone, role_id = :role_id, timezone = :timezone, is_active = :is_active,
+                    preferred_language = :preferred_language,
+                    phone = :phone, is_active = :is_active,
                     updated_at = NOW()
                 WHERE id = :id
             ");
@@ -159,11 +139,7 @@ final class PdoUsersRepository
                 ':username' => $data['username'],
                 ':email' => $data['email'],
                 ':preferred_language' => $data['preferred_language'] ?? 'en',
-                ':country_id' => $data['country_id'] ?: null,
-                ':city_id' => $data['city_id'] ?: null,
                 ':phone' => $data['phone'] ?: null,
-                ':role_id' => $data['role_id'] ?: null,
-                ':timezone' => $data['timezone'] ?? 'UTC',
                 ':is_active' => (int)($data['is_active'] ?? 1),
                 ':id' => (int)$data['id']
             ];
@@ -172,19 +148,15 @@ final class PdoUsersRepository
             $id = (int)$data['id'];
         } else {
             $stmt = $this->pdo->prepare("
-                INSERT INTO users (username, email, password_hash, preferred_language, country_id, city_id, phone, role_id, timezone, is_active, created_at)
-                VALUES (:username, :email, :password_hash, :preferred_language, :country_id, :city_id, :phone, :role_id, :timezone, :is_active, NOW())
+                INSERT INTO users (username, email, password_hash, preferred_language, phone, is_active, created_at)
+                VALUES (:username, :email, :password_hash, :preferred_language, :phone, :is_active, NOW())
             ");
             $stmt->execute([
                 ':username' => $data['username'],
                 ':email' => $data['email'],
                 ':password_hash' => $passwordHash ?: '',
                 ':preferred_language' => $data['preferred_language'] ?? 'en',
-                ':country_id' => $data['country_id'] ?: null,
-                ':city_id' => $data['city_id'] ?: null,
                 ':phone' => $data['phone'] ?: null,
-                ':role_id' => $data['role_id'] ?: null,
-                ':timezone' => $data['timezone'] ?? 'UTC',
                 ':is_active' => (int)($data['is_active'] ?? 1)
             ]);
             $id = (int)$this->pdo->lastInsertId();

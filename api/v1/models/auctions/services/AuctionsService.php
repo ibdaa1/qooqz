@@ -1,51 +1,67 @@
 <?php
 declare(strict_types=1);
 
-final class Product_categoriesService
+final class AuctionsService
 {
-    private PdoProduct_categoriesRepository $repository;
-    private Product_categoriesValidator $validator;
+    private PdoAuctionsRepository $repo;
 
-    public function __construct(PdoProduct_categoriesRepository $repository, Product_categoriesValidator $validator)
+    public function __construct(PdoAuctionsRepository $repo)
     {
-        $this->repository = $repository;
-        $this->validator = $validator;
+        $this->repo = $repo;
     }
 
-    public function list(?int $limit = null, ?int $offset = null, array $filters = [], string $orderBy = 'id', string $orderDir = 'DESC'): array
-    {
-        return $this->repository->all($limit, $offset, $filters, $orderBy, $orderDir);
+    public function list(
+        int $tenantId,
+        ?int $limit = null,
+        ?int $offset = null,
+        array $filters = [],
+        string $orderBy = 'id',
+        string $orderDir = 'DESC',
+        string $lang = 'ar'
+    ): array {
+        return $this->repo->all($tenantId, $limit, $offset, $filters, $orderBy, $orderDir, $lang);
     }
 
-    public function count(array $filters = []): int
+    public function count(int $tenantId, array $filters = []): int
     {
-        return $this->repository->count($filters);
+        return $this->repo->count($tenantId, $filters);
     }
 
-    public function get(int $id): array
+    public function get(int $tenantId, int $id, string $lang = 'ar'): array
     {
-        $data = $this->repository->find($id);
+        $data = $this->repo->find($tenantId, $id, $lang);
         if (!$data) {
-            throw new RuntimeException('Product category not found');
+            throw new RuntimeException('Auction not found');
         }
         return $data;
     }
 
-    public function save(array $data): array
+    public function create(int $tenantId, array $data): int
     {
-        $isUpdate = !empty($data['id']);
-        if (!$this->validator->validate($data, $isUpdate ? 'update' : 'create')) {
-            throw new InvalidArgumentException(implode(', ', $this->validator->getErrors()));
-        }
-
-        $id = $this->repository->save($data);
-        return $this->get($id);
+        $this->validate($data, false);
+        return $this->repo->save($tenantId, $data);
     }
 
-    public function delete(int $id): void
+    public function update(int $tenantId, array $data): int
     {
-        if (!$this->repository->delete($id)) {
-            throw new RuntimeException('Failed to delete product category');
+        if (empty($data['id'])) {
+            throw new InvalidArgumentException('ID is required for update');
+        }
+        $this->validate($data, true);
+        return $this->repo->save($tenantId, $data);
+    }
+
+    public function delete(int $tenantId, int $id): bool
+    {
+        return $this->repo->delete($tenantId, $id);
+    }
+
+    private function validate(array $data, bool $isUpdate): void
+    {
+        $validator = new AuctionsValidator();
+        if (!$validator->validate($data, $isUpdate ? 'update' : 'create')) {
+            throw new InvalidArgumentException(implode(', ', $validator->getErrors()));
         }
     }
 }
+
