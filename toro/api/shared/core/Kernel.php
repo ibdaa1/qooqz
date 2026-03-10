@@ -23,6 +23,9 @@ class Kernel
     /** @var string[] Default middleware for all routes */
     private array $globalMiddleware = [];
 
+    /** @var string[]|null Cached version prefixes (e.g. ['/v2', '/v1']), populated lazily */
+    private ?array $versionPrefixCache = null;
+
     public function __construct()
     {
         $this->loadRoutes();
@@ -134,6 +137,34 @@ class Kernel
     {
         $routesForMethod = $this->routes[$method] ?? [];
 
+        // 1. Try the URI as given (exact then pattern).
+        $result = $this->tryMatchAgainst($routesForMethod, $uri);
+        if ($result !== null) {
+            return $result;
+        }
+
+        // 2. If the URI carries no version prefix, auto-try every registered
+        //    version prefix (sorted descending so the latest wins, e.g. v2 > v1).
+        if (!preg_match('#^/v\d+(/|$)#', $uri)) {
+            foreach ($this->detectVersionPrefixes() as $prefix) {
+                $result = $this->tryMatchAgainst($routesForMethod, $prefix . $uri);
+                if ($result !== null) {
+                    return $result;
+                }
+            }
+        }
+
+        throw new NotFoundException("Route not found: {$method} {$uri}");
+    }
+
+    /**
+     * Try to match $uri against the given route map (exact then pattern).
+     * Returns [routeDef, params] on success, null on no match.
+     *
+     * @param array<string, array{handler: callable|string, middleware: string[]}> $routesForMethod
+     */
+    private function tryMatchAgainst(array $routesForMethod, string $uri): ?array
+    {
         if (isset($routesForMethod[$uri])) {
             return [$routesForMethod[$uri], []];
         }
@@ -147,7 +178,35 @@ class Kernel
             }
         }
 
-        throw new NotFoundException("Route not found: {$method} {$uri}");
+        return null;
+    }
+
+    /**
+     * Detect all version prefixes present in the registered routes
+     * (e.g. ['/v2', '/v1']), sorted descending so the latest is tried first.
+     * Result is cached for the lifetime of the request.
+     *
+     * @return string[]
+     */
+    private function detectVersionPrefixes(): array
+    {
+        if ($this->versionPrefixCache !== null) {
+            return $this->versionPrefixCache;
+        }
+
+        $seen = [];
+        foreach ($this->routes as $methodRoutes) {
+            foreach (array_keys($methodRoutes) as $path) {
+                if (preg_match('#^(/v(\d+))(/|$)#', $path, $m)) {
+                    $seen[$m[1]] = (int) $m[2];
+                }
+            }
+        }
+
+        // Sort by numeric version number descending (/v2 before /v1, /v10 before /v2)
+        arsort($seen);
+        $this->versionPrefixCache = array_keys($seen);
+        return $this->versionPrefixCache;
     }
 
     // ── Dispatch ──────────────────────────────────────────────────────────────
