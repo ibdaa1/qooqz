@@ -1,16 +1,9 @@
 <?php
 /**
- * TORO — Kernel.php
+ * TORO — Kernel.php (Production Ready)
  * /public_html/toro/api/shared/core/Kernel.php
  *
- * Namespace: Shared\Core
- *
- * Responsibilities:
- *   1. Parse method + URI
- *   2. Match route from registered route files
- *   3. Build & run middleware pipeline
- *   4. Dispatch to controller action
- *   5. Send JSON response
+ * @package Shared\Core
  */
 
 declare(strict_types=1);
@@ -24,22 +17,40 @@ use Shared\Domain\Exceptions\AuthorizationException;
 
 class Kernel
 {
-    /** @var array<string, array<string, array{handler: callable|string, middleware: string[]}>> */
+    /**
+     * Registered routes.
+     *
+     * @var array<string, array<string, array{handler: callable|string, middleware: string[]}>>
+     */
     private array $routes = [];
 
-    /** @var string[] Default middleware for all routes */
-    private array $globalMiddleware = [
-        // Global middleware intentionally kept minimal.
-        // Per-route throttling is applied via ThrottleMiddleware::class . ':limit,window'
-    ];
+    /**
+     * Global middleware applied to every route.
+     *
+     * @var string[]
+     */
+    private array $globalMiddleware = [];
 
+    /**
+     * Constructor – automatically discovers and loads all route files from /v1/routes/.
+     */
     public function __construct()
     {
         $this->loadRoutes();
     }
 
-    // ── Route Registration ────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
+    // Route Registration
+    // -------------------------------------------------------------------------
 
+    /**
+     * Add a new route.
+     *
+     * @param string               $method     HTTP method (GET, POST, etc.)
+     * @param string               $path       URI pattern, supports {param} placeholders
+     * @param string|callable      $handler    Controller action "Class@method" or Closure
+     * @param array<string>        $middleware List of middleware class names (with optional parameters)
+     */
     public function addRoute(
         string $method,
         string $path,
@@ -53,57 +64,59 @@ class Kernel
         ];
     }
 
-    // ── Load all route files ──────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
+    // Auto‑load Route Files
+    // -------------------------------------------------------------------------
 
+    /**
+     * Recursively include every PHP file inside BASE_PATH . '/v1/routes/'.
+     * The variable $router (or $this) is available inside each file.
+     */
     private function loadRoutes(): void
     {
-        $router = $this; // exposed to every route file via closure scope
+        $routeDirectory = BASE_PATH . '/v1/routes/';
 
-        $routesDir = BASE_PATH . '/v1/routes';
+        if (!is_dir($routeDirectory)) {
+            // No routes directory – nothing to load
+            return;
+        }
 
-        // 1. Load all module route files alphabetically (excludes admin.php, public.php, v1.php)
-        $moduleFiles = glob($routesDir . '/*.php') ?: [];
-        sort($moduleFiles);
+        // Make $router available to route files (many legacy files expect it)
+        $router = $this;
 
-        $alwaysLast = ['admin.php', 'public.php'];
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($routeDirectory, \RecursiveDirectoryIterator::SKIP_DOTS)
+        );
 
-        foreach ($moduleFiles as $file) {
-            $basename = basename($file);
-            // skip debug helper and the two aggregator files — loaded below in order
-            if ($basename === 'v1.php' || in_array($basename, $alwaysLast, true)) {
-                continue;
+        foreach ($iterator as $file) {
+            /** @var \SplFileInfo $file */
+            if ($file->isFile() && $file->getExtension() === 'php') {
+                // Include the route file – both $this and $router are in scope
+                require_once $file->getPathname();
             }
-            require_once $file;
-        }
-
-        // 2. Admin aggregate (/v1/admin/*) — must come after module files
-        $adminFile = $routesDir . '/admin.php';
-        if (file_exists($adminFile)) {
-            require_once $adminFile;
-        }
-
-        // 3. Public aggregate (/v1/public/*) — must come last
-        $publicFile = $routesDir . '/public.php';
-        if (file_exists($publicFile)) {
-            require_once $publicFile;
         }
     }
 
-    // ── Main Handle ───────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
+    // Request Handling
+    // -------------------------------------------------------------------------
 
+    /**
+     * Handle the current HTTP request and send a JSON response.
+     */
     public function handle(): void
     {
         $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
-        $uri    = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+        $uri    = (string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 
-        // Strip base path prefix
+        // Strip base path if the app runs in a subdirectory
         $base = '/toro/api';
         if (str_starts_with($uri, $base)) {
             $uri = substr($uri, strlen($base));
         }
-        $uri = '/' . trim($uri, '/') ?: '/';
+        $uri = '/' . ltrim($uri, '/') ?: '/';
 
-        // Handle OPTIONS preflight
+        // Preflight OPTIONS request
         if ($method === 'OPTIONS') {
             http_response_code(204);
             exit;
@@ -112,15 +125,14 @@ class Kernel
         try {
             [$routeDef, $params] = $this->matchRoute($method, $uri);
 
-            // Build middleware pipeline
+            // Merge global and route‑specific middleware
             $allMiddleware = array_merge($this->globalMiddleware, $routeDef['middleware'] ?? []);
-            $pipeline      = new MiddlewarePipeline($allMiddleware);
 
-            // Final handler
+            // Build and run the middleware pipeline
+            $pipeline = new MiddlewarePipeline($allMiddleware);
             $pipeline->pipe(function () use ($routeDef, $params) {
                 $this->dispatch($routeDef['handler'], $params);
             });
-
             $pipeline->run();
 
         } catch (NotFoundException $e) {
@@ -137,7 +149,7 @@ class Kernel
             ], 422);
 
         } catch (\Throwable $e) {
-            Logger::error('Unhandled exception', [
+            $this->logError('Unhandled exception', [
                 'message' => $e->getMessage(),
                 'file'    => $e->getFile(),
                 'line'    => $e->getLine(),
@@ -152,25 +164,34 @@ class Kernel
         }
     }
 
-    // ── Route Matching (supports {param} placeholders) ────────────────────────
+    // -------------------------------------------------------------------------
+    // Route Matching (with {param} support)
+    // -------------------------------------------------------------------------
 
     /**
-     * @return array{0: array, 1: array<string,string>}
+     * Find a route matching the method and URI.
+     *
+     * @param string $method
+     * @param string $uri
+     *
+     * @return array{0: array{handler: string|callable, middleware: string[]}, 1: array<string,string>}
+     *
      * @throws NotFoundException
      */
     private function matchRoute(string $method, string $uri): array
     {
         $routesForMethod = $this->routes[$method] ?? [];
 
-        // 1. Exact match
+        // Exact match
         if (isset($routesForMethod[$uri])) {
             return [$routesForMethod[$uri], []];
         }
 
-        // 2. Pattern match with {param}
+        // Pattern match with placeholders
         foreach ($routesForMethod as $pattern => $routeDef) {
-            $regex  = preg_replace('/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/', '(?P<$1>[^/]+)', $pattern);
-            $regex  = '#^' . $regex . '$#';
+            $regex = preg_replace('/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/', '(?P<$1>[^/]+)', $pattern);
+            $regex = '#^' . $regex . '$#';
+
             if (preg_match($regex, $uri, $matches)) {
                 $params = array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY);
                 return [$routeDef, $params];
@@ -180,29 +201,63 @@ class Kernel
         throw new NotFoundException("Route not found: {$method} {$uri}");
     }
 
-    // ── Dispatch ──────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
+    // Dispatch to Controller
+    // -------------------------------------------------------------------------
 
-    private function dispatch(callable|string $handler, array $params): void
+    /**
+     * Execute the route handler.
+     *
+     * @param string|callable      $handler
+     * @param array<string,string> $params
+     *
+     * @throws \RuntimeException
+     */
+    private function dispatch(string|callable $handler, array $params): void
     {
         if (is_callable($handler)) {
-            call_user_func($handler, $params);
+            $handler($params);
             return;
         }
 
-        // "ControllerClass@method"
         if (is_string($handler) && str_contains($handler, '@')) {
             [$class, $method] = explode('@', $handler, 2);
+
             if (!class_exists($class)) {
                 throw new \RuntimeException("Controller class not found: {$class}");
             }
+
             $controller = new $class();
+
             if (!method_exists($controller, $method)) {
                 throw new \RuntimeException("Method {$method} not found in {$class}");
             }
+
             $controller->{$method}($params);
             return;
         }
 
         throw new \RuntimeException('Invalid route handler definition');
+    }
+
+    // -------------------------------------------------------------------------
+    // Error Logging
+    // -------------------------------------------------------------------------
+
+    /**
+     * Log an error – override with a PSR‑3 logger in production.
+     *
+     * @param string $message
+     * @param array  $context
+     */
+    private function logError(string $message, array $context = []): void
+    {
+        // Use your preferred logger (Monolog, etc.) here.
+        // For now, fall back to error_log.
+        error_log(sprintf(
+            '[Kernel Error] %s %s',
+            $message,
+            json_encode($context)
+        ));
     }
 }
