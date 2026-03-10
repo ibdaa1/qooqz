@@ -62,10 +62,11 @@ class Kernel
 
         foreach ($iterator as $file) {
             /** @var \SplFileInfo $file */
-            if ($file->isFile() && $file->getExtension() === 'php') {
-                // يتم تضمين الملف – المتغيرات $this و $router متاحة داخله
-                require_once $file->getPathname();
+            if (!$file->isFile() || $file->getExtension() !== 'php') {
+                continue;
             }
+            // يتم تضمين الملف – المتغيرات $this و $router متاحة داخله
+            require_once $file->getPathname();
         }
     }
 

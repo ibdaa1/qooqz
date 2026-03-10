@@ -1,12 +1,7 @@
 <?php
+/**
+ * v1/routes/v1.php — intentionally empty.
+ * Do NOT add unconditional echo/header/exit here; this file is
+ * auto-loaded by Kernel::loadRoutes() along with every other *.php file.
+ */
 declare(strict_types=1);
-
-header('Content-Type: application/json');
-
-echo json_encode([
-    'status' => 'v1 route working',
-    'time' => date('c'),
-    'request_uri' => $_SERVER['REQUEST_URI'] ?? null,
-    'method' => $_SERVER['REQUEST_METHOD'] ?? null
-]);
-exit;
