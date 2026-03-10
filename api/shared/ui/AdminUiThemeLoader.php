@@ -5,8 +5,8 @@ declare(strict_types=1);
 
 final class AdminUiThemeLoader
 {
-    /** Card style card_type values that map to POS product/category CSS variables. */
-    private const POS_CARD_TYPES = ['product', 'category'];
+    /** Card style card_type values that map to POS product/category/entity CSS variables. */
+    private const POS_CARD_TYPES = ['product', 'category', 'entity'];
 
     private PDO $pdo;
 
@@ -206,6 +206,12 @@ final class AdminUiThemeLoader
                 '--card-category-text'         => 'var(--text-secondary, #94a3b8)',
                 '--card-category-border'       => 'var(--border-color, #334155)',
                 '--card-category-radius'       => '20px',
+            ],
+            'entity' => [
+                '--card-entity-bg'             => 'var(--background-secondary, #1e293b)',
+                '--card-entity-text'           => 'var(--text-secondary, #94a3b8)',
+                '--card-entity-border'         => 'var(--border-color, #334155)',
+                '--card-entity-radius'         => '16px',
             ],
         ];
 
