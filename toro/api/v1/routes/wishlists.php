@@ -1,33 +1,39 @@
 <?php
 /**
  * TORO — v1/routes/wishlists.php
- * Wishlist routes
+ * مسارات المفضلة
+ *
+ * $router هو instance من Shared\Core\Kernel
  */
+declare(strict_types=1);
 
-use Shared\Core\Kernel;
-use V1\Middleware\AuthMiddleware;
+$_wishPath = __DIR__ . '/../modules/Wishlists';
+require_once $_wishPath . '/Contracts/WishlistsRepositoryInterface.php';
+require_once $_wishPath . '/Repositories/PdoWishlistsRepository.php';
+require_once $_wishPath . '/Services/WishlistsService.php';
+require_once $_wishPath . '/Controllers/WishlistsController.php';
+unset($_wishPath);
 
-$baseDir = __DIR__ . '/../modules/Wishlists';
-require_once $baseDir . '/Contracts/WishlistsRepositoryInterface.php';
-require_once $baseDir . '/Repositories/PdoWishlistsRepository.php';
-require_once $baseDir . '/Services/WishlistsService.php';
-require_once $baseDir . '/Controllers/WishlistsController.php';
+$_authMw = ['V1\Middleware\AuthMiddleware', 'V1\Middleware\ThrottleMiddleware:60,60'];
 
-$auth = [AuthMiddleware::class . '@handle'];
+// GET /v1/users/{userId}/wishlist — قائمة المفضلة
+$router->addRoute('GET', '/v1/users/{userId}/wishlist',
+    'WishlistsController@index', $_authMw);
 
-// ── Module-level paths ─────────────────────────────────────────────────────────
+// POST /v1/users/{userId}/wishlist — إضافة منتج
+$router->addRoute('POST', '/v1/users/{userId}/wishlist',
+    'WishlistsController@add', $_authMw);
 
-Kernel::get('/v1/users/{userId}/wishlist',
-    'WishlistsController@index', $auth);
+// POST /v1/users/{userId}/wishlist/toggle — تبديل منتج (إضافة/إزالة)
+$router->addRoute('POST', '/v1/users/{userId}/wishlist/toggle',
+    'WishlistsController@toggle', $_authMw);
 
-Kernel::post('/v1/users/{userId}/wishlist',
-    'WishlistsController@add', $auth);
+// DELETE /v1/users/{userId}/wishlist/{productId} — إزالة منتج
+$router->addRoute('DELETE', '/v1/users/{userId}/wishlist/{productId}',
+    'WishlistsController@remove', $_authMw);
 
-Kernel::post('/v1/users/{userId}/wishlist/toggle',
-    'WishlistsController@toggle', $auth);
+// DELETE /v1/users/{userId}/wishlist — مسح كل المفضلة
+$router->addRoute('DELETE', '/v1/users/{userId}/wishlist',
+    'WishlistsController@clear', $_authMw);
 
-Kernel::delete('/v1/users/{userId}/wishlist/{productId}',
-    'WishlistsController@remove', $auth);
-
-Kernel::delete('/v1/users/{userId}/wishlist',
-    'WishlistsController@clear', $auth);
+unset($_authMw);
