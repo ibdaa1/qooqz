@@ -5,6 +5,15 @@
 --
 -- Safe to re-run (uses INSERT ... SELECT ... WHERE NOT EXISTS pattern).
 
+-- ── Fix any existing entity-card rows whose slug/card_type were set incorrectly ──
+-- (e.g. slug='eee' created manually; identified by tenant=1 + wrong slug + no proper card_type)
+UPDATE `card_styles`
+SET    `slug`      = 'entities-default',
+       `card_type` = 'entities',
+       `name`      = 'Entity Card'
+WHERE  `slug` = 'eee'
+  AND (`card_type` = 'product' OR `card_type` IS NULL OR `card_type` = '');
+
 -- ── Entity Card (entities listing page) ──────────────────────────────────────
 INSERT INTO `card_styles`
   (`tenant_id`, `theme_id`, `name`, `slug`, `card_type`,

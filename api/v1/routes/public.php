@@ -763,6 +763,20 @@ if ($first === 'entity') {
         [$lang, $entityId]
     );
 
+    // Entity settings — expose all business-logic fields for the frontend
+    $entitySettings = $pdoOne(
+        "SELECT auto_accept_orders, allow_cod, min_order_amount, preparation_time_minutes,
+                allow_online_booking, booking_window_days, max_bookings_per_slot,
+                booking_cancellation_allowed, allow_preorders, max_daily_orders,
+                is_visible, maintenance_mode, show_reviews, show_contact_info,
+                featured_in_app, default_payment_method, allow_multiple_payment_methods,
+                delivery_radius_km, free_delivery_min_order,
+                notification_preferences, additional_settings
+           FROM entity_settings
+          WHERE entity_id = ? LIMIT 1",
+        [$entityId]
+    );
+
     ResponseFormatter::success([
         'ok'      => true,
         'data'    => array_merge($entity, [
@@ -770,6 +784,7 @@ if ($first === 'entity') {
             'addresses'       => $addresses,
             'payment_methods' => $paymentMethods,
             'attributes'      => $attributes,
+            'settings'        => $entitySettings ?: [],
         ]),
     ]);
     exit;

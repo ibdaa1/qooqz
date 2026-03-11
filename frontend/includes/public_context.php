@@ -900,14 +900,42 @@ function _pub_card_row(string $cardType): ?array {
             return $c;
         }
     }
-    // Fallback: when card_type is empty, match by the base of the slug (e.g. 'auction' matches 'auction-default')
+    // Fallback 1: match by the base of the slug (e.g. 'entities-default' base 'entities' matches 'entities').
+    // Works for ALL cards regardless of card_type value (covers mis-typed DB rows).
     foreach ($cards as $c) {
-        if (!empty($c['card_type'])) continue;
-        $slug = $c['slug'] ?? '';
-        $dashPos = strpos($slug, '-');
-        $base = $dashPos !== false ? substr($slug, 0, $dashPos) : $slug;
-        if ($base === $cardType) {
+        $slug     = $c['slug'] ?? '';
+        $dashPos  = strpos($slug, '-');
+        $slugBase = $dashPos !== false ? substr($slug, 0, $dashPos) : $slug;
+        if ($slugBase === $cardType) {
             return $c;
+        }
+    }
+    // Fallback 2: singular/plural alias using an explicit map of known card types.
+    // Covers 'entities'↔'entity', 'tenants'↔'tenant', 'products'↔'product', etc.
+    static $aliasMap = [
+        'entities'  => 'entity',   'entity'    => 'entities',
+        'tenants'   => 'tenant',   'tenant'    => 'tenants',
+        'products'  => 'product',  'product'   => 'products',
+        'categories'=> 'category', 'category'  => 'categories',
+        'auctions'  => 'auction',  'auction'   => 'auctions',
+        'jobs'      => 'job',      'job'       => 'jobs',
+        'blogs'     => 'blog',     'blog'      => 'blogs',
+        'discounts' => 'discount', 'discount'  => 'discounts',
+        'features'  => 'feature',  'feature'   => 'features',
+        'banners'   => 'banner',   'banner'    => 'banners',
+    ];
+    if (isset($aliasMap[$cardType])) {
+        $alias = $aliasMap[$cardType];
+        foreach ($cards as $c) {
+            if (($c['card_type'] ?? '') === $alias || ($c['slug'] ?? '') === $alias) {
+                return $c;
+            }
+            $slug     = $c['slug'] ?? '';
+            $dashPos  = strpos($slug, '-');
+            $slugBase = $dashPos !== false ? substr($slug, 0, $dashPos) : $slug;
+            if ($slugBase === $alias) {
+                return $c;
+            }
         }
     }
     return null;

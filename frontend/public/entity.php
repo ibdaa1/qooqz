@@ -132,6 +132,10 @@ if ($pdo) {
         $entitySettings = $esStmt->fetch(PDO::FETCH_ASSOC) ?: [];
     } catch (Throwable $_) { $entitySettings = []; }
 }
+// HTTP fallback: use settings embedded in the API response (when PDO is unavailable)
+if (empty($entitySettings) && !empty($entity['settings']) && is_array($entity['settings'])) {
+    $entitySettings = $entity['settings'];
+}
 
 // Respect is_visible: hide entity if not visible
 if (isset($entitySettings['is_visible']) && (int)$entitySettings['is_visible'] === 0) {
