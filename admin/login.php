@@ -6,6 +6,18 @@ declare(strict_types=1);
  * Fixed: Use APP_SESSID to match API
  */
 
+// ✅ Use same session storage path as the API (api/shared/config/session.php).
+// Without this, PHP falls back to the system default while login sessions are
+// stored in api/storage/sessions → user always appears logged out on page reload.
+$adminLoginSessionPath = dirname(__DIR__) . '/api/storage/sessions';
+if (!is_dir($adminLoginSessionPath)) {
+    @mkdir($adminLoginSessionPath, 0700, true);
+}
+if (is_dir($adminLoginSessionPath)) {
+    ini_set('session.save_path', $adminLoginSessionPath);
+}
+unset($adminLoginSessionPath);
+
 // ✅ Use same session name as API
 session_name('APP_SESSID');
 

@@ -10,6 +10,20 @@ declare(strict_types=1);
  */
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
+    // Ensure the same session storage path as the main API bootstrap (session.php).
+    // This block runs only when auth.php is loaded without the full API bootstrap
+    // (e.g. in tests or edge cases). Without this, sessions land on PHP's default
+    // path while the rest of the app uses api/storage/sessions → user appears
+    // logged out on next request.
+    $authSessionPath = dirname(__DIR__, 2) . '/storage/sessions';
+    if (!is_dir($authSessionPath)) {
+        @mkdir($authSessionPath, 0700, true);
+    }
+    if (is_dir($authSessionPath)) {
+        ini_set('session.save_path', $authSessionPath);
+    }
+    unset($authSessionPath);
+
     // Defensive session cookie params — adjust domain as needed
     $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
     $cookieParams = [

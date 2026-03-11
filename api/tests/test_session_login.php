@@ -21,21 +21,11 @@ header('Content-Type: application/json; charset=utf-8');
 // ------------------------------------------------------------------
 // 1. حساب مسار حفظ الجلسات (نفس المسار الذي تستخدمه bootstrap.php)
 // ------------------------------------------------------------------
-$apiDir          = dirname(__DIR__);               // /api
-$apiSessionPath  = $apiDir . '/storage/sessions';
-$defaultSavePath = session_save_path() ?: ini_get('session.save_path') ?: '/tmp';
+$apiDir         = dirname(__DIR__);               // /api
+$apiSessionPath = $apiDir . '/storage/sessions';
 
-$diag = [];
-$diag['session_paths'] = [
-    'api_custom_path'  => $apiSessionPath,
-    'api_path_exists'  => is_dir($apiSessionPath),
-    'api_path_writable'=> is_dir($apiSessionPath) && is_writable($apiSessionPath),
-    'php_default_path' => $defaultSavePath,
-    'paths_match'      => (realpath($apiSessionPath) === realpath($defaultSavePath)),
-];
-$diag['mismatch_warning'] = !$diag['session_paths']['paths_match']
-    ? 'مشكلة: مسار حفظ الجلسات مختلف! API يحفظ في api_custom_path لكن هذا الملف يقرأ من php_default_path → المستخدم يبدو دائماً غير مسجّل.'
-    : 'مسار الجلسات متطابق ✓';
+// Capture PHP default path BEFORE applying any custom setting.
+$defaultSavePath = session_save_path() ?: ini_get('session.save_path') ?: '/tmp';
 
 // ------------------------------------------------------------------
 // 2. ضبط مسار الحفظ قبل بدء الجلسة
@@ -48,6 +38,28 @@ if (!is_dir($apiSessionPath)) {
 if (is_dir($apiSessionPath)) {
     ini_set('session.save_path', $apiSessionPath);
 }
+
+// Evaluate paths_match AFTER ini_set: meaningful check is whether the session
+// is NOW configured to use the api custom path, not whether PHP default ≠ custom.
+$actualSavePath = ini_get('session.save_path');
+$pathsMatch = (
+    $actualSavePath !== '' &&
+    realpath($actualSavePath) !== false &&
+    realpath($actualSavePath) === realpath($apiSessionPath)
+);
+
+$diag = [];
+$diag['session_paths'] = [
+    'api_custom_path'   => $apiSessionPath,
+    'api_path_exists'   => is_dir($apiSessionPath),
+    'api_path_writable' => is_dir($apiSessionPath) && is_writable($apiSessionPath),
+    'php_default_path'  => $defaultSavePath,
+    'actual_save_path'  => $actualSavePath,
+    'paths_match'       => $pathsMatch,
+];
+$diag['mismatch_warning'] = !$pathsMatch
+    ? 'مشكلة: مسار حفظ الجلسات مختلف! API يحفظ في api_custom_path لكن هذا الملف يقرأ من php_default_path → المستخدم يبدو دائماً غير مسجّل.'
+    : 'مسار الجلسات متطابق ✓';
 
 // بدء الجلسة بنفس الإعدادات المستخدمة في bootstrap_admin_ui.php
 if (session_status() !== PHP_SESSION_ACTIVE) {
