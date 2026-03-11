@@ -261,7 +261,7 @@ if ($ids === [1, 2, 3]) {
 }
 
 // 1g. notifTenantId fallback chain
-// This mirrors the exact expression used in public_notifications.php:
+// This mirrors the exact expression used in api/v1/routes/public/notifications.php:
 //   $notifTenantId = (int)($tenantId ?? $_SESSION['pub_tenant_id'] ?? 1) ?: 1;
 function resolveNotifTenantId(?int $urlParam, ?int $sessionTenantId): int {
     // Mirrors: (int)($tenantId ?? $_SESSION['pub_tenant_id'] ?? 1) ?: 1
