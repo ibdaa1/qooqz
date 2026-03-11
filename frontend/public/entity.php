@@ -120,6 +120,38 @@ if (empty($entity)) {
 }
 
 /* -------------------------------------------------------
+ * Fetch entity_settings and respect them
+ * ----------------------------------------------------- */
+$entitySettings = [];
+if ($pdo) {
+    try {
+        $esStmt = $pdo->prepare(
+            "SELECT * FROM entity_settings WHERE entity_id = ? LIMIT 1"
+        );
+        $esStmt->execute([$entity['id'] ?? $entityId]);
+        $entitySettings = $esStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $_) { $entitySettings = []; }
+}
+
+// Respect is_visible: hide entity if not visible
+if (isset($entitySettings['is_visible']) && (int)$entitySettings['is_visible'] === 0) {
+    $GLOBALS['PUB_PAGE_TITLE'] = t('entity.not_found') . ' — QOOQZ';
+    include dirname(__DIR__) . '/partials/header.php';
+    echo '<div class="pub-container" style="padding:60px 0;text-align:center;"><p>' . e(t('entity.not_available', 'This entity is currently unavailable.')) . '</p></div>';
+    include dirname(__DIR__) . '/partials/footer.php';
+    exit;
+}
+
+// Respect maintenance_mode: show maintenance page
+$entityInMaintenance = !empty($entitySettings['maintenance_mode']);
+
+// Respect show_reviews setting
+$entityShowReviews = !isset($entitySettings['show_reviews']) || (int)$entitySettings['show_reviews'] !== 0;
+
+// Respect show_contact_info setting
+$entityShowContactInfo = !isset($entitySettings['show_contact_info']) || (int)$entitySettings['show_contact_info'] !== 0;
+
+/* -------------------------------------------------------
  * Fetch entity products
  * ----------------------------------------------------- */
 $productPage  = max(1, (int)($_GET['page'] ?? 1));
@@ -349,6 +381,15 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
 ?>
 
 <!-- Entity Banner -->
+<?php if ($entityInMaintenance): ?>
+<div class="pub-container" style="padding:40px 0;text-align:center;">
+    <div style="background:var(--pub-surface);border:1px solid var(--pub-border);border-radius:var(--pub-radius);padding:40px 20px;">
+        <div style="font-size:3rem;margin-bottom:16px;">🔧</div>
+        <h2 style="margin:0 0 10px;color:var(--pub-text);"><?= e(t('entity.maintenance_title', 'Under Maintenance')) ?></h2>
+        <p style="color:var(--pub-muted);margin:0;"><?= e(t('entity.maintenance_msg', 'This entity is currently undergoing maintenance. Please check back later.')) ?></p>
+    </div>
+</div>
+<?php else: ?>
 <div class="pub-entity-banner">
     <?php if (!empty($entity['cover_url'])): ?>
         <img src="<?= e(pub_img($entity['cover_url'], 'entity_cover')) ?>"
@@ -408,6 +449,7 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
             <?php endif; ?>
 
             <!-- Contact info -->
+            <?php if ($entityShowContactInfo): ?>
             <div class="pub-entity-contacts">
                 <?php if (!empty($entity['phone'])): ?>
                     <a href="tel:<?= e($entity['phone']) ?>" class="pub-contact-item">
@@ -425,6 +467,7 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
                     </a>
                 <?php endif; ?>
             </div>
+            <?php endif; ?>
 
             <!-- Social links -->
             <div class="pub-entity-social">
@@ -494,11 +537,13 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
             <span class="pub-tab-count"><?= count($discounts) ?></span>
         </button>
         <?php endif; ?>
+        <?php if ($entityShowReviews): ?>
         <button class="pub-tab" data-tab="ratings" role="tab"
                 aria-selected="false" aria-controls="tabRatings">
             ⭐ <?= e(t('entity.ratings_tab')) ?>
             <?php if ($entityRatingTotal > 0): ?><span class="pub-tab-count"><?= $entityRatingTotal ?></span><?php endif; ?>
         </button>
+        <?php endif; ?>
     </div>
 
     <!-- TAB: Products -->
@@ -816,6 +861,7 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
     </div>
 
     <!-- TAB: Ratings -->
+    <?php if ($entityShowReviews): ?>
     <div class="pub-tab-panel" id="tabRatings" style="display:none;">
         <div style="margin-top:20px;">
             <?php if ($entityRatingAvg !== null): ?>
@@ -902,6 +948,7 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
             <?php endif; ?>
         </div>
     </div>
+    <?php endif; // end show_reviews ?>
 
 </div><!-- /.pub-container discounts -->
 
@@ -1143,4 +1190,5 @@ echo '<style>
 }());
 </script>
 
+<?php endif; // end maintenance check ?>
 <?php include dirname(__DIR__) . '/partials/footer.php'; ?>

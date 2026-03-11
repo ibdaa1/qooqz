@@ -116,9 +116,12 @@ $_tenantEntityCardClass = pub_card_css_class('entities');
     <!-- Entities grid -->
     <?php if (!empty($entities)): ?>
     <div class="pub-grid-md">
-        <?php foreach ($entities as $en): ?>
+        <?php foreach ($entities as $en):
+            // Per-entity card color from entity_settings.additional_settings
+            $enCardStyle = pub_entity_card_style($en, $_tenantEntityCardStyle);
+        ?>
         <a href="/frontend/public/entity.php?id=<?= (int)($en['id'] ?? 0) ?>"
-           class="pub-entity-card<?= $_tenantEntityCardClass ? ' ' . $_tenantEntityCardClass : '' ?>" style="text-decoration:none;<?= e($_tenantEntityCardStyle) ?>">
+           class="pub-entity-card<?= $_tenantEntityCardClass ? ' ' . $_tenantEntityCardClass : '' ?>" style="text-decoration:none;<?= e($enCardStyle) ?>">
             <div class="pub-entity-card-logo">
                 <?php if (!empty($en['logo_url'])): ?>
                     <img src="<?= e(pub_img($en['logo_url'], 'entity_logo')) ?>"

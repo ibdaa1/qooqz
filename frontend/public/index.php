@@ -323,9 +323,11 @@ $_imgCategory   = pub_card_img_style('category');
         <?php /* ---- Brands / Vendors ---- */
         elseif (in_array($secType, ['brands', 'vendors'], true)): ?>
         <div class="pub-grid-md">
-            <?php foreach ($items as $ent): ?>
+            <?php foreach ($items as $ent):
+                $entCardStyle = pub_entity_card_style($ent, $_cardEntity);
+            ?>
             <a href="/frontend/public/entity.php?id=<?= (int)($ent['id'] ?? 0) ?>"
-               class="pub-entity-card<?= $_clsEntity ? ' '.$_clsEntity : '' ?>" style="text-decoration:none;<?= e($_cardEntity) ?>">
+               class="pub-entity-card<?= $_clsEntity ? ' '.$_clsEntity : '' ?>" style="text-decoration:none;<?= e($entCardStyle) ?>">
                 <div class="pub-entity-avatar">
                     <?php if (!empty($ent['logo_url'])): ?>
                         <img src="<?= e(pub_img($ent['logo_url'], 'entity_logo')) ?>"
@@ -479,9 +481,11 @@ else:
             <a href="/frontend/public/entities.php" class="pub-section-link"><?= e(t('sections.view_all')) ?></a>
         </div>
         <div class="pub-grid-md">
-            <?php foreach ($featuredEntities as $ent): ?>
+            <?php foreach ($featuredEntities as $ent):
+                $entCardStyle = pub_entity_card_style($ent, $_cardEntity);
+            ?>
             <a href="/frontend/public/entity.php?id=<?= (int)($ent['id'] ?? 0) ?>"
-               class="pub-entity-card<?= $_clsEntity ? ' '.$_clsEntity : '' ?>" style="text-decoration:none;<?= e($_cardEntity) ?>">
+               class="pub-entity-card<?= $_clsEntity ? ' '.$_clsEntity : '' ?>" style="text-decoration:none;<?= e($entCardStyle) ?>">
                 <div class="pub-entity-avatar">
                     <?php if (!empty($ent['logo_url'])): ?>
                         <img src="<?= e(pub_img($ent['logo_url'], 'entity_logo')) ?>"

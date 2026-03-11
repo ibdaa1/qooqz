@@ -805,8 +805,10 @@ if ($first === 'entities') {
     $rows  = $pdoList(
         "SELECT e.id, e.store_name, e.slug, e.vendor_type, e.is_verified, e.tenant_id,
                 (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url,
-                NULL AS logo_thumb_url
+                NULL AS logo_thumb_url,
+                es.additional_settings
            FROM entities e
+           LEFT JOIN entity_settings es ON es.entity_id = e.id
           $where ORDER BY e.is_verified DESC, e.id DESC LIMIT ? OFFSET ?",
         array_merge($params, [$per, $offset])
     );
@@ -836,8 +838,10 @@ if ($first === 'tenants') {
         );
         $rows  = $pdoList(
             "SELECT e.id, e.store_name, e.slug, e.vendor_type, e.is_verified, e.phone,
-                    (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url
+                    (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url,
+                    es.additional_settings
                FROM entities e
+               LEFT JOIN entity_settings es ON es.entity_id = e.id
               WHERE e.tenant_id = ? AND e.status = 'approved'
               ORDER BY e.id ASC LIMIT ? OFFSET ?",
             [(int)$id, $per, $offset]

@@ -980,6 +980,33 @@ if (!function_exists('pub_card_img_style')) {
     }
 }
 
+if (!function_exists('pub_entity_card_style')) {
+    /**
+     * Return an inline CSS style string for an entity card, applying the per-entity
+     * card color from entity_settings.additional_settings JSON (card_color, card_text_color)
+     * when set, falling back to the global card_styles-based style.
+     *
+     * @param array  $entity         Entity data row (must include 'additional_settings' key if available)
+     * @param string $globalCardStyle Fallback from pub_card_inline_style('entities')
+     * @return string Inline CSS style string (without surrounding style="")
+     */
+    function pub_entity_card_style(array $entity, string $globalCardStyle = ''): string {
+        if (!empty($entity['additional_settings'])) {
+            $addSettings = json_decode((string)$entity['additional_settings'], true);
+            if (is_array($addSettings) && !empty($addSettings['card_color'])) {
+                $cc = preg_replace('/[^#a-zA-Z0-9(). ,%]/', '', (string)$addSettings['card_color']);
+                $style = 'background-color:' . htmlspecialchars($cc, ENT_QUOTES, 'UTF-8');
+                if (!empty($addSettings['card_text_color'])) {
+                    $tc = preg_replace('/[^#a-zA-Z0-9(). ,%]/', '', (string)$addSettings['card_text_color']);
+                    $style .= ';color:' . htmlspecialchars($tc, ENT_QUOTES, 'UTF-8');
+                }
+                return $style;
+            }
+        }
+        return $globalCardStyle;
+    }
+}
+
 
 /* -------------------------------------------------------
  * 11b. Notifications loader — reads recent notifications for a tenant

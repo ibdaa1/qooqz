@@ -533,6 +533,39 @@ $apiBase = '/api';
                                 <option value="1" data-i18n="form.fields.featured_in_app.yes">Yes</option>
                             </select>
                         </div>
+
+                        <div class="form-group">
+                            <label for="settingCardColor" data-i18n="form.fields.card_color.label">
+                                <?= __t('form.fields.card_color.label', 'Card Background Color') ?>
+                            </label>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input type="color" id="settingCardColorPicker"
+                                       style="width:44px;height:36px;padding:2px;border:1px solid var(--border-color,#334155);border-radius:6px;cursor:pointer;background:none;"
+                                       oninput="document.getElementById('settingCardColor').value=this.value">
+                                <input type="text" id="settingCardColor" name="card_color" class="form-control"
+                                       placeholder="#ffffff"
+                                       oninput="if(this.value.match(/^#[0-9a-fA-F]{6}$/))document.getElementById('settingCardColorPicker').value=this.value"
+                                       style="flex:1;">
+                            </div>
+                            <small style="color:var(--text-secondary,#94a3b8);font-size:0.78rem;">
+                                <?= __t('form.fields.card_color.hint', 'Overrides the global card style for this entity.') ?>
+                            </small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="settingCardTextColor" data-i18n="form.fields.card_text_color.label">
+                                <?= __t('form.fields.card_text_color.label', 'Card Text Color') ?>
+                            </label>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input type="color" id="settingCardTextColorPicker"
+                                       style="width:44px;height:36px;padding:2px;border:1px solid var(--border-color,#334155);border-radius:6px;cursor:pointer;background:none;"
+                                       oninput="document.getElementById('settingCardTextColor').value=this.value">
+                                <input type="text" id="settingCardTextColor" name="card_text_color" class="form-control"
+                                       placeholder="#1e293b"
+                                       oninput="if(this.value.match(/^#[0-9a-fA-F]{6}$/))document.getElementById('settingCardTextColorPicker').value=this.value"
+                                       style="flex:1;">
+                            </div>
+                        </div>
                     </div>
                 </div>
 

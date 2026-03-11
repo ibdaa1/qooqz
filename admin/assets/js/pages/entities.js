@@ -997,8 +997,24 @@
             .substring(0, 255);
     }
 
+    function parseAdditionalSettings(jsonString) {
+        if (!jsonString) return {};
+        try { return JSON.parse(jsonString); } catch (e) { return {}; }
+    }
+
     async function saveEntitySettings(entityId, isEdit = false) {
         try {
+            // Build additional_settings JSON with card colors
+            const existingAddSettings = parseAdditionalSettings(
+                state.entitySettings ? state.entitySettings.additional_settings : null
+            );
+            const cardColor = document.getElementById('settingCardColor')?.value?.trim() || '';
+            const cardTextColor = document.getElementById('settingCardTextColor')?.value?.trim() || '';
+            if (cardColor) existingAddSettings.card_color = cardColor;
+            else delete existingAddSettings.card_color;
+            if (cardTextColor) existingAddSettings.card_text_color = cardTextColor;
+            else delete existingAddSettings.card_text_color;
+
             const settings = {
                 entity_id: parseInt(entityId),
                 auto_accept_orders: document.getElementById('settingAutoAcceptOrders')?.value === '1' ? 1 : 0,
@@ -1009,7 +1025,8 @@
                 max_bookings_per_slot: parseInt(document.getElementById('settingMaxBookingsPerSlot')?.value || 0) || 0,
                 show_reviews: document.getElementById('settingShowReviews')?.value === '1' ? 1 : 0,
                 show_contact_info: document.getElementById('settingShowContactInfo')?.value === '1' ? 1 : 0,
-                featured_in_app: document.getElementById('settingFeaturedInApp')?.value === '1' ? 1 : 0
+                featured_in_app: document.getElementById('settingFeaturedInApp')?.value === '1' ? 1 : 0,
+                additional_settings: JSON.stringify(existingAddSettings)
             };
 
             await apiCall(API.settings, {
@@ -2038,6 +2055,25 @@
                 if (el.settingShowReviews) el.settingShowReviews.value = settings.show_reviews != null ? String(settings.show_reviews) : '1';
                 if (el.settingShowContactInfo) el.settingShowContactInfo.value = settings.show_contact_info != null ? String(settings.show_contact_info) : '1';
                 if (el.settingFeaturedInApp) el.settingFeaturedInApp.value = settings.featured_in_app != null ? String(settings.featured_in_app) : '0';
+
+                // Load card_color and card_text_color from additional_settings JSON
+                const addSettings = parseAdditionalSettings(settings.additional_settings);
+                const cardColorEl = document.getElementById('settingCardColor');
+                const cardColorPickerEl = document.getElementById('settingCardColorPicker');
+                const cardTextColorEl = document.getElementById('settingCardTextColor');
+                const cardTextColorPickerEl = document.getElementById('settingCardTextColorPicker');
+                if (cardColorEl) {
+                    cardColorEl.value = addSettings.card_color || '';
+                    if (cardColorPickerEl && addSettings.card_color && addSettings.card_color.match(/^#[0-9a-fA-F]{6}$/)) {
+                        cardColorPickerEl.value = addSettings.card_color;
+                    }
+                }
+                if (cardTextColorEl) {
+                    cardTextColorEl.value = addSettings.card_text_color || '';
+                    if (cardTextColorPickerEl && addSettings.card_text_color && addSettings.card_text_color.match(/^#[0-9a-fA-F]{6}$/)) {
+                        cardTextColorPickerEl.value = addSettings.card_text_color;
+                    }
+                }
             }
         } catch (err) {
             console.warn('[Entities] Failed to load settings:', err);

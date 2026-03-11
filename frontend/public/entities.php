@@ -50,8 +50,12 @@ if ($pdo) {
             "SELECT e.id, e.store_name, e.slug, e.vendor_type, e.is_verified,
                     (SELECT et2.description FROM entity_translations et2
                      WHERE et2.entity_id = e.id AND et2.language_code = ? LIMIT 1) AS description,
-                    (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url
+                    (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url,
+                    (SELECT GROUP_CONCAT(i2.url ORDER BY i2.id ASC SEPARATOR '|')
+                     FROM images i2 WHERE i2.owner_id = e.id) AS all_image_urls,
+                    es.additional_settings
              FROM entities e
+             LEFT JOIN entity_settings es ON es.entity_id = e.id
              WHERE $whereClause
              ORDER BY e.is_verified DESC, e.id DESC
              LIMIT $limit OFFSET $offset"
@@ -133,15 +137,34 @@ $_entityCardClass = pub_card_css_class('entities');
     <!-- Entities grid -->
     <?php if (!empty($entities)): ?>
     <div class="pub-grid-md">
-        <?php foreach ($entities as $ent): ?>
+        <?php foreach ($entities as $ent):
+            // Per-entity card color: use entity_settings.additional_settings.card_color if set
+            $entCardStyle = pub_entity_card_style($ent, $_entityCardStyle);
+            // Build image list for slideshow
+            $entImgs = [];
+            if (!empty($ent['all_image_urls'])) {
+                foreach (explode('|', $ent['all_image_urls']) as $rawU) {
+                    $s = pub_img(trim($rawU), 'entity_logo');
+                    if ($s) $entImgs[] = $s;
+                }
+            } elseif (!empty($ent['logo_url'])) {
+                $s = pub_img($ent['logo_url'], 'entity_logo');
+                if ($s) $entImgs[] = $s;
+            }
+            $entHasMulti = count($entImgs) > 1;
+        ?>
         <a href="/frontend/public/entity.php?id=<?= (int)($ent['id'] ?? 0) ?>"
-           class="pub-entity-card<?= $_entityCardClass ? ' '.$_entityCardClass : '' ?>" style="text-decoration:none;<?= e($_entityCardStyle) ?>">
-            <div class="pub-entity-avatar">
-                <?php $logoSrc = pub_img($ent['logo_url'] ?? null, 'entity_logo'); ?>
-                <?php if ($logoSrc): ?>
-                    <img src="<?= e($logoSrc) ?>"
-                         alt="<?= e($ent['store_name'] ?? '') ?>" loading="lazy"
-                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+           class="pub-entity-card<?= $_entityCardClass ? ' '.$_entityCardClass : '' ?>"
+           style="text-decoration:none;<?= e($entCardStyle) ?>"<?= $entHasMulti ? ' data-img-slide="1"' : '' ?>>
+            <div class="pub-entity-avatar" style="position:relative;overflow:hidden;">
+                <?php if (!empty($entImgs)): ?>
+                    <?php foreach ($entImgs as $eIdx => $eSrc): ?>
+                    <img src="<?= e($eSrc) ?>"
+                         alt="<?= e($ent['store_name'] ?? '') ?>"
+                         class="pub-ent-slide-img<?= $eIdx > 0 ? ' pub-ent-slide-img--hidden' : '' ?>"
+                         loading="lazy"
+                         onerror="this.style.display='none'">
+                    <?php endforeach; ?>
                     <span style="display:none;align-items:center;justify-content:center;">🏢</span>
                 <?php else: ?>
                     🏢
@@ -185,5 +208,36 @@ $_entityCardClass = pub_card_css_class('entities');
     <?php endif; ?>
 
 </div>
+
+<style>
+.pub-ent-slide-img { width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0; transition:opacity 0.4s; }
+.pub-ent-slide-img--hidden { opacity:0; pointer-events:none; }
+</style>
+<script>
+(function () {
+    var INTERVAL = 3000;
+    document.querySelectorAll('[data-img-slide="1"]').forEach(function (card) {
+        var imgs = card.querySelectorAll('.pub-ent-slide-img');
+        if (imgs.length < 2) return;
+        var cur = 0;
+        var timer = null;
+        function showSlide(n) {
+            imgs[cur].classList.add('pub-ent-slide-img--hidden');
+            cur = (n + imgs.length) % imgs.length;
+            imgs[cur].classList.remove('pub-ent-slide-img--hidden');
+        }
+        function startAuto() {
+            if (timer) clearInterval(timer);
+            timer = setInterval(function () { showSlide(cur + 1); }, INTERVAL);
+        }
+        function stopAuto() {
+            if (timer) { clearInterval(timer); timer = null; }
+        }
+        startAuto();
+        card.addEventListener('mouseenter', stopAuto);
+        card.addEventListener('mouseleave', startAuto);
+    });
+}());
+</script>
 
 <?php include dirname(__DIR__) . '/partials/footer.php'; ?>
