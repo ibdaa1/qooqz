@@ -13,6 +13,19 @@ function _aui_log(string $m): void {
 }
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
+    // Use the same session storage path as the main API bootstrap (session.php).
+    // Without this, PHP falls back to the system default (/tmp) while login
+    // sessions are stored in /api/storage/sessions → user always appears logged out.
+    $apiSessionPath = __DIR__ . '/storage/sessions';
+    if (!is_dir($apiSessionPath)) {
+        if (!mkdir($apiSessionPath, 0700, true) && !is_dir($apiSessionPath)) {
+            _aui_log('Failed to create session directory: ' . $apiSessionPath);
+        }
+    }
+    if (is_dir($apiSessionPath)) {
+        ini_set('session.save_path', $apiSessionPath);
+    }
+
     session_name('APP_SESSID');
     session_start([
         'cookie_secure' => !empty($_SERVER['HTTPS']),

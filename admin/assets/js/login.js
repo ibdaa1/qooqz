@@ -84,9 +84,17 @@ async function postToApi(formId) {
 
         // Server returned 2xx: check different possible structures
         // Accept formats:
+        // - { ok: true, ... }           ← ResponseFormatter::success
         // - { success: true, ... }
-        // - ResponseFormatter::success -> maybe { status: 'success', data: ... } or similar
-        const success = data && (data.success === true || data.status === 'success' || data.message === 'Login successful');
+        // - { status: 'success', ... }
+        // - { message: 'Login successful' }
+        const success = data && (
+            data.ok === true ||
+            data.success === true ||
+            data.status === 'success' ||
+            data.message === 'Login successful' ||
+            data.message === 'Authenticated'
+        );
 
         if (success) {
             setResult(data.message || 'Success', true);
