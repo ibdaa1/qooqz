@@ -635,6 +635,10 @@ window.THEMES_CONFIG = {
                         <select id="cardType" class="form-control">
                             <option value="product"      data-i18n="theme_manager_settings.card_types.product">Product</option>
                             <option value="category"     data-i18n="theme_manager_settings.card_types.category">Category</option>
+                            <option value="entity"       data-i18n="theme_manager_settings.card_types.entity">Entity</option>
+                            <option value="entities"     data-i18n="theme_manager_settings.card_types.entities">Entities</option>
+                            <option value="tenant"       data-i18n="theme_manager_settings.card_types.tenant">Tenant</option>
+                            <option value="tenants"      data-i18n="theme_manager_settings.card_types.tenants">Tenants</option>
                             <option value="vendor"       data-i18n="theme_manager_settings.card_types.vendor">Vendor</option>
                             <option value="blog"         data-i18n="theme_manager_settings.card_types.blog">Blog</option>
                             <option value="feature"      data-i18n="theme_manager_settings.card_types.feature">Feature</option>

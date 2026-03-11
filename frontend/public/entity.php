@@ -158,7 +158,8 @@ if ($pdo) {
                     p.is_featured, p.stock_quantity, p.stock_status, p.rating_average, p.rating_count,
                     (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
                     (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
-                    (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url
+                    (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url,
+                    (SELECT GROUP_CONCAT(i.url ORDER BY i.id ASC SEPARATOR '|') FROM images i WHERE i.owner_id = p.id) AS image_urls
                FROM products p
           LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
               $pWhere ORDER BY p.is_featured DESC, p.id DESC
@@ -575,15 +576,37 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
         <?php if (!empty($products)): ?>
         <div class="pub-grid" style="margin-top:20px;">
             <?php foreach ($products as $p): ?>
-            <div class="pub-product-card<?= $_entityProductCardClass ? ' ' . $_entityProductCardClass : '' ?>"<?= $_entityProductCardStyle ? ' style="' . e($_entityProductCardStyle) . '"' : '' ?>>
+            <?php
+                // Build all images list for slideshow
+                $pAllImgs = [];
+                if (!empty($p['image_urls'])) {
+                    foreach (explode('|', $p['image_urls']) as $rawU) {
+                        $s = pub_img(trim($rawU), 'product_thumb');
+                        if ($s) $pAllImgs[] = $s;
+                    }
+                } elseif (!empty($p['image_url'])) {
+                    $pAllImgs[] = pub_img($p['image_url'], 'product_thumb');
+                }
+                $pHasMulti = count($pAllImgs) > 1;
+            ?>
+            <div class="pub-product-card<?= $_entityProductCardClass ? ' ' . $_entityProductCardClass : '' ?>"<?= $_entityProductCardStyle ? ' style="' . e($_entityProductCardStyle) . '"' : '' ?><?= $pHasMulti ? ' data-img-slide="1"' : '' ?>>
                 <a href="/frontend/public/product.php?id=<?= (int)($p['id'] ?? 0) ?>"
                    style="text-decoration:none;display:block;">
                 <div class="pub-cat-img-wrap" style="<?= e($_entityProductImgStyle) ?>">
-                    <?php if (!empty($p['image_url'])): ?>
-                        <img src="<?= e(pub_img($p['image_url'], 'product_thumb')) ?>"
-                             alt="<?= e($p['name'] ?? '') ?>" class="pub-cat-img" loading="lazy"
-                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                    <?php if (!empty($pAllImgs)): ?>
+                        <?php foreach ($pAllImgs as $piIdx => $piSrc): ?>
+                        <img src="<?= e($piSrc) ?>"
+                             alt="<?= e($p['name'] ?? '') ?>" class="pub-cat-img pub-slide-img<?= $piIdx > 0 ? ' pub-slide-img--hidden' : '' ?>" loading="lazy"
+                             onerror="this.style.display='none'">
+                        <?php endforeach; ?>
                         <span class="pub-img-placeholder" style="display:none;">🖼️</span>
+                        <?php if ($pHasMulti): ?>
+                        <div class="pub-slide-dots" aria-hidden="true">
+                            <?php for ($pdi = 0; $pdi < count($pAllImgs); $pdi++): ?>
+                            <span class="pub-slide-dot<?= $pdi === 0 ? ' pub-slide-dot--active' : '' ?>"></span>
+                            <?php endfor; ?>
+                        </div>
+                        <?php endif; ?>
                     <?php else: ?>
                         <span class="pub-img-placeholder">🖼️</span>
                     <?php endif; ?>
@@ -603,7 +626,7 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
                         data-product-id="<?= (int)($p['id'] ?? 0) ?>"
                         data-product-name="<?= e($p['name'] ?? '') ?>"
                         data-product-price="<?= (float)($p['price'] ?? 0) ?>"
-                        data-product-image="<?= e($p['image_url'] ?? '') ?>"
+                        data-product-image="<?= e($pAllImgs[0] ?? ($p['image_url'] ?? '')) ?>"
                         data-product-sku="<?= e($p['sku'] ?? '') ?>">
                     🛒 <?= e(t('cart.add')) ?>
                 </button>
@@ -1078,7 +1101,46 @@ echo '<style>
   .pub-attr-key { min-width:80px; }
   .pub-cat-tab-btn { padding:5px 10px; font-size:0.78rem; }
 }
+.pub-slide-img--hidden { display: none !important; }
+.pub-slide-dots {
+    position: absolute; bottom: 6px; left: 0; right: 0;
+    display: flex; justify-content: center; gap: 4px; pointer-events: none;
+}
+.pub-slide-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(255,255,255,0.5); transition: background 0.3s;
+}
+.pub-slide-dot--active { background: rgba(255,255,255,0.95); }
 </style>';
 ?>
+<script>
+(function () {
+    var INTERVAL = 2800;
+    document.querySelectorAll('[data-img-slide="1"]').forEach(function (card) {
+        var imgs = card.querySelectorAll('.pub-slide-img');
+        var dots = card.querySelectorAll('.pub-slide-dot');
+        if (imgs.length < 2) return;
+        var cur = 0;
+        var timer = null;
+        function showSlide(n) {
+            imgs[cur].classList.add('pub-slide-img--hidden');
+            if (dots[cur]) dots[cur].classList.remove('pub-slide-dot--active');
+            cur = (n + imgs.length) % imgs.length;
+            imgs[cur].classList.remove('pub-slide-img--hidden');
+            if (dots[cur]) dots[cur].classList.add('pub-slide-dot--active');
+        }
+        function startAuto() {
+            if (timer) clearInterval(timer);
+            timer = setInterval(function () { showSlide(cur + 1); }, INTERVAL);
+        }
+        function stopAuto() {
+            if (timer) { clearInterval(timer); timer = null; }
+        }
+        startAuto();
+        card.addEventListener('mouseenter', stopAuto);
+        card.addEventListener('mouseleave', startAuto);
+    });
+}());
+</script>
 
 <?php include dirname(__DIR__) . '/partials/footer.php'; ?>

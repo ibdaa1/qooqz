@@ -78,6 +78,7 @@ if ($pdo) {
                     (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
                     (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url,
                     NULL AS image_thumb_url,
+                    (SELECT GROUP_CONCAT(i.url ORDER BY i.id ASC SEPARATOR '|') FROM images i WHERE i.owner_id = p.id) AS image_urls,
                     (SELECT oi.entity_id FROM order_items oi WHERE oi.product_id = p.id LIMIT 1) AS entity_id
              FROM products p
              LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
@@ -156,8 +157,19 @@ $_productImgStyle  = pub_card_img_style('product');
             $pPrice = $p['price'] ?? null;
             $pCur   = $p['currency_code'] ?? t('common.currency');
             $imgSrc = pub_img($p['image_thumb_url'] ?? $p['image_url'] ?? null, 'product_thumb');
+            // Build all images list for slideshow
+            $allImgUrls = [];
+            if (!empty($p['image_urls'])) {
+                foreach (explode('|', $p['image_urls']) as $rawUrl) {
+                    $src = pub_img(trim($rawUrl), 'product_thumb');
+                    if ($src) $allImgUrls[] = $src;
+                }
+            } elseif ($imgSrc) {
+                $allImgUrls[] = $imgSrc;
+            }
+            $hasMultipleImages = count($allImgUrls) > 1;
         ?>
-        <div class="pub-product-card<?= $_productCardClass ? ' '.$_productCardClass : '' ?>" style="position:relative;<?= e($_productCardStyle) ?>">
+        <div class="pub-product-card<?= $_productCardClass ? ' '.$_productCardClass : '' ?>" style="position:relative;<?= e($_productCardStyle) ?>"<?= $hasMultipleImages ? ' data-img-slide="1"' : '' ?>>
             <!-- Wishlist heart -->
             <button class="pub-wishlist-btn"
                     type="button"
@@ -169,11 +181,20 @@ $_productImgStyle  = pub_card_img_style('product');
                style="text-decoration:none;display:flex;flex-direction:column;flex:1;"
                aria-label="<?= e($pName) ?>">
                 <div class="pub-cat-img-wrap" style="<?= e($_productImgStyle) ?>">
-                    <?php if ($imgSrc): ?>
-                        <img src="<?= e($imgSrc) ?>"
-                             alt="<?= e($pName) ?>" class="pub-cat-img" loading="lazy"
-                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                    <?php if (!empty($allImgUrls)): ?>
+                        <?php foreach ($allImgUrls as $idx => $iSrc): ?>
+                        <img src="<?= e($iSrc) ?>"
+                             alt="<?= e($pName) ?>" class="pub-cat-img pub-slide-img<?= $idx > 0 ? ' pub-slide-img--hidden' : '' ?>" loading="lazy"
+                             onerror="this.style.display='none'">
+                        <?php endforeach; ?>
                         <span class="pub-img-placeholder" style="display:none;" aria-hidden="true">🖼️</span>
+                        <?php if ($hasMultipleImages): ?>
+                        <div class="pub-slide-dots" aria-hidden="true">
+                            <?php for ($di = 0; $di < count($allImgUrls); $di++): ?>
+                            <span class="pub-slide-dot<?= $di === 0 ? ' pub-slide-dot--active' : '' ?>"></span>
+                            <?php endfor; ?>
+                        </div>
+                        <?php endif; ?>
                     <?php else: ?>
                         <span class="pub-img-placeholder" aria-hidden="true">🖼️</span>
                     <?php endif; ?>
@@ -266,5 +287,47 @@ $_productImgStyle  = pub_card_img_style('product');
     <?php endif; ?>
 
 </div>
+
+<style>
+.pub-slide-img--hidden { display: none !important; }
+.pub-slide-dots {
+    position: absolute; bottom: 6px; left: 0; right: 0;
+    display: flex; justify-content: center; gap: 4px; pointer-events: none;
+}
+.pub-slide-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(255,255,255,0.5); transition: background 0.3s;
+}
+.pub-slide-dot--active { background: rgba(255,255,255,0.95); }
+</style>
+<script>
+(function () {
+    var INTERVAL = 2800;
+    document.querySelectorAll('[data-img-slide="1"]').forEach(function (card) {
+        var imgs = card.querySelectorAll('.pub-slide-img');
+        var dots = card.querySelectorAll('.pub-slide-dot');
+        if (imgs.length < 2) return;
+        var cur = 0;
+        var timer = null;
+        function showSlide(n) {
+            imgs[cur].classList.add('pub-slide-img--hidden');
+            if (dots[cur]) dots[cur].classList.remove('pub-slide-dot--active');
+            cur = (n + imgs.length) % imgs.length;
+            imgs[cur].classList.remove('pub-slide-img--hidden');
+            if (dots[cur]) dots[cur].classList.add('pub-slide-dot--active');
+        }
+        function startAuto() {
+            if (timer) clearInterval(timer);
+            timer = setInterval(function () { showSlide(cur + 1); }, INTERVAL);
+        }
+        function stopAuto() {
+            if (timer) { clearInterval(timer); timer = null; }
+        }
+        startAuto();
+        card.addEventListener('mouseenter', stopAuto);
+        card.addEventListener('mouseleave', startAuto);
+    });
+}());
+</script>
 
 <?php include dirname(__DIR__) . '/partials/footer.php'; ?>
