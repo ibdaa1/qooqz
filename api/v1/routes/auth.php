@@ -104,9 +104,10 @@ function _load_user_rbac(PDO $pdo, int $userId, ?int $roleId = null): array {
             $rp = $q3->fetchAll(PDO::FETCH_COLUMN, 0);
             if ($rp) $perms = array_merge($perms, $rp);
         } elseif (!empty($roles)) {
-            $in = implode(',', array_fill(0, count($roles), '?'));
+            $safeRoles = array_values(array_map('strval', $roles));
+            $in = implode(',', array_fill(0, count($safeRoles), '?'));
             $q4 = $pdo->prepare("SELECT DISTINCT p.key_name FROM permissions p JOIN role_permissions rp ON rp.permission_id = p.id JOIN roles r ON r.id = rp.role_id WHERE r.key_name IN ($in)");
-            $q4->execute($roles);
+            $q4->execute($safeRoles);
             $rp2 = $q4->fetchAll(PDO::FETCH_COLUMN, 0);
             if ($rp2) $perms = array_merge($perms, $rp2);
         }
@@ -279,13 +280,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // regenerate session id to prevent fixation and ensure Set-Cookie
         session_regenerate_id(true);
 
+        $dbUserId = isset($row['id']) ? (int)$row['id'] : 0;
+
+        // Fetch role_id and tenant_id from tenant_users (not stored on users table)
+        $tenantRow = null;
+        if ($dbUserId > 0) {
+            try {
+                $tuStmt = $pdo->prepare(
+                    "SELECT tenant_id, role_id FROM tenant_users
+                     WHERE user_id = ? AND is_active = 1
+                     ORDER BY joined_at DESC LIMIT 1"
+                );
+                $tuStmt->execute([$dbUserId]);
+                $tenantRow = $tuStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            } catch (Throwable $e) {
+                if (class_exists('Logger')) Logger::error('tenant_users lookup error: ' . $e->getMessage());
+            }
+        }
+
+        $roleId   = isset($tenantRow['role_id'])   ? (int)$tenantRow['role_id']   : null;
+        $tenantId = isset($tenantRow['tenant_id']) ? (int)$tenantRow['tenant_id'] : 1;
+
         // set session + global user
         $user = [
-            'id'                 => isset($row['id']) ? (int)$row['id'] : null,
+            'id'                 => $dbUserId ?: null,
             'name'               => $row['name'] ?? $row['full_name'] ?? $row['username'] ?? null,
             'username'           => $row['username'] ?? $row['email'] ?? null,
             'email'              => $row['email'] ?? null,
-            'role_id'            => isset($row['role_id']) ? (int)$row['role_id'] : null,
+            'role_id'            => $roleId,
+            'tenant_id'          => $tenantId,
             'preferred_language' => $row['preferred_language'] ?? null,
             'is_active'          => !empty($row['is_active']),
         ];
@@ -297,6 +320,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user['roles_count'] = count($user['roles']);
 
         $_SESSION['user_id'] = $user['id'];
+        $_SESSION['tenant_id'] = $tenantId;
         $_SESSION['user'] = $user;
         $_SESSION['permissions'] = $user['permissions'];
         $_SESSION['roles'] = $user['roles'];

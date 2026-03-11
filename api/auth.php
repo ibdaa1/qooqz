@@ -133,20 +133,67 @@ function _auth_rbac(PDO $pdo, int $userId, ?int $roleId): array
     $perms = [];
     $roles = [];
     try {
-        if ($roleId) {
+        // Check user_roles junction table first (many-to-many)
+        $st = $pdo->query("SHOW TABLES LIKE 'user_roles'");
+        if ($st && $st->rowCount()) {
+            $q = $pdo->prepare(
+                "SELECT r.key_name FROM roles r
+                 JOIN user_roles ur ON ur.role_id = r.id
+                 WHERE ur.user_id = ?"
+            );
+            $q->execute([$userId]);
+            $r = $q->fetchAll(PDO::FETCH_COLUMN, 0);
+            if ($r) {
+                $roles = array_merge($roles, $r);
+            }
+        } elseif ($roleId) {
             $q = $pdo->prepare("SELECT key_name FROM roles WHERE id = ? LIMIT 1");
             $q->execute([$roleId]);
             $r = $q->fetchColumn();
             if ($r) {
                 $roles[] = $r;
             }
+        }
+        // Check user_permissions junction table
+        $st2 = $pdo->query("SHOW TABLES LIKE 'user_permissions'");
+        if ($st2 && $st2->rowCount()) {
             $q2 = $pdo->prepare(
+                "SELECT p.key_name FROM permissions p
+                 JOIN user_permissions up ON up.permission_id = p.id
+                 WHERE up.user_id = ?"
+            );
+            $q2->execute([$userId]);
+            $up = $q2->fetchAll(PDO::FETCH_COLUMN, 0);
+            if ($up) {
+                $perms = array_merge($perms, $up);
+            }
+        }
+        // Role permissions
+        if ($roleId) {
+            $q3 = $pdo->prepare(
                 "SELECT p.key_name FROM permissions p
                  JOIN role_permissions rp ON rp.permission_id = p.id
                  WHERE rp.role_id = ?"
             );
-            $q2->execute([$roleId]);
-            $perms = $q2->fetchAll(PDO::FETCH_COLUMN, 0);
+            $q3->execute([$roleId]);
+            $rp = $q3->fetchAll(PDO::FETCH_COLUMN, 0);
+            if ($rp) {
+                $perms = array_merge($perms, $rp);
+            }
+        } elseif (!empty($roles)) {
+            $safeRoles = array_values(array_map('strval', $roles));
+            $in = implode(',', array_fill(0, count($safeRoles), '?'));
+            $q4 = $pdo->prepare(
+                "SELECT DISTINCT p.key_name FROM permissions p
+                 JOIN role_permissions rp ON rp.permission_id = p.id
+                 JOIN roles r ON r.id = rp.role_id
+                 WHERE r.key_name IN ($in)"
+            );
+            $q4->execute($safeRoles);
+            $rp2 = $q4->fetchAll(PDO::FETCH_COLUMN, 0);
+            if ($rp2) {
+                $perms = array_merge($perms, $rp2);
+            }
         }
     } catch (Throwable $e) {
         error_log('[api/auth.php] RBAC error: ' . $e->getMessage());
@@ -296,7 +343,25 @@ if ($method === 'POST') {
         }
 
         $dbUserId = isset($row['id']) ? (int)$row['id'] : 0;
-        $roleId   = isset($row['role_id']) ? (int)$row['role_id'] : null;
+
+        // Fetch role_id and tenant_id from tenant_users (not stored on users table)
+        $tenantRow = null;
+        if ($dbUserId > 0) {
+            try {
+                $tuStmt = $pdo->prepare(
+                    "SELECT tenant_id, role_id FROM tenant_users
+                     WHERE user_id = ? AND is_active = 1
+                     ORDER BY joined_at DESC LIMIT 1"
+                );
+                $tuStmt->execute([$dbUserId]);
+                $tenantRow = $tuStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            } catch (Throwable $e) {
+                error_log('[api/auth.php] tenant_users lookup error: ' . $e->getMessage());
+            }
+        }
+
+        $roleId   = isset($tenantRow['role_id'])   ? (int)$tenantRow['role_id']   : null;
+        $tenantId = isset($tenantRow['tenant_id']) ? (int)$tenantRow['tenant_id'] : 1;
 
         $rbac = _auth_rbac($pdo, $dbUserId, $roleId);
 
@@ -307,6 +372,7 @@ if ($method === 'POST') {
             'username'           => $row['username'] ?? null,
             'email'              => $row['email']    ?? null,
             'role_id'            => $roleId,
+            'tenant_id'          => $tenantId,
             'preferred_language' => $row['preferred_language'] ?? 'en',
             'is_active'          => !empty($row['is_active']),
             'roles'              => $rbac['roles'],
@@ -314,6 +380,7 @@ if ($method === 'POST') {
         ];
 
         $_SESSION['user_id']     = $user['id'];
+        $_SESSION['tenant_id']   = $tenantId;
         $_SESSION['user']        = $user;
         $_SESSION['permissions'] = $user['permissions'];
         $_SESSION['roles']       = $user['roles'];
