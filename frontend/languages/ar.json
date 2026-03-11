@@ -163,7 +163,15 @@
     "filter": "بحث",
     "clear": "مسح",
     "empty": "لا توجد كيانات متاحة حالياً",
-    "entity_count": "كيان"
+    "entity_count": "كيان",
+    "featured": "مميز",
+    "online_booking": "حجز أونلاين",
+    "delivery": "توصيل",
+    "cod": "الدفع عند الاستلام",
+    "min_order": "أقل طلب",
+    "type_product": "بائع منتجات",
+    "type_service": "مزود خدمات",
+    "type_both": "منتجات وخدمات"
   },
   "tenants": {
     "page_title": "المستأجرون",
@@ -200,7 +208,10 @@
     "no_image": "لا توجد صورة",
     "currency": "ر.س",
     "cancel": "إلغاء",
-    "delete": "حذف"
+    "delete": "حذف",
+    "yes": "نعم",
+    "no": "لا",
+    "login": "تسجيل الدخول"
   },
   "cart": {
     "title": "سلة التسوق",
@@ -269,7 +280,27 @@
     "submit_rating": "إرسال التقييم",
     "pick_rating": "يرجى اختيار تقييم بالنجوم",
     "rating_submitted": "تم إرسال التقييم — في انتظار المراجعة.",
-    "login_to_rate": "لكتابة تقييم"
+    "login_to_rate": "لكتابة تقييم",
+    "not_available": "هذا الكيان غير متاح حالياً",
+    "settings_title": "معلومات الخدمة",
+    "settings_min_order": "الحد الأدنى للطلب",
+    "settings_prep_time": "وقت التحضير",
+    "settings_minutes": "دقيقة",
+    "settings_delivery_radius": "نطاق التوصيل",
+    "settings_km": "كم",
+    "settings_free_delivery": "توصيل مجاني من",
+    "settings_online_booking": "الحجز الإلكتروني",
+    "settings_booking_window": "نافذة الحجز",
+    "settings_days": "يوم",
+    "settings_max_per_slot": "الحد الأقصى في الوقت الواحد",
+    "settings_cancellation": "إلغاء الحجز",
+    "settings_preorders": "قبول الطلبات المسبقة",
+    "settings_cod": "الدفع عند الاستلام",
+    "settings_auto_accept": "قبول الطلبات تلقائياً",
+    "settings_max_daily": "الحد الأقصى للطلبات اليومية",
+    "settings_default_payment": "طريقة الدفع الافتراضية",
+    "settings_featured": "مميز في التطبيق",
+    "all_in_category": "جميع المنتجات"
   },
   "deals": {
     "title": "🔥 عروض ساخنة",

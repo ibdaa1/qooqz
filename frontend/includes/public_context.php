@@ -984,7 +984,9 @@ if (!function_exists('pub_entity_card_style')) {
     /**
      * Return an inline CSS style string for an entity card, applying the per-entity
      * card color from entity_settings.additional_settings JSON (card_color, card_text_color)
-     * when set, falling back to the global card_styles-based style.
+     * when set. When no per-entity color is set, returns the non-background parts of
+     * $globalCardStyle (border, shadow, padding, etc.) so the CSS class can control
+     * the background without being overridden by a redundant inline value.
      *
      * @param array  $entity         Entity data row (must include 'additional_settings' key if available)
      * @param string $globalCardStyle Fallback from pub_card_inline_style('entities')
@@ -1003,7 +1005,17 @@ if (!function_exists('pub_entity_card_style')) {
                 return $style;
             }
         }
-        return $globalCardStyle;
+        // Strip the background-color declaration from the global fallback so the CSS class
+        // (card-entities-default / .pub-entity-card) controls the background. This prevents
+        // entities without a specific card color from having their background locked to the
+        // same value as the page background via an inline style override.
+        if ($globalCardStyle === '') return '';
+        $parts = array_filter(array_map('trim', explode(';', $globalCardStyle)), function (string $p): bool {
+            if ($p === '') return false;
+            $prop = strtolower(strtok($p, ':'));
+            return $prop !== 'background-color' && $prop !== 'background';
+        });
+        return implode(';', $parts);
     }
 }
 

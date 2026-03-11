@@ -163,7 +163,15 @@
     "filter": "Search",
     "clear": "Clear",
     "empty": "No entities available at the moment",
-    "entity_count": "entity/entities"
+    "entity_count": "entity/entities",
+    "featured": "Featured",
+    "online_booking": "Online Booking",
+    "delivery": "Delivery",
+    "cod": "Cash on Delivery",
+    "min_order": "Min. Order",
+    "type_product": "Product Seller",
+    "type_service": "Service Provider",
+    "type_both": "Products & Services"
   },
   "tenants": {
     "page_title": "Tenants",
@@ -200,7 +208,9 @@
     "no_image": "No image",
     "currency": "SAR",
     "cancel": "Cancel",
-    "delete": "Delete"
+    "delete": "Delete",
+    "yes": "Yes",
+    "no": "No"
   },
   "cart": {
     "title": "Shopping Cart",
@@ -269,7 +279,27 @@
     "submit_rating": "Submit Review",
     "pick_rating": "Please select a star rating",
     "rating_submitted": "Review submitted — awaiting moderation.",
-    "login_to_rate": "to write a review"
+    "login_to_rate": "to write a review",
+    "not_available": "This entity is currently unavailable.",
+    "settings_title": "Service Information",
+    "settings_min_order": "Minimum Order",
+    "settings_prep_time": "Preparation Time",
+    "settings_minutes": "min",
+    "settings_delivery_radius": "Delivery Radius",
+    "settings_km": "km",
+    "settings_free_delivery": "Free Delivery From",
+    "settings_online_booking": "Online Booking",
+    "settings_booking_window": "Booking Window",
+    "settings_days": "days",
+    "settings_max_per_slot": "Max per Time Slot",
+    "settings_cancellation": "Cancellation Allowed",
+    "settings_preorders": "Pre-orders",
+    "settings_cod": "Cash on Delivery",
+    "settings_auto_accept": "Auto Accept Orders",
+    "settings_max_daily": "Max Daily Orders",
+    "settings_default_payment": "Default Payment Method",
+    "settings_featured": "Featured in App",
+    "all_in_category": "All items"
   },
   "deals": {
     "title": "🔥 Hot Deals",

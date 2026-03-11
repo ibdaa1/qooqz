@@ -53,11 +53,14 @@ if ($pdo) {
                     (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url,
                     (SELECT GROUP_CONCAT(i2.url ORDER BY i2.id ASC SEPARATOR '|')
                      FROM images i2 WHERE i2.owner_id = e.id) AS all_image_urls,
-                    es.additional_settings
+                    es.additional_settings,
+                    es.allow_online_booking, es.delivery_radius_km, es.allow_cod,
+                    es.featured_in_app, es.min_order_amount, es.free_delivery_min_order,
+                    es.preparation_time_minutes
              FROM entities e
              LEFT JOIN entity_settings es ON es.entity_id = e.id
              WHERE $whereClause
-             ORDER BY e.is_verified DESC, e.id DESC
+             ORDER BY COALESCE(es.featured_in_app, 0) DESC, e.is_verified DESC, e.id DESC
              LIMIT $limit OFFSET $offset"
         );
         $stmt->execute(array_merge([$lang], $params));
@@ -181,6 +184,20 @@ $_entityCardClass = pub_card_css_class('entities');
                 <?php if (!empty($ent['is_verified'])): ?>
                     <span class="pub-entity-verified">✅ <?= e(t('entities.verified')) ?></span>
                 <?php endif; ?>
+                <!-- Entity settings feature badges -->
+                <?php
+                $_entBadges = [];
+                if (!empty($ent['featured_in_app'])) $_entBadges[] = '<span class="pub-entity-feature-badge pub-entity-feature-badge--featured">⭐ ' . e(t('entities.featured')) . '</span>';
+                if (!empty($ent['allow_online_booking'])) $_entBadges[] = '<span class="pub-entity-feature-badge pub-entity-feature-badge--booking">📅 ' . e(t('entities.online_booking')) . '</span>';
+                if ((float)($ent['delivery_radius_km'] ?? 0) > 0) $_entBadges[] = '<span class="pub-entity-feature-badge pub-entity-feature-badge--delivery">🚚 ' . e(t('entities.delivery')) . '</span>';
+                if (!empty($ent['allow_cod'])) $_entBadges[] = '<span class="pub-entity-feature-badge pub-entity-feature-badge--cod">💵 ' . e(t('entities.cod')) . '</span>';
+                if ((float)($ent['min_order_amount'] ?? 0) > 0) $_entBadges[] = '<span class="pub-entity-feature-badge pub-entity-feature-badge--minorder">🛒 ' . e(t('entities.min_order')) . ': ' . number_format((float)$ent['min_order_amount'], 2) . '</span>';
+                if (!empty($_entBadges)):
+                ?>
+                <div class="pub-entity-badges" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">
+                    <?= implode('', $_entBadges) ?>
+                </div>
+                <?php endif; ?>
             </div>
         </a>
         <?php endforeach; ?>
@@ -212,6 +229,17 @@ $_entityCardClass = pub_card_css_class('entities');
 <style>
 .pub-ent-slide-img { width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0; transition:opacity 0.4s; }
 .pub-ent-slide-img--hidden { opacity:0; pointer-events:none; }
+.pub-entity-feature-badge {
+  display:inline-flex; align-items:center; gap:3px;
+  font-size:0.72rem; font-weight:600; padding:2px 7px;
+  border-radius:20px; line-height:1.5; white-space:nowrap;
+  border:1px solid transparent;
+}
+.pub-entity-feature-badge--featured  { background:rgba(245,158,11,0.12); color:#b45309; border-color:rgba(245,158,11,0.3); }
+.pub-entity-feature-badge--booking   { background:rgba(59,130,246,0.10); color:#1d4ed8; border-color:rgba(59,130,246,0.25); }
+.pub-entity-feature-badge--delivery  { background:rgba(16,185,129,0.10); color:#047857; border-color:rgba(16,185,129,0.25); }
+.pub-entity-feature-badge--cod       { background:rgba(139,92,246,0.10); color:#6d28d9; border-color:rgba(139,92,246,0.25); }
+.pub-entity-feature-badge--minorder  { background:rgba(107,114,128,0.08); color:#374151; border-color:rgba(107,114,128,0.2); }
 </style>
 <script>
 (function () {
