@@ -115,7 +115,8 @@ try {
                         'max_bookings_per_slot' => 0,
                         'show_reviews' => 1,
                         'show_contact_info' => 1,
-                        'featured_in_app' => 0
+                        'featured_in_app' => 0,
+                        'card_style_id' => null,
                     ]);
                 }
             } else {
