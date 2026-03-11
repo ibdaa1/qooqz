@@ -295,26 +295,8 @@ if ($method === 'POST') {
             _auth_json(false, 'Account disabled', [], 403);
         }
 
-        $dbUserId = (int)($row['id'] ?? 0);
-
-        // Fetch tenant_id and role_id from tenant_users (not stored on users table)
-        $tenantRow = null;
-        if ($dbUserId > 0) {
-            try {
-                $tuStmt = $pdo->prepare(
-                    "SELECT tenant_id, role_id FROM tenant_users
-                     WHERE user_id = ? AND is_active = 1
-                     ORDER BY joined_at DESC LIMIT 1"
-                );
-                $tuStmt->execute([$dbUserId]);
-                $tenantRow = $tuStmt->fetch(PDO::FETCH_ASSOC) ?: null;
-            } catch (Throwable $e) {
-                error_log('[api/auth.php] tenant_users lookup error: ' . $e->getMessage());
-            }
-        }
-
-        $roleId   = isset($tenantRow['role_id'])   ? (int)$tenantRow['role_id']   : null;
-        $tenantId = isset($tenantRow['tenant_id']) ? (int)$tenantRow['tenant_id'] : 1;
+        $dbUserId = isset($row['id']) ? (int)$row['id'] : 0;
+        $roleId   = isset($row['role_id']) ? (int)$row['role_id'] : null;
 
         $rbac = _auth_rbac($pdo, $dbUserId, $roleId);
 
@@ -325,7 +307,6 @@ if ($method === 'POST') {
             'username'           => $row['username'] ?? null,
             'email'              => $row['email']    ?? null,
             'role_id'            => $roleId,
-            'tenant_id'          => $tenantId,
             'preferred_language' => $row['preferred_language'] ?? 'en',
             'is_active'          => !empty($row['is_active']),
             'roles'              => $rbac['roles'],
@@ -333,7 +314,6 @@ if ($method === 'POST') {
         ];
 
         $_SESSION['user_id']     = $user['id'];
-        $_SESSION['tenant_id']   = $user['tenant_id'];
         $_SESSION['user']        = $user;
         $_SESSION['permissions'] = $user['permissions'];
         $_SESSION['roles']       = $user['roles'];
