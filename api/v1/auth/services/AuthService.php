@@ -39,9 +39,13 @@ class AuthService
 
         try {
             $stmt = $this->pdo->prepare(
-                "SELECT id, username, email, phone, password_hash, is_active, role_id
-                 FROM users
-                 WHERE username = :u OR email = :e OR phone = :p
+                "SELECT u.id, u.username, u.email, u.phone, u.password_hash, u.is_active,
+                        tu.role_id, tu.tenant_id
+                 FROM users u
+                 LEFT JOIN tenant_users tu ON tu.user_id = u.id AND tu.is_active = 1
+                 WHERE (u.username = :u OR u.email = :e OR u.phone = :p)
+                 AND u.is_active = 1
+                 ORDER BY tu.joined_at DESC
                  LIMIT 1"
             );
 
@@ -81,10 +85,11 @@ class AuthService
 
             // Sanitize output
             return [
-                'id'       => (int)$user['id'],
-                'username' => $user['username'],
-                'email'    => $user['email'],
-                'role_id'  => isset($user['role_id']) ? (int)$user['role_id'] : null,
+                'id'        => (int)$user['id'],
+                'username'  => $user['username'],
+                'email'     => $user['email'],
+                'role_id'   => isset($user['role_id']) ? (int)$user['role_id'] : null,
+                'tenant_id' => isset($user['tenant_id']) ? (int)$user['tenant_id'] : 1,
             ];
 
         } catch (Throwable $e) {

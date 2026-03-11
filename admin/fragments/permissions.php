@@ -96,20 +96,65 @@ if (!$canView && !$isSuperAdmin) {
 // ════════════════════════════════════════════════════════════
 // TRANSLATION HELPERS
 // ════════════════════════════════════════════════════════════
-function __t($key, $fallback = '') {
-    if (function_exists('i18n_get')) {
-        $v = i18n_get($key);
-        return $v ?? ($fallback ?? $key);
+if (!function_exists('__t')) {
+    function __t($key, $fallback = '') {
+        if (function_exists('i18n_get')) {
+            $v = i18n_get($key);
+            return $v ?? ($fallback ?? $key);
+        }
+        return $fallback ?? $key;
     }
-    return $fallback ?? $key;
 }
 
-function __tr($key, $replacements = []) {
-    $text = __t($key, $key);
-    foreach ($replacements as $ph => $val) {
-        $text = str_replace("{" . $ph . "}", (string)$val, $text);
+if (!function_exists('__tr')) {
+    function __tr($key, $replacements = []) {
+        $text = __t($key, $key);
+        foreach ($replacements as $ph => $val) {
+            $text = str_replace("{" . $ph . "}", (string)$val, $text);
+        }
+        return $text;
     }
-    return $text;
+}
+
+// ════════════════════════════════════════════════════════════
+// DB-DRIVEN CSS VARS HELPER (Permissions)
+// ════════════════════════════════════════════════════════════
+if (!function_exists('renderFragmentThemeVars')) {
+    function renderFragmentThemeVars(array $theme): void {
+        echo ':root {' . PHP_EOL;
+        foreach ($theme['color_settings'] ?? [] as $c) {
+            if (empty($c['setting_key']) || !isset($c['color_value'])) continue;
+            $k = htmlspecialchars($c['setting_key'], ENT_QUOTES);
+            $h = htmlspecialchars(str_replace('_', '-', $c['setting_key']), ENT_QUOTES);
+            $v = htmlspecialchars($c['color_value'], ENT_QUOTES);
+            echo "    --{$k}: {$v};" . PHP_EOL;
+            if ($h !== $k) echo "    --{$h}: {$v};" . PHP_EOL;
+        }
+        foreach ($theme['font_settings'] ?? [] as $f) {
+            if (empty($f['setting_key'])) continue;
+            $sk = htmlspecialchars($f['setting_key'], ENT_QUOTES);
+            $sh = htmlspecialchars(str_replace('_', '-', $f['setting_key']), ENT_QUOTES);
+            if (!empty($f['font_family'])) {
+                $ff = htmlspecialchars($f['font_family'], ENT_QUOTES);
+                echo "    --{$sk}-family: {$ff};" . PHP_EOL;
+                if ($sh !== $sk) echo "    --{$sh}-family: {$ff};" . PHP_EOL;
+            }
+            if (!empty($f['font_size'])) {
+                $fs = htmlspecialchars($f['font_size'], ENT_QUOTES);
+                echo "    --{$sk}-size: {$fs};" . PHP_EOL;
+                if ($sh !== $sk) echo "    --{$sh}-size: {$fs};" . PHP_EOL;
+            }
+        }
+        foreach ($theme['design_settings'] ?? [] as $d) {
+            if (empty($d['setting_key']) || !isset($d['setting_value'])) continue;
+            $dk = htmlspecialchars($d['setting_key'], ENT_QUOTES);
+            $dh = htmlspecialchars(str_replace('_', '-', $d['setting_key']), ENT_QUOTES);
+            $dv = htmlspecialchars($d['setting_value'], ENT_QUOTES);
+            echo "    --{$dk}: {$dv};" . PHP_EOL;
+            if ($dh !== $dk) echo "    --{$dh}: {$dv};" . PHP_EOL;
+        }
+        echo '}' . PHP_EOL;
+    }
 }
 
 // ════════════════════════════════════════════════════════════
@@ -127,14 +172,23 @@ if ($isSuperAdmin && $pdo instanceof PDO) {
 $apiBase = '/api';
 
 ?>
+<!-- DB-driven CSS vars (all settings, colors, fonts from database) -->
+<style id="db-theme-vars-permissions">
+<?php renderFragmentThemeVars($GLOBALS['ADMIN_UI']['theme'] ?? []); ?>
+<?php if (!empty($GLOBALS['ADMIN_UI']['theme']['generated_css'])): ?>
+<?= $GLOBALS['ADMIN_UI']['theme']['generated_css'] ?>
+<?php endif; ?>
+</style>
+
 <!-- Force load CSS if embedded -->
 <?php if ($isFragment): ?>
-<link rel="stylesheet" href="/admin/assets/css/permissions-system.css?v=<?= time() ?>">
+<link rel="stylesheet" href="/admin/assets/css/permissions-system.css">
 <?php endif; ?>
 
 <!-- Page Meta -->
 <meta data-page="permissions"
-      data-i18n-files="/admin/languages/Permissions/<?= rawurlencode($lang) ?>.json">
+      data-assets-css="/admin/assets/css/permissions-system.css"
+      data-i18n-files="/languages/Permissions/<?= rawurlencode($lang) ?>.json">
 
 <!-- Page Container -->
 <div class="page-container" id="permissionsPageContainer" dir="<?= htmlspecialchars($dir) ?>">
@@ -311,7 +365,7 @@ $apiBase = '/api';
                         <i class="fas fa-times"></i> <span data-i18n="permissions.clear"><?= __t('permissions.clear', 'Clear') ?></span>
                     </button>
                     <?php if ($canEdit): ?>
-                    <button class="btn btn-success" id="btnSaveAssign" onclick="PermissionsApp.saveAssign()">
+                    <button class="btn btn-success" id="btnSaveAssign">
                         <i class="fas fa-save"></i> <span data-i18n="permissions.save"><?= __t('permissions.save', 'Save') ?></span>
                     </button>
                     <?php endif; ?>
@@ -345,7 +399,7 @@ $apiBase = '/api';
                     </button>
                     <?php endif; ?>
                     <?php if ($canEdit): ?>
-                    <button class="btn btn-success" id="btnSaveResource" onclick="PermissionsApp.saveResources()">
+                    <button class="btn btn-success" id="btnSaveResource">
                         <i class="fas fa-save"></i> <span data-i18n="permissions.save_changes"><?= __t('permissions.save_changes', 'Save Changes') ?></span>
                     </button>
                     <?php endif; ?>
@@ -410,7 +464,7 @@ $apiBase = '/api';
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="PermissionsApp.closeRoleModal()" data-i18n="permissions.cancel"><?= __t('permissions.cancel', 'Cancel') ?></button>
-            <button class="btn btn-primary" id="btnSaveRole" onclick="PermissionsApp.saveRole()">
+            <button class="btn btn-primary" id="btnSaveRole">
                 <i class="fas fa-save"></i> <span data-i18n="permissions.save"><?= __t('permissions.save', 'Save') ?></span>
             </button>
         </div>
@@ -443,7 +497,7 @@ $apiBase = '/api';
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="PermissionsApp.closePermissionModal()" data-i18n="permissions.cancel"><?= __t('permissions.cancel', 'Cancel') ?></button>
-            <button class="btn btn-primary" id="btnSavePermission" onclick="PermissionsApp.savePermission()">
+            <button class="btn btn-primary" id="btnSavePermission">
                 <i class="fas fa-save"></i> <span data-i18n="permissions.save"><?= __t('permissions.save', 'Save') ?></span>
             </button>
         </div>
@@ -503,7 +557,7 @@ $apiBase = '/api';
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="PermissionsApp.closeResourcePermModal()" data-i18n="permissions.cancel"><?= __t('permissions.cancel', 'Cancel') ?></button>
-            <button class="btn btn-primary" id="btnSaveResourcePerm" onclick="PermissionsApp.saveResourcePerm()">
+            <button class="btn btn-primary" id="btnSaveResourcePerm">
                 <i class="fas fa-save"></i> <span data-i18n="permissions.save"><?= __t('permissions.save', 'Save') ?></span>
             </button>
         </div>
@@ -532,53 +586,6 @@ window.PAGE_PERMISSIONS = <?= json_encode([
     'canDeleteOwn' => $canDeleteOwn,
     'isSuperAdmin' => $isSuperAdmin
 ], JSON_UNESCAPED_UNICODE) ?>;
-</script>
-
-<!-- Translation loader (runs early) -->
-<script type="text/javascript">
-(function(){
-    async function applyTranslations() {
-        try {
-            const lang = window.APP_CONFIG.USER_LANG || 'en';
-            const url = `/languages/Permissions/${encodeURIComponent(lang)}.json`;
-            console.log('[Permissions] Loading translations from', url);
-            const res = await fetch(url, { credentials: 'same-origin' });
-            if (!res.ok) throw new Error('Translation fetch failed: ' + res.status);
-            const data = await res.json();
-            const translations = data.strings || data;
-            window.PERMISSIONS_TRANSLATIONS = translations;
-            
-            // apply translations to elements with data-i18n
-            const container = document.getElementById('permissionsPageContainer');
-            if (!container) return;
-            container.querySelectorAll('[data-i18n]').forEach(el => {
-                const key = el.getAttribute('data-i18n');
-                const txt = key.split('.').reduce((o,k) => (o && o[k] !== undefined) ? o[k] : null, translations);
-                if (txt !== null && txt !== undefined) {
-                    if (el.tagName === 'INPUT' && el.hasAttribute('placeholder')) {
-                        el.placeholder = txt;
-                    } else {
-                        el.textContent = txt;
-                    }
-                }
-            });
-            // placeholders
-            container.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{
-                const key = el.getAttribute('data-i18n-placeholder');
-                const txt = key.split('.').reduce((o,k) => (o && o[k] !== undefined) ? o[k] : null, translations);
-                if (txt !== null && txt !== undefined) el.placeholder = txt;
-            });
-            console.log('[Permissions] Translations applied');
-        } catch (err) {
-            console.warn('[Permissions] Translation load/apply failed:', err);
-        }
-    }
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', applyTranslations);
-    } else {
-        setTimeout(applyTranslations, 50);
-    }
-})();
 </script>
 
 <script src="/admin/assets/js/permissions-system.js?v=<?= time() ?>"></script>

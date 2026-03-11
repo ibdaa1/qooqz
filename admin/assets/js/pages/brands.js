@@ -617,7 +617,7 @@
             const ownerId = el.formId.value ? el.formId.value : 0;
             iframe.src = `/admin/fragments/media_studio.php?embedded=1&tenant_id=${tenantId}&owner_id=${ownerId}&image_type_id=${state.imageTypeId}&mode=select`;
         }
-        if (modal) modal.style.display = 'block';
+        if (modal) modal.style.display = 'flex';
 
         const closeBtn = document.getElementById('brandMediaStudioClose');
         if (closeBtn) {

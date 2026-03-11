@@ -68,6 +68,18 @@
     return dest;
   }
 
+  // System / generic font names that do NOT exist on Google Fonts.
+  // Used to skip unnecessary Google Fonts requests.
+  const SYSTEM_FONT_NAMES = new Set([
+    'system-ui', 'ui-sans-serif', 'ui-serif', 'ui-monospace',
+    'sans-serif', 'serif', 'monospace', 'cursive', 'fantasy', 'math',
+    'inherit', 'initial', 'unset',
+    'arial', 'verdana', 'helvetica', 'helvetica neue', 'georgia',
+    'times', 'times new roman', 'courier', 'courier new',
+    'impact', 'trebuchet ms', 'comic sans ms', 'tahoma',
+    'lucida', 'palatino', 'garamond',
+  ]);
+
   function normalizeExplicitColor(v) {
     if (v === undefined || v === null) return null;
     const s = String(v).trim();
@@ -305,9 +317,50 @@
         themeData.color_settings.forEach(c => {
           if (!c?.setting_key || !c?.color_value) return;
           const key = '--' + safeSlug(c.setting_key);
+          // Also set the hyphenated version so CSS var() references using hyphens work
+          // e.g. DB key "background_secondary" → sets both --background_secondary AND --background-secondary
+          const keyH = '--' + safeSlug(c.setting_key).replace(/_/g, '-');
           const val = normalizeExplicitColor(c.color_value) || c.color_value;
           root.style.setProperty(key, String(val));
+          if (keyH !== key) root.style.setProperty(keyH, String(val));
         });
+
+        // Create CSS variable aliases so CSS files can use stable names
+        // regardless of which key name the DB stores them under.
+        // Checks both hyphen and underscore variants of each source.
+        const getProp = name => {
+          return root.style.getPropertyValue(name).trim() ||
+                 root.style.getPropertyValue(name.replace(/-/g, '_')).trim() ||
+                 root.style.getPropertyValue(name.replace(/_/g, '-')).trim();
+        };
+        const alias = (target, ...sources) => {
+          if (getProp(target)) return; // already set by DB
+          for (const src of sources) {
+            const v = getProp(src);
+            if (v) { root.style.setProperty(target, v); return; }
+          }
+        };
+        // --danger-color mirrors --error-color (DB key: error_color)
+        alias('--danger-color', '--error-color', '--error_color');
+        // --card-bg mirrors --background-secondary
+        alias('--card-bg', '--card_bg', '--background-secondary', '--background_secondary');
+        // --input-bg: CSS files use this name; JS previously only set --input-background
+        alias('--input-bg', '--input_bg', '--input-background', '--background-secondary', '--background_secondary', '--background-primary');
+        // --input-background: keep for backward-compat with any code using this name
+        alias('--input-background', '--input-bg', '--background-secondary', '--background_secondary', '--background-primary');
+        // --background-tertiary: use secondary if not explicitly set
+        const secBg = getProp('--background-secondary');
+        if (secBg && !getProp('--background-tertiary')) {
+          root.style.setProperty('--background-tertiary', secBg);
+        }
+        // --thead-bg: table header background — maps to DB's background-tertiary/secondary
+        alias('--thead-bg', '--thead_bg', '--background-tertiary', '--background_tertiary', '--background-secondary', '--background_secondary', '--background-primary');
+        // --border-color: if DB uses a different key name
+        alias('--border-color', '--border', '--divider-color', '--line-color');
+        // --text-secondary/tertiary: placeholders and muted text
+        alias('--text-secondary', '--text_secondary', '--text-muted', '--text-light');
+        alias('--text-tertiary', '--text_tertiary', '--text-secondary', '--text_secondary', '--text-muted');
+        Admin.log('✓ Color aliases applied');
       }
 
       // 3. Apply font_settings
@@ -320,14 +373,20 @@
           if (f.font_family) {
             root.style.setProperty(base + '-family', f.font_family);
 
-            // Load Google Font
+            // Load Google Font — extract only the first font name from the CSS stack
+            // e.g. "Courier New, monospace" → "Courier New" (not "Courier New, monospace")
             if (f.font_url) {
               Admin.asset.loadCss(f.font_url);
-            } else if (!/system|arial|verdana|sans-serif/i.test(f.font_family)) {
-              const gurl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(
-                f.font_family.replace(/\s+/g, '+')
-              )}&display=swap`;
-              Admin.asset.loadCss(gurl);
+            } else {
+              // Strip quotes and take only the first family from the comma-separated stack
+              const primaryFont = f.font_family.split(',')[0].trim().replace(/['"]/g, '');
+              // Skip generic and known system fonts — they don't exist on Google Fonts
+              if (primaryFont && !SYSTEM_FONT_NAMES.has(primaryFont.toLowerCase())) {
+                const gurl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(
+                  primaryFont.replace(/\s+/g, '+')
+                )}&display=swap`;
+                Admin.asset.loadCss(gurl);
+              }
             }
           }
 
@@ -767,6 +826,15 @@
 
       target.innerHTML = html;
       Admin.log('✓ HTML inserted');
+
+      // Load CSS files from <link rel="stylesheet"> elements found in the fragment.
+      // Browsers do NOT fetch external stylesheets when elements are created via innerHTML,
+      // so we must load them explicitly via Admin.asset.loadCss().
+      const links = [...target.querySelectorAll('link[rel="stylesheet"]')];
+      if (links.length > 0) {
+        Admin.log('📎 Loading', links.length, 'CSS file(s) from fragment');
+        await Promise.all(links.map(l => Admin.asset.loadCss(l.getAttribute('href'))));
+      }
 
       // Run scripts FIRST
       Admin.runScripts(target);

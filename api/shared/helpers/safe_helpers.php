@@ -3,6 +3,8 @@
 // Contains safe_htmlspecialchars helper to avoid type errors when non-strings are passed.
 declare(strict_types=1);
 
+define('_SAFE_HELPERS_LOADED', true);
+
 if (!function_exists('safe_htmlspecialchars')) {
     /**
      * Convert input to string safely and call htmlspecialchars with UTF-8.

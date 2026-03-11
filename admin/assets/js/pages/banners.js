@@ -1,443 +1,782 @@
-/*!
+/**
  * admin/assets/js/pages/banners.js
- * Robust Banner management client
+ * Banners management — rebuilt following brands.js / products.js pattern
  *
- * - Uses window.ADMIN_UI, window.I18N_FLAT, window.API_BANNERS, window.CSRF_TOKEN
- * - Handles missing endpoints gracefully (falls back to local cache)
- * - Tries multiple upload endpoints
- * - Defensive: no uncaught exceptions if DOM elements missing
+ * - Uses window.BANNERS_CONFIG, window.PAGE_PERMISSIONS, window.ADMIN_UI
+ * - Images stored in unified images table (image_type_id = 9)
+ * - Translations: EN required, AR optional (stored in banner_translations)
+ * - Fully i18n-aware via window.BANNERS_TRANSLATIONS
  */
-
 (function () {
-  'use strict';
+    'use strict';
 
-  // Config from server
-  var ADMIN_UI = window.ADMIN_UI || {};
-  var I18N_FLAT = window.I18N_FLAT || {};
-  var USER_INFO = window.USER_INFO || ADMIN_UI.user || {};
-  var THEME = window.THEME || ADMIN_UI.theme || {};
-  var LANG = window.LANG || ADMIN_UI.lang || 'en';
-  var DIRECTION = window.DIRECTION || ADMIN_UI.direction || 'ltr';
-  var CSRF_TOKEN = window.CSRF_TOKEN || ADMIN_UI.csrf_token || '';
-  var API = window.API_BANNERS || (ADMIN_UI.api && ADMIN_UI.api.banners) || '/api/banners';
-  var UPLOAD_CANDIDATES = [
-    (ADMIN_UI.api && ADMIN_UI.api.upload_image) || null,
-    API + '/upload',
-    '/api/upload_image.php'
-  ].filter(Boolean);
+    // ═══════════════════════════════════════════════════════
+    // CONFIG
+    // ═══════════════════════════════════════════════════════
+    const cfg = window.BANNERS_CONFIG || {};
+    const API_URL          = cfg.apiUrl          || '/api/banners';
+    const IMAGES_API       = cfg.imagesApi       || '/api/images';
+    const LANGUAGES_API    = cfg.languagesApi    || '/api/languages';
+    const BUTTON_STYLES_API = cfg.buttonStylesApi || '/api/button_styles';
+    const IMAGE_TYPE_ID    = cfg.imageTypeId || 9;
+    const CSRF_TOKEN       = cfg.csrfToken   || window.CSRF_TOKEN || '';
+    const LANG             = cfg.lang        || window.USER_LANGUAGE || 'en';
+    const ITEMS_PER_PAGE   = cfg.itemsPerPage || 25;
 
-  // Permission
-  var CAN_MANAGE_BANNERS = !!(USER_INFO && Array.isArray(USER_INFO.permissions) && USER_INFO.permissions.indexOf('manage_banners') !== -1);
+    const perms = window.PAGE_PERMISSIONS || {};
+    const CAN_CREATE = !!perms.canCreate;
+    const CAN_EDIT   = !!perms.canEdit;
+    const CAN_DELETE = !!perms.canDelete;
+    const IS_SUPER   = !!perms.isSuperAdmin;
 
-  // Minimal fallbacks (English)
-  var FALLBACKS = {
-    'banners.loading': 'Loading...',
-    'banners.no_banners': 'No banners found',
-    'banners.btn_edit': 'Edit',
-    'banners.btn_delete': 'Delete',
-    'banners.btn_toggle': 'Toggle',
-    'banners.btn_save': 'Save',
-    'banners.btn_new': 'Add Banner',
-    'banners.btn_refresh': 'Refresh',
-    'banners.btn_cancel': 'Cancel',
-    'banners.yes': 'Yes',
-    'banners.no': 'No',
-    'banners.confirm_delete': 'Are you sure?',
-    'banners.processing': 'Processing...',
-    'banners.saved_success': 'Saved successfully',
-    'banners.deleted_success': 'Deleted successfully',
-    'banners.toggled_success': 'Toggled successfully',
-    'banners.error_loading': 'Error loading banners',
-    'banners.error_save': 'Error saving banner',
-    'banners.error_delete': 'Error deleting banner',
-    'banners.error_toggle': 'Error toggling banner',
-    'banners.error_fetch': 'Error fetching data',
-    'banners.uploading': 'Uploading...',
-    'banners.uploaded': 'Uploaded',
-    'banners.no_permission_notice': 'You do not have permission'
-  };
-
-  // Helpers
-  function t(key) {
-    if (!key) return '';
-    if (I18N_FLAT && typeof I18N_FLAT[key] !== 'undefined' && I18N_FLAT[key] !== '') return I18N_FLAT[key];
-    if (ADMIN_UI && ADMIN_UI.strings && typeof ADMIN_UI.strings[key] !== 'undefined' && ADMIN_UI.strings[key] !== '') return ADMIN_UI.strings[key];
-    return FALLBACKS[key] || key.split('.').pop().replace(/_/g, ' ');
-  }
-  function qs(sel, ctx) { ctx = ctx || document; return ctx.querySelector(sel); }
-  function qsa(sel, ctx) { ctx = ctx || document; return Array.prototype.slice.call(ctx.querySelectorAll(sel || '')); }
-  function getEl(id) { return document.getElementById(id); }
-  function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-  function fetchText(url, opts) {
-    opts = opts || {};
-    opts.credentials = opts.credentials || 'same-origin';
-    return fetch(url, opts).then(function (r) {
-      return r.text().then(function (text) {
-        return { ok: r.ok, status: r.status, text: text };
-      });
-    });
-  }
-  function fetchJson(url, opts) {
-    return fetchText(url, opts).then(function (res) {
-      if (!res.ok) {
-        var msg = 'HTTP ' + res.status;
-        try { var parsed = JSON.parse(res.text); msg = parsed.message || msg; } catch (e) {}
-        var err = new Error(msg);
-        err.status = res.status;
-        err.body = res.text;
-        throw err;
-      }
-      try { return JSON.parse(res.text || 'null'); } catch (e) { throw new Error('Invalid JSON response'); }
-    });
-  }
-  function postJson(url, body) {
-    var opts = { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body || {}) };
-    return fetchJson(url, opts);
-  }
-  function postForm(url, fd) {
-    var opts = { method: 'POST', credentials: 'same-origin', body: fd };
-    return fetchJson(url, opts);
-  }
-
-  // UI Elements
-  var tbody = getEl('bannersTbody');
-  var countEl = getEl('bannersCount');
-  var statusEl = getEl('bannersStatus');
-  var searchEl = getEl('bannerSearch');
-  var formWrap = getEl('bannerFormWrap');
-  var bannerForm = getEl('bannerForm');
-  var imgInput = getEl('banner_image_file');
-  var mobInput = getEl('banner_mobile_image_file');
-
-  var bannersCache = [];
-
-  function setStatus(msg, isError) {
-    if (!statusEl) return;
-    statusEl.textContent = msg || '';
-    statusEl.style.color = isError ? (THEME && THEME.colors_map && THEME.colors_map['error'] ? THEME.colors_map['error'] : '#b91c1c') : (THEME && THEME.colors_map && THEME.colors_map['primary'] ? THEME.colors_map['primary'] : '#064e3b');
-  }
-
-  function renderTable(rows) {
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    if (!rows || rows.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="padding:12px;text-align:center;color:#666;">' + esc(t('banners.no_banners')) + '</td></tr>';
-      if (countEl) countEl.textContent = '0';
-      return;
-    }
-    if (countEl) countEl.textContent = String(rows.length);
-    rows.forEach(function (b) {
-      var id = esc(b.id);
-      var title = esc(b.title || '');
-      var img = b.image_url ? '<img src="' + esc(b.image_url) + '" style="max-height:50px;border-radius:4px">' : '';
-      var pos = esc(b.position || '');
-      var activeLabel = b.is_active ? t('banners.yes') : t('banners.no');
-      var actions = '';
-      if (CAN_MANAGE_BANNERS) {
-        actions += '<button class="btn editBtn" data-id="' + esc(b.id) + '">' + esc(t('banners.btn_edit')) + '</button> ';
-        actions += '<button class="btn danger delBtn" data-id="' + esc(b.id) + '">' + esc(t('banners.btn_delete')) + '</button> ';
-        actions += '<button class="btn toggleBtn" data-id="' + esc(b.id) + '" data-active="' + (b.is_active ? '1' : '0') + '">' + esc(t('banners.btn_toggle')) + '</button>';
-      }
-      var tr = document.createElement('tr');
-      tr.innerHTML = '<td style="padding:8px;border-bottom:1px solid #eee;">' + id + '</td>'
-        + '<td style="padding:8px;border-bottom:1px solid #eee;">' + title + '</td>'
-        + '<td style="padding:8px;border-bottom:1px solid #eee;">' + img + '</td>'
-        + '<td style="padding:8px;border-bottom:1px solid #eee;">' + pos + '</td>'
-        + '<td style="padding:8px;border-bottom:1px solid #eee;text-align:center;">' + esc(activeLabel) + '</td>'
-        + '<td style="padding:8px;border-bottom:1px solid #eee;">' + actions + '</td>';
-      tbody.appendChild(tr);
-    });
-
-    // attach handlers
-    qsa('.editBtn', tbody).forEach(function (btn) {
-      btn.addEventListener('click', function () { openEdit(this.getAttribute('data-id')); });
-    });
-    qsa('.delBtn', tbody).forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var id = this.getAttribute('data-id');
-        if (!CAN_MANAGE_BANNERS) { alert(t('banners.no_permission_notice')); return; }
-        if (confirm(t('banners.confirm_delete'))) deleteBanner(id);
-      });
-    });
-    qsa('.toggleBtn', tbody).forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var id = this.getAttribute('data-id');
-        var cur = parseInt(this.getAttribute('data-active') || '0', 10);
-        toggleActive(id, cur ? 0 : 1);
-      });
-    });
-  }
-
-  // Load list
-  function loadBanners() {
-    setStatus(t('banners.loading'));
-    fetchJson(API + '?format=json', { method: 'GET' })
-      .then(function (json) {
-        var rows = [];
-        if (!json) rows = [];
-        else if (Array.isArray(json.data)) rows = json.data;
-        else if (Array.isArray(json.rows)) rows = json.rows;
-        else if (Array.isArray(json)) rows = json;
-        else if (json.success && Array.isArray(json.data)) rows = json.data;
-        bannersCache = rows || [];
-        renderTable(bannersCache);
-        setStatus('');
-      })
-      .catch(function (err) {
-        console.warn('list error', err);
-        // If 404 or Not Found, show empty list but keep page usable
-        bannersCache = bannersCache || [];
-        renderTable(bannersCache);
-        setStatus((err && err.message) ? err.message : t('banners.error_loading'), true);
-      });
-  }
-
-  // Open edit with robust fallbacks:
-  // 1) Try server fetch with ?_fetch_row=1&id=
-  // 2) If 404/Not Found, try RESTful GET /api/banners/{id}
-  // 3) If still fails, try local bannersCache
-  function openEdit(id) {
-    setStatus(t('banners.loading'));
-    fetchJson(API + '?_fetch_row=1&id=' + encodeURIComponent(id), { method: 'GET' })
-      .then(function (json) {
-        var row = (json && json.data) ? json.data : (json || {});
-        populateForm(row);
-        setStatus('');
-      })
-      .catch(function (err) {
-        // If server not support, try RESTful endpoint
-        fetchJson(API + '/' + encodeURIComponent(id), { method: 'GET' })
-          .then(function (json2) {
-            var row2 = (json2 && json2.data) ? json2.data : (json2 || {});
-            populateForm(row2);
-            setStatus('');
-          })
-          .catch(function (err2) {
-            // fallback: find in local cache
-            var local = bannersCache.find(function (b) { return String(b.id) === String(id); });
-            if (local) {
-              populateForm(local);
-              setStatus('');
-            } else {
-              console.error('openEdit failed (server+local)', err, err2);
-              setStatus(t('banners.error_fetch'), true);
-            }
-          });
-      });
-  }
-
-  // Populate form from banner object
-  function populateForm(b) {
-    if (!formWrap) return;
-    formWrap.style.display = 'block';
-    safeSet('bannerId', b.id || '');
-    safeSet('bannerTitle', b.title || '');
-    safeSet('bannerImageUrl', b.image_url || '');
-    safeSet('banner_mobile_image_url', b.mobile_image_url || '');
-    safeSet('bannerPosition', b.position || '');
-    safeSet('bannerIsActive', b.is_active ? 1 : 0);
-    var prev = getEl('banner_image_preview'); if (prev) prev.innerHTML = b.image_url ? '<img src="' + esc(b.image_url) + '" style="max-height:80px">' : '';
-    var mprev = getEl('banner_mobile_image_preview'); if (mprev) mprev.innerHTML = b.mobile_image_url ? '<img src="' + esc(b.mobile_image_url) + '" style="max-height:80px">' : '';
-    var hidden = getEl('banner_translations'); if (hidden) hidden.value = JSON.stringify(b.translations || {});
-  }
-
-  // Toggle active
-  function toggleActive(id, newState) {
-    if (!CAN_MANAGE_BANNERS) { alert(t('banners.no_permission_notice')); return; }
-    setStatus(t('banners.processing'));
-    var payload = { action: 'toggle_active', id: id, is_active: newState ? 1 : 0 };
-    if (CSRF_TOKEN) payload.csrf_token = CSRF_TOKEN;
-    postJson(API, payload).then(function (res) {
-      if (res && (res.success || res.ok)) {
-        setStatus(res.message || t('banners.toggled_success'));
-        bannersCache = bannersCache.map(function (b) { if (String(b.id) === String(id)) b.is_active = newState ? 1 : 0; return b; });
-        renderTable(filterBanners(searchEl && searchEl.value ? searchEl.value : ''));
-      } else {
-        fallbackToggleSave(id, newState);
-      }
-    }).catch(function (err) {
-      console.warn('toggle error', err);
-      fallbackToggleSave(id, newState);
-    });
-  }
-
-  function fallbackToggleSave(id, newState) {
-    var b = bannersCache.find(function (x) { return String(x.id) === String(id); }) || { id: id, title: '' };
-    var fd = new FormData();
-    fd.append('action', 'save');
-    fd.append('id', id);
-    fd.append('title', b.title || '');
-    fd.append('is_active', newState ? 1 : 0);
-    if (CSRF_TOKEN) fd.append('csrf_token', CSRF_TOKEN);
-    postForm(API, fd).then(function (res) {
-      if (res && (res.success || res.ok)) {
-        setStatus(res.message || t('banners.saved_success'));
-        bannersCache = bannersCache.map(function (x) { if (String(x.id) === String(id)) x.is_active = newState ? 1 : 0; return x; });
-        renderTable(filterBanners(searchEl && searchEl.value ? searchEl.value : ''));
-      } else setStatus(res && res.message ? res.message : t('banners.error_save'), true);
-    }).catch(function (err) { console.error(err); setStatus(t('banners.error_save'), true); });
-  }
-
-  // Delete
-  function deleteBanner(id) {
-    if (!CAN_MANAGE_BANNERS) { alert(t('banners.no_permission_notice')); return; }
-    setStatus(t('banners.processing'));
-    var payload = { action: 'delete', id: id };
-    if (CSRF_TOKEN) payload.csrf_token = CSRF_TOKEN;
-    postJson(API, payload).then(function (res) {
-      if (res && (res.success || res.ok)) {
-        setStatus(res.message || t('banners.deleted_success'));
-        bannersCache = bannersCache.filter(function (b) { return String(b.id) !== String(id); });
-        renderTable(filterBanners(searchEl && searchEl.value ? searchEl.value : ''));
-      } else setStatus(res && res.message ? res.message : t('banners.error_delete'), true);
-    }).catch(function (err) { console.error(err); setStatus(t('banners.error_delete'), true); });
-  }
-
-  // Save (create/update)
-  function saveBannerFromForm() {
-    if (!CAN_MANAGE_BANNERS) { alert(t('banners.no_permission_notice')); return; }
-    if (!bannerForm) { setStatus('Form not found', true); return; }
-    // collect translations if present
-    var translationsHidden = getEl('banner_translations');
-    if (translationsHidden) {
-      try { translationsHidden.value = JSON.stringify(collectTranslationInputs()); } catch (e) { translationsHidden.value = '{}'; }
-    }
-    var fd = new FormData(bannerForm);
-    fd.set('action', 'save');
-    if (CSRF_TOKEN) fd.set('csrf_token', CSRF_TOKEN);
-    setStatus(t('banners.processing'));
-    postForm(API, fd).then(function (res) {
-      if (res && (res.success || res.ok)) {
-        setStatus(res.message || t('banners.saved_success'));
-        if (formWrap) formWrap.style.display = 'none';
-        setTimeout(loadBanners, 600);
-      } else setStatus(res && res.message ? res.message : t('banners.error_save'), true);
-    }).catch(function (err) { console.error(err); setStatus(t('banners.error_save'), true); });
-  }
-
-  // Upload: try multiple candidate endpoints sequentially
-  function tryUpload(file, cb, progressCb) {
-    if (!file) return cb({ message: 'No file' });
-    var idx = 0;
-    function attempt() {
-      if (idx >= UPLOAD_CANDIDATES.length) return cb({ message: 'No upload endpoint available' });
-      var url = UPLOAD_CANDIDATES[idx++];
-      var xhr = new XMLHttpRequest();
-      var fd = new FormData();
-      fd.append('file', file);
-      if (CSRF_TOKEN) fd.append('csrf_token', CSRF_TOKEN);
-      xhr.open('POST', url, true);
-      xhr.withCredentials = true;
-      xhr.upload.onprogress = function (e) { if (e.lengthComputable && typeof progressCb === 'function') progressCb(Math.round(e.loaded / e.total * 100)); };
-      xhr.onload = function () {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            var j = JSON.parse(xhr.responseText || '{}');
-            // accept common shapes
-            var urlOut = (j && (j.url || (j.data && j.data.url) || (j.data && j.data.file && j.data.file.url))) || null;
-            if (urlOut) return cb(null, urlOut, j);
-            // else try next candidate
-            attempt();
-          } catch (e) { attempt(); }
-        } else {
-          attempt();
+    // ═══════════════════════════════════════════════════════
+    // STATE
+    // ═══════════════════════════════════════════════════════
+    let state = {
+        items:           [],
+        currentPage:     1,
+        totalItems:      0,
+        editingId:       null,
+        selectedImageId: null,
+        languages:       [],
+        filters: {
+            search:   '',
+            position: '',
+            status:   ''
         }
-      };
-      xhr.onerror = function () { attempt(); };
-      xhr.send(fd);
+    };
+
+    // ═══════════════════════════════════════════════════════
+    // i18n
+    // ═══════════════════════════════════════════════════════
+    function t(key, fallback) {
+        const tr = window.BANNERS_TRANSLATIONS || {};
+        const val = key.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : null, tr);
+        if (val !== null && val !== undefined) return String(val);
+        return fallback || key.split('.').pop().replace(/_/g, ' ');
     }
-    attempt();
-  }
 
-  // Wire file inputs
-  if (imgInput) imgInput.addEventListener('change', function () {
-    var f = this.files && this.files[0]; if (!f) return;
-    var status = getEl('imageUploadStatus');
-    if (status) status.textContent = t('banners.uploading');
-    tryUpload(f, function (err, url) {
-      if (err) { if (status) status.textContent = err.message || t('banners.error_save'); return; }
-      var field = getEl('bannerImageUrl'); if (field) field.value = url;
-      var prev = getEl('banner_image_preview'); if (prev) prev.innerHTML = '<img src="' + esc(url) + '" style="max-height:80px">';
-      if (status) status.textContent = t('banners.uploaded');
-    }, function (p) { var s = getEl('imageUploadStatus'); if (s) s.textContent = t('banners.uploading') + ' ' + p + '%'; });
-  });
+    // ═══════════════════════════════════════════════════════
+    // DOM HELPERS
+    // ═══════════════════════════════════════════════════════
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-  if (mobInput) mobInput.addEventListener('change', function () {
-    var f = this.files && this.files[0]; if (!f) return;
-    var status = getEl('mobileImageUploadStatus');
-    if (status) status.textContent = t('banners.uploading');
-    tryUpload(f, function (err, url) {
-      if (err) { if (status) status.textContent = err.message || t('banners.error_save'); return; }
-      var field = getEl('banner_mobile_image_url'); if (field) field.value = url;
-      var prev = getEl('banner_mobile_image_preview'); if (prev) prev.innerHTML = '<img src="' + esc(url) + '" style="max-height:80px">';
-      if (status) status.textContent = t('banners.uploaded');
-    }, function (p) { var s = getEl('mobileImageUploadStatus'); if (s) s.textContent = t('banners.uploading') + ' ' + p + '%'; });
-  });
-
-  // Collect translations inline table if exists
-  function collectTranslationInputs() {
-    var out = {};
-    var rows = qsa('#translationsInlineTable tbody tr');
-    rows.forEach(function (row) {
-      var code = row.getAttribute('data-lang'); if (!code) return;
-      var title = (qs('.tr-title[data-lang="' + code + '"]', row) || qs('.tr-title', row) || { value: '' }).value || '';
-      var subtitle = (qs('.tr-subtitle[data-lang="' + code + '"]', row) || qs('.tr-subtitle', row) || { value: '' }).value || '';
-      var link_text = (qs('.tr-linktext[data-lang="' + code + '"]', row) || qs('.tr-linktext', row) || { value: '' }).value || '';
-      if (title || subtitle || link_text) out[code] = { title: title, subtitle: subtitle, link_text: link_text };
-    });
-    return out;
-  }
-
-  // Safe setter
-  function safeSet(id, val) { var el = getEl(id); if (!el) return; try { if (el.type === 'checkbox') el.checked = !!val; else el.value = val === null || typeof val === 'undefined' ? '' : val; } catch (e) {} }
-
-  // Bind UI events
-  if (bannerForm) bannerForm.addEventListener('submit', function (e) { e.preventDefault(); saveBannerFromForm(); });
-  var saveBtn = getEl('bannerSaveBtn'); if (saveBtn) saveBtn.addEventListener('click', function (e) { e.preventDefault(); saveBannerFromForm(); });
-
-  var newBtn = getEl('btnNew') || getEl('bannerNewBtn');
-  if (newBtn) newBtn.addEventListener('click', function () {
-    if (!CAN_MANAGE_BANNERS) { alert(t('banners.no_permission_notice')); return; }
-    if (formWrap) formWrap.style.display = 'block';
-    safeSet('bannerId', '');
-    if (bannerForm) bannerForm.reset();
-    var hidden = getEl('banner_translations'); if (hidden) hidden.value = '{}';
-  });
-
-  var cancelBtn = getEl('btnCancelForm') || getEl('bannerCancelBtn');
-  if (cancelBtn) cancelBtn.addEventListener('click', function () { if (formWrap) formWrap.style.display = 'none'; });
-
-  // Search debounce
-  var searchTimer = null;
-  if (searchEl) searchEl.addEventListener('input', function () { clearTimeout(searchTimer); var q = String(this.value || ''); searchTimer = setTimeout(function () { renderTable(filterBanners(q)); }, 180); });
-
-  function filterBanners(q) {
-    if (!q) return bannersCache.slice();
-    q = q.trim().toLowerCase();
-    return bannersCache.filter(function (b) {
-      if (String(b.id).indexOf(q) !== -1) return true;
-      if ((b.title || '').toLowerCase().indexOf(q) !== -1) return true;
-      if ((b.subtitle || '').toLowerCase().indexOf(q) !== -1) return true;
-      if ((b.position || '').toLowerCase().indexOf(q) !== -1) return true;
-      return false;
-    });
-  }
-
-  var refreshBtn = getEl('btnRefresh') || getEl('bannerRefresh');
-  if (refreshBtn) refreshBtn.addEventListener('click', loadBanners);
-
-  // Initial
-  document.addEventListener('DOMContentLoaded', function () {
-    loadBanners();
-    if (!CAN_MANAGE_BANNERS) {
-      qsa('#bannerForm input, #bannerForm select, #bannerForm button, #banner_image_file, #banner_mobile_image_file, #bannerSaveBtn, #bannerDeleteBtn, #bannerNewBtn').forEach(function (el) { try { el.disabled = true; } catch (e) {} });
-      var nb = getEl('bannerNewBtn'); if (nb) nb.style.display = 'none';
+    // ═══════════════════════════════════════════════════════
+    // FETCH HELPERS
+    // ═══════════════════════════════════════════════════════
+    async function apiFetch(url, opts = {}) {
+        opts.credentials = opts.credentials || 'same-origin';
+        if (!opts.headers) opts.headers = {};
+        opts.headers['Accept'] = 'application/json';
+        if (opts.method && opts.method !== 'GET') {
+            opts.headers['X-CSRF-Token'] = CSRF_TOKEN;
+        }
+        const res = await fetch(url, opts);
+        const text = await res.text();
+        let json;
+        try { json = JSON.parse(text); } catch (e) { throw new Error('Invalid JSON: ' + text.slice(0, 200)); }
+        if (!res.ok) {
+            const msg = (json && (json.message || json.error)) || `HTTP ${res.status}`;
+            throw Object.assign(new Error(msg), { status: res.status, data: json });
+        }
+        return json;
     }
-    if (DIRECTION && DIRECTION === 'rtl') { var r = getEl('adminBanners'); if (r) r.setAttribute('dir','rtl'); }
-  });
 
-  // Expose debug
-  window._bannersAdmin = { load: loadBanners, cache: function () { return bannersCache; }, api: API };
+    async function apiGet(url) {
+        return apiFetch(url);
+    }
+
+    async function apiPost(url, body) {
+        return apiFetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+    }
+
+    async function apiPut(url, body) {
+        return apiFetch(url, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+    }
+
+    async function apiDelete(url, body) {
+        return apiFetch(url, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // TOAST
+    // ═══════════════════════════════════════════════════════
+    function showToast(msg, type = 'success') {
+        const el = $('bannersToast');
+        if (!el) return;
+        el.innerHTML = `<div class="toast toast-${esc(type)}" style="
+            padding:12px 20px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.25);
+            background:${type === 'success' ? 'var(--success-color,#10b981)' : 'var(--danger-color,#ef4444)'};
+            color:#fff; font-size:0.9rem;">
+            ${esc(msg)}
+        </div>`;
+        el.style.display = 'block';
+        setTimeout(() => { el.style.display = 'none'; }, 3500);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // LOAD BANNERS
+    // ═══════════════════════════════════════════════════════
+    async function loadBanners() {
+        const tbody = $('bannersTbody');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;">${esc(t('banners.loading', 'Loading...'))}</td></tr>`;
+        }
+
+        try {
+            const params = new URLSearchParams();
+            params.set('lang', LANG);
+            params.set('all_translations', '1');
+            if (state.filters.position) params.set('position', state.filters.position);
+            if (state.filters.status !== '')  params.set('is_active', state.filters.status);
+
+            const data = await apiGet(`${API_URL}?${params.toString()}`);
+            // Support both array response and {data:[...]} wrapper
+            const items = Array.isArray(data) ? data : (data.data || data.items || []);
+            state.items      = items;
+            state.totalItems = items.length;
+            renderTable();
+        } catch (err) {
+            console.error('[Banners] loadBanners failed:', err);
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--danger-color,#ef4444);">${esc(t('messages.error.load_failed', 'Failed to load data'))}: ${esc(err.message)}</td></tr>`;
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // RENDER TABLE
+    // ═══════════════════════════════════════════════════════
+    async function renderTable() {
+        const tbody = $('bannersTbody');
+        if (!tbody) return;
+
+        let items = state.items;
+
+        // Client-side search filter
+        const search = state.filters.search.trim().toLowerCase();
+        if (search) {
+            items = items.filter(b =>
+                (b.title || '').toLowerCase().includes(search) ||
+                (b.subtitle || '').toLowerCase().includes(search)
+            );
+        }
+
+        if (!items.length) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;">
+                <div style="color:var(--text-secondary,#94a3b8);">
+                    <i class="fas fa-image" style="font-size:2rem;margin-bottom:8px;display:block;"></i>
+                    ${esc(t('table.empty.title', 'No Banners Found'))}
+                </div>
+            </td></tr>`;
+            return;
+        }
+
+        const rows = await Promise.all(items.map(async (banner) => {
+            // Fetch image for this banner
+            let imgHtml = `<span style="color:var(--text-secondary,#94a3b8);">—</span>`;
+            try {
+                const imgData = await apiGet(`${IMAGES_API}/by_owner?owner_id=${banner.id}&image_type_id=${IMAGE_TYPE_ID}`);
+                const images  = Array.isArray(imgData) ? imgData : (imgData.data || []);
+                if (images.length) {
+                    const img = images[0];
+                    const url = img.url || img.thumb_url || '';
+                    if (url) {
+                        imgHtml = `<img src="${esc(url)}" alt="" style="width:80px;height:32px;object-fit:cover;border-radius:4px;">`;
+                    }
+                }
+            } catch (_) { /* no image */ }
+
+            const activeClass = banner.is_active ? 'badge-success' : 'badge-warning';
+            const activeText  = banner.is_active
+                ? t('table.status.active',   'Active')
+                : t('table.status.inactive', 'Inactive');
+
+            const dateStr = [banner.start_date, banner.end_date]
+                .filter(Boolean)
+                .map(d => d.slice(0, 10))
+                .join(' → ') || '—';
+
+            const editBtn   = CAN_EDIT   ? `<button class="btn btn-sm btn-outline btn-edit"   data-id="${banner.id}"><i class="fas fa-edit"></i></button>`   : '';
+            const deleteBtn = CAN_DELETE ? `<button class="btn btn-sm btn-danger btn-delete"  data-id="${banner.id}"><i class="fas fa-trash"></i></button>` : '';
+
+            return `<tr data-id="${banner.id}">
+                <td style="padding:10px 12px;">${esc(banner.id)}</td>
+                <td style="padding:10px 12px;">${imgHtml}</td>
+                <td style="padding:10px 12px;">
+                    <strong>${esc(banner.title || '')}</strong>
+                    ${banner.subtitle ? `<br><small style="color:var(--text-secondary,#94a3b8);">${esc(banner.subtitle)}</small>` : ''}
+                </td>
+                <td style="padding:10px 12px;">${esc(banner.position || '')}</td>
+                <td style="padding:10px 12px;">${esc(banner.sort_order ?? 0)}</td>
+                <td style="padding:10px 12px;"><span class="badge ${activeClass}">${esc(activeText)}</span></td>
+                <td style="padding:10px 12px; font-size:0.82rem;">${esc(dateStr)}</td>
+                <td style="padding:10px 12px;">
+                    <div style="display:flex;gap:4px;">
+                        ${editBtn}
+                        ${deleteBtn}
+                    </div>
+                </td>
+            </tr>`;
+        }));
+
+        tbody.innerHTML = rows.join('');
+        bindTableActions();
+    }
+
+    function bindTableActions() {
+        document.querySelectorAll('#bannersTable .btn-edit').forEach(btn => {
+            btn.addEventListener('click', () => openEditForm(parseInt(btn.dataset.id, 10)));
+        });
+        document.querySelectorAll('#bannersTable .btn-delete').forEach(btn => {
+            btn.addEventListener('click', () => confirmDelete(parseInt(btn.dataset.id, 10)));
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // FORM OPEN / CLOSE
+    // ═══════════════════════════════════════════════════════
+    function openAddForm() {
+        resetForm();
+        state.editingId      = null;
+        state.selectedImageId = null;
+        const titleEl = $('bannerFormTitle');
+        if (titleEl) titleEl.textContent = t('form.add_title', 'Add Banner');
+        const formContainer = $('bannerFormContainer');
+        if (formContainer) {
+            formContainer.style.display = 'block';
+            formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    async function openEditForm(id) {
+        resetForm();
+        state.editingId = id;
+        const titleEl = $('bannerFormTitle');
+        if (titleEl) titleEl.textContent = t('form.edit_title', 'Edit Banner');
+        const formContainer = $('bannerFormContainer');
+        if (formContainer) formContainer.style.display = 'block';
+
+        try {
+            const data = await apiGet(`${API_URL}/${id}?all_translations=1`);
+            const banner = data.data || data;
+            populateForm(banner);
+            if (formContainer) formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (err) {
+            showToast(t('messages.error.load_failed', 'Failed to load data') + ': ' + err.message, 'error');
+            if (formContainer) formContainer.style.display = 'none';
+        }
+    }
+
+    function closeForm() {
+        const formContainer = $('bannerFormContainer');
+        if (formContainer) formContainer.style.display = 'none';
+        resetForm();
+    }
+
+    function resetForm() {
+        const form = $('bannerForm');
+        if (form) form.reset();
+        const idEl = $('formId');
+        if (idEl) idEl.value = '';
+        const imgId = $('bannerImageId');
+        if (imgId) imgId.value = '';
+        state.selectedImageId  = null;
+        state.editingId        = null;
+        // reset image preview
+        const preview = $('bannerImagePreview');
+        if (preview) { preview.src = ''; preview.style.display = 'none'; }
+        const links = $('bannerImageLinks');
+        if (links) links.innerHTML = '';
+        // reset color inputs
+        const bg = $('bannerBgColor');
+        if (bg) bg.value = '#FFFFFF';
+        const tc = $('bannerTextColor');
+        if (tc) tc.value = '#000000';
+        // reset translation fields
+        const enLangFields = ['title', 'subtitle', 'link_text'];
+        enLangFields.forEach(f => {
+            const el = $(`trans_en_${f}`);
+            if (el) el.value = '';
+        });
+        // clear dynamic translation panels
+        const dynPanels = $('bannerTranslations');
+        if (dynPanels) dynPanels.innerHTML = '';
+        // clear validation
+        document.querySelectorAll('#bannerForm .is-invalid').forEach(el => el.classList.remove('is-invalid'));
+    }
+
+    function populateForm(banner) {
+        const set = (id, val) => { const el = $(id); if (el) el.value = val == null ? '' : val; };
+
+        set('formId',          banner.id);
+        set('bannerTitle',     banner.title || '');
+        set('bannerSubtitle',  banner.subtitle || '');
+        set('bannerLinkUrl',   banner.link_url || '');
+        set('bannerLinkText',  banner.link_text || '');
+        set('bannerSortOrder', banner.sort_order ?? 0);
+        set('bannerBgColor',   banner.background_color || '#FFFFFF');
+        set('bannerTextColor', banner.text_color || '#000000');
+        set('bannerButtonStyle', banner.button_style || '');
+
+        // Position
+        const posEl = $('bannerPosition');
+        if (posEl) posEl.value = banner.position || 'homepage_main';
+
+        // Status
+        const statusEl = $('bannerIsActive');
+        if (statusEl) statusEl.value = String(banner.is_active ?? 1);
+
+        // Dates (convert to datetime-local format)
+        if (banner.start_date) {
+            const startEl = $('bannerStartDate');
+            if (startEl) startEl.value = banner.start_date.slice(0, 16);
+        }
+        if (banner.end_date) {
+            const endEl = $('bannerEndDate');
+            if (endEl) endEl.value = banner.end_date.slice(0, 16);
+        }
+
+        // Translations
+        const translations = banner.translations || {};
+
+        // EN always in fixed fields — if no EN translation record, fall back to
+        // the top-level banner fields so the fields are pre-filled for the user.
+        const enTrans = translations['en'] || {};
+        const set_trans_en = (field, fallback) => {
+            const el = $(`trans_en_${field}`);
+            if (el) el.value = enTrans[field] || fallback || '';
+        };
+        set_trans_en('title',     banner.title);
+        set_trans_en('subtitle',  banner.subtitle);
+        set_trans_en('link_text', banner.link_text);
+
+        // Other languages → dynamic panels
+        const dynPanels = $('bannerTranslations');
+        if (dynPanels) dynPanels.innerHTML = '';
+        Object.entries(translations).forEach(([langCode, lt]) => {
+            if (langCode === 'en') return;
+            const langName = (state.languages.find(l => l.code === langCode) || {}).name || langCode.toUpperCase();
+            const panel = createBannerTranslationPanel(langCode, langName, lt);
+            if (dynPanels) dynPanels.appendChild(panel);
+        });
+
+        // Load image
+        loadBannerImage(banner.id);
+    }
+
+    async function loadBannerImage(bannerId) {
+        try {
+            const data = await apiGet(`${IMAGES_API}/by_owner?owner_id=${encodeURIComponent(bannerId)}&image_type_id=${IMAGE_TYPE_ID}`);
+            const images = Array.isArray(data) ? data : (data.data || []);
+            if (images.length) {
+                const img = images[0];
+                state.selectedImageId = img.id;
+                const imgIdEl = $('bannerImageId');
+                if (imgIdEl) imgIdEl.value = img.id;
+                const url = img.url || img.thumb_url || '';
+                const preview = $('bannerImagePreview');
+                if (preview && url) {
+                    preview.src = url;
+                    preview.style.display = 'block';
+                }
+                const links = $('bannerImageLinks');
+                if (links && url) {
+                    links.innerHTML = `<a href="${esc(url)}" target="_blank" style="font-size:0.8rem;color:var(--primary-color,#3b82f6);">View</a>`;
+                }
+            }
+        } catch (_) { /* no image found, that's ok */ }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // FORM SUBMIT
+    // ═══════════════════════════════════════════════════════
+    async function handleFormSubmit(e) {
+        e.preventDefault();
+
+        // Validate EN title
+        const enTitleEl = $('trans_en_title');
+        if (!enTitleEl || !enTitleEl.value.trim()) {
+            if (enTitleEl) enTitleEl.classList.add('is-invalid');
+            showToast(t('messages.error.en_required', 'English title is required'), 'error');
+            enTitleEl && enTitleEl.focus();
+            return;
+        }
+        if (enTitleEl) enTitleEl.classList.remove('is-invalid');
+
+        const saveBtn  = $('bannerSaveBtn');
+        const saveTxt  = $('bannerSaveBtnText');
+        if (saveBtn)  saveBtn.disabled = true;
+        if (saveTxt)  saveTxt.textContent = t('form.buttons.saving', 'Saving...');
+
+        try {
+            const payload = buildPayload();
+
+            let result;
+            if (state.editingId) {
+                result = await apiPut(`${API_URL}/${state.editingId}`, payload);
+            } else {
+                result = await apiPost(API_URL, payload);
+            }
+
+            const savedBanner = result.data || result;
+            showToast(
+                state.editingId
+                    ? t('messages.success.updated', 'Banner updated successfully')
+                    : t('messages.success.created', 'Banner created successfully'),
+                'success'
+            );
+            closeForm();
+            await loadBanners();
+        } catch (err) {
+            console.error('[Banners] save failed:', err);
+            showToast(t('messages.error.save_failed', 'Failed to save data') + ': ' + err.message, 'error');
+        } finally {
+            if (saveBtn)  saveBtn.disabled = false;
+            if (saveTxt)  saveTxt.textContent = t('form.buttons.save', 'Save');
+        }
+    }
+
+    function buildPayload() {
+        const get = (id) => { const el = $(id); return el ? el.value.trim() : ''; };
+
+        // Build translations object
+        const translations = {};
+
+        // EN from fixed translation fields — fall back to main banner fields so EN
+        // translation is always saved even when the user only fills the top fields.
+        const enTitle    = get('trans_en_title')    || get('bannerTitle');
+        const enSubtitle = get('trans_en_subtitle') || get('bannerSubtitle');
+        const enLinkText = get('trans_en_link_text') || get('bannerLinkText');
+        if (enTitle || enSubtitle || enLinkText) {
+            translations['en'] = { title: enTitle, subtitle: enSubtitle, link_text: enLinkText };
+        }
+
+        // Collect from dynamic translation panels
+        document.querySelectorAll('#bannerTranslations .banner-translation-panel').forEach(panel => {
+            const langCode = panel.dataset.lang;
+            if (!langCode || langCode === 'en') return;
+            const title    = (panel.querySelector('.btrans-title')    || {}).value || '';
+            const subtitle = (panel.querySelector('.btrans-subtitle') || {}).value || '';
+            const linkText = (panel.querySelector('.btrans-link-text')|| {}).value || '';
+            if (title || subtitle || linkText) {
+                translations[langCode] = { title, subtitle, link_text: linkText };
+            }
+        });
+
+        // Use EN translation title as main title (guaranteed above), fallback to bannerTitle
+        const mainTitle = (translations.en && translations.en.title) || get('bannerTitle');
+
+        return {
+            title:            mainTitle,
+            subtitle:         (translations.en && translations.en.subtitle) || get('bannerSubtitle'),
+            link_url:         get('bannerLinkUrl'),
+            link_text:        (translations.en && translations.en.link_text) || get('bannerLinkText'),
+            position:         get('bannerPosition') || 'homepage_main',
+            background_color: get('bannerBgColor') || '#FFFFFF',
+            text_color:       get('bannerTextColor') || '#000000',
+            button_style:     get('bannerButtonStyle'),
+            sort_order:       parseInt(get('bannerSortOrder'), 10) || 0,
+            is_active:        parseInt(get('bannerIsActive'), 10) ?? 1,
+            start_date:       get('bannerStartDate') || null,
+            end_date:         get('bannerEndDate') || null,
+            image_id:         state.selectedImageId || null,
+            translations:     translations
+        };
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // DELETE
+    // ═══════════════════════════════════════════════════════
+    async function confirmDelete(id) {
+        const confirmed = window.confirm(t('table.actions.confirm_delete', 'Are you sure you want to delete this banner?'));
+        if (!confirmed) return;
+
+        try {
+            await apiDelete(`${API_URL}/${id}`);
+            showToast(t('messages.success.deleted', 'Banner deleted successfully'), 'success');
+            await loadBanners();
+        } catch (err) {
+            console.error('[Banners] delete failed:', err);
+            showToast(t('messages.error.delete_failed', 'Failed to delete data') + ': ' + err.message, 'error');
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // IMAGE SELECT (Inline Media Studio iframe)
+    // ═══════════════════════════════════════════════════════
+    function openMediaStudio() {
+        const tenantId = (window.APP_CONFIG && window.APP_CONFIG.TENANT_ID) || 1;
+        const ownerId  = state.editingId || 0;
+        const lang     = LANG || 'en';
+        const src      = `/admin/fragments/media_studio.php?embedded=1&tenant_id=${encodeURIComponent(tenantId)}&owner_id=${encodeURIComponent(ownerId)}&image_type_id=${IMAGE_TYPE_ID}&lang=${encodeURIComponent(lang)}&mode=select&limit=1`;
+
+        const overlay = $('bannerMediaStudioOverlay');
+        const frame   = $('bannerMediaStudioFrame');
+        if (!overlay || !frame) return;
+
+        frame.src = src;
+        overlay.style.display = 'flex';
+    }
+
+    function closeMediaStudio() {
+        const overlay = $('bannerMediaStudioOverlay');
+        const frame   = $('bannerMediaStudioFrame');
+        if (overlay) overlay.style.display = 'none';
+        // Reset src to stop any pending requests
+        if (frame) frame.src = 'about:blank';
+    }
+
+    function removeImage() {
+        state.selectedImageId = null;
+        const imgIdEl  = $('bannerImageId');
+        if (imgIdEl)  imgIdEl.value = '';
+        const preview = $('bannerImagePreview');
+        if (preview)  { preview.src = ''; preview.style.display = 'none'; }
+        const links   = $('bannerImageLinks');
+        if (links)    links.innerHTML = '';
+    }
+
+    // Listen for media studio ImageStudio:selected CustomEvent (dispatched to window.parent)
+    window.addEventListener('ImageStudio:selected', function (ev) {
+        const img = ev.detail;
+        if (!img) return;
+        // media_studio.js dispatches a single object when selectionLimit=1, but can dispatch
+        // an array when multi-select is allowed. We handle both defensively.
+        const selected = Array.isArray(img) ? img[0] : img;
+        if (!selected) return;
+
+        state.selectedImageId = selected.id;
+        const imgIdEl = $('bannerImageId');
+        if (imgIdEl) imgIdEl.value = selected.id;
+
+        const url = selected.url || selected.thumb_url || '';
+        const preview = $('bannerImagePreview');
+        if (preview && url) {
+            preview.src = url;
+            preview.style.display = 'block';
+        }
+
+        const links = $('bannerImageLinks');
+        if (links && url) {
+            links.innerHTML = `<a href="${esc(url)}" target="_blank" style="font-size:0.8rem;color:var(--primary-color,#3b82f6);">View</a>`;
+        }
+        closeMediaStudio();
+    });
+
+    // Listen for media studio close event
+    window.addEventListener('ImageStudio:close', function () {
+        closeMediaStudio();
+    });
+
+    // ═══════════════════════════════════════════════════════
+    // TRANSLATIONS
+    // ═══════════════════════════════════════════════════════
+    async function loadLanguages() {
+        try {
+            const res = await apiGet(`${LANGUAGES_API}?format=json`);
+            const items = res?.data?.items || res?.data || res || [];
+            state.languages = Array.isArray(items) ? items : [];
+            const langSelect = $('bannerLangSelect');
+            if (!langSelect) return;
+            langSelect.innerHTML = `<option value="">${t('form.translations.choose_language', 'Choose language')}</option>`;
+            state.languages.forEach(lang => {
+                if (lang.code === 'en') return; // EN is always shown as fixed panel
+                const opt = document.createElement('option');
+                opt.value = lang.code;
+                opt.textContent = lang.name || lang.code;
+                langSelect.appendChild(opt);
+            });
+        } catch (err) {
+            console.warn('[Banners] Failed to load languages:', err);
+        }
+    }
+
+    async function loadButtonStyles() {
+        const select = $('bannerButtonStyle');
+        if (!select) return;
+        // If already populated by PHP (more than 1 option), skip
+        if (select.options.length > 1) return;
+        try {
+            const res = await apiGet(`${BUTTON_STYLES_API}?format=json&is_active=1`);
+            const items = res?.data?.items || res?.data || (Array.isArray(res) ? res : []);
+            if (!Array.isArray(items) || items.length === 0) return;
+            items.forEach(bs => {
+                const slug = bs.slug || bs.id || '';
+                const name = bs.name || bs.slug || slug;
+                if (!slug) return;
+                const opt = document.createElement('option');
+                opt.value = slug;
+                opt.textContent = name;
+                select.appendChild(opt);
+            });
+        } catch (err) {
+            console.warn('[Banners] Failed to load button styles:', err);
+        }
+    }
+
+    function createBannerTranslationPanel(langCode, langName, data) {
+        const panel = document.createElement('div');
+        panel.className = 'translation-panel banner-translation-panel';
+        panel.dataset.lang = langCode;
+        const dir = (state.languages.find(l => l.code === langCode) || {}).direction || 'ltr';
+        panel.innerHTML = `
+            <div class="translation-panel-header">
+                <span class="lang-badge">${esc(langCode.toUpperCase())}</span>
+                <span>${esc(langName)}</span>
+                <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.banner-translation-panel').remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="translation-panel-body">
+                <div class="form-group">
+                    <label>${t('form.translations.title_label', 'Title')}</label>
+                    <input type="text" class="form-control btrans-title" dir="${esc(dir)}" value="${esc(data.title || '')}" placeholder="${t('form.translations.title_in_lang', 'Title in')} ${esc(langName)}">
+                </div>
+                <div class="form-group">
+                    <label>${t('form.translations.subtitle_label', 'Subtitle')}</label>
+                    <input type="text" class="form-control btrans-subtitle" dir="${esc(dir)}" value="${esc(data.subtitle || '')}">
+                </div>
+                <div class="form-group">
+                    <label>${t('form.translations.link_text_label', 'Button Text')}</label>
+                    <input type="text" class="form-control btrans-link-text" dir="${esc(dir)}" value="${esc(data.link_text || '')}">
+                </div>
+            </div>
+        `;
+        return panel;
+    }
+
+    function addBannerTranslation() {
+        const langSelect = $('bannerLangSelect');
+        if (!langSelect || !langSelect.value) return;
+        const langCode = langSelect.value;
+        const langName = langSelect.options[langSelect.selectedIndex].textContent;
+
+        // Prevent duplicates
+        if (document.querySelector(`#bannerTranslations [data-lang="${langCode}"]`)) {
+            showToast(t('messages.translation_exists', 'Translation already added'), 'warning');
+            return;
+        }
+
+        const panel = createBannerTranslationPanel(langCode, langName, {});
+        const container = $('bannerTranslations');
+        if (container) container.appendChild(panel);
+        langSelect.value = '';
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // FILTER / SEARCH
+    // ═══════════════════════════════════════════════════════
+    function bindFilters() {
+        const searchEl   = $('bannerSearch');
+        const posEl      = $('bannerFilterPosition');
+        const statusEl   = $('bannerFilterStatus');
+        const refreshBtn = $('btnRefresh');
+
+        if (searchEl) {
+            searchEl.addEventListener('input', () => {
+                state.filters.search = searchEl.value;
+                renderTable();
+            });
+        }
+        if (posEl) {
+            posEl.addEventListener('change', () => {
+                state.filters.position = posEl.value;
+                loadBanners();
+            });
+        }
+        if (statusEl) {
+            statusEl.addEventListener('change', () => {
+                state.filters.status = statusEl.value;
+                loadBanners();
+            });
+        }
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => loadBanners());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // BIND UI EVENTS
+    // ═══════════════════════════════════════════════════════
+    // Shared escape-key handler (hoisted outside bindEvents to avoid multiple registrations)
+    function handleEscapeKey(e) {
+        if (e.key === 'Escape') {
+            const overlay = $('bannerMediaStudioOverlay');
+            if (overlay && overlay.style.display !== 'none') closeMediaStudio();
+        }
+    }
+
+    function bindEvents() {
+        const addBtn       = $('btnAddBanner');
+        const closeBtn     = $('btnCloseForm');
+        const cancelBtn    = $('btnCancelForm');
+        const form         = $('bannerForm');
+        const selectImgBtn = $('bannerSelectImageBtn');
+        const removeImgBtn = $('bannerRemoveImageBtn');
+        const msCloseBtn   = $('bannerMediaStudioClose');
+        const msOverlay    = $('bannerMediaStudioOverlay');
+        const addLangBtn   = $('bannerAddLangBtn');
+
+        if (addBtn)       addBtn.addEventListener('click', openAddForm);
+        if (closeBtn)     closeBtn.addEventListener('click', closeForm);
+        if (cancelBtn)    cancelBtn.addEventListener('click', closeForm);
+        if (form)         form.addEventListener('submit', handleFormSubmit);
+        if (selectImgBtn) selectImgBtn.addEventListener('click', openMediaStudio);
+        if (removeImgBtn) removeImgBtn.addEventListener('click', removeImage);
+        if (addLangBtn)   addLangBtn.addEventListener('click', addBannerTranslation);
+        if (msCloseBtn)   msCloseBtn.addEventListener('click', closeMediaStudio);
+
+        // Click on overlay backdrop closes modal
+        if (msOverlay) {
+            msOverlay.addEventListener('click', function (e) {
+                if (e.target === msOverlay) closeMediaStudio();
+            });
+        }
+
+        // Escape key closes media studio modal (registered once via named function)
+        document.removeEventListener('keydown', handleEscapeKey);
+        document.addEventListener('keydown', handleEscapeKey);
+
+        bindFilters();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════════════════════
+    async function init() {
+        bindEvents();
+        await Promise.all([
+            loadBanners(),
+            loadLanguages(),
+            loadButtonStyles()
+        ]);
+        console.log('[Banners] ✓ Initialized');
+    }
+
+    // Expose module
+    window.Banners = { init };
+
+    // Auto-init if DOM ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        // give translations a chance to load first
+        setTimeout(init, 100);
+    }
 
 })();

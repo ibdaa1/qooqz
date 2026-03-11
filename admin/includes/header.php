@@ -147,10 +147,19 @@ foreach ($theme['design_settings'] ?? [] as $d) {
 <html lang="<?= htmlspecialchars($lang) ?>" dir="<?= htmlspecialchars($dir) ?>">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="<?= $csrfToken ?>">
     <meta name="i18n-primary-file" content="<?= $translationPath . rawurlencode($lang) ?>.json">
-    
+
+    <!-- PWA / Mobile App Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" data-i18n="brand" content="Admin">
+    <meta name="application-name" data-i18n="brand" content="Admin">
+    <meta name="theme-color" content="#1e2533">
+    <link rel="manifest" href="/admin/manifest.json">
+
     <title data-i18n="brand">Admin Panel</title>
 
     <!-- Stylesheets -->
@@ -171,60 +180,110 @@ foreach ($theme['design_settings'] ?? [] as $d) {
     </style>
     <?php endif; ?>
 
-    <!-- CSS Variables -->
+    <!-- CSS Variables — DB-driven (both underscore and hyphen forms for full compatibility) -->
     <style id="dynamic-theme-vars">
 :root {
-<?php foreach ($theme['color_settings'] ?? [] as $c): ?>
-    --<?= htmlspecialchars($c['setting_key']) ?>: <?= htmlspecialchars($c['color_value']) ?>;
-<?php endforeach; ?>
-<?php foreach ($theme['font_settings'] ?? [] as $f): ?>
+<?php
+// ── Color settings (both underscore and hyphenated) ──────────────────────────
+$_emittedVars = [];
+foreach ($theme['color_settings'] ?? [] as $c):
+    $k = htmlspecialchars($c['setting_key']);
+    $h = htmlspecialchars(str_replace('_', '-', $c['setting_key']));
+    $v = htmlspecialchars($c['color_value']);
+    $_emittedVars['--' . $k] = $v;
+    $_emittedVars['--' . $h] = $v;
+?>
+    --<?= $k ?>: <?= $v ?>;
+<?php if ($h !== $k): ?>    --<?= $h ?>: <?= $v ?>;
+<?php endif; endforeach; ?>
+<?php foreach ($theme['font_settings'] ?? [] as $f):
+    $sk = htmlspecialchars($f['setting_key']);
+    $sh = htmlspecialchars(str_replace('_', '-', $f['setting_key']));
+?>
 <?php if (!empty($f['font_family'])): ?>
-    --<?= htmlspecialchars($f['setting_key']) ?>-family: <?= htmlspecialchars($f['font_family']) ?>;
+    --<?= $sk ?>-family: <?= htmlspecialchars($f['font_family']) ?>;
+    --<?= $sh ?>-family: <?= htmlspecialchars($f['font_family']) ?>;
 <?php endif; ?>
 <?php if (!empty($f['font_size'])): ?>
-    --<?= htmlspecialchars($f['setting_key']) ?>-size: <?= htmlspecialchars($f['font_size']) ?>;
+    --<?= $sk ?>-size: <?= htmlspecialchars($f['font_size']) ?>;
+    --<?= $sh ?>-size: <?= htmlspecialchars($f['font_size']) ?>;
 <?php endif; ?>
 <?php if (!empty($f['font_weight'])): ?>
-    --<?= htmlspecialchars($f['setting_key']) ?>-weight: <?= htmlspecialchars($f['font_weight']) ?>;
+    --<?= $sk ?>-weight: <?= htmlspecialchars($f['font_weight']) ?>;
+    --<?= $sh ?>-weight: <?= htmlspecialchars($f['font_weight']) ?>;
 <?php endif; ?>
 <?php endforeach; ?>
-<?php foreach ($theme['design_settings'] ?? [] as $d): ?>
-<?php if (!empty($d['setting_value'])): ?>
-    --<?= htmlspecialchars($d['setting_key']) ?>: <?= htmlspecialchars($d['setting_value']) ?>;
+<?php foreach ($theme['design_settings'] ?? [] as $d):
+    if (empty($d['setting_value'])) continue;
+    $dk = htmlspecialchars($d['setting_key']);
+    $dh = htmlspecialchars(str_replace('_', '-', $d['setting_key']));
+    $dv = htmlspecialchars($d['setting_value']);
+?>
+    --<?= $dk ?>: <?= $dv ?>;
+<?php if ($dh !== $dk): ?>    --<?= $dh ?>: <?= $dv ?>;
 <?php endif; ?>
+<?php endforeach; ?>
+<?php
+// ── Alias vars — provide the stable names used by CSS files ─────────────────
+// These map framework-level CSS var names to values from the DB so that
+// CSS var() references work before admin_core.js runs.
+$backgroundSecondary = $_emittedVars['--background-secondary'] ?? $_emittedVars['--background_secondary'] ?? null;
+$backgroundPrimary   = $_emittedVars['--background-primary']   ?? $_emittedVars['--background_primary']   ?? null;
+$backgroundMain      = $_emittedVars['--background-main']      ?? $_emittedVars['--background_main']      ?? null;
+$backgroundFallback  = $backgroundSecondary ?? $backgroundPrimary ?? $backgroundMain;
+$errorColor          = $_emittedVars['--error-color']  ?? $_emittedVars['--error_color']  ?? null;
+
+// Map: CSS-var-name => resolved value (only emit if not already set from DB)
+$themeAliasVars = [
+    '--card-bg'          => $_emittedVars['--card-bg']          ?? $_emittedVars['--card_bg']          ?? $backgroundFallback,
+    '--input-bg'         => $_emittedVars['--input-bg']         ?? $_emittedVars['--input_bg']         ?? $backgroundFallback,
+    '--input-background' => $_emittedVars['--input-background'] ?? $_emittedVars['--input_background'] ?? $backgroundFallback,
+    '--thead-bg'         => $_emittedVars['--thead-bg']         ?? $_emittedVars['--thead_bg']         ?? $backgroundFallback,
+    '--danger-color'     => $_emittedVars['--danger-color']     ?? $_emittedVars['--danger_color']     ?? $errorColor,
+];
+foreach ($themeAliasVars as $varName => $varValue):
+    if (!$varValue || !empty($_emittedVars[$varName])) continue; // skip if already emitted or no value
+?>    <?= $varName ?>: <?= $varValue ?>;
 <?php endforeach; ?>
 }
 
-/* Apply theme immediately */
+/* Apply theme immediately — these rules rely solely on DB CSS vars */
 body {
-    background: var(--background-main, var(--background_main, #0A0A0A));
-    color: var(--text-primary, var(--text_primary, #FFFFFF));
+    background: var(--background_main, #0a0a0a);
+    color: var(--text_primary, #ffffff);
+    font-family: var(--body_font-family, inherit);
 }
 
 .admin-header {
-    background: var(--sidebar-background, var(--sidebar_background, #4B0082));
-    color: var(--sidebar-text, var(--sidebar_text, #FFFFFF));
+    background: var(--header_background, var(--background_secondary, #1e2533));
+    color: var(--header_text, var(--text_primary, #FFFFFF));
+    border-bottom: 1px solid var(--border_color, #334155);
 }
 
 .admin-sidebar {
-    background: var(--sidebar-background, var(--sidebar_background, #4B0082));
-    color: var(--sidebar-text, var(--sidebar_text, #FFFFFF));
+    background: var(--sidebar_background, #4B0082);
+    color: var(--sidebar_text, #ffffff);
 }
     </style>
 
     <!-- Load Google Fonts -->
     <?php 
     $loadedFonts = [];
+    $genericFontNames = ['sans-serif','serif','monospace','cursive','fantasy','system-ui','ui-sans-serif','ui-serif','ui-monospace'];
     foreach ($theme['font_settings'] ?? [] as $f): 
         if (empty($f['font_family'])) continue;
-        if (preg_match('/system|arial|verdana/i', $f['font_family'])) continue;
-        if (in_array($f['font_family'], $loadedFonts)) continue;
-        $loadedFonts[] = $f['font_family'];
+        // Extract only the primary font name (DB may store "Roboto, sans-serif"; Google Fonts needs just "Roboto")
+        $primaryFont = trim(explode(',', $f['font_family'])[0]);
+        // Skip generic/system fonts that cannot be loaded from Google Fonts
+        if (in_array(strtolower($primaryFont), $genericFontNames)) continue;
+        if (preg_match('/\b(system|arial|verdana|helvetica|georgia|times|courier|impact)\b/i', $primaryFont)) continue;
+        if (in_array($primaryFont, $loadedFonts)) continue;
+        $loadedFonts[] = $primaryFont;
     ?>
     <?php if (!empty($f['font_url'])): ?>
     <link rel="stylesheet" href="<?= htmlspecialchars($f['font_url']) ?>">
     <?php else: ?>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=<?= urlencode(str_replace(' ', '+', $f['font_family'])) ?>&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=<?= urlencode($primaryFont) ?>&display=swap">
     <?php endif; ?>
     <?php endforeach; ?>
 
@@ -288,21 +347,6 @@ body {
         </a>
     </div>
 
-    <div class="header-center">
-        <div class="search-wrap">
-            <input id="adminSearch" 
-                   type="search" 
-                   placeholder="Search..."
-                   data-i18n-placeholder="search_placeholder"
-                   autocomplete="off">
-            <button id="searchBtn" 
-                    class="icon-btn" 
-                    type="button">
-                <i class="fas fa-search"></i>
-            </button>
-        </div>
-    </div>
-
     <div class="header-right">
         <button id="notifBtn" 
                 class="icon-btn" 
@@ -350,7 +394,7 @@ body {
         if (is_readable($menuFile)) {
             include $menuFile;
         } else {
-            echo '<p style="padding:1rem; color:rgba(255,255,255,0.7);" data-i18n="menu_unavailable">Menu not available</p>';
+            echo '<p style="padding:1rem; color:var(--sidebar_text);" data-i18n="menu_unavailable">Menu not available</p>';
         }
         ?>
     </aside>

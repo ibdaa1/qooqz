@@ -18,7 +18,7 @@
         filters: {},
         permissions: {},
         translations: {},
-        language: window.USER_LANGUAGE || 'ar',
+        language: window.USER_LANGUAGE || 'en',
         categories: [], // تخزين البيانات المحملة
         parents: [] // تخزين الفئات الرئيسية
     };
@@ -160,14 +160,16 @@
         const metaDescPlaceholder = 'Meta Description (' + langUpper + ')';
         const metaKeywordsPlaceholder = 'Meta Keywords (' + langUpper + ')';
         const removeText = t('form.translations.remove');
+        // English is the required default language — its panel cannot be removed
+        const isDefault = (code === 'en');
 
         const div = document.createElement('div');
         div.className = 'translation-panel';
         div.dataset.lang = code;
         div.innerHTML = `
             <div class="translation-panel-header">
-                <h5><i class="fas fa-globe"></i> ${langUpper}</h5>
-                <button type="button" class="remove btn btn-sm btn-danger">${removeText}</button>
+                <h5><i class="fas fa-globe"></i> ${langUpper}${isDefault ? ' <small style="color:var(--success-color,#22c55e);font-size:0.75rem;">(default)</small>' : ''}</h5>
+                ${isDefault ? '' : `<button type="button" class="remove btn btn-sm btn-danger">${removeText}</button>`}
             </div>
             <div class="translation-panel-body">
                 <div class="form-row">
@@ -177,7 +179,7 @@
                     </div>
                     <div class="form-group">
                         <label>Slug *</label>
-                        <input class="form-control" name="translations[${code}][slug]" value="${esc(data.slug || '')}" placeholder="${slugPlaceholder}" required>
+                        <input class="form-control" name="translations[${code}][slug]" value="${esc(data.slug || '')}" placeholder="${slugPlaceholder}" ${isDefault ? 'required' : ''}>
                     </div>
                 </div>
                 <div class="form-group">
@@ -201,23 +203,22 @@
             </div>
         `;
 
-        // إضافة حدث الحذف بشكل صحيح
-        div.querySelector('.remove').onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
+        // Add remove handler only for non-default languages
+        if (!isDefault) {
+            div.querySelector('.remove').onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
 
-            // تسجيل اللغة للحذف
-            const categoryId = el.formId?.value ? parseInt(el.formId.value) : null;
-            deletedTranslations.push({
-                language_code: code,
-                category_id: categoryId
-            });
+                const categoryId = el.formId?.value ? parseInt(el.formId.value) : null;
+                deletedTranslations.push({
+                    language_code: code,
+                    category_id: categoryId
+                });
 
-            console.log(`[Categories] Translation marked for deletion: ${code}, category: ${categoryId}`);
-
-            // إزالة اللوحة من DOM
-            div.remove();
-        };
+                console.log(`[Categories] Translation marked for deletion: ${code}, category: ${categoryId}`);
+                div.remove();
+            };
+        }
 
         el.translations.appendChild(div);
         console.log(`[Categories] Translation panel created for: ${code}`);
@@ -559,26 +560,27 @@
             const statusText = item.is_active ? t('table.status.active') : t('table.status.inactive');
             const statusClass = item.is_active ? 'badge-success' : 'badge-danger';
             const featuredText = item.is_featured ? t('form.fields.featured.yes') : t('form.fields.featured.no');
+            const isSuperAdmin = window.PAGE_PERMISSIONS?.isSuperAdmin || window.ADMIN_UI?.is_super_admin;
 
             html += `
                 <tr>
                     <td>${item.id}</td>
-                    <td>${item.tenant_id}</td>
+                    ${isSuperAdmin ? `<td>${item.tenant_id}</td>` : ''}
                     <td>${image}</td>
                     <td><strong>${esc(name)}</strong></td>
                     <td>${esc(slug)}</td>
                     <td>${esc(parent)}</td>
                     <td>${sortOrder}</td>
                     <td>
-                        <span class="badge ${statusClass}" style="background-color: ${item.is_active ? '#10b981' : '#ef4444'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
+                        <span class="badge ${statusClass}" style="background-color: ${item.is_active ? 'var(--success-color,#22c55e)' : 'var(--danger-color,#ef4444)'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
                             ${statusText}
                         </span>
                     </td>
                     <td>${featuredText}</td>
                     <td>
                         <div class="table-actions" style="display: flex; gap: 8px;">
-                            ${state.permissions.canEdit ? `<button class="btn btn-sm btn-outline" onclick="Categories.edit(${item.id})" style="padding: 4px 8px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 4px; font-size: 12px;">${t('table.actions.edit')}</button>` : ''}
-                            ${state.permissions.canDelete ? `<button class="btn btn-sm btn-danger" onclick="Categories.remove(${item.id})" style="padding: 4px 8px; background-color: #ef4444; color: white; border: none; border-radius: 4px; font-size: 12px;">${t('table.actions.delete')}</button>` : ''}
+                            ${state.permissions.canEdit ? `<button class="btn btn-sm btn-outline" onclick="Categories.edit(${item.id})">${t('table.actions.edit')}</button>` : ''}
+                            ${state.permissions.canDelete ? `<button class="btn btn-sm btn-danger" onclick="Categories.remove(${item.id})">${t('table.actions.delete')}</button>` : ''}
                         </div>
                     </td>
                 </tr>
@@ -753,8 +755,8 @@
             if (linksContainer) {
                 if (item.image_id || (item.image_url && item.image_url !== '/assets/images/no-image.png')) {
                     linksContainer.innerHTML = `
-                        <a href="${esc(imageUrl)}" target="_blank" style="text-decoration:none; color:#3b82f6;"><i class="fas fa-expand"></i> Large</a>
-                        <a href="${esc(thumbUrl)}" target="_blank" style="text-decoration:none; color:#64748b;"><i class="fas fa-compress"></i> Thumbnail</a>
+                        <a href="${esc(imageUrl)}" target="_blank" style="text-decoration:none; color:var(--primary-color,#3b82f6);"><i class="fas fa-expand"></i> Large</a>
+                        <a href="${esc(thumbUrl)}" target="_blank" style="text-decoration:none; color:var(--text-secondary,#64748b);"><i class="fas fa-compress"></i> Thumbnail</a>
                     `;
                 } else {
                     linksContainer.innerHTML = '';
@@ -773,6 +775,11 @@
                         createTranslationPanel(code, tr);
                     });
                 }
+            }
+
+            // Always ensure English translation panel is present
+            if (el.translations && !el.translations.querySelector('[data-lang="en"]')) {
+                createTranslationPanel('en', {});
             }
 
             // تمرير الـ scroll للنموذج
@@ -812,8 +819,9 @@
         // إعادة تهيئة مصفوفة الترجمات المحذوفة
         deletedTranslations = [];
 
-        // Clear translation panels
+        // Clear translation panels and auto-add English by default
         if (el.translations) el.translations.innerHTML = '';
+        createTranslationPanel('en', {});
 
         // Reset image type to category
         if (el.imageTypeSelect) {
@@ -836,7 +844,7 @@
             // Force image_type_id=1 (categories) and lock params
             iframe.src = `/admin/fragments/media_studio.php?embedded=1&tenant_id=${tenantId}&owner_id=${ownerId}&image_type_id=1&mode=select`;
         }
-        if (modal) modal.style.display = 'block';
+        if (modal) modal.style.display = 'flex';
 
         // Setup close button for modal (if not already handled)
         const closeBtn = document.getElementById('catMediaStudioClose');
@@ -902,9 +910,13 @@
                     console.log('[Categories] Fetching images for items...');
                     items = await Promise.all(items.map(async (item) => {
                         try {
-                            const res = await fetch(`/api/images?tenant_id=${tenantId}&owner_id=${item.id}&image_type_id=${imageTypeId}`);
+                            // Use /by_owner endpoint (same as products.js) — returns data.data as a
+                            // direct array, avoiding the nested {data:{data:[...]}} from /api/images list.
+                            const res = await fetch(`/api/images/by_owner?owner_id=${item.id}&image_type_id=${imageTypeId}`);
                             const data = await res.json();
-                            let imageUrl = data?.data?.length ? data.data[0].url : null;
+                            // data.data is a direct array of image objects
+                            const images = Array.isArray(data?.data) ? data.data : [];
+                            let imageUrl = images.length ? images[0].url : null;
                             // Fallback to item.image_url if fetch returns nothing but item has one
                             if (!imageUrl && item.image_url) imageUrl = item.image_url;
                             return { ...item, image_url: imageUrl }; // Normalize to image_url
@@ -930,18 +942,52 @@
             console.log('[Categories] Final items with items:', items.length, 'meta:', finalMeta);
 
             // Update Pagination
-            if (el.pagination && typeof AF.Table !== 'undefined' && typeof AF.Table.renderPagination === 'function') {
-                AF.Table.renderPagination(el.pagination, el.paginationInfo, finalMeta);
+            if (el.pagination) {
+                const total = finalMeta.total || items.length || 0;
+                const perPage = finalMeta.per_page || state.perPage;
+                const totalPages = finalMeta.last_page || finalMeta.total_pages || Math.ceil(total / perPage) || 1;
+
+                // Update info text
+                if (el.paginationInfo) {
+                    const start = total > 0 ? ((page - 1) * perPage) + 1 : 0;
+                    const end = Math.min(page * perPage, total);
+                    el.paginationInfo.textContent = `${start}–${end} of ${total}`;
+                }
+
+                // Build pagination buttons with inline onclick
+                let pgHtml = `<button class="pagination-btn" ${page <= 1 ? 'disabled' : ''} onclick="Categories.load(${page - 1})">
+                    <i class="fas fa-chevron-left"></i> Previous
+                </button>`;
+
+                const maxVisible = 7;
+                let startPage = Math.max(1, page - Math.floor(maxVisible / 2));
+                let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+                if (endPage - startPage < maxVisible - 1) startPage = Math.max(1, endPage - maxVisible + 1);
+
+                if (startPage > 1) {
+                    pgHtml += `<button class="pagination-btn" onclick="Categories.load(1)">1</button>`;
+                    if (startPage > 2) pgHtml += `<span class="pagination-dots">...</span>`;
+                }
+                for (let i = startPage; i <= endPage; i++) {
+                    pgHtml += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="Categories.load(${i})" ${i === page ? 'aria-current="page"' : ''}>${i}</button>`;
+                }
+                if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) pgHtml += `<span class="pagination-dots">...</span>`;
+                    pgHtml += `<button class="pagination-btn" onclick="Categories.load(${totalPages})">${totalPages}</button>`;
+                }
+
+                pgHtml += `<button class="pagination-btn" ${page >= totalPages ? 'disabled' : ''} onclick="Categories.load(${page + 1})">
+                    Next <i class="fas fa-chevron-right"></i>
+                </button>`;
+
+                el.pagination.innerHTML = pgHtml;
             } else if (el.paginationInfo) {
                 // Manual fallback for pagination info
                 const total = finalMeta.total || 0;
                 const from = items.length ? ((finalMeta.page - 1) * (finalMeta.per_page || state.perPage)) + 1 : 0;
                 const to = items.length ? Math.min(finalMeta.page * (finalMeta.per_page || state.perPage), total) : 0;
-
-                // Fix "Showing 0 to 0 of 0" if data exists but meta is wrong
                 const displayFrom = total > 0 && from === 0 ? 1 : from;
                 const displayTo = total > 0 && to === 0 ? items.length : to;
-
                 el.paginationInfo.textContent = `Showing ${displayFrom} to ${displayTo} of ${total} results`;
             }
 
@@ -1119,8 +1165,8 @@
                         const linksContainer = document.getElementById('catImageLinks');
                         if (linksContainer) {
                             linksContainer.innerHTML = `
-                                <a href="${esc(img.url)}" target="_blank" style="text-decoration:none; color:#3b82f6;"><i class="fas fa-expand"></i> Large</a>
-                                <a href="${esc(img.thumb_url || img.url)}" target="_blank" style="text-decoration:none; color:#64748b;"><i class="fas fa-compress"></i> Thumbnail</a>
+                                <a href="${esc(img.url)}" target="_blank" style="text-decoration:none; color:var(--primary-color,#3b82f6);"><i class="fas fa-expand"></i> Large</a>
+                                <a href="${esc(img.thumb_url || img.url)}" target="_blank" style="text-decoration:none; color:var(--text-secondary,#64748b);"><i class="fas fa-compress"></i> Thumbnail</a>
                             `;
                         }
                     });
@@ -1137,7 +1183,7 @@
                         const typeSelect = studioWin.document.querySelector('select[name="image_type_id"]');
                         if (typeSelect) {
                             typeSelect.style.pointerEvents = 'none';
-                            typeSelect.style.background = '#eee';
+                            typeSelect.style.background = 'var(--background-secondary,#eee)';
                         }
                         const ownerInput = studioWin.document.querySelector('input[name="owner_id"]');
                         if (ownerInput) {
@@ -1145,7 +1191,7 @@
                             const ownerFilter = studioWin.document.getElementById('ownerIdFilter');
                             if (ownerFilter) {
                                 ownerFilter.readOnly = true;
-                                ownerFilter.style.background = '#eee';
+                                ownerFilter.style.background = 'var(--background-secondary,#eee)';
                             }
                         }
                     }
@@ -1177,12 +1223,467 @@
         };
         if (el.tenantId) el.tenantId.oninput = verifyTenant;
 
+        // Excel import button
+        const btnImport = AF.$('btnImportExcel');
+        if (btnImport) btnImport.onclick = openExcelImport;
+
+        // Inject DB theme CSS vars (all colors, fonts, cards, buttons from database)
+        injectThemeCss();
+
         // تحميل البيانات
         load();
         console.log('[Categories] Initialized successfully!');
     }
 
-    // ----------------------------
+    // ════════════════════════════════════════════════════════════
+    // THEME CSS INJECTION FROM DATABASE
+    // Uses window.ADMIN_UI.theme (injected by PHP from DB) to
+    // apply all colors, fonts, button styles and card styles.
+    // ════════════════════════════════════════════════════════════
+    function injectThemeCss() {
+        try {
+            const themeData = window.ADMIN_UI && window.ADMIN_UI.theme;
+            if (!themeData) return;
+
+            const root = document.documentElement;
+
+            // Apply color settings
+            if (Array.isArray(themeData.color_settings)) {
+                themeData.color_settings.forEach(c => {
+                    if (!c || !c.setting_key || !c.color_value) return;
+                    const key = c.setting_key.replace(/_/g, '-');
+                    root.style.setProperty('--' + c.setting_key, c.color_value);
+                    root.style.setProperty('--' + key, c.color_value);
+                });
+
+                // Create stable aliases used throughout CSS and inline styles
+                // Only set alias if the target isn't already provided directly by the DB
+                const alias = (target, ...sources) => {
+                    if (root.style.getPropertyValue(target).trim()) return;
+                    for (const src of sources) {
+                        const v = root.style.getPropertyValue(src).trim();
+                        if (v) { root.style.setProperty(target, v); return; }
+                    }
+                };
+                alias('--danger-color', '--error-color', '--error_color');
+                alias('--card-bg', '--background-secondary', '--background_secondary');
+                const secBg = root.style.getPropertyValue('--background-secondary').trim();
+                if (secBg && !root.style.getPropertyValue('--background-tertiary').trim()) {
+                    root.style.setProperty('--background-tertiary', secBg);
+                }
+                // --thead-bg: table header rows use DB background-tertiary/secondary.
+                // Both hyphen and underscore forms are checked because the DB may store
+                // the key as either background-tertiary or background_tertiary.
+                alias('--thead-bg', '--background-tertiary', '--background_tertiary', '--background-secondary', '--background_secondary');
+                // Inputs/search fields/filter selects use the surface/secondary background
+                alias('--input-background', '--background-secondary', '--background_secondary', '--background-primary', '--background_primary');
+                // Border color aliases
+                alias('--border-color', '--border', '--divider-color', '--divider_color');
+                // Text muted/tertiary for placeholders
+                alias('--text-secondary', '--text-muted', '--text_muted', '--text-light');
+                alias('--text-tertiary', '--text-secondary', '--text_secondary', '--text-muted');
+            }
+
+            // Apply font settings
+            if (Array.isArray(themeData.font_settings)) {
+                themeData.font_settings.forEach(f => {
+                    if (!f || !f.setting_key) return;
+                    const base = f.setting_key;
+                    const baseH = base.replace(/_/g, '-');
+                    if (f.font_family) {
+                        root.style.setProperty('--' + base + '-family', f.font_family);
+                        root.style.setProperty('--' + baseH + '-family', f.font_family);
+                    }
+                    if (f.font_size) {
+                        root.style.setProperty('--' + base + '-size', f.font_size);
+                        root.style.setProperty('--' + baseH + '-size', f.font_size);
+                    }
+                    if (f.font_weight) {
+                        root.style.setProperty('--' + base + '-weight', f.font_weight);
+                        root.style.setProperty('--' + baseH + '-weight', f.font_weight);
+                    }
+                });
+            }
+
+            // Apply design settings (border-radius, padding, spacing…)
+            if (Array.isArray(themeData.design_settings)) {
+                themeData.design_settings.forEach(d => {
+                    if (!d || !d.setting_key || !d.setting_value) return;
+                    const key = d.setting_key.replace(/_/g, '-');
+                    root.style.setProperty('--' + d.setting_key, d.setting_value);
+                    root.style.setProperty('--' + key, d.setting_value);
+                });
+            }
+
+            // Apply generated_css if present
+            if (themeData.generated_css) {
+                let genStyle = document.getElementById('__categories_theme_generated__');
+                if (!genStyle) {
+                    genStyle = document.createElement('style');
+                    genStyle.id = '__categories_theme_generated__';
+                    document.head.appendChild(genStyle);
+                }
+                genStyle.textContent = themeData.generated_css;
+            }
+
+            console.log('[Categories] DB theme CSS applied from window.ADMIN_UI');
+        } catch (err) {
+            console.warn('[Categories] Could not apply theme CSS:', err);
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // EXCEL IMPORT - Hierarchical Categories
+    // Supports main / sub / sub-sub / sub-sub-sub levels.
+    // Excel columns: name, parent_name, level, slug, description,
+    //                sort_order, is_active, is_featured
+    // English is the default language; fills categories +
+    // category_translations tables.
+    // ════════════════════════════════════════════════════════════
+
+    let _excelRows = [];
+    let _excelImporting = false;
+
+    function openExcelImport() {
+        _excelRows = [];
+        _excelImporting = false;
+        const fileInput = document.getElementById('catExcelFileInput');
+        if (fileInput) fileInput.value = '';
+        const previewInfo = document.getElementById('catExcelPreviewInfo');
+        if (previewInfo) previewInfo.style.display = 'none';
+        const progressArea = document.getElementById('catExcelProgressArea');
+        if (progressArea) progressArea.style.display = 'none';
+        const resultSummary = document.getElementById('catExcelResultSummary');
+        if (resultSummary) resultSummary.style.display = 'none';
+        const startBtn = document.getElementById('catExcelImportStart');
+        if (startBtn) startBtn.disabled = true;
+        const modal = document.getElementById('catExcelImportModal');
+        if (modal) modal.style.display = 'flex';
+
+        // Bind events
+        if (fileInput) fileInput.onchange = onExcelFileChange;
+        const closeBtn = document.getElementById('catExcelImportClose');
+        if (closeBtn) closeBtn.onclick = closeExcelImport;
+        const cancelBtn = document.getElementById('catExcelImportCancel');
+        if (cancelBtn) cancelBtn.onclick = closeExcelImport;
+        if (startBtn) startBtn.onclick = startExcelImport;
+        const sampleBtn = document.getElementById('catExcelDownloadSample');
+        if (sampleBtn) sampleBtn.onclick = downloadExcelSample;
+    }
+
+    function closeExcelImport() {
+        if (_excelImporting) return;
+        const modal = document.getElementById('catExcelImportModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function downloadExcelSample() {
+        // Columns cover both DB tables:
+        //   categories: name, parent_name, level, slug, description, sort_order, is_active, is_featured
+        //   category_translations (EN): en_name, en_slug, en_description, en_meta_title, en_meta_description, en_meta_keywords
+        //   category_translations (AR): ar_name, ar_slug, ar_description, ar_meta_title, ar_meta_description, ar_meta_keywords
+        const header = [
+            'name', 'parent_name', 'level', 'slug', 'description', 'sort_order', 'is_active', 'is_featured',
+            'en_name', 'en_slug', 'en_description', 'en_meta_title', 'en_meta_description', 'en_meta_keywords',
+            'ar_name', 'ar_slug', 'ar_description', 'ar_meta_title', 'ar_meta_description', 'ar_meta_keywords'
+        ].join(',');
+        const rows = [
+            'Electronics,,1,electronics,Electronic products and gadgets,0,1,0,' +
+                'Electronics,electronics,Electronic products and gadgets,Electronics - Best Deals,Buy electronics online,electronics gadgets,' +
+                'الإلكترونيات,,الإلكترونيات ومستلزماتها,أفضل الإلكترونيات,اشتر الإلكترونيات أونلاين,إلكترونيات أجهزة',
+            'Smartphones,Electronics,2,smartphones,Mobile phones and smartphones,0,1,1,' +
+                'Smartphones,smartphones,Mobile phones and smartphones,Best Smartphones,Buy smartphones online,smartphones mobile,' +
+                'الهواتف الذكية,al-hawatif-al-dhakiyya,الهواتف الذكية ومستلزماتها,أفضل الهواتف الذكية,اشتر هاتفاً ذكياً,هواتف ذكية موبايل',
+            'Laptops,Electronics,2,laptops,Portable computers,1,1,0,' +
+                'Laptops,laptops,Portable computers and notebooks,Best Laptops,Buy laptops online,laptops notebooks,' +
+                'اللابتوب,al-laptop,أجهزة الكمبيوتر المحمول,أفضل اللابتوب,اشتر لابتوب,لابتوب كمبيوتر محمول',
+            'Clothing,,1,clothing,Fashion and apparel,1,1,0,' +
+                'Clothing,clothing,Fashion clothing and apparel,Best Fashion,Buy clothes online,clothing fashion apparel,' +
+                'الملابس,al-malabis,أزياء وملابس,أفضل الملابس,اشتر الملابس أونلاين,ملابس أزياء',
+        ];
+        const csv = header + '\n' + rows.join('\n');
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'categories_import_sample.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    async function onExcelFileChange(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const previewInfo = document.getElementById('catExcelPreviewInfo');
+        const previewText = document.getElementById('catExcelPreviewText');
+        const startBtn = document.getElementById('catExcelImportStart');
+
+        try {
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (ext === 'csv' || ext === 'txt') {
+                const text = await file.text();
+                _excelRows = parseCsvToRows(text);
+            } else {
+                // Load SheetJS lazily for xlsx files
+                _excelRows = await parseXlsxFile(file);
+            }
+
+            if (_excelRows.length === 0) {
+                if (previewText) previewText.textContent = 'No rows found in file.';
+                if (previewInfo) { previewInfo.style.display = 'block'; previewInfo.style.borderColor = 'rgba(239,68,68,0.3)'; previewInfo.style.background = 'rgba(239,68,68,0.08)'; }
+                if (startBtn) startBtn.disabled = true;
+                return;
+            }
+
+            if (previewText) previewText.innerHTML = `<i class="fas fa-check-circle" style="color:#22c55e;"></i> Found <strong>${_excelRows.length}</strong> rows ready to import. First row: <em>${esc(_excelRows[0].name || 'N/A')}</em>`;
+            if (previewInfo) { previewInfo.style.display = 'block'; previewInfo.style.borderColor = 'rgba(34,197,94,0.3)'; previewInfo.style.background = 'rgba(34,197,94,0.08)'; }
+            if (startBtn) startBtn.disabled = false;
+        } catch (err) {
+            if (previewText) previewText.textContent = 'Error reading file: ' + err.message;
+            if (previewInfo) { previewInfo.style.display = 'block'; previewInfo.style.borderColor = 'rgba(239,68,68,0.3)'; previewInfo.style.background = 'rgba(239,68,68,0.08)'; }
+            if (startBtn) startBtn.disabled = true;
+            console.error('[Categories] Excel parse error:', err);
+        }
+    }
+
+    function parseCsvToRows(text) {
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        if (lines.length < 2) return [];
+        const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim().toLowerCase());
+        const rows = [];
+        for (let i = 1; i < lines.length; i++) {
+            const vals = [];
+            let inQuote = false, cur = '';
+            for (let c = 0; c < lines[i].length; c++) {
+                const ch = lines[i][c];
+                if (ch === '"') { inQuote = !inQuote; }
+                else if (ch === ',' && !inQuote) { vals.push(cur.trim()); cur = ''; }
+                else { cur += ch; }
+            }
+            vals.push(cur.trim());
+            const row = {};
+            headers.forEach((h, idx) => { row[h] = (vals[idx] || '').replace(/^"|"$/g, '').trim(); });
+            if (row.name) rows.push(row);
+        }
+        return rows;
+    }
+
+    async function parseXlsxFile(file) {
+        // Lazy-load SheetJS from CDN
+        if (!window.XLSX) {
+            await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+                script.onload = resolve;
+                script.onerror = () => reject(new Error('Failed to load SheetJS'));
+                document.head.appendChild(script);
+            });
+        }
+        const data = await file.arrayBuffer();
+        const wb = window.XLSX.read(data, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const json = window.XLSX.utils.sheet_to_json(ws, { defval: '' });
+        // Normalise keys to lowercase
+        return json.filter(r => r.name || r.Name).map(r => {
+            const norm = {};
+            Object.keys(r).forEach(k => { norm[k.toLowerCase().replace(/\s+/g, '_')] = String(r[k] || '').trim(); });
+            return norm;
+        });
+    }
+
+    function slugify(text) {
+        return text.toLowerCase().trim()
+            .replace(/[\s_]+/g, '-')
+            .replace(/[^\w-]/g, '')
+            .replace(/--+/g, '-')
+            .replace(/^-|-$/g, '');
+    }
+
+    async function startExcelImport() {
+        if (_excelImporting || _excelRows.length === 0) return;
+        _excelImporting = true;
+
+        const startBtn = document.getElementById('catExcelImportStart');
+        const cancelBtn = document.getElementById('catExcelImportCancel');
+        const progressArea = document.getElementById('catExcelProgressArea');
+        const progressBar = document.getElementById('catExcelProgressBar');
+        const progressPct = document.getElementById('catExcelProgressPct');
+        const progressLabel = document.getElementById('catExcelProgressLabel');
+        const progressLog = document.getElementById('catExcelProgressLog');
+        const resultSummary = document.getElementById('catExcelResultSummary');
+
+        if (startBtn) startBtn.disabled = true;
+        if (cancelBtn) cancelBtn.disabled = true;
+        if (progressArea) progressArea.style.display = 'block';
+        if (resultSummary) resultSummary.style.display = 'none';
+        if (progressLog) progressLog.textContent = '';
+        if (progressBar) progressBar.style.width = '0%';
+        if (progressPct) progressPct.textContent = '0%';
+
+        const log = (msg) => {
+            if (progressLog) progressLog.textContent += msg + '\n';
+        };
+
+        const tenantId = window.APP_CONFIG?.TENANT_ID || 1;
+        const csrfToken = window.APP_CONFIG?.CSRF_TOKEN || window.CSRF_TOKEN || '';
+        const apiUrl = (window.APP_CONFIG?.API_BASE || '/api') + '/categories';
+
+        // Build name->id map for parent resolution
+        // Load existing categories first
+        const nameToId = {};
+        try {
+            const res = await fetch(apiUrl + '?per_page=9999&tenant_id=' + tenantId, { credentials: 'same-origin' });
+            if (res.ok) {
+                const data = await res.json();
+                const items = data.data?.items || data.data || [];
+                items.forEach(c => { nameToId[c.name.toLowerCase()] = c.id; });
+                log(`Loaded ${items.length} existing categories for parent lookup.`);
+            }
+        } catch (e) {
+            log('Warning: Could not load existing categories: ' + e.message);
+        }
+
+        // Sort rows by level (root first, then subs)
+        const sortedRows = [..._excelRows].sort((a, b) => {
+            const la = parseInt(a.level) || (a.parent_name ? 2 : 1);
+            const lb = parseInt(b.level) || (b.parent_name ? 2 : 1);
+            return la - lb;
+        });
+
+        let created = 0, skipped = 0, failed = 0;
+
+        for (let i = 0; i < sortedRows.length; i++) {
+            const row = sortedRows[i];
+            const name = (row.name || '').trim();
+            if (!name) { skipped++; continue; }
+
+            const pct = Math.round(((i + 1) / sortedRows.length) * 100);
+            if (progressBar) progressBar.style.width = pct + '%';
+            if (progressPct) progressPct.textContent = pct + '%';
+            if (progressLabel) progressLabel.textContent = `Importing ${i + 1}/${sortedRows.length}…`;
+
+            // Resolve parent_id
+            let parentId = null;
+            const parentName = (row.parent_name || '').trim();
+            if (parentName) {
+                parentId = nameToId[parentName.toLowerCase()] || null;
+                if (!parentId) {
+                    log(`⚠ Row ${i + 1}: Parent "${parentName}" not found for "${name}" — will create as root`);
+                }
+            }
+
+            const slug = (row.slug || '').trim() || slugify(name);
+
+            // Build translations from per-language columns (e.g. en_name, ar_name, ar_description …).
+            // Supported columns: {lang}_name, {lang}_slug, {lang}_description,
+            //                    {lang}_meta_title, {lang}_meta_description, {lang}_meta_keywords
+            const translations = {};
+
+            // Detect all language prefixes present in this row.
+            // Standard ISO 639-1 (2-char) and ISO 639-2/3 (3-char) codes are supported.
+            const langPrefixes = new Set();
+            Object.keys(row).forEach(col => {
+                const m = col.match(/^([a-z]{2,3})_(name|slug|description|meta_title|meta_description|meta_keywords)$/);
+                if (m) langPrefixes.add(m[1]);
+            });
+
+            // Build a translation entry for each detected language
+            langPrefixes.forEach(lang => {
+                const tName = (row[`${lang}_name`] || '').trim();
+                const tSlug = (row[`${lang}_slug`] || '').trim();
+                const tDesc = (row[`${lang}_description`] || '').trim();
+                // Only add translation if at least a name is supplied
+                if (tName || lang === 'en') {
+                    // Slug priority: explicit translated slug → slugified translated name →
+                    //                slugified base English name → base category slug
+                    const computedSlug = tSlug || slugify(tName) || slugify(name) || slug;
+                    translations[lang] = {
+                        name: tName || name,
+                        slug: computedSlug,
+                        description: tDesc,
+                        meta_title: (row[`${lang}_meta_title`] || '').trim(),
+                        meta_description: (row[`${lang}_meta_description`] || '').trim(),
+                        meta_keywords: (row[`${lang}_meta_keywords`] || '').trim()
+                    };
+                }
+            });
+
+            // Always ensure English translation exists (required by the API)
+            if (!translations.en) {
+                translations.en = {
+                    name: name,
+                    slug: slug,
+                    description: (row.description || '').trim(),
+                    meta_title: '',
+                    meta_description: '',
+                    meta_keywords: ''
+                };
+            }
+
+            const payload = {
+                tenant_id: tenantId,
+                name: name,
+                slug: slug,
+                parent_id: parentId,
+                sort_order: parseInt(row.sort_order) || 0,
+                is_active: row.is_active === '' ? 1 : (row.is_active === '1' ? 1 : 0),
+                is_featured: row.is_featured === '1' ? 1 : 0,
+                description: (row.description || '').trim(),
+                translations
+            };
+
+            try {
+                const res = await fetch(apiUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await res.json();
+                if (result.success && result.data?.id) {
+                    nameToId[name.toLowerCase()] = result.data.id;
+                    created++;
+                    log(`✓ Created: "${name}" (ID: ${result.data.id}${parentId ? ', parent: ' + parentName : ''})`);
+                } else {
+                    failed++;
+                    log(`✗ Failed: "${name}" — ${result.message || 'Unknown error'}`);
+                }
+            } catch (err) {
+                failed++;
+                log(`✗ Error: "${name}" — ${err.message}`);
+            }
+
+            // Small delay to avoid rate limiting
+            await new Promise(r => setTimeout(r, 80));
+        }
+
+        if (progressBar) progressBar.style.width = '100%';
+        if (progressPct) progressPct.textContent = '100%';
+        if (progressLabel) progressLabel.textContent = 'Import complete!';
+
+        if (resultSummary) {
+            const color = failed > 0 ? '#f59e0b' : '#22c55e';
+            resultSummary.style.display = 'block';
+            resultSummary.style.background = failed > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)';
+            resultSummary.style.border = `1px solid ${color}33`;
+            resultSummary.innerHTML = `<strong style="color:${color};"><i class="fas fa-check-circle"></i> Import Complete</strong><br>
+                ✓ Created: <strong>${created}</strong> &nbsp;&nbsp;
+                ✗ Failed: <strong>${failed}</strong> &nbsp;&nbsp;
+                ⊘ Skipped: <strong>${skipped}</strong>`;
+        }
+
+        _excelImporting = false;
+        if (cancelBtn) cancelBtn.disabled = false;
+
+        // Refresh the categories table
+        load(1);
+    }
     // PUBLIC API
     // ----------------------------
     window.Categories = {

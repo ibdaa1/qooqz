@@ -229,7 +229,7 @@
     align-items: center;
     padding: 1.25rem 1.5rem;
     border-bottom: 1px solid var(--border-color, #334155);
-    background: var(--background-tertiary, #0f172a);
+    background: var(--background-tertiary, var(--background-secondary, #0f172a));
 }
 
 .card-title {
@@ -267,9 +267,192 @@
     overflow: hidden;
 }
 
+.table-card .card-body {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
 /* ════════════════════════════════════════════════════════════
    FORMS
    ════════════════════════════════════════════════════════════ */
+
+/* ── Add Image Tabs ── */
+.add-image-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--border-color, #334155);
+    margin-bottom: 1.5rem;
+}
+
+.add-tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    color: var(--text-secondary, #94a3b8);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: var(--body-font-family, inherit);
+}
+
+.add-tab-btn:hover {
+    color: var(--primary-color, #3b82f6);
+    background: rgba(59, 130, 246, 0.06);
+}
+
+.add-tab-btn.active {
+    color: var(--primary-color, #3b82f6);
+    border-bottom-color: var(--primary-color, #3b82f6);
+}
+
+.add-tab-content {
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Upload Drop Zone ── */
+.upload-drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 2.5rem;
+    border: 2px dashed var(--border-color, #334155);
+    border-radius: 12px;
+    background: var(--background-tertiary, var(--background-secondary, #0f172a));
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.upload-drop-zone:hover,
+.upload-drop-zone.drag-over {
+    border-color: var(--primary-color, #3b82f6);
+    background: rgba(59, 130, 246, 0.06);
+}
+
+.upload-drop-icon {
+    font-size: 3rem;
+    color: var(--primary-color, #3b82f6);
+    opacity: 0.7;
+}
+
+.upload-drop-text {
+    color: var(--text-secondary, #94a3b8);
+    font-size: 0.9375rem;
+    margin: 0;
+}
+
+.upload-file-input {
+    display: none;
+}
+
+/* ── Uploaded File List ── */
+.upload-file-list {
+    border: 1px solid var(--border-color, #334155);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
+.upload-file-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid var(--border-color, #334155);
+    color: var(--text-primary, #fff);
+    font-size: 0.875rem;
+}
+
+.upload-file-item:last-child {
+    border-bottom: none;
+}
+
+.upload-file-item i {
+    color: var(--primary-color, #3b82f6);
+    flex-shrink: 0;
+}
+
+.upload-file-item small {
+    color: var(--text-secondary, #94a3b8);
+    margin-inline-start: auto;
+}
+
+/* ── From Studio Hint ── */
+.from-studio-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    border-radius: 8px;
+    color: var(--text-secondary, #94a3b8);
+    font-size: 0.9375rem;
+    margin-bottom: 1.5rem;
+}
+
+.from-studio-hint i {
+    color: var(--primary-color, #3b82f6);
+    margin-top: 0.1rem;
+    flex-shrink: 0;
+}
+
+/* ── Studio Copy Mode Bar ── */
+.studio-copy-bar {
+    position: sticky;
+    top: 0;
+    z-index: 500;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.875rem 1.5rem;
+    background: var(--primary-color, #3b82f6);
+    color: #fff;
+    gap: 1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    animation: slideDown 0.25s ease;
+}
+
+@keyframes slideDown {
+    from { transform: translateY(-100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+
+.studio-copy-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 0.9375rem;
+}
+
+.studio-copy-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+/* ── Studio Copy Row highlight ── */
+.data-table tbody tr.studio-copy-selected {
+    background: rgba(59, 130, 246, 0.18);
+    outline: 2px solid var(--primary-color, #3b82f6);
+    outline-offset: -2px;
+}
+
+
 
 .form-row {
     display: grid;
@@ -298,7 +481,7 @@
 .form-control {
     width: 100%;
     padding: 0.75rem;
-    background: var(--input-background, #0f172a);
+    background: var(--input-background, var(--input-bg, #0f172a));
     border: 1px solid var(--border-color, #334155);
     border-radius: 8px;
     color: var(--text-primary, #fff);
@@ -387,7 +570,7 @@
 }
 
 .data-table thead {
-    background: var(--background-tertiary, #0f172a);
+    background: var(--thead-bg, var(--background-tertiary, var(--background-secondary, #0f172a)));
 }
 
 .data-table th {
@@ -554,7 +737,7 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.75rem 1rem;
-    background: var(--background-tertiary, #0f172a);
+    background: var(--background-tertiary, var(--background-secondary, #0f172a));
     border-radius: 8px;
     margin-bottom: 1rem;
     color: var(--text-primary, #fff);

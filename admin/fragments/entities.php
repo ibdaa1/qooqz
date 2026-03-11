@@ -113,7 +113,7 @@ $apiBase = '/api';
 
 <!-- Page Meta -->
 <meta data-page="entities"
-      data-i18n-files="/admin/languages/Entities/<?= rawurlencode($lang) ?>.json">
+      data-i18n-files="/languages/Entities/<?= rawurlencode($lang) ?>.json">
 
 <!-- Page Container -->
 <div class="page-container" id="entitiesPageContainer" dir="<?= htmlspecialchars($dir) ?>">
@@ -199,18 +199,6 @@ $apiBase = '/api';
                 <div class="tab-content active" id="tab-basic">
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="entityStoreName" class="required" data-i18n="form.fields.store_name.label">
-                                <?= __t('form.fields.store_name.label', 'Store Name') ?>
-                            </label>
-                            <input type="text" id="entityStoreName" name="store_name" class="form-control" required
-                                   data-i18n-placeholder="form.fields.store_name.placeholder"
-                                   placeholder="<?= __t('form.fields.store_name.placeholder', 'Enter store name') ?>">
-                            <div class="invalid-feedback" data-i18n="form.fields.store_name.required">
-                                <?= __t('form.fields.store_name.required', 'Store name is required') ?>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
                             <label for="entitySlug" data-i18n="form.fields.slug.label">
                                 <?= __t('form.fields.slug.label', 'Slug') ?>
                             </label>
@@ -222,22 +210,61 @@ $apiBase = '/api';
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="entityIsMain" data-i18n="form.fields.is_main.label">
-                                <?= __t('form.fields.is_main.label', 'Is Main Entity') ?>
-                            </label>
-                            <select id="entityIsMain" name="is_main" class="form-control">
-                                <option value="1" data-i18n="form.fields.is_main.yes">Yes</option>
-                                <option value="0" data-i18n="form.fields.is_main.no">No</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
                             <label for="entityBranchCode" data-i18n="form.fields.branch_code.label">
                                 <?= __t('form.fields.branch_code.label', 'Branch Code') ?>
                             </label>
                             <input type="text" id="entityBranchCode" name="branch_code" class="form-control"
                                    data-i18n-placeholder="form.fields.branch_code.placeholder"
                                    placeholder="<?= __t('form.fields.branch_code.placeholder', 'BR001') ?>">
+                        </div>
+                    </div>
+
+                    <!-- Entity Type (Main / Branch) -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="entityType" data-i18n="form.fields.entity_type.label">
+                                <?= __t('form.fields.entity_type.label', 'Entity Type') ?>
+                            </label>
+                            <select id="entityType" name="entity_type" class="form-control">
+                                <option value="main" data-i18n="form.fields.entity_type.main"><?= __t('form.fields.entity_type.main', 'Main Entity') ?></option>
+                                <option value="branch" data-i18n="form.fields.entity_type.branch"><?= __t('form.fields.entity_type.branch', 'Branch') ?></option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Parent Entity (shown only for branches) -->
+                    <div id="parentIdGroup" style="display:none">
+                        <div class="form-row">
+                            <div class="form-group full-width">
+                                <label for="entityParentSearch" data-i18n="form.fields.parent_entity.label">
+                                    <?= __t('form.fields.parent_entity.label', 'Search Parent Entity') ?>
+                                </label>
+                                <input type="text" id="entityParentSearch" class="form-control"
+                                       style="margin-bottom:6px;"
+                                       data-i18n-placeholder="form.fields.parent_entity.search_placeholder"
+                                       placeholder="<?= __t('form.fields.parent_entity.search_placeholder', 'Type to filter entities...') ?>">
+                                <select id="entityParentSelect" class="form-control" size="5" style="height:auto;">
+                                    <option value=""><?= __t('form.fields.parent_entity.placeholder', '— Select parent entity —') ?></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group full-width">
+                                <label for="entityParentId" data-i18n="form.fields.parent_id.label">
+                                    <?= __t('form.fields.parent_id.label', 'Parent Entity ID') ?>
+                                </label>
+                                <div style="display:flex; gap:8px; align-items:flex-start;">
+                                    <input type="number" id="entityParentId" name="parent_id" class="form-control"
+                                           min="1" style="max-width:200px;"
+                                           data-i18n-placeholder="form.fields.parent_id.placeholder"
+                                           placeholder="<?= __t('form.fields.parent_id.placeholder', 'Enter parent entity ID') ?>">
+                                    <button type="button" id="btnValidateParent" class="btn btn-outline">
+                                        <i class="fas fa-search"></i>
+                                        <?= __t('form.fields.parent_id.validate', 'Validate') ?>
+                                    </button>
+                                </div>
+                                <div id="parentValidationResult" style="display:none; margin-top:6px; font-size:0.875rem; padding:6px 10px; border-radius:4px;"></div>
+                            </div>
                         </div>
                     </div>
 
@@ -306,6 +333,61 @@ $apiBase = '/api';
                                 <option value="0" data-i18n="form.fields.is_verified.no">No</option>
                                 <option value="1" data-i18n="form.fields.is_verified.yes">Yes</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <!-- Timezone -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="entityTimezoneId" data-i18n="form.fields.timezone.label">
+                                <?= __t('form.fields.timezone.label', 'Timezone') ?>
+                            </label>
+                            <select id="entityTimezoneId" name="timezone_id" class="form-control">
+                                <option value=""><?= __t('form.fields.timezone.placeholder', '— Select timezone —') ?></option>
+                                <!-- populated by JS from /api/timezones -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- English Content (primary language) -->
+                    <div class="english-content-section" style="margin-top:28px;padding-top:20px;border-top:2px solid var(--primary-color,#3b82f6);">
+                        <h4 style="margin-bottom:16px;color:var(--text-primary,#fff);display:flex;align-items:center;gap:10px;">
+                            <span style="background:var(--primary-color,#3b82f6);color:#fff;padding:3px 10px;border-radius:20px;font-size:0.75rem;font-weight:700;">EN</span>
+                            <?= __t('form.sections.english_content', 'English Content') ?>
+                            <span style="color:var(--text-secondary,#94a3b8);font-size:0.8rem;font-weight:400;margin-left:6px;">(<?= __t('form.sections.english_required', 'Default language — required') ?>)</span>
+                        </h4>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enEntityName" class="required"><?= __t('form.fields.en_store_name.label', 'Store Name (English)') ?></label>
+                                <input type="text" id="enEntityName" name="en_store_name" class="form-control" required
+                                       placeholder="<?= __t('form.fields.en_store_name.placeholder', 'Enter store name in English') ?>">
+                                <div class="invalid-feedback"><?= __t('form.fields.en_store_name.required', 'English store name is required') ?></div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enEntityDescription"><?= __t('form.fields.en_description.label', 'Description (English)') ?></label>
+                                <textarea id="enEntityDescription" name="en_description" class="form-control" rows="3"
+                                          placeholder="<?= __t('form.fields.en_description.placeholder', 'Enter entity description in English') ?>"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enEntityMetaTitle"><?= __t('form.fields.en_meta_title.label', 'Meta Title (English)') ?></label>
+                                <input type="text" id="enEntityMetaTitle" name="en_meta_title" class="form-control"
+                                       placeholder="<?= __t('form.fields.en_meta_title.placeholder', 'SEO meta title in English') ?>">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enEntityMetaDescription"><?= __t('form.fields.en_meta_description.label', 'Meta Description (English)') ?></label>
+                                <textarea id="enEntityMetaDescription" name="en_meta_description" class="form-control" rows="2"
+                                          placeholder="<?= __t('form.fields.en_meta_description.placeholder', 'SEO meta description in English') ?>"></textarea>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -451,6 +533,39 @@ $apiBase = '/api';
                                 <option value="1" data-i18n="form.fields.featured_in_app.yes">Yes</option>
                             </select>
                         </div>
+
+                        <div class="form-group">
+                            <label for="settingCardColor" data-i18n="form.fields.card_color.label">
+                                <?= __t('form.fields.card_color.label', 'Card Background Color') ?>
+                            </label>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input type="color" id="settingCardColorPicker"
+                                       style="width:44px;height:36px;padding:2px;border:1px solid var(--border-color,#334155);border-radius:6px;cursor:pointer;background:none;"
+                                       oninput="document.getElementById('settingCardColor').value=this.value">
+                                <input type="text" id="settingCardColor" name="card_color" class="form-control"
+                                       placeholder="#ffffff"
+                                       oninput="if(this.value.match(/^#[0-9a-fA-F]{6}$/))document.getElementById('settingCardColorPicker').value=this.value"
+                                       style="flex:1;">
+                            </div>
+                            <small style="color:var(--text-secondary,#94a3b8);font-size:0.78rem;">
+                                <?= __t('form.fields.card_color.hint', 'Overrides the global card style for this entity.') ?>
+                            </small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="settingCardTextColor" data-i18n="form.fields.card_text_color.label">
+                                <?= __t('form.fields.card_text_color.label', 'Card Text Color') ?>
+                            </label>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input type="color" id="settingCardTextColorPicker"
+                                       style="width:44px;height:36px;padding:2px;border:1px solid var(--border-color,#334155);border-radius:6px;cursor:pointer;background:none;"
+                                       oninput="document.getElementById('settingCardTextColor').value=this.value">
+                                <input type="text" id="settingCardTextColor" name="card_text_color" class="form-control"
+                                       placeholder="#1e293b"
+                                       oninput="if(this.value.match(/^#[0-9a-fA-F]{6}$/))document.getElementById('settingCardTextColorPicker').value=this.value"
+                                       style="flex:1;">
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -570,6 +685,14 @@ $apiBase = '/api';
                         <h4 style="margin-bottom:12px; color:var(--text-primary,#fff); border-bottom:1px solid var(--border-color,#263044); padding-bottom:8px;">
                             <i class="fas fa-language"></i> <?= __t('form.sections.translations', 'Translations') ?>
                         </h4>
+                        <p style="font-size:0.88rem;color:var(--text-secondary,#94a3b8);margin-bottom:16px;padding:10px 14px;background:var(--card-bg,#081127);border-radius:6px;border:1px solid var(--border-color,#263044);">
+                            <i class="fas fa-info-circle" style="color:var(--primary-color,#3b82f6);margin-<?= $dir === 'rtl' ? 'left' : 'right' ?>:6px;"></i>
+                            <?= __t('form.translations.english_note', 'The') ?>
+                            <strong style="color:var(--text-primary,#fff);">English</strong>
+                            <?= __t('form.translations.english_in_basic', 'translation fields are in the') ?>
+                            <strong style="color:var(--text-primary,#fff);"><?= __t('tabs.basic', 'Basic Info') ?></strong>
+                            <?= __t('form.translations.tab_hint', 'tab. Use this tab to add translations for other languages (Arabic, French, etc.).') ?>
+                        </p>
                         <div id="entityTranslations" class="translation-panels"></div>
                         <div class="form-group" style="margin-top:12px;">
                             <label for="entityLangSelect" data-i18n="form.translations.select_lang">Select Language</label>
@@ -798,6 +921,7 @@ window.ENTITIES_CONFIG = {
     settingsApi: '<?= $apiBase ?>/entity_settings',
     workingHoursApi: '<?= $apiBase ?>/entities_working_hours',
     languagesApi: '<?= $apiBase ?>/languages',
+    timezonesApi: '<?= $apiBase ?>/timezones',
     tenantsApi: '<?= $apiBase ?>/tenants',
     entityTypesApi: '<?= $apiBase ?>/entity_types',
     addressesApi: '<?= $apiBase ?>/addresses',

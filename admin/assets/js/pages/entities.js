@@ -21,6 +21,7 @@
         settings: CONFIG.settingsApi || '/api/entity_settings',
         workingHours: CONFIG.workingHoursApi || '/api/entities_working_hours',
         languages: CONFIG.languagesApi || '/api/languages',
+        timezones: CONFIG.timezonesApi || '/api/timezones',
         tenants: CONFIG.tenantsApi || '/api/tenants',
         entityTypes: CONFIG.entityTypesApi || '/api/entity_types',
         addresses: CONFIG.addressesApi || '/api/addresses',
@@ -33,9 +34,11 @@
         total: 0,
         entities: [],
         languages: [],
+        timezones: [],
         tenants: [],
         entityTypes: [],
         attributes: [],
+        allEntities: [],
         filters: {},
         currentEntity: null,
         entityAttributes: [],
@@ -464,6 +467,18 @@
                 populateDropdown(el.entityLangSelect, state.languages, 'code', 'name', t('form.translations.select_lang', 'Select language'));
             }
 
+            // Load timezones
+            try {
+                const tzResult = await apiCall(API.timezones);
+                if (tzResult.success) {
+                    const tzData = Array.isArray(tzResult.data) ? tzResult.data : (tzResult.data?.items || tzResult.data?.data || []);
+                    state.timezones = tzData;
+                    populateTimezoneSelect(state.timezones);
+                }
+            } catch (tzErr) {
+                console.warn('[Entities] Failed to load timezones:', tzErr);
+            }
+
             // Load attributes
             const attributesResult = await apiCall(`${API.attributes}?format=json&lang=${state.language}`);
             if (attributesResult.success) {
@@ -471,9 +486,36 @@
                 state.attributes = attrData;
                 populateAttributeSelect(state.attributes);
             }
+
+            // Load parent entities for the searchable dropdown
+            try {
+                const entitiesResult = await apiCall(`${API.entities}?limit=500&lang=${state.language}&tenant_id=${state.tenantId}`);
+                if (entitiesResult.success) {
+                    const entData = entitiesResult.data?.items || entitiesResult.data || [];
+                    state.allEntities = Array.isArray(entData) ? entData : [];
+                    populateParentEntitySelect(state.allEntities);
+                }
+            } catch (entErr) {
+                console.warn('[Entities] Failed to load parent entities list:', entErr);
+            }
         } catch (err) {
             console.warn('[Entities] Failed to load dropdown data:', err);
         }
+    }
+
+    function populateTimezoneSelect(timezones) {
+        const sel = el.entityTimezoneId;
+        if (!sel) return;
+        const current = sel.value;
+        // Keep the first blank option
+        while (sel.options.length > 1) sel.remove(1);
+        timezones.forEach(function (tz) {
+            const opt = document.createElement('option');
+            opt.value = tz.id;
+            opt.textContent = (tz.label || tz.timezone) + ' (' + tz.timezone + ')';
+            sel.appendChild(opt);
+        });
+        if (current) sel.value = current;
     }
 
     function populateDropdown(selectEl, data, valueKey, textKey, placeholder = '') {
@@ -508,6 +550,36 @@
             opt.dataset.type = attr.attribute_type || 'text';
             el.entityAttrSelect.appendChild(opt);
         });
+    }
+
+    function populateParentEntitySelect(entities) {
+        const sel = el.entityParentSelect || document.getElementById('entityParentSelect');
+        if (!sel) return;
+        const currentVal = sel.value;
+        sel.innerHTML = '<option value="">' + t('form.fields.parent_entity.placeholder', '— Select parent entity —') + '</option>';
+        entities.forEach(ent => {
+            const opt = document.createElement('option');
+            opt.value = ent.id;
+            const name = ent.store_name || ent.original_store_name || ('Entity #' + ent.id);
+            const code = ent.branch_code ? ' (' + esc(ent.branch_code) + ')' : '';
+            opt.textContent = name + code + ' — #' + ent.id;
+            sel.appendChild(opt);
+        });
+        if (currentVal) sel.value = currentVal;
+    }
+
+    function filterParentEntitySelect(query) {
+        if (!state.allEntities) return;
+        const q = (query || '').toLowerCase().trim();
+        const filtered = q
+            ? state.allEntities.filter(function(ent) {
+                const name = (ent.store_name || ent.original_store_name || '').toLowerCase();
+                const code = (ent.branch_code || '').toLowerCase();
+                const id = String(ent.id);
+                return name.includes(q) || code.includes(q) || id.includes(q);
+            })
+            : state.allEntities;
+        populateParentEntitySelect(filtered);
     }
 
     // ════════════════════════════════════════════════════════════
@@ -623,7 +695,7 @@
             if (el.formTitle) el.formTitle.textContent = t('form.edit_title', 'Edit Entity');
             if (el.formId) el.formId.value = entity.id || '';
 
-            if (el.entityStoreName) el.entityStoreName.value = entity.original_store_name || entity.store_name || '';
+            if (el.enEntityName && !el.enEntityName.value) el.enEntityName.value = entity.original_store_name || entity.store_name || '';
             if (el.entitySlug) el.entitySlug.value = entity.slug || '';
             if (el.entityType) {
                 const hasParent = entity.parent_id && entity.parent_id !== '0' && entity.parent_id !== 0;
@@ -631,6 +703,9 @@
                 toggleParentIdField(hasParent);
             }
             if (el.entityParentId) el.entityParentId.value = entity.parent_id || '';
+            if (el.entityParentSelect && entity.parent_id) {
+                el.entityParentSelect.value = entity.parent_id;
+            }
             if (entity.parent_id) {
                 validateParentId(entity.parent_id);
             }
@@ -641,6 +716,11 @@
             if (el.entityTaxNumber) el.entityTaxNumber.value = entity.tax_number || '';
             if (el.entityStatus) el.entityStatus.value = entity.status || 'pending';
             if (el.entityIsVerified) el.entityIsVerified.value = entity.is_verified || '0';
+            if (el.entityTimezoneId) {
+                // Timezones may be loaded async; set after a tick if empty
+                const setTz = () => { if (el.entityTimezoneId) el.entityTimezoneId.value = entity.timezone_id || ''; };
+                if (state.timezones.length > 0) { setTz(); } else { setTimeout(setTz, 600); }
+            }
 
             if (el.entityPhone) el.entityPhone.value = entity.phone || '';
             if (el.entityMobile) el.entityMobile.value = entity.mobile || '';
@@ -666,6 +746,11 @@
 
             if (el.entityAttributesList) el.entityAttributesList.innerHTML = '';
             if (el.entityTranslations) el.entityTranslations.innerHTML = '';
+            // Clear English inline fields
+            if (el.enEntityName) el.enEntityName.value = '';
+            if (el.enEntityDescription) el.enEntityDescription.value = '';
+            if (el.enEntityMetaTitle) el.enEntityMetaTitle.value = '';
+            if (el.enEntityMetaDescription) el.enEntityMetaDescription.value = '';
             renderWorkingHours(getDefaultWorkingHours());
             clearMediaPreviews();
             clearAddress();
@@ -718,12 +803,18 @@
         if (group) {
             group.style.display = showParent ? '' : 'none';
         }
-        if (!showParent && el.entityParentId) {
-            el.entityParentId.value = '';
+        if (!showParent) {
+            if (el.entityParentId) el.entityParentId.value = '';
             const result = el.parentValidationResult || document.getElementById('parentValidationResult');
             if (result) {
                 result.style.display = 'none';
                 result.innerHTML = '';
+            }
+            // Clear search filter and reset dropdown
+            const searchEl = el.entityParentSearch || document.getElementById('entityParentSearch');
+            if (searchEl) searchEl.value = '';
+            if (state.allEntities && state.allEntities.length) {
+                populateParentEntitySelect(state.allEntities);
             }
         }
     }
@@ -822,8 +913,8 @@
             }
 
             const entityData = {
-                store_name: formData.get('store_name'),
-                slug: formData.get('slug') || generateSlug(formData.get('store_name')),
+                store_name: formData.get('en_store_name') || formData.get('store_name') || '',
+                slug: formData.get('slug') || generateSlug(formData.get('en_store_name') || formData.get('store_name')) || ('entity-' + Date.now()),
                 parent_id: (formData.get('entity_type') === 'branch' && formData.get('parent_id')) ? parseInt(formData.get('parent_id'), 10) : null,
                 branch_code: formData.get('branch_code') || null,
                 vendor_type: formData.get('vendor_type') || 'product_seller',
@@ -834,6 +925,7 @@
                 user_id: formData.get('user_id') || state.userId,
                 status: formData.get('status') || 'pending',
                 is_verified: formData.get('is_verified') || '0',
+                timezone_id: formData.get('timezone_id') ? parseInt(formData.get('timezone_id'), 10) : null,
 
                 phone: formData.get('phone'),
                 mobile: formData.get('mobile') || null,
@@ -905,8 +997,24 @@
             .substring(0, 255);
     }
 
+    function parseAdditionalSettings(jsonString) {
+        if (!jsonString) return {};
+        try { return JSON.parse(jsonString); } catch (e) { return {}; }
+    }
+
     async function saveEntitySettings(entityId, isEdit = false) {
         try {
+            // Build additional_settings JSON with card colors
+            const existingAddSettings = parseAdditionalSettings(
+                state.entitySettings ? state.entitySettings.additional_settings : null
+            );
+            const cardColor = document.getElementById('settingCardColor')?.value?.trim() || '';
+            const cardTextColor = document.getElementById('settingCardTextColor')?.value?.trim() || '';
+            if (cardColor) existingAddSettings.card_color = cardColor;
+            else delete existingAddSettings.card_color;
+            if (cardTextColor) existingAddSettings.card_text_color = cardTextColor;
+            else delete existingAddSettings.card_text_color;
+
             const settings = {
                 entity_id: parseInt(entityId),
                 auto_accept_orders: document.getElementById('settingAutoAcceptOrders')?.value === '1' ? 1 : 0,
@@ -917,7 +1025,8 @@
                 max_bookings_per_slot: parseInt(document.getElementById('settingMaxBookingsPerSlot')?.value || 0) || 0,
                 show_reviews: document.getElementById('settingShowReviews')?.value === '1' ? 1 : 0,
                 show_contact_info: document.getElementById('settingShowContactInfo')?.value === '1' ? 1 : 0,
-                featured_in_app: document.getElementById('settingFeaturedInApp')?.value === '1' ? 1 : 0
+                featured_in_app: document.getElementById('settingFeaturedInApp')?.value === '1' ? 1 : 0,
+                additional_settings: JSON.stringify(existingAddSettings)
             };
 
             await apiCall(API.settings, {
@@ -1110,8 +1219,9 @@
 
     function validateForm() {
         let isValid = true;
+        let firstInvalidField = null;
 
-        const requiredFields = [el.entityStoreName, el.entityPhone, el.entityEmail];
+        const requiredFields = [el.enEntityName, el.entityPhone, el.entityEmail];
 
         requiredFields.forEach(field => {
             if (!field || !field.value.trim()) {
@@ -1119,9 +1229,21 @@
                 if (field) {
                     field.classList.add('is-invalid');
                     field.addEventListener('input', () => field.classList.remove('is-invalid'), { once: true });
+                    if (!firstInvalidField) firstInvalidField = field;
                 }
             }
         });
+
+        // Switch to the tab containing the first invalid field so the user can see it
+        if (firstInvalidField) {
+            const tabContent = firstInvalidField.closest('.tab-content');
+            if (tabContent && tabContent.id && tabContent.id.startsWith('tab-')) {
+                const tabId = tabContent.id.slice(4);
+                const tabBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+                if (tabBtn) tabBtn.click();
+            }
+            setTimeout(() => firstInvalidField.focus(), 50);
+        }
 
         return isValid;
     }
@@ -1371,7 +1493,7 @@
         _currentImageType = imageType;
 
         if (el.mediaModal && el.mediaFrame) {
-            el.mediaModal.style.display = 'block';
+            el.mediaModal.style.display = 'flex';
             el.mediaFrame.src = `${CONFIG.mediaStudioBase}?embedded=1&tenant_id=${state.tenantId}&lang=${state.language}&owner_id=${state.currentEntity.id}&image_type_id=${imageType}`;
 
             el.mediaFrame.dataset.imageType = imageType;
@@ -1816,8 +1938,25 @@
     function collectTranslations() {
         const translations = {};
 
+        // ── 1. Collect from the inline English section (always present) ──
+        const enName        = el.enEntityName?.value?.trim() || '';
+        const enDesc        = el.enEntityDescription?.value?.trim() || '';
+        const enMetaTitle   = el.enEntityMetaTitle?.value?.trim() || '';
+        const enMetaDesc    = el.enEntityMetaDescription?.value?.trim() || '';
+
+        if (enName || enDesc || enMetaTitle || enMetaDesc) {
+            translations['en'] = {
+                store_name:       enName,
+                description:      enDesc,
+                meta_title:       enMetaTitle,
+                meta_description: enMetaDesc
+            };
+        }
+
+        // ── 2. Collect from dynamic translation panels (other languages) ──
         document.querySelectorAll('.translation-panel').forEach(panel => {
             const lang = panel.dataset.lang;
+            if (lang === 'en') return; // already handled above
             const storeName = panel.querySelector('.trans-store-name')?.value || '';
             const desc = panel.querySelector('.trans-desc')?.value || '';
             const metaTitle = panel.querySelector('.trans-meta-title')?.value || '';
@@ -1843,6 +1982,14 @@
                 const items = Array.isArray(result.data) ? result.data : (result.data?.items || []);
                 if (el.entityTranslations) el.entityTranslations.innerHTML = '';
                 items.forEach(trans => {
+                    // Populate the English inline fields instead of a panel
+                    if (trans.language_code === 'en') {
+                        if (el.enEntityName) el.enEntityName.value = trans.store_name || '';
+                        if (el.enEntityDescription) el.enEntityDescription.value = trans.description || '';
+                        if (el.enEntityMetaTitle) el.enEntityMetaTitle.value = trans.meta_title || '';
+                        if (el.enEntityMetaDescription) el.enEntityMetaDescription.value = trans.meta_description || '';
+                        return;
+                    }
                     const langName = state.languages.find(l => l.code === trans.language_code)?.name || trans.language_code;
                     const panel = createTranslationPanel(trans.language_code, langName, {
                         id: trans.id,
@@ -1908,6 +2055,25 @@
                 if (el.settingShowReviews) el.settingShowReviews.value = settings.show_reviews != null ? String(settings.show_reviews) : '1';
                 if (el.settingShowContactInfo) el.settingShowContactInfo.value = settings.show_contact_info != null ? String(settings.show_contact_info) : '1';
                 if (el.settingFeaturedInApp) el.settingFeaturedInApp.value = settings.featured_in_app != null ? String(settings.featured_in_app) : '0';
+
+                // Load card_color and card_text_color from additional_settings JSON
+                const addSettings = parseAdditionalSettings(settings.additional_settings);
+                const cardColorEl = document.getElementById('settingCardColor');
+                const cardColorPickerEl = document.getElementById('settingCardColorPicker');
+                const cardTextColorEl = document.getElementById('settingCardTextColor');
+                const cardTextColorPickerEl = document.getElementById('settingCardTextColorPicker');
+                if (cardColorEl) {
+                    cardColorEl.value = addSettings.card_color || '';
+                    if (cardColorPickerEl && addSettings.card_color && addSettings.card_color.match(/^#[0-9a-fA-F]{6}$/)) {
+                        cardColorPickerEl.value = addSettings.card_color;
+                    }
+                }
+                if (cardTextColorEl) {
+                    cardTextColorEl.value = addSettings.card_text_color || '';
+                    if (cardTextColorPickerEl && addSettings.card_text_color && addSettings.card_text_color.match(/^#[0-9a-fA-F]{6}$/)) {
+                        cardTextColorPickerEl.value = addSettings.card_text_color;
+                    }
+                }
             }
         } catch (err) {
             console.warn('[Entities] Failed to load settings:', err);
@@ -2132,10 +2298,11 @@
             formId: $id('formId'),
 
             // Form fields - Basic
-            entityStoreName: $id('entityStoreName'),
             entitySlug: $id('entitySlug'),
             entityType: $id('entityType'),
             entityParentId: $id('entityParentId'),
+            entityParentSelect: $id('entityParentSelect'),
+            entityParentSearch: $id('entityParentSearch'),
             parentIdGroup: $id('parentIdGroup'),
             btnValidateParent: $id('btnValidateParent'),
             parentValidationResult: $id('parentValidationResult'),
@@ -2146,8 +2313,15 @@
             entityTaxNumber: $id('entityTaxNumber'),
             entityStatus: $id('entityStatus'),
             entityIsVerified: $id('entityIsVerified'),
+            entityTimezoneId: $id('entityTimezoneId'),
             entityTenantId: $id('entityTenantId'),
             entityUserId: $id('entityUserId'),
+
+            // English content fields
+            enEntityName: $id('enEntityName'),
+            enEntityDescription: $id('enEntityDescription'),
+            enEntityMetaTitle: $id('enEntityMetaTitle'),
+            enEntityMetaDescription: $id('enEntityMetaDescription'),
 
             // Form fields - Contact
             entityPhone: $id('entityPhone'),
@@ -2256,6 +2430,21 @@
         if (el.entityParentId) {
             el.entityParentId.onblur = function() {
                 if (this.value) validateParentId(this.value);
+            };
+        }
+        // Sync searchable parent select → number input
+        if (el.entityParentSelect) {
+            el.entityParentSelect.onchange = function() {
+                if (this.value && el.entityParentId) {
+                    el.entityParentId.value = this.value;
+                    validateParentId(this.value);
+                }
+            };
+        }
+        // Filter parent entity dropdown as user types
+        if (el.entityParentSearch) {
+            el.entityParentSearch.oninput = function() {
+                filterParentEntitySelect(this.value);
             };
         }
 

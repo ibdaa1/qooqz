@@ -3,6 +3,7 @@
     "title": "الفئات",
     "subtitle": "إدارة فئات المنتجات والمحتوى",
     "add_new": "إضافة فئة",
+    "import_excel": "استيراد Excel",
     "loading": "جارٍ التحميل...",
     "no_data": "لا توجد بيانات",
     "error": "حدث خطأ",
@@ -105,6 +106,7 @@
     "translations": {
       "select_lang": "اختر اللغة",
       "choose_lang": "اختر اللغة",
+      "translations_title": "الترجمات",
       "name_in_lang": "الاسم في {lang}",
       "slug_in_lang": "الرابط في {lang}",
       "description_in_lang": "الوصف في {lang}",
@@ -145,5 +147,20 @@
   },
   "pagination": {
     "showing": "عرض"
+  },
+  "excel": {
+    "title": "استيراد الفئات من Excel / CSV",
+    "download_sample": "تنزيل النموذج",
+    "choose_file": "اختر ملفاً (CSV أو XLSX)",
+    "import": "بدء الاستيراد",
+    "cancel": "إلغاء",
+    "importing": "جارٍ الاستيراد…",
+    "columns_info_label": "صيغة أعمدة Excel:",
+    "preview_found": "تم العثور على {count} صف جاهز للاستيراد",
+    "import_complete": "اكتمل الاستيراد",
+    "created": "تم الإنشاء",
+    "failed": "فشل",
+    "skipped": "تم التخطي",
+    "columns_info": "الأعمدة المدعومة: name، parent_name، level، slug، description، sort_order، is_active، is_featured — وأعمدة اللغات: en_name، en_slug، en_description، en_meta_title، en_meta_description، en_meta_keywords، ar_name، ar_slug، ar_description، ar_meta_title، ar_meta_description، ar_meta_keywords"
   }
 }

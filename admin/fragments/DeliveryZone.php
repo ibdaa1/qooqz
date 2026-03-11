@@ -138,6 +138,7 @@ if (empty($_SESSION['csrf_token'])) {
     try { $_SESSION['csrf_token'] = bin2hex(random_bytes(32)); } catch (Throwable $e) { $_SESSION['csrf_token'] = bin2hex(openssl_random_pseudo_bytes(32)); }
 }
 $csrfToken = (string)($_SESSION['csrf_token'] ?? '');
+$tenantId  = (int)($_SESSION['tenant_id'] ?? 1);
 
 // ---------------- Languages listing (languages/admin/*.json) ----------------
 $langBase = '/languages/admin';
@@ -242,124 +243,166 @@ if ($shouldRenderFull && !$parentHasHeader) {
 }
 
 // ------------------ Render fragment HTML ------------------
+// Leaflet CSS is loaded into <head> by DeliveryZone.js (ensureLeafletCss) to guarantee
+// tile panes are positioned correctly even when the fragment is AJAX-injected.
 ?>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
-<link rel="stylesheet" href="/admin/assets/css/pages/DeliveryZone.css" />
+<link rel="stylesheet" href="/admin/assets/css/pages/DeliveryZone.css">
 
-<div id="adminDeliveryZone" class="delivery-zone-admin" dir="<?php echo htmlspecialchars($langDirection, ENT_QUOTES | ENT_SUBSTITUTE); ?>" data-lang="<?php echo htmlspecialchars($preferredLang, ENT_QUOTES | ENT_SUBSTITUTE); ?>">
-  <header class="dz-header">
-    <h2 class="dz-title" id="dz_title" data-i18n="delivery_zone.module_title">Delivery Zones</h2>
-    <div class="dz-controls">
-      <button id="dzNewBtn" class="btn primary" type="button" data-i18n="delivery_zone.create_title">New Zone</button>
-      <button id="dzRefresh" class="btn" type="button" data-i18n="actions.refresh">Refresh</button>
+<div id="adminDeliveryZone" class="dz-page-container" dir="<?php echo htmlspecialchars($langDirection, ENT_QUOTES | ENT_SUBSTITUTE); ?>" data-lang="<?php echo htmlspecialchars($preferredLang, ENT_QUOTES | ENT_SUBSTITUTE); ?>">
+
+  <div class="page-header">
+    <div class="page-header-content">
+      <h1 class="page-title" id="dz_title" data-i18n="delivery_zone.module_title">Delivery Zones</h1>
     </div>
-  </header>
+    <div class="page-header-actions">
+      <button id="dzNewBtn" class="btn btn-primary" type="button"><i class="fas fa-plus"></i> <span data-i18n="delivery_zone.new_zone">New Zone</span></button>
+      <button id="dzRefresh" class="btn btn-outline" type="button"><i class="fas fa-sync-alt"></i> <span data-i18n="actions.refresh">Refresh</span></button>
+    </div>
+  </div>
 
-  <section class="dz-main">
+  <div class="dz-workspace">
+    <!-- Sidebar: filters + list -->
     <aside class="dz-sidebar">
-      <div class="dz-filters">
-        <input id="dzSearch" class="dz-input" data-i18n-placeholder="placeholders.search" placeholder="Search zones..." />
-        <select id="dzStatusFilter" class="dz-select">
-          <option value="" data-i18n="delivery_zone.all_statuses">All</option>
-          <option value="active" data-i18n="statuses.active">Active</option>
-          <option value="inactive" data-i18n="statuses.inactive">Inactive</option>
-        </select>
+      <div class="card">
+        <div class="card-body dz-filters">
+          <input id="dzSearch" class="form-control" data-i18n-placeholder="placeholders.search" placeholder="Search zones...">
+          <select id="dzStatusFilter" class="form-control">
+            <option value="" data-i18n="delivery_zone.all_statuses">All</option>
+            <option value="1" data-i18n="statuses.active">Active</option>
+            <option value="0" data-i18n="statuses.inactive">Inactive</option>
+          </select>
+        </div>
       </div>
-      <div id="dzList" class="dz-list" data-i18n-loading="messages.loading">Loading...</div>
+      <div id="dzList" class="dz-list">
+        <div class="loading-state"><div class="spinner"></div></div>
+      </div>
     </aside>
 
+    <!-- Main: map + form -->
     <div class="dz-map-area">
-      <div id="dzMap" style="height:520px;border:1px solid #ddd;border-radius:6px"></div>
+      <div class="card">
+        <div class="card-body" style="padding:0">
+          <div id="dzMap" style="height:500px;width:100%;border-radius:0 0 12px 12px"></div>
+        </div>
+      </div>
 
-      <div class="dz-form-area">
-        <form id="dzForm" class="dz-form" onsubmit="return false;">
-          <input type="hidden" name="csrf_token" id="dz_csrf" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE); ?>">
-          <input type="hidden" id="dz_id" name="id" value="0">
+      <div id="dzFormCard" class="card form-card" style="display:none">
+        <div class="card-header">
+          <h3 class="card-title" id="dzFormTitle" data-i18n="delivery_zone.zone_details">Zone Details</h3>
+          <button id="dzCloseForm" class="btn btn-sm btn-outline" type="button"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="card-body">
+          <form id="dzForm" novalidate>
+            <input type="hidden" id="dz_id" name="id">
 
-          <label class="dz-label">
-            <span data-i18n="fields.zone_name">Zone Name</span>
-            <input id="dz_zone_name" name="zone_name" class="dz-input" data-i18n-placeholder="placeholders.enter_zone_name" />
-          </label>
+            <!-- Row 1: zone_name + zone_type + provider_id -->
+            <div class="form-row">
+              <div class="form-group col-4">
+                <label class="required" data-i18n="fields.zone_name">Zone Name</label>
+                <input id="dz_zone_name" name="zone_name" class="form-control" required placeholder="e.g. North District">
+              </div>
+              <div class="form-group col-4">
+                <label class="required" data-i18n="fields.zone_type">Zone Type</label>
+                <select id="dz_zone_type" name="zone_type" class="form-control" required>
+                  <option value="city" data-i18n="zone_type_values.city">City</option>
+                  <option value="district" data-i18n="zone_type_values.district">District</option>
+                  <option value="radius" data-i18n="zone_type_values.radius">Radius</option>
+                  <option value="polygon" data-i18n="zone_type_values.polygon">Polygon</option>
+                </select>
+              </div>
+              <div class="form-group col-4">
+                <label class="required" data-i18n="fields.provider_id">Provider ID</label>
+                <input id="dz_provider_id" name="provider_id" type="number" class="form-control" required min="1" placeholder="Enter provider ID">
+              </div>
+            </div>
 
-          <label class="dz-label">
-            <span data-i18n="fields.zone_type">Zone Type</span>
-            <select id="dz_zone_type" name="zone_type" class="dz-select">
-              <option value="polygon" data-i18n="zone_type_values.polygon">Polygon</option>
-              <option value="rectangle" data-i18n="zone_type_values.rectangle">Rectangle</option>
-              <option value="radius" data-i18n="zone_type_values.radius">Circle (Radius)</option>
-              <option value="city" data-i18n="zone_type_values.city">City</option>
-              <option value="district" data-i18n="zone_type_values.district">District</option>
-              <option value="postal" data-i18n="zone_type_values.postal">Postal</option>
-            </select>
-          </label>
+            <!-- Row 2: city_id (shown for city type) -->
+            <div id="dz_city_row" class="form-row" style="display:none">
+              <div class="form-group col-12">
+                <label data-i18n="fields.city_id">City ID</label>
+                <input id="dz_city_id" name="city_id" type="number" class="form-control" min="1" placeholder="Enter city ID">
+              </div>
+            </div>
 
-          <label class="dz-label">
-            <span data-i18n="fields.zone_value_json">Zone Value (JSON)</span>
-            <textarea id="dz_zone_value" name="zone_value" class="dz-textarea" rows="3" data-i18n-placeholder="placeholders.paste_geojson"></textarea>
-          </label>
+            <!-- Row 3: center_lat + center_lng + radius_km (shown for radius type) -->
+            <div id="dz_radius_row" class="form-row" style="display:none">
+              <div class="form-group col-4">
+                <label data-i18n="fields.center_lat">Center Latitude</label>
+                <input id="dz_center_lat" name="center_lat" type="text" class="form-control" placeholder="24.7136">
+              </div>
+              <div class="form-group col-4">
+                <label data-i18n="fields.center_lng">Center Longitude</label>
+                <input id="dz_center_lng" name="center_lng" type="text" class="form-control" placeholder="46.6753">
+              </div>
+              <div class="form-group col-4">
+                <label data-i18n="fields.radius_km">Radius (km)</label>
+                <input id="dz_radius_km" name="radius_km" type="number" step="0.01" class="form-control" placeholder="5.00">
+              </div>
+            </div>
 
-          <div class="dz-row">
-            <label class="dz-label dz-col">
-              <span data-i18n="fields.shipping_rate">Shipping Rate</span>
-              <input id="dz_shipping_rate" name="shipping_rate" type="number" step="0.01" class="dz-input" value="0.00">
-            </label>
+            <!-- Row 4: delivery_fee + free_delivery_over + min_order_value -->
+            <div class="form-row">
+              <div class="form-group col-4">
+                <label class="required" data-i18n="fields.delivery_fee">Delivery Fee</label>
+                <input id="dz_delivery_fee" name="delivery_fee" type="number" step="0.01" class="form-control" value="0.00" min="0" required>
+              </div>
+              <div class="form-group col-4">
+                <label data-i18n="fields.free_delivery_over">Free Delivery Over</label>
+                <input id="dz_free_delivery_over" name="free_delivery_over" type="number" step="0.01" class="form-control" placeholder="">
+              </div>
+              <div class="form-group col-4">
+                <label data-i18n="fields.min_order_value">Min Order Value</label>
+                <input id="dz_min_order_value" name="min_order_value" type="number" step="0.01" class="form-control" placeholder="">
+              </div>
+            </div>
 
-            <label class="dz-label dz-col">
-              <span data-i18n="fields.free_shipping_threshold">Free Shipping Threshold</span>
-              <input id="dz_free_threshold" name="free_shipping_threshold" type="number" step="0.01" class="dz-input">
-            </label>
-          </div>
+            <!-- Row 5: estimated_minutes + is_active -->
+            <div class="form-row">
+              <div class="form-group col-6">
+                <label data-i18n="fields.estimated_minutes">Estimated Minutes</label>
+                <input id="dz_estimated_minutes" name="estimated_minutes" type="number" class="form-control" value="45" min="1">
+              </div>
+              <div class="form-group col-6">
+                <label data-i18n="fields.status">Status</label>
+                <select id="dz_is_active" name="is_active" class="form-control">
+                  <option value="1" data-i18n="statuses.active">Active</option>
+                  <option value="0" data-i18n="statuses.inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
 
-          <div class="dz-row">
-            <label class="dz-label dz-col">
-              <span data-i18n="fields.estimated_delivery_days">Estimated Delivery Days</span>
-              <input id="dz_estimated_days" name="estimated_delivery_days" type="number" class="dz-input" value="3">
-            </label>
+            <div id="dz_geojson_row" class="form-group" style="display:none">
+              <label data-i18n="fields.zone_boundary">Zone Boundary (GeoJSON) &mdash; draw on map or paste JSON</label>
+              <textarea id="dz_zone_value" name="zone_value" class="form-control" rows="3"
+                        placeholder='{"type":"Polygon","coordinates":[...]}'></textarea>
+            </div>
 
-            <label class="dz-label dz-col">
-              <span data-i18n="fields.status">Status</span>
-              <select id="dz_status" name="status" class="dz-select">
-                <option value="active" data-i18n="statuses.active">Active</option>
-                <option value="inactive" data-i18n="statuses.inactive">Inactive</option>
-              </select>
-            </label>
-          </div>
-
-          <div class="form-actions">
-            <button id="dzSaveBtn" class="btn primary" type="button" data-i18n="actions.save">Save</button>
-            <button id="dzResetBtn" class="btn" type="button" data-i18n="actions.reset">Reset</button>
-            <label class="dz-inline">
-              <input type="checkbox" id="dz_auto_save" checked>
-              <span data-i18n="delivery_zone.auto_save">Auto-save</span>
-            </label>
-          </div>
-        </form>
+            <div class="form-actions-footer">
+              <button id="dzSaveBtn" class="btn btn-primary" type="button"><i class="fas fa-save"></i> <span data-i18n="actions.save">Save</span></button>
+              <button id="dzResetBtn" class="btn btn-outline" type="button" data-i18n="actions.cancel">Cancel</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
-  </section>
+  </div>
 </div>
 
-<script>
-  // Expose runtime variables for DeliveryZone JS
+<script type="text/javascript">
   window.DZ = window.DZ || {};
-  window.DZ.API_BASE = '/api/routes/DeliveryZone.php';
-  window.DZ.HELPERS = {
-    countries: '/api/helpers/countries.php?scope=all',
-    cities: '/api/helpers/cities.php?scope=all'
-  };
-  try { window.CURRENT_USER = <?php echo $currentUserJson; ?>; } catch (e) { window.CURRENT_USER = { id:0, username:'guest', permissions:[] }; }
-  try { window.AVAILABLE_LANGUAGES = <?php echo $availableLangsJson; ?>; } catch (e) { window.AVAILABLE_LANGUAGES = [{"code":"en","name":"English","direction":"ltr","strings":{}}]; }
-  window.ADMIN_LANG = '<?php echo htmlspecialchars($preferredLang, ENT_QUOTES | ENT_SUBSTITUTE); ?>';
-  window.LANG_DIRECTION = '<?php echo htmlspecialchars($langDirection, ENT_QUOTES | ENT_SUBSTITUTE); ?>';
-  window.CSRF_TOKEN = '<?php echo addslashes($csrfToken); ?>';
-  var langBase = '<?php echo addslashes($langBase); ?>';
+  window.DZ.API_BASE   = '/api/delivery_zones';
+  window.DZ.TENANT_ID  = <?php echo $tenantId; ?>;
+  window.DZ.CSRF_TOKEN = '<?php echo addslashes($csrfToken); ?>';
+  try { window.CURRENT_USER = <?php echo $currentUserJson; ?>; } catch (e) { window.CURRENT_USER = {id:0}; }
+  window.ADMIN_LANG    = '<?php echo htmlspecialchars($preferredLang, ENT_QUOTES | ENT_SUBSTITUTE); ?>';
+  window.LANG_DIRECTION= '<?php echo htmlspecialchars($langDirection, ENT_QUOTES | ENT_SUBSTITUTE); ?>';
+  // If DeliveryZone.js was already loaded (prior AJAX navigation), runScripts
+  // will have skipped the <script src> tag below — call boot() explicitly here.
+  if (window.DZ && typeof window.DZ.boot === 'function') window.DZ.boot();
 </script>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js" defer></script>
-<script src="/admin/assets/js/i18n.js" defer></script>
-<script src="/admin/assets/js/pages/DeliveryZone.js" defer></script>
+<!-- DeliveryZone.js self-loads Leaflet JS + CSS before initialising the map -->
+<script src="/admin/assets/js/pages/DeliveryZone.js"></script>
 
 <?php
 // ---------------- Post-render: buffer check and footer inclusion ----------------

@@ -33,16 +33,6 @@ foreach ($theme['color_settings'] ?? [] as $c) {
 }
 
 // Get specific colors
-$sidebarBg = $colors['sidebar_background'] ?? '#4B0082';
-$sidebarText = $colors['sidebar_text'] ?? '#FFFFFF';
-$primaryColor = $colors['primary_color'] ?? '#3b82f6';
-$dangerColor = $colors['danger_color'] ?? '#ef4444';
-$sidebarHover = $colors['sidebar_hover'] ?? '#6A0DAD';
-$sidebarActive = $colors['sidebar_active'] ?? '#8A2BE2';
-$infoColor = $colors['info_color'] ?? '#3b82f6';
-$successColor = $colors['success_color'] ?? '#10b981';
-$warningColor = $colors['warning_color'] ?? '#f59e0b';
-
 // Get design settings for footer text
 $footerText = '© ' . date('Y') . ' Admin Panel';
 foreach ($theme['design_settings'] ?? [] as $d) {
@@ -65,18 +55,22 @@ $brand = $payload['strings']['brand'] ?? 'Admin';
   </footer>
 
 <style>
-/* Dynamic CSS Variables from DB (same as header) */
+/* Dynamic CSS Variables from DB (both underscore and hyphen for compatibility) */
 :root {
-    <?php foreach ($colors as $key => $value): ?>
+    <?php foreach ($colors as $key => $value):
+        $hkey = str_replace('_', '-', $key);
+    ?>
     --<?= htmlspecialchars($key) ?>: <?= htmlspecialchars($value) ?>;
+    <?php if ($hkey !== $key): ?>--<?= htmlspecialchars($hkey) ?>: <?= htmlspecialchars($value) ?>;
+    <?php endif; ?>
     <?php endforeach; ?>
 }
 
-/* Footer styles using the same colors as header */
+/* Footer styles — colors from DB via :root vars above */
 .admin-footer {
-    background: var(--sidebar_background, #4B0082) !important;
-    color: var(--sidebar_text, #FFFFFF) !important;
-    border-top: 1px solid var(--primary_color, #3b82f6);
+    background: var(--footer_background, var(--background_secondary, #1e2533)) !important;
+    color: var(--footer_text, var(--text_secondary, #B0B0B0)) !important;
+    border-top: 1px solid var(--border_color);
     padding: 1rem 0;
     margin-top: auto;
 }
@@ -131,14 +125,18 @@ $brand = $payload['strings']['brand'] ?? 'Admin';
     }
   })();
 
-  // fetchAndInsert: simple fragment loader
-  window.Admin.fetchAndInsert = function(url, targetSelector) {
-    const target = document.querySelector(targetSelector);
-    if (!target) return Promise.reject(new Error('Target not found'));
-    return fetch(url, { credentials: 'same-origin' })
-      .then(res => res.ok ? res.text() : Promise.reject(new Error('HTTP ' + res.status)))
-      .then(html => { target.innerHTML = html; return html; });
-  };
+  // fetchAndInsert: guard — admin_core.js (defer) provides the full version with CSS loading,
+  // script execution, theme, and translations. Only set a minimal fallback here if it hasn't
+  // been defined yet (i.e., when admin_core.js is not loaded on the page).
+  if (!window.Admin.__installed) {
+    window.Admin.fetchAndInsert = function(url, targetSelector) {
+      const target = document.querySelector(targetSelector);
+      if (!target) return Promise.reject(new Error('Target not found'));
+      return fetch(url, { credentials: 'same-origin' })
+        .then(res => res.ok ? res.text() : Promise.reject(new Error('HTTP ' + res.status)))
+        .then(html => { target.innerHTML = html; return html; });
+    };
+  }
 
   // AJAX helper
   window.Admin.ajax = function(url, opts = {}) {
@@ -153,7 +151,11 @@ $brand = $payload['strings']['brand'] ?? 'Admin';
     const root = document.documentElement;
     theme.colors.forEach(c => {
       if (c.setting_key && c.color_value) {
+        // Set both underscore and hyphenated forms so CSS var() references work regardless
+        // of which naming convention was used (DB stores underscores, CSS uses hyphens)
         root.style.setProperty('--' + c.setting_key, c.color_value);
+        const hk = c.setting_key.replace(/_/g, '-');
+        if (hk !== c.setting_key) root.style.setProperty('--' + hk, c.color_value);
       }
     });
   };
@@ -171,20 +173,22 @@ $brand = $payload['strings']['brand'] ?? 'Admin';
     toast.style.right = '20px';
     toast.style.padding = '10px';
     toast.style.borderRadius = '5px';
-    toast.style.color = '#fff';
     toast.style.zIndex = '10000';
 
-    // Get colors from CSS variables (set by theme)
+    // Get colors from CSS variables (set by theme from DB)
     const rootStyles = getComputedStyle(document.documentElement);
     const colors = {
-      info: rootStyles.getPropertyValue('--info_color') || '#3b82f6',
-      success: rootStyles.getPropertyValue('--success_color') || '#10b981',
-      warning: rootStyles.getPropertyValue('--warning_color') || '#f59e0b',
-      error: rootStyles.getPropertyValue('--danger_color') || '#ef4444',
-      default: rootStyles.getPropertyValue('--primary_color') || '#4B0082'
+      info: rootStyles.getPropertyValue('--info_color').trim(),
+      success: rootStyles.getPropertyValue('--success_color').trim(),
+      warning: rootStyles.getPropertyValue('--warning_color').trim(),
+      error: rootStyles.getPropertyValue('--danger_color').trim(),
+      default: rootStyles.getPropertyValue('--primary_color').trim()
     };
 
-    toast.style.background = colors[type] || colors.default;
+    const bg = colors[type] || colors.default;
+    if (bg) toast.style.background = bg;
+    const fg = rootStyles.getPropertyValue('--sidebar_text').trim();
+    toast.style.color = fg || 'inherit';
     toast.textContent = msg;
     document.body.appendChild(toast);
     setTimeout(() => document.body.removeChild(toast), 4000);

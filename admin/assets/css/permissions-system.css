@@ -5,43 +5,50 @@
 
 /* ════════════════════════════════════════════════════════════
    CSS VARIABLES
+   Map to admin framework theme variables (DB-driven) with fallbacks.
    ════════════════════════════════════════════════════════════ */
 
 :root {
-    --primary: #3b82f6;
-    --primary-hover: #2563eb;
-    --success: #10b981;
-    --success-hover: #059669;
-    --danger: #ef4444;
-    --danger-hover: #dc2626;
-    --warning: #f59e0b;
-    --warning-hover: #d97706;
-    --info: #06b6d4;
-    --info-hover: #0891b2;
-    
-    --bg-primary: #0f172a;
-    --bg-secondary: #1e293b;
-    --bg-tertiary: #334155;
-    --bg-hover: #475569;
-    
-    --border: #334155;
-    --border-light: #475569;
-    
-    --text-primary: #e2e8f0;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
-    
+    /* Colors — reference admin theme vars (set by header.php from DB) */
+    --primary:        var(--primary_color,       var(--primary-color,       #3b82f6));
+    --primary-hover:  var(--primary_hover,        var(--primary-hover-color, #2563eb));
+    --success:        var(--success_color,        var(--success-color,       #10b981));
+    --success-hover:  var(--success_hover,        var(--success-hover-color, #059669));
+    --danger:         var(--danger_color,         var(--danger-color,        var(--error_color,  var(--error-color,  #ef4444))));
+    --danger-hover:   var(--danger_hover,         var(--danger-hover-color,  #dc2626));
+    --warning:        var(--warning_color,        var(--warning-color,       #f59e0b));
+    --warning-hover:  var(--warning_hover,        var(--warning-hover-color, #d97706));
+    --info:           var(--info_color,           var(--info-color,          #06b6d4));
+    --info-hover:     var(--info_hover,           var(--info-hover-color,    #0891b2));
+
+    /* Backgrounds */
+    --bg-primary:   var(--background_main,      var(--background-main,      #0f172a));
+    --bg-secondary: var(--card_bg,              var(--card-bg,              var(--background_secondary, var(--background-secondary, #1e293b))));
+    --bg-tertiary:  var(--background_tertiary,  var(--background-tertiary,  #334155));
+    --bg-hover:     var(--background_hover,     var(--background-hover,     #475569));
+
+    /* Borders */
+    --border:       var(--border_color,         var(--border-color,         #334155));
+    --border-light: var(--border_light,         var(--border-light-color,   #475569));
+
+    /* Text */
+    --text-primary:   var(--text_primary,   var(--text-primary,   #e2e8f0));
+    --text-secondary: var(--text_secondary, var(--text-secondary, #94a3b8));
+    --text-muted:     var(--text_muted,     var(--text-muted,     #64748b));
+
+    /* Shadows */
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
-    
+
+    /* Border-radius */
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
     --radius-xl: 16px;
     --radius-full: 9999px;
-    
+
     --transition: all 0.2s ease;
 }
 
@@ -49,16 +56,16 @@
    RESET & BASE
    ════════════════════════════════════════════════════════════ */
 
-* {
+#permissionsPageContainer, #permissionsPageContainer * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    background: var(--bg-primary);
-    color: var(--text-primary);
+#permissionsPageContainer {
+    font-family: var(--body_font-family, var(--body-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif));
+    background: transparent;
+    color: var(--text-primary, #e2e8f0);
     line-height: 1.6;
     font-size: 14px;
 }
@@ -67,14 +74,14 @@ body {
    CONTAINER
    ══════════════════════════════��═════════════════════════════ */
 
-.container {
+#permissionsPageContainer .container {
     max-width: 1920px;
     margin: 0 auto;
     padding: 2rem;
 }
 
 @media (max-width: 768px) {
-    .container {
+    #permissionsPageContainer .container {
         padding: 1rem;
     }
 }
@@ -83,7 +90,7 @@ body {
    PAGE HEADER
    ════════════════════════════════════════════════════════════ */
 
-.page-header {
+#permissionsPageContainer .page-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -94,7 +101,7 @@ body {
     gap: 1rem;
 }
 
-.page-title {
+#permissionsPageContainer .page-title {
     font-size: 2rem;
     font-weight: 700;
     display: flex;
@@ -104,16 +111,16 @@ body {
     color: var(--text-primary);
 }
 
-.page-title i {
+#permissionsPageContainer .page-title i {
     color: var(--primary);
 }
 
-.page-subtitle {
+#permissionsPageContainer .page-subtitle {
     color: var(--text-secondary);
     font-size: 0.875rem;
 }
 
-.page-actions {
+#permissionsPageContainer .page-actions {
     display: flex;
     gap: 0.75rem;
 }
@@ -122,7 +129,7 @@ body {
    MAIN TABS
    ════════════════════════════════════════════════════════════ */
 
-.main-tabs {
+#permissionsPageContainer .main-tabs {
     display: flex;
     gap: 0.5rem;
     margin-bottom: 2rem;
@@ -131,20 +138,20 @@ body {
     -webkit-overflow-scrolling: touch;
 }
 
-.main-tabs::-webkit-scrollbar {
+#permissionsPageContainer .main-tabs::-webkit-scrollbar {
     height: 4px;
 }
 
-.main-tabs::-webkit-scrollbar-track {
+#permissionsPageContainer .main-tabs::-webkit-scrollbar-track {
     background: var(--bg-secondary);
 }
 
-.main-tabs::-webkit-scrollbar-thumb {
+#permissionsPageContainer .main-tabs::-webkit-scrollbar-thumb {
     background: var(--primary);
     border-radius: 4px;
 }
 
-.main-tab {
+#permissionsPageContainer .main-tab {
     padding: 1rem 1.75rem;
     background: transparent;
     border: none;
@@ -160,18 +167,18 @@ body {
     gap: 0.5rem;
 }
 
-.main-tab:hover {
+#permissionsPageContainer .main-tab:hover {
     color: var(--text-primary);
     background: rgba(59, 130, 246, 0.05);
 }
 
-.main-tab.active {
+#permissionsPageContainer .main-tab.active {
     color: var(--primary);
     border-bottom-color: var(--primary);
     background: rgba(59, 130, 246, 0.1);
 }
 
-.main-tab i {
+#permissionsPageContainer .main-tab i {
     font-size: 1rem;
 }
 
@@ -179,11 +186,11 @@ body {
    TAB CONTENT
    ════════════════════════════════════════════════════════════ */
 
-.tab-content {
+#permissionsPageContainer .tab-content {
     display: none;
 }
 
-.tab-content.active {
+#permissionsPageContainer .tab-content.active {
     display: block;
     animation: fadeIn 0.3s ease;
 }
@@ -203,19 +210,19 @@ body {
    CARDS
    ════════════════════════════════════════════════════════════ */
 
-.card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+#permissionsPageContainer .card {
+    background: var(--background-secondary, var(--card_bg, var(--card-bg, #1e293b)));
+    border: 1px solid var(--border-color, var(--border_color, #334155));
+    border-radius: var(--radius-lg, 12px);
     margin-bottom: 1.5rem;
     overflow: hidden;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.3));
 }
 
-.card-header {
+#permissionsPageContainer .card-header {
     padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--border);
-    background: rgba(59, 130, 246, 0.03);
+    border-bottom: 1px solid var(--border-color, var(--border_color, #334155));
+    background: var(--background-tertiary, var(--thead-bg, #0f172a));
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -223,7 +230,7 @@ body {
     gap: 1rem;
 }
 
-.card-title {
+#permissionsPageContainer .card-title {
     font-size: 1.125rem;
     font-weight: 600;
     display: flex;
@@ -232,11 +239,11 @@ body {
     color: var(--text-primary);
 }
 
-.card-title i {
+#permissionsPageContainer .card-title i {
     color: var(--primary);
 }
 
-.card-body {
+#permissionsPageContainer .card-body {
     padding: 1.5rem;
 }
 
@@ -244,7 +251,7 @@ body {
    BUTTONS
    ════════════════════════════════════════════════════════════ */
 
-.btn {
+#permissionsPageContainer .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -260,71 +267,71 @@ body {
     white-space: nowrap;
 }
 
-.btn:disabled {
+#permissionsPageContainer .btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-.btn-sm {
+#permissionsPageContainer .btn-sm {
     padding: 0.5rem 1rem;
     font-size: 0.8125rem;
 }
 
-.btn-lg {
+#permissionsPageContainer .btn-lg {
     padding: 1rem 2rem;
     font-size: 1rem;
 }
 
-.btn-primary {
+#permissionsPageContainer .btn-primary {
     background: var(--primary);
     color: white;
 }
 
-.btn-primary:hover:not(:disabled) {
+#permissionsPageContainer .btn-primary:hover:not(:disabled) {
     background: var(--primary-hover);
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
 
-.btn-success {
+#permissionsPageContainer .btn-success {
     background: var(--success);
     color: white;
 }
 
-.btn-success:hover:not(:disabled) {
+#permissionsPageContainer .btn-success:hover:not(:disabled) {
     background: var(--success-hover);
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
 
-.btn-danger {
+#permissionsPageContainer .btn-danger {
     background: var(--danger);
     color: white;
 }
 
-.btn-danger:hover:not(:disabled) {
+#permissionsPageContainer .btn-danger:hover:not(:disabled) {
     background: var(--danger-hover);
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
 
-.btn-warning {
+#permissionsPageContainer .btn-warning {
     background: var(--warning);
     color: white;
 }
 
-.btn-warning:hover:not(:disabled) {
+#permissionsPageContainer .btn-warning:hover:not(:disabled) {
     background: var(--warning-hover);
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
 
-.btn-secondary {
+#permissionsPageContainer .btn-secondary {
     background: var(--bg-tertiary);
     color: var(--text-primary);
 }
 
-.btn-secondary:hover:not(:disabled) {
+#permissionsPageContainer .btn-secondary:hover:not(:disabled) {
     background: var(--bg-hover);
 }
 
@@ -332,29 +339,29 @@ body {
    TABLES
    ════════════════════════════════════════════════════════════ */
 
-.table-responsive {
+#permissionsPageContainer .table-responsive {
     overflow-x: auto;
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     -webkit-overflow-scrolling: touch;
 }
 
-.data-table {
+#permissionsPageContainer .data-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.875rem;
 }
 
-.data-table th,
-.data-table td {
+#permissionsPageContainer .data-table th,
+#permissionsPageContainer .data-table td {
     padding: 1rem;
     border-bottom: 1px solid var(--border);
     text-align: left;
 }
 
-.data-table th {
-    background: var(--bg-primary);
-    color: var(--primary);
+#permissionsPageContainer .data-table th {
+    background: var(--thead-bg, var(--background-tertiary, #0f172a));
+    color: var(--text-secondary, #94a3b8);
     font-weight: 600;
     position: sticky;
     top: 0;
@@ -362,34 +369,34 @@ body {
     white-space: nowrap;
 }
 
-.data-table tbody tr {
+#permissionsPageContainer .data-table tbody tr {
     transition: var(--transition);
 }
 
-.data-table tbody tr:hover {
+#permissionsPageContainer .data-table tbody tr:hover {
     background: rgba(59, 130, 246, 0.05);
 }
 
-.data-table tbody tr:last-child td {
+#permissionsPageContainer .data-table tbody tr:last-child td {
     border-bottom: none;
 }
 
-.data-table code {
-    background: var(--bg-primary);
+#permissionsPageContainer .data-table code {
+    background: var(--background-tertiary, var(--thead-bg, #0f172a));
     padding: 0.25rem 0.5rem;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm, 6px);
     font-size: 0.8125rem;
-    color: var(--primary);
+    color: var(--primary-color, var(--primary, #3b82f6));
 }
 
 /* Resource Table */
-.resource-table th,
-.resource-table td {
+#permissionsPageContainer .resource-table th,
+#permissionsPageContainer .resource-table td {
     text-align: center;
 }
 
-.resource-table th.sticky-col,
-.resource-table td.sticky-col {
+#permissionsPageContainer .resource-table th.sticky-col,
+#permissionsPageContainer .resource-table td.sticky-col {
     position: sticky;
     left: 0;
     background: var(--bg-secondary);
@@ -399,12 +406,12 @@ body {
     box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
 }
 
-.resource-table th.sticky-col {
-    background: var(--bg-primary);
+#permissionsPageContainer .resource-table th.sticky-col {
+    background: var(--thead-bg, var(--background-tertiary, #0f172a));
     z-index: 12;
 }
 
-.text-center {
+#permissionsPageContainer .text-center {
     text-align: center;
 }
 
@@ -412,11 +419,11 @@ body {
    FORMS
    ════════════════════════════════════════════════════════════ */
 
-.form-group {
+#permissionsPageContainer .form-group {
     margin-bottom: 1.25rem;
 }
 
-.form-label {
+#permissionsPageContainer .form-label {
     display: block;
     margin-bottom: 0.5rem;
     font-weight: 500;
@@ -424,34 +431,34 @@ body {
     color: var(--text-primary);
 }
 
-.form-control {
+#permissionsPageContainer .form-control {
     width: 100%;
     padding: 0.75rem;
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    color: var(--text-primary);
+    background: var(--input-background, var(--input-bg, #0f172a));
+    border: 1px solid var(--border-color, var(--border_color, #334155));
+    border-radius: var(--radius-md, 8px);
+    color: var(--text-primary, #e2e8f0);
     font-size: 0.875rem;
-    transition: var(--transition);
+    transition: var(--transition, all 0.2s ease);
 }
 
-.form-control:focus {
+#permissionsPageContainer .form-control:focus {
     outline: none;
-    border-color: var(--primary);
+    border-color: var(--primary-color, var(--primary, #3b82f6));
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-.form-control::placeholder {
+#permissionsPageContainer .form-control::placeholder {
     color: var(--text-muted);
 }
 
-textarea.form-control {
+#permissionsPageContainer textarea.form-control {
     resize: vertical;
     min-height: 100px;
     font-family: inherit;
 }
 
-.form-text {
+#permissionsPageContainer .form-text {
     display: block;
     margin-top: 0.25rem;
     font-size: 0.75rem;
@@ -462,14 +469,14 @@ textarea.form-control {
    CHECKBOX
    ════════════════════════════════════════════════════════════ */
 
-.checkbox {
+#permissionsPageContainer .checkbox {
     width: 20px;
     height: 20px;
     cursor: pointer;
     accent-color: var(--primary);
 }
 
-.checkbox-wrapper {
+#permissionsPageContainer .checkbox-wrapper {
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
@@ -480,7 +487,7 @@ textarea.form-control {
    ALERTS
    ════════════════════════════════════════════════════════════ */
 
-.alerts-container {
+#permissionsPageContainer .alerts-container {
     position: fixed;
     top: 2rem;
     right: 2rem;
@@ -490,7 +497,7 @@ textarea.form-control {
 }
 
 @media (max-width: 768px) {
-    .alerts-container {
+    #permissionsPageContainer .alerts-container {
         top: 1rem;
         right: 1rem;
         left: 1rem;
@@ -498,7 +505,7 @@ textarea.form-control {
     }
 }
 
-.alert {
+#permissionsPageContainer .alert {
     padding: 1rem 1.25rem;
     border-radius: var(--radius-md);
     margin-bottom: 1rem;
@@ -522,29 +529,29 @@ textarea.form-control {
     }
 }
 
-.alert i {
+#permissionsPageContainer .alert i {
     font-size: 1.25rem;
 }
 
-.alert-success {
+#permissionsPageContainer .alert-success {
     background: rgba(16, 185, 129, 0.15);
     border-color: var(--success);
     color: var(--success);
 }
 
-.alert-error {
+#permissionsPageContainer .alert-error {
     background: rgba(239, 68, 68, 0.15);
     border-color: var(--danger);
     color: var(--danger);
 }
 
-.alert-warning {
+#permissionsPageContainer .alert-warning {
     background: rgba(245, 158, 11, 0.15);
     border-color: var(--warning);
     color: var(--warning);
 }
 
-.alert-info {
+#permissionsPageContainer .alert-info {
     background: rgba(59, 130, 246, 0.15);
     border-color: var(--primary);
     color: var(--primary);
@@ -554,7 +561,7 @@ textarea.form-control {
    MODAL
    ════════════════════════════════════════════════════════════ */
 
-.modal {
+#roleModal, #permissionModal, #resourcePermModal {
     display: none;
     position: fixed;
     top: 0;
@@ -569,11 +576,11 @@ textarea.form-control {
     overflow-y: auto;
 }
 
-.modal.active {
+#roleModal.active, #permissionModal.active, #resourcePermModal.active {
     display: flex;
 }
 
-.modal-dialog {
+#roleModal .modal-dialog, #permissionModal .modal-dialog, #resourcePermModal .modal-dialog {
     background: var(--bg-secondary);
     border-radius: var(--radius-lg);
     max-width: 600px;
@@ -595,7 +602,7 @@ textarea.form-control {
     }
 }
 
-.modal-header {
+#roleModal .modal-header, #permissionModal .modal-header, #resourcePermModal .modal-header {
     padding: 1.5rem;
     border-bottom: 1px solid var(--border);
     display: flex;
@@ -603,13 +610,13 @@ textarea.form-control {
     align-items: center;
 }
 
-.modal-title {
+#roleModal .modal-title, #permissionModal .modal-title, #resourcePermModal .modal-title {
     font-size: 1.25rem;
     font-weight: 600;
     color: var(--text-primary);
 }
 
-.modal-close {
+#roleModal .modal-close, #permissionModal .modal-close, #resourcePermModal .modal-close {
     background: none;
     border: none;
     color: var(--text-secondary);
@@ -620,16 +627,18 @@ textarea.form-control {
     line-height: 1;
 }
 
-.modal-close:hover {
+#roleModal .modal-close:hover,
+#permissionModal .modal-close:hover,
+#resourcePermModal .modal-close:hover {
     color: var(--text-primary);
     transform: scale(1.1);
 }
 
-.modal-body {
+#roleModal .modal-body, #permissionModal .modal-body, #resourcePermModal .modal-body {
     padding: 1.5rem;
 }
 
-.modal-footer {
+#roleModal .modal-footer, #permissionModal .modal-footer, #resourcePermModal .modal-footer {
     padding: 1.5rem;
     border-top: 1px solid var(--border);
     display: flex;
@@ -641,13 +650,13 @@ textarea.form-control {
    LOADING
    ════════════════════════════════════════════════════════════ */
 
-.loading {
+#permissionsPageContainer .loading {
     text-align: center;
     padding: 3rem 2rem;
     color: var(--text-secondary);
 }
 
-.spinner {
+#permissionsPageContainer .spinner {
     width: 48px;
     height: 48px;
     border: 4px solid rgba(59, 130, 246, 0.1);
@@ -667,26 +676,26 @@ textarea.form-control {
    EMPTY STATE
    ════════════════════════════════════════════════════════════ */
 
-.empty-state {
+#permissionsPageContainer .empty-state {
     text-align: center;
     padding: 4rem 2rem;
     color: var(--text-secondary);
 }
 
-.empty-state i {
+#permissionsPageContainer .empty-state i {
     font-size: 4rem;
     margin-bottom: 1.5rem;
     opacity: 0.3;
     color: var(--primary);
 }
 
-.empty-state h3 {
+#permissionsPageContainer .empty-state h3 {
     font-size: 1.25rem;
     margin-bottom: 0.5rem;
     color: var(--text-primary);
 }
 
-.empty-state p {
+#permissionsPageContainer .empty-state p {
     font-size: 0.875rem;
     margin-bottom: 1.5rem;
 }
@@ -695,14 +704,14 @@ textarea.form-control {
    ROLE SELECTOR
    ════════════════════════════════════════════════════════════ */
 
-.role-selector {
+#permissionsPageContainer .role-selector {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 1rem;
     margin-bottom: 2rem;
 }
 
-.role-card {
+#permissionsPageContainer .role-card {
     padding: 1.5rem;
     background: var(--bg-primary);
     border: 2px solid var(--border);
@@ -712,32 +721,32 @@ textarea.form-control {
     text-align: center;
 }
 
-.role-card:hover {
+#permissionsPageContainer .role-card:hover {
     border-color: var(--primary);
     transform: translateY(-3px);
     box-shadow: 0 8px 20px rgba(59, 130, 246, 0.25);
 }
 
-.role-card.selected {
+#permissionsPageContainer .role-card.selected {
     border-color: var(--primary);
     background: rgba(59, 130, 246, 0.1);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
-.role-icon {
+#permissionsPageContainer .role-icon {
     font-size: 2.5rem;
     margin-bottom: 1rem;
     color: var(--primary);
 }
 
-.role-name {
+#permissionsPageContainer .role-name {
     font-weight: 600;
     font-size: 1.125rem;
     margin-bottom: 0.5rem;
     color: var(--text-primary);
 }
 
-.role-key {
+#permissionsPageContainer .role-key {
     font-size: 0.75rem;
     color: var(--text-secondary);
     font-family: 'Courier New', monospace;
@@ -747,7 +756,7 @@ textarea.form-control {
    PERMISSION GROUPS
    ════════════════════════════════════════════════════════════ */
 
-.permission-group {
+#permissionsPageContainer .permission-group {
     background: var(--bg-primary);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
@@ -755,7 +764,7 @@ textarea.form-control {
     margin-bottom: 1.5rem;
 }
 
-.permission-group-title {
+#permissionsPageContainer .permission-group-title {
     font-size: 1.125rem;
     font-weight: 600;
     color: var(--primary);
@@ -765,13 +774,13 @@ textarea.form-control {
     gap: 0.75rem;
 }
 
-.permission-grid {
+#permissionsPageContainer .permission-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 1rem;
 }
 
-.permission-checkbox-item {
+#permissionsPageContainer .permission-checkbox-item {
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
@@ -779,22 +788,22 @@ textarea.form-control {
     transition: var(--transition);
 }
 
-.permission-checkbox-item:hover {
+#permissionsPageContainer .permission-checkbox-item:hover {
     border-color: var(--primary);
     background: rgba(59, 130, 246, 0.05);
 }
 
-.permission-details {
+#permissionsPageContainer .permission-details {
     flex: 1;
 }
 
-.permission-name {
+#permissionsPageContainer .permission-name {
     font-weight: 500;
     margin-bottom: 0.25rem;
     color: var(--text-primary);
 }
 
-.permission-desc {
+#permissionsPageContainer .permission-desc {
     font-size: 0.8125rem;
     color: var(--text-secondary);
 }
@@ -803,7 +812,7 @@ textarea.form-control {
    ACTIONS
    ════════════════════════════════════════════════════════════ */
 
-.actions {
+#permissionsPageContainer .actions {
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
@@ -813,31 +822,31 @@ textarea.form-control {
    UTILITIES
    ════════════════════════════════════════════════════════════ */
 
-.text-primary {
+#permissionsPageContainer .text-primary {
     color: var(--primary);
 }
 
-.text-success {
+#permissionsPageContainer .text-success {
     color: var(--success);
 }
 
-.text-danger {
+#permissionsPageContainer .text-danger {
     color: var(--danger);
 }
 
-.text-warning {
+#permissionsPageContainer .text-warning {
     color: var(--warning);
 }
 
-.text-muted {
+#permissionsPageContainer .text-muted {
     color: var(--text-muted);
 }
 
-.text-center {
+#permissionsPageContainer .text-center {
     text-align: center;
 }
 
-.text-right {
+#permissionsPageContainer .text-right {
     text-align: right;
 }
 
@@ -845,7 +854,7 @@ textarea.form-control {
    BADGES
    ════════════════════════════════════════════════════════════ */
 
-.badge {
+#permissionsPageContainer .badge {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
@@ -855,22 +864,22 @@ textarea.form-control {
     border-radius: var(--radius-full);
 }
 
-.badge-primary {
+#permissionsPageContainer .badge-primary {
     background: rgba(59, 130, 246, 0.2);
     color: var(--primary);
 }
 
-.badge-success {
+#permissionsPageContainer .badge-success {
     background: rgba(16, 185, 129, 0.2);
     color: var(--success);
 }
 
-.badge-danger {
+#permissionsPageContainer .badge-danger {
     background: rgba(239, 68, 68, 0.2);
     color: var(--danger);
 }
 
-.badge-warning {
+#permissionsPageContainer .badge-warning {
     background: rgba(245, 158, 11, 0.2);
     color: var(--warning);
 }
@@ -880,87 +889,87 @@ textarea.form-control {
    ════════════════════════════════════════════════════════════ */
 
 @media (max-width: 1024px) {
-    .permission-grid {
+    #permissionsPageContainer .permission-grid {
         grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     }
 }
 
 @media (max-width: 768px) {
-    .page-title {
+    #permissionsPageContainer .page-title {
         font-size: 1.5rem;
     }
     
-    .role-selector {
+    #permissionsPageContainer .role-selector {
         grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     }
     
-    .permission-grid {
+    #permissionsPageContainer .permission-grid {
         grid-template-columns: 1fr;
     }
     
-    .card-header {
+    #permissionsPageContainer .card-header {
         flex-direction: column;
         align-items: flex-start;
     }
     
-    .actions {
+    #permissionsPageContainer .actions {
         width: 100%;
     }
     
-    .btn {
+    #permissionsPageContainer .btn {
         width: 100%;
         justify-content: center;
     }
     
-    .data-table {
+    #permissionsPageContainer .data-table {
         font-size: 0.8125rem;
     }
     
-    .data-table th,
-    .data-table td {
+    #permissionsPageContainer .data-table th,
+    #permissionsPageContainer .data-table td {
         padding: 0.75rem 0.5rem;
     }
 }
 
 @media (max-width: 480px) {
-    .container {
+    #permissionsPageContainer .container {
         padding: 0.5rem;
     }
     
-    .main-tab {
+    #permissionsPageContainer .main-tab {
         padding: 0.75rem 1rem;
         font-size: 0.8125rem;
     }
     
-    .main-tab span {
+    #permissionsPageContainer .main-tab span {
         display: none;
     }
     
-    .role-selector {
+    #permissionsPageContainer .role-selector {
         grid-template-columns: 1fr;
     }
 }
 
 /* ════════════════════════════════════════════════════════════
-   SCROLLBAR STYLING
+   SCROLLBAR STYLING (scoped to permissions container)
    ════════════════════════════════════════════════════════════ */
 
-::-webkit-scrollbar {
+#permissionsPageContainer ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
 }
 
-::-webkit-scrollbar-track {
-    background: var(--bg-secondary);
+#permissionsPageContainer ::-webkit-scrollbar-track {
+    background: var(--background-secondary, #1e293b);
 }
 
-::-webkit-scrollbar-thumb {
-    background: var(--bg-tertiary);
+#permissionsPageContainer ::-webkit-scrollbar-thumb {
+    background: var(--background-tertiary, #334155);
     border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-    background: var(--bg-hover);
+#permissionsPageContainer ::-webkit-scrollbar-thumb:hover {
+    background: var(--border-color, #475569);
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -968,15 +977,17 @@ textarea.form-control {
    ════════════════════════════════════════════════════════════ */
 
 @media print {
-    .page-header,
-    .main-tabs,
-    .btn,
-    .modal,
-    .alerts-container {
+    #permissionsPageContainer .page-header,
+    #permissionsPageContainer .main-tabs,
+    #permissionsPageContainer .btn,
+    #roleModal,
+    #permissionModal,
+    #resourcePermModal,
+    #permissionsPageContainer .alerts-container {
         display: none !important;
     }
     
-    .card {
+    #permissionsPageContainer .card {
         break-inside: avoid;
     }
 }

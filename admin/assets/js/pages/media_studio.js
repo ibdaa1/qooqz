@@ -94,7 +94,6 @@
                 if (data.success && data.data) {
                     state.imageTypes = data.data;
                     populateDatalist('imageTypesList', state.imageTypes, 'id', 'name');
-                    populateDatalist('uploadImageTypesList', state.imageTypes, 'id', 'name');
                     populateDatalist('filterImageTypesList', state.imageTypes, 'id', 'name');
                 }
             } else {
@@ -371,39 +370,73 @@
         console.log('[MediaStudio] Table rendered');
     }
 
-    // Show form
+    // Show simplified "Add Image" form (Upload + From Studio tabs)
+    function showAddForm() {
+        hideForm();
+        if (!el.addImageContainer) return;
+
+        // Sync hidden fields from CONFIG.autoFill
+        if (CONFIG.autoFill) {
+            if (el.uploadOwnerId)            el.uploadOwnerId.value            = CONFIG.autoFill.owner_id      || '';
+            if (el.uploadImageTypeIdHidden)  el.uploadImageTypeIdHidden.value  = CONFIG.autoFill.image_type_id || '';
+            if (el.uploadTenantId)           el.uploadTenantId.value           = CONFIG.autoFill.tenant_id     || CONFIG.tenantId;
+            if (el.uploadUserId)             el.uploadUserId.value             = CONFIG.autoFill.user_id       || '';
+        }
+
+        // Reset upload form
+        if (el.uploadForm) el.uploadForm.reset();
+        if (el.uploadFileList) { el.uploadFileList.innerHTML = ''; el.uploadFileList.style.display = 'none'; }
+
+        // Show Upload tab by default
+        switchAddTab('upload');
+
+        el.addImageContainer.style.display = 'block';
+        el.addImageContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function switchAddTab(tabName) {
+        if (el.addTabUpload) el.addTabUpload.style.display  = tabName === 'upload'  ? 'block' : 'none';
+        if (el.addTabStudio) el.addTabStudio.style.display  = tabName === 'studio'  ? 'block' : 'none';
+        document.querySelectorAll('.add-tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tabName);
+        });
+    }
+
+    // Show full Edit form for existing records
     function showForm(isEdit = false, data = null) {
         if (!el.formContainer) return;
 
+        // Hide add form and upload form
+        if (el.addImageContainer) el.addImageContainer.style.display = 'none';
+        exitStudioCopyMode();
+
         el.formContainer.style.display = 'block';
-        el.uploadFormContainer.style.display = 'none';
         el.form.reset();
         el.formId.value = '';
 
-        el.formTitle.textContent = isEdit ? t('form_edit_title') : t('form_add_title');
+        if (el.formTitle) el.formTitle.textContent = isEdit ? t('form_edit_title') : t('form_add_title');
 
         if (isEdit && data) {
             el.formId.value = data.id;
-            if (el.ownerId) el.ownerId.value = data.owner_id;
+            if (el.ownerId)        el.ownerId.value        = data.owner_id;
             setDisplayFromId('imageTypeIdHidden', 'imageTypeId', 'imageTypesList', data.image_type_id);
-            if (el.filename) el.filename.value = data.filename || '';
-            if (el.url) el.url.value = data.url || '';
-            if (el.thumbUrl) el.thumbUrl.value = data.thumb_url || '';
-            if (el.mimeType) el.mimeType.value = data.mime_type || '';
-            if (el.size) el.size.value = data.size || '';
-            if (el.visibility) el.visibility.value = data.visibility || 'private';
-            if (el.isMain) el.isMain.value = data.is_main || 0;
-            if (el.sortOrder) el.sortOrder.value = data.sort_order || 0;
-            if (el.imageTenantId) el.imageTenantId.value = data.tenant_id || CONFIG.tenantId;
-            if (el.imageUserId) el.imageUserId.value = data.user_id || CONFIG.autoFill?.user_id || '';
-            if (el.btnDelete) el.btnDelete.style.display = 'inline-block';
+            if (el.filename)       el.filename.value       = data.filename   || '';
+            if (el.url)            el.url.value            = data.url        || '';
+            if (el.thumbUrl)       el.thumbUrl.value       = data.thumb_url  || '';
+            if (el.mimeType)       el.mimeType.value       = data.mime_type  || '';
+            if (el.size)           el.size.value           = data.size       || '';
+            if (el.visibility)     el.visibility.value     = data.visibility || 'private';
+            if (el.isMain)         el.isMain.value         = data.is_main    || 0;
+            if (el.sortOrder)      el.sortOrder.value      = data.sort_order || 0;
+            if (el.imageTenantId)  el.imageTenantId.value  = data.tenant_id  || CONFIG.tenantId;
+            if (el.imageUserId)    el.imageUserId.value    = data.user_id    || CONFIG.autoFill?.user_id || '';
+            if (el.btnDelete)      el.btnDelete.style.display = 'inline-block';
         } else {
-            // Auto-fill from config
             if (CONFIG.autoFill) {
-                if (el.ownerId) el.ownerId.value = CONFIG.autoFill.owner_id || '';
+                if (el.ownerId)       el.ownerId.value       = CONFIG.autoFill.owner_id || '';
                 setDisplayFromId('imageTypeIdHidden', 'imageTypeId', 'imageTypesList', CONFIG.autoFill.image_type_id || '');
                 if (el.imageTenantId) el.imageTenantId.value = CONFIG.autoFill.tenant_id || CONFIG.tenantId;
-                if (el.imageUserId) el.imageUserId.value = CONFIG.autoFill.user_id || '';
+                if (el.imageUserId)   el.imageUserId.value   = CONFIG.autoFill.user_id   || '';
             }
             if (el.btnDelete) el.btnDelete.style.display = 'none';
         }
@@ -411,23 +444,97 @@
         el.formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // Show upload form
+    // Legacy showUploadForm — now delegates to showAddForm (upload tab)
     function showUploadForm() {
-        if (!el.uploadFormContainer) return;
+        showAddForm();
+        switchAddTab('upload');
+    }
 
-        el.uploadFormContainer.style.display = 'block';
-        el.formContainer.style.display = 'none';
-        el.uploadForm.reset();
+    // ─────────────────────────────────────────────────────────
+    // Studio Copy Mode – pick existing image to add as new
+    // ─────────────────────────────────────────────────────────
 
-        // Auto-fill
-        if (CONFIG.autoFill) {
-            if (el.uploadOwnerId) el.uploadOwnerId.value = CONFIG.autoFill.owner_id || '';
-            setDisplayFromId('uploadImageTypeIdHidden', 'uploadImageTypeId', 'uploadImageTypesList', CONFIG.autoFill.image_type_id || '');
-            if (el.uploadTenantId) el.uploadTenantId.value = CONFIG.autoFill.tenant_id || CONFIG.tenantId;
-            if (el.uploadUserId) el.uploadUserId.value = CONFIG.autoFill.user_id || '';
+    function enterStudioCopyMode() {
+        state.studioCopyMode = true;
+
+        if (el.addImageContainer) el.addImageContainer.style.display = 'none';
+        if (el.studioCopyBar)     el.studioCopyBar.style.display     = 'flex';
+        if (el.btnConfirmCopy)    el.btnConfirmCopy.disabled         = true;
+
+        // Reset any existing selection
+        state.studioCopySelectedId = null;
+        if (el.tableBody) el.tableBody.querySelectorAll('tr').forEach(tr => tr.classList.remove('studio-copy-selected'));
+
+        // Scroll to grid
+        const grid = document.getElementById('mediaStudioPage');
+        if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function exitStudioCopyMode() {
+        if (!state.studioCopyMode) return;
+        state.studioCopyMode         = false;
+        state.studioCopySelectedId   = null;
+        if (el.studioCopyBar)  el.studioCopyBar.style.display = 'none';
+        if (el.tableBody) el.tableBody.querySelectorAll('tr').forEach(tr => tr.classList.remove('studio-copy-selected'));
+    }
+
+    async function confirmStudioCopy() {
+        const srcId = state.studioCopySelectedId;
+        if (!srcId) {
+            showNotification(t('no_items_selected_alert') || 'Please select an image first', 'error');
+            return;
         }
 
-        el.uploadFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const srcImg = state.items.find(img => img.id === srcId);
+        if (!srcImg) { showNotification(t('alert_error'), 'error'); return; }
+
+        const data = {
+            owner_id:       CONFIG.autoFill?.owner_id      || srcImg.owner_id,
+            image_type_id:  CONFIG.autoFill?.image_type_id || srcImg.image_type_id,
+            tenant_id:      CONFIG.tenantId,
+            user_id:        CONFIG.autoFill?.user_id        || srcImg.user_id || 0,
+            url:            srcImg.url,
+            thumb_url:      srcImg.thumb_url   || '',
+            filename:       srcImg.filename    || '',
+            mime_type:      srcImg.mime_type   || 'image/jpeg',
+            size:           srcImg.size        || 0,
+            visibility:     srcImg.visibility  || 'private',
+            is_main:        srcImg.is_main     || 0,
+            sort_order:     srcImg.sort_order  || 0,
+            csrf_token:     CONFIG.csrfToken   || '',
+        };
+
+        try {
+            if (el.btnConfirmCopy) {
+                el.btnConfirmCopy.disabled = true;
+                el.btnConfirmCopy.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            }
+
+            const formData = new FormData();
+            Object.entries(data).forEach(([k, v]) => { if (v !== null && v !== undefined) formData.append(k, v); });
+
+            const response = await fetch(API, { method: 'POST', body: formData, credentials: 'same-origin' });
+            const result   = await response.json();
+
+            if (el.btnConfirmCopy) {
+                el.btnConfirmCopy.disabled = false;
+                el.btnConfirmCopy.innerHTML = '<i class="fas fa-check"></i> <span>' + (t('use_image') || 'Use This Image') + '</span>';
+            }
+
+            showNotification(result.message || (result.success ? t('alert_added') : t('alert_error')), result.success ? 'success' : 'error');
+
+            if (result.success) {
+                exitStudioCopyMode();
+                loadData(state.page);
+            }
+        } catch (err) {
+            console.error('[MediaStudio] confirmStudioCopy error:', err);
+            if (el.btnConfirmCopy) {
+                el.btnConfirmCopy.disabled = false;
+                el.btnConfirmCopy.innerHTML = '<i class="fas fa-check"></i> <span>' + (t('use_image') || 'Use This Image') + '</span>';
+            }
+            showNotification(t('alert_error'), 'error');
+        }
     }
 
     // Save data
@@ -550,20 +657,19 @@
     async function uploadData(e) {
         if (e) e.preventDefault();
 
-        const imageTypeDisplay = el.uploadImageTypeDisplay.value.trim();
-        const imageTypeId = getIdFromDatalist('uploadImageTypesList', imageTypeDisplay);
-        if (!imageTypeId) {
-            showNotification(t('validation_image_type'), 'error');
+        const files = el.uploadImages ? el.uploadImages.files : null;
+        if (!files || files.length === 0) {
+            showNotification(t('validation_select_files') || 'Please select at least one file', 'error');
             return;
         }
 
         const data = {
-            owner_id: parseInt(el.uploadOwnerId.value),
-            image_type_id: parseInt(imageTypeId),
-            tenant_id: parseInt(el.uploadTenantId?.value || CONFIG.tenantId),
-            user_id: parseInt(el.uploadUserId?.value || CONFIG.autoFill?.user_id || 0),
-            visibility: el.uploadVisibility.value,
-            sort_order: parseInt(el.uploadSortOrder.value)
+            owner_id:      parseInt(el.uploadOwnerId?.value       || 0),
+            image_type_id: parseInt(el.uploadImageTypeIdHidden?.value || 0),
+            tenant_id:     parseInt(el.uploadTenantId?.value      || CONFIG.tenantId),
+            user_id:       parseInt(el.uploadUserId?.value        || CONFIG.autoFill?.user_id || 0),
+            visibility:    'public',
+            sort_order:    0,
         };
 
         try {
@@ -573,42 +679,35 @@
             }
 
             const formData = new FormData();
-            Object.keys(data).forEach(key => {
-                formData.append(key, data[key]);
-            });
+            Object.keys(data).forEach(key => { formData.append(key, data[key]); });
             formData.append('csrf_token', CONFIG.csrfToken || '');
 
             // Add files
-            const files = el.uploadImages.files;
             for (let i = 0; i < files.length; i++) {
                 formData.append('images[]', files[i]);
             }
 
             console.log('[MediaStudio] Uploading files:', files.length);
 
-            const response = await fetch(API, {
-                method: 'POST',
-                body: formData
-            });
-
-            const result = await response.json();
+            const response = await fetch(API, { method: 'POST', body: formData, credentials: 'same-origin' });
+            const result   = await response.json();
             console.log('[MediaStudio] Upload response:', result);
 
             if (el.btnUploadSave) {
-                el.btnUploadSave.innerHTML = '<i class="fas fa-upload"></i> ' + t('upload_button');
+                el.btnUploadSave.innerHTML = '<i class="fas fa-upload"></i> <span>' + t('upload_button') + '</span>';
                 el.btnUploadSave.disabled = false;
             }
 
             showNotification(result.message || t('alert_uploaded'), result.success ? 'success' : 'error');
 
             if (result.success) {
-                hideUploadForm();
+                hideAddForm();
                 loadData(state.page);
             }
         } catch (error) {
             console.error('[MediaStudio] Upload error:', error);
             if (el.btnUploadSave) {
-                el.btnUploadSave.innerHTML = '<i class="fas fa-upload"></i> ' + t('upload_button');
+                el.btnUploadSave.innerHTML = '<i class="fas fa-upload"></i> <span>' + t('upload_button') + '</span>';
                 el.btnUploadSave.disabled = false;
             }
             showNotification(t('alert_error'), 'error');
@@ -787,9 +886,16 @@
         if (el.form) el.form.reset();
     }
 
-    function hideUploadForm() {
-        if (el.uploadFormContainer) el.uploadFormContainer.style.display = 'none';
+    function hideAddForm() {
+        if (el.addImageContainer) el.addImageContainer.style.display = 'none';
         if (el.uploadForm) el.uploadForm.reset();
+        if (el.uploadFileList) { el.uploadFileList.innerHTML = ''; el.uploadFileList.style.display = 'none'; }
+        exitStudioCopyMode();
+    }
+
+    // Legacy alias so existing code that calls hideUploadForm() still works
+    function hideUploadForm() {
+        hideAddForm();
     }
 
     function updatePagination(meta) {
@@ -850,7 +956,13 @@
             pageTitle: document.querySelector('.page-title'),
             pageSubtitle: document.querySelector('.page-subtitle'),
             formContainer: document.getElementById('imageFormContainer'),
-            uploadFormContainer: document.getElementById('uploadFormContainer'),
+            formContainer: document.getElementById('imageFormContainer'),
+            addImageContainer: document.getElementById('addImageContainer'),
+            addTabUpload: document.getElementById('addTabUpload'),
+            addTabStudio: document.getElementById('addTabStudio'),
+            studioCopyBar: document.getElementById('studioCopyBar'),
+            btnConfirmCopy: document.getElementById('btnConfirmCopy'),
+            btnCancelCopy: document.getElementById('btnCancelCopy'),
             form: document.getElementById('imageForm'),
             uploadForm: document.getElementById('uploadForm'),
             formTitle: document.getElementById('formTitle'),
@@ -869,20 +981,21 @@
             imageTenantId: document.getElementById('imageTenantId'),
             imageUserId: document.getElementById('imageUserId'),
             uploadOwnerId: document.getElementById('uploadOwnerId'),
-            uploadImageTypeDisplay: document.getElementById('uploadImageTypeId'),
-            uploadImageTypeHidden: document.getElementById('uploadImageTypeIdHidden'),
-            uploadVisibility: document.getElementById('uploadVisibility'),
-            uploadSortOrder: document.getElementById('uploadSortOrder'),
+            uploadImageTypeIdHidden: document.getElementById('uploadImageTypeIdHidden'),
             uploadTenantId: document.getElementById('uploadTenantId'),
             uploadUserId: document.getElementById('uploadUserId'),
             uploadImages: document.getElementById('uploadImages'),
+            uploadDropZone: document.getElementById('uploadDropZone'),
+            uploadFileList: document.getElementById('uploadFileList'),
             btnSave: document.getElementById('btnSaveImage'),
             btnUploadSave: document.getElementById('btnUploadSave'),
             btnCancel: document.getElementById('btnCancelImageForm'),
             btnCancelUpload: document.getElementById('btnCancelUploadForm'),
             btnDelete: document.getElementById('btnDeleteImage'),
             btnClose: document.getElementById('btnCloseImageForm'),
-            btnCloseUpload: document.getElementById('btnCloseUploadForm'),
+            btnCloseAdd: document.getElementById('btnCloseAddForm'),
+            btnEnterStudioCopy: document.getElementById('btnEnterStudioCopy'),
+            btnCancelStudioTab: document.getElementById('btnCancelStudioTab'),
 
             btnSelectConfirm: document.getElementById('btnSelectConfirm'),
 
@@ -911,8 +1024,6 @@
             paginationWrapper: document.getElementById('imagePaginationWrapper'),
             btnRetry: document.getElementById('btnRetryImages'),
             btnAdd: document.getElementById('btnAddImage'),
-            btnUpload: document.getElementById('btnUploadImages'),
-            btnSelectConfirm: document.getElementById('btnSelectConfirm'),
 
             // Selection Bar
             selectionBar: document.getElementById('selectionBar'),
@@ -923,57 +1034,82 @@
             notificationsContainer: document.getElementById('notificationsContainer')
         };
 
+        // Extend state for studio copy mode
+        state.studioCopyMode       = false;
+        state.studioCopySelectedId = null;
+
         // Handle Embedded Mode
         if (CONFIG.embedded) {
             document.body.classList.add('embedded-mode');
 
-            // If in select mode, show select button
             if (CONFIG.mode === 'select') {
                 if (el.btnSelectConfirm) {
                     el.btnSelectConfirm.style.display = 'inline-block';
                     el.btnSelectConfirm.onclick = handleSelectionConfirm;
                 }
-                // Hide actions that might be irrelevant in select mode if needed
             }
 
             // Auto-Run Actions
             if (CONFIG.action === 'add') {
-                showForm(false);
+                showAddForm();
             } else if (CONFIG.action === 'upload') {
-                showUploadForm();
+                showAddForm();
             }
         }
 
-        // Bind events
-        if (el.form) el.form.onsubmit = saveData;
+        // ── Edit form events ──
+        if (el.form)       el.form.onsubmit        = saveData;
+        if (el.btnCancel)  el.btnCancel.onclick     = hideForm;
+        if (el.btnClose)   el.btnClose.onclick      = hideForm;
+        if (el.btnDelete)  el.btnDelete.onclick     = () => { if (el.formId.value) deleteData(parseInt(el.formId.value)); };
 
-        if (el.uploadForm) el.uploadForm.onsubmit = uploadData;
-        if (el.btnCancel) el.btnCancel.onclick = hideForm;
-        if (el.btnCancelUpload) el.btnCancelUpload.onclick = hideUploadForm;
-        if (el.btnClose) el.btnClose.onclick = hideForm;
-        if (el.btnCloseUpload) el.btnCloseUpload.onclick = hideUploadForm;
+        // ── Add form events ──
+        if (el.uploadForm)         el.uploadForm.onsubmit         = uploadData;
+        if (el.btnCancelUpload)    el.btnCancelUpload.onclick     = hideAddForm;
+        if (el.btnCloseAdd)        el.btnCloseAdd.onclick         = hideAddForm;
+        if (el.btnCancelStudioTab) el.btnCancelStudioTab.onclick  = hideAddForm;
+        if (el.btnEnterStudioCopy) el.btnEnterStudioCopy.onclick  = enterStudioCopyMode;
+
+        // ── Studio Copy Bar events ──
+        if (el.btnConfirmCopy) el.btnConfirmCopy.onclick = confirmStudioCopy;
+        if (el.btnCancelCopy)  el.btnCancelCopy.onclick  = exitStudioCopyMode;
+
+        // ── Tab switching ──
+        document.querySelectorAll('.add-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => switchAddTab(btn.dataset.tab));
+        });
+
+        // ── Drag & Drop upload zone ──
+        if (el.uploadDropZone) {
+            el.uploadDropZone.addEventListener('dragover', e => { e.preventDefault(); el.uploadDropZone.classList.add('drag-over'); });
+            el.uploadDropZone.addEventListener('dragleave', () => el.uploadDropZone.classList.remove('drag-over'));
+            el.uploadDropZone.addEventListener('drop', e => {
+                e.preventDefault();
+                el.uploadDropZone.classList.remove('drag-over');
+                if (e.dataTransfer.files.length) {
+                    const dt = new DataTransfer();
+                    Array.from(e.dataTransfer.files).forEach(f => dt.items.add(f));
+                    el.uploadImages.files = dt.files;
+                    updateFileList(dt.files);
+                }
+            });
+        }
+
+        if (el.uploadImages) {
+            el.uploadImages.addEventListener('change', () => updateFileList(el.uploadImages.files));
+        }
+
+        // ── Filter/pagination events ──
         if (el.btnApply) el.btnApply.onclick = applyFilters;
         if (el.btnReset) el.btnReset.onclick = resetFilters;
         if (el.btnRetry) el.btnRetry.onclick = () => loadData(state.page);
-        if (el.btnAdd) el.btnAdd.onclick = () => showForm(false);
-        if (el.btnUpload) el.btnUpload.onclick = showUploadForm;
-        if (el.btnDelete) el.btnDelete.onclick = () => {
-            if (el.formId.value) {
-                deleteData(parseInt(el.formId.value));
-            }
-        };
+        if (el.btnAdd)   el.btnAdd.onclick   = showAddForm;
         if (el.btnDeleteSelected) el.btnDeleteSelected.onclick = deleteSelected;
 
         if (el.imageTypeDisplay) {
             el.imageTypeDisplay.addEventListener('input', function () {
                 const id = getIdFromDatalist('imageTypesList', this.value);
                 el.imageTypeHidden.value = id || '';
-            });
-        }
-        if (el.uploadImageTypeDisplay) {
-            el.uploadImageTypeDisplay.addEventListener('input', function () {
-                const id = getIdFromDatalist('uploadImageTypesList', this.value);
-                el.uploadImageTypeHidden.value = id || '';
             });
         }
         if (el.filterType) {
@@ -996,26 +1132,34 @@
         if (el.tableBody) {
             el.tableBody.addEventListener('change', function (e) {
                 if (e.target.classList.contains('image-checkbox')) {
-                    // Start: Selection Limit Logic
                     if (e.target.checked && CONFIG.mode === 'select' && CONFIG.selectionLimit === 1) {
-                        // Uncheck others
                         el.tableBody.querySelectorAll('.image-checkbox').forEach(cb => {
                             if (cb !== e.target) cb.checked = false;
                         });
                     }
-                    // End: Selection Limit Logic
                     updateSelectedItems();
                 }
             });
             el.tableBody.addEventListener('click', function (e) {
-                // If in select mode, clicking the row (not buttons) should select the checkbox
+                // Studio copy mode: clicking a row picks it
+                if (state.studioCopyMode && !e.target.closest('button') && !e.target.closest('input') && !e.target.closest('a')) {
+                    const tr = e.target.closest('tr');
+                    if (tr) {
+                        el.tableBody.querySelectorAll('tr').forEach(r => r.classList.remove('studio-copy-selected'));
+                        tr.classList.add('studio-copy-selected');
+                        state.studioCopySelectedId = parseInt(tr.dataset.id);
+                        if (el.btnConfirmCopy) el.btnConfirmCopy.disabled = false;
+                    }
+                    return;
+                }
+
+                // Normal select mode: clicking row selects checkbox
                 if (CONFIG.mode === 'select' && !e.target.closest('button') && !e.target.closest('input') && !e.target.closest('a')) {
                     const tr = e.target.closest('tr');
                     if (tr) {
                         const cb = tr.querySelector('.image-checkbox');
                         if (cb) {
                             cb.checked = !cb.checked;
-                            // Trigger change event manually if needed, or just update state
                             if (cb.checked && CONFIG.selectionLimit === 1) {
                                 el.tableBody.querySelectorAll('.image-checkbox').forEach(other => {
                                     if (other !== cb) other.checked = false;
@@ -1042,6 +1186,21 @@
             applyTranslations();
             loadImageTypes().then(() => loadData());
         });
+    }
+
+    // Update the file list display in the upload zone
+    function updateFileList(files) {
+        if (!el.uploadFileList) return;
+        if (!files || files.length === 0) {
+            el.uploadFileList.style.display = 'none';
+            el.uploadFileList.innerHTML = '';
+            return;
+        }
+        el.uploadFileList.style.display = 'block';
+        const items = Array.from(files).map(f =>
+            `<div class="upload-file-item"><i class="fas fa-image"></i> <span>${escapeHtml(f.name)}</span> <small>(${Math.round(f.size/1024)} KB)</small></div>`
+        ).join('');
+        el.uploadFileList.innerHTML = items;
     }
 
     async function editImage(id) {
@@ -1091,9 +1250,9 @@
     window.MediaStudio = {
         init,
         load: loadData,
-        add: () => showForm(false),
-        upload: showUploadForm,
-        edit: editImage,
+        add:    showAddForm,
+        upload: showAddForm,
+        edit:   editImage,
         remove: deleteData
     };
 

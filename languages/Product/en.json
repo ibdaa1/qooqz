@@ -22,6 +22,9 @@
     "refresh": "Refresh",
     "active": "Active",
     "inactive": "Inactive",
+    "featured": "Featured",
+    "bestseller": "Best Seller",
+    "new_product": "New",
     "actions": "Actions",
     "total": "Total",
     "general": {
@@ -122,6 +125,21 @@
       "are_you_sure": "Are you sure?",
       "network_error": "Network error occurred",
       "server_error": "Server error occurred"
+    },
+    "csv": {
+      "import_button": "Import CSV",
+      "title": "Import Products via CSV",
+      "instructions": "Upload a CSV file to bulk-import products with English translations. Each row = one product. Max recommended: 1000 rows per file.",
+      "download_sample": "Download Sample CSV Template",
+      "choose_file": "Select CSV File",
+      "importing": "Importing…",
+      "import": "Start Import",
+      "cancel": "Cancel",
+      "preview_found": "Found {count} rows ready to import",
+      "import_complete": "Import Complete",
+      "created": "Created",
+      "failed": "Failed",
+      "columns_info_label": "CSV Column Format:"
     }
   }
 }

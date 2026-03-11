@@ -111,15 +111,85 @@ function __tr($key, $replacements = []) {
 // ════════════════════════════════════════════════════════════
 $apiBase = '/api';
 
+// ════════════════════════════════════════════════════════════
+// DB-DRIVEN CSS VARS HELPER (Products)
+// All settings, colors, fonts, cards, buttons from database only.
+// ════════════════════════════════════════════════════════════
+if (!function_exists('renderFragmentThemeVars')) {
+    function renderFragmentThemeVars(array $theme): void {
+        echo ':root {' . PHP_EOL;
+        foreach ($theme['color_settings'] ?? [] as $c) {
+            if (empty($c['setting_key']) || !isset($c['color_value'])) continue;
+            $k = htmlspecialchars($c['setting_key'], ENT_QUOTES);
+            $h = htmlspecialchars(str_replace('_', '-', $c['setting_key']), ENT_QUOTES);
+            $v = htmlspecialchars($c['color_value'], ENT_QUOTES);
+            echo "    --{$k}: {$v};" . PHP_EOL;
+            if ($h !== $k) echo "    --{$h}: {$v};" . PHP_EOL;
+        }
+        foreach ($theme['font_settings'] ?? [] as $f) {
+            if (empty($f['setting_key'])) continue;
+            $sk = htmlspecialchars($f['setting_key'], ENT_QUOTES);
+            $sh = htmlspecialchars(str_replace('_', '-', $f['setting_key']), ENT_QUOTES);
+            if (!empty($f['font_family'])) {
+                $ff = htmlspecialchars($f['font_family'], ENT_QUOTES);
+                echo "    --{$sk}-family: {$ff};" . PHP_EOL;
+                if ($sh !== $sk) echo "    --{$sh}-family: {$ff};" . PHP_EOL;
+            }
+            if (!empty($f['font_size'])) {
+                $fs = htmlspecialchars($f['font_size'], ENT_QUOTES);
+                echo "    --{$sk}-size: {$fs};" . PHP_EOL;
+                if ($sh !== $sk) echo "    --{$sh}-size: {$fs};" . PHP_EOL;
+            }
+            if (!empty($f['font_weight'])) {
+                $fw = htmlspecialchars($f['font_weight'], ENT_QUOTES);
+                echo "    --{$sk}-weight: {$fw};" . PHP_EOL;
+                if ($sh !== $sk) echo "    --{$sh}-weight: {$fw};" . PHP_EOL;
+            }
+        }
+        foreach ($theme['design_settings'] ?? [] as $d) {
+            if (empty($d['setting_key']) || !isset($d['setting_value'])) continue;
+            $dk = htmlspecialchars($d['setting_key'], ENT_QUOTES);
+            $dh = htmlspecialchars(str_replace('_', '-', $d['setting_key']), ENT_QUOTES);
+            $dv = htmlspecialchars($d['setting_value'], ENT_QUOTES);
+            echo "    --{$dk}: {$dv};" . PHP_EOL;
+            if ($dh !== $dk) echo "    --{$dh}: {$dv};" . PHP_EOL;
+        }
+        foreach ($theme['button_styles'] ?? [] as $b) {
+            if (empty($b['slug'])) continue;
+            $slug = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$b['slug']));
+            if (!empty($b['background_color'])) echo "    --btn-{$slug}-bg: " . htmlspecialchars($b['background_color'], ENT_QUOTES) . ';' . PHP_EOL;
+            if (!empty($b['text_color']))       echo "    --btn-{$slug}-color: " . htmlspecialchars($b['text_color'], ENT_QUOTES) . ';' . PHP_EOL;
+            if (!empty($b['border_color']))     echo "    --btn-{$slug}-border: " . htmlspecialchars($b['border_color'], ENT_QUOTES) . ';' . PHP_EOL;
+            if (!empty($b['border_radius']))    echo "    --btn-{$slug}-radius: " . htmlspecialchars((string)$b['border_radius'], ENT_QUOTES) . 'px;' . PHP_EOL;
+        }
+        foreach ($theme['card_styles'] ?? [] as $cs) {
+            if (empty($cs['slug'])) continue;
+            $slug = preg_replace('/[^a-z0-9_-]/', '-', strtolower((string)$cs['slug']));
+            if (!empty($cs['background_color'])) echo "    --card-{$slug}-bg: " . htmlspecialchars($cs['background_color'], ENT_QUOTES) . ';' . PHP_EOL;
+            if (!empty($cs['border_color']))     echo "    --card-{$slug}-border: " . htmlspecialchars($cs['border_color'], ENT_QUOTES) . ';' . PHP_EOL;
+            if (!empty($cs['border_radius']))    echo "    --card-{$slug}-radius: " . htmlspecialchars((string)$cs['border_radius'], ENT_QUOTES) . 'px;' . PHP_EOL;
+            if (!empty($cs['shadow_style']))     echo "    --card-{$slug}-shadow: " . htmlspecialchars($cs['shadow_style'], ENT_QUOTES) . ';' . PHP_EOL;
+            if (!empty($cs['padding']))          echo "    --card-{$slug}-padding: " . htmlspecialchars($cs['padding'], ENT_QUOTES) . ';' . PHP_EOL;
+        }
+        echo '}' . PHP_EOL;
+    }
+}
+
 ?>
-<!-- Force load CSS if embedded -->
-<?php if ($isFragment): ?>
-<link rel="stylesheet" href="/admin/assets/css/pages/products.css?v=<?= time() ?>">
+<!-- DB-driven CSS vars (all settings, colors, fonts, cards, buttons from database) -->
+<style id="db-theme-vars-products">
+<?php renderFragmentThemeVars($GLOBALS['ADMIN_UI']['theme'] ?? []); ?>
+<?php if (!empty($GLOBALS['ADMIN_UI']['theme']['generated_css'])): ?>
+<?= $GLOBALS['ADMIN_UI']['theme']['generated_css'] ?>
 <?php endif; ?>
+</style>
+<!-- Structural layout CSS (uses only var() for all visual properties) -->
+<link rel="stylesheet" href="/admin/assets/css/pages/products.css?v=<?= time() ?>">
 
 <!-- Page Meta -->
 <meta data-page="products"
-      data-i18n-files="/admin/languages/Products/<?= rawurlencode($lang) ?>.json">
+      data-assets-css="/admin/assets/css/pages/products.css"
+      data-i18n-files="/languages/Product/<?= rawurlencode($lang) ?>.json">
 
 <!-- Page Container -->
 <div class="page-container" id="productsPageContainer" dir="<?= htmlspecialchars($dir) ?>">
@@ -132,6 +202,10 @@ $apiBase = '/api';
         </div>
         <div class="page-header-actions">
             <?php if ($canCreate): ?>
+            <button id="btnImportCsv" class="btn btn-secondary">
+                <i class="fas fa-file-csv"></i>
+                <span data-i18n="csv.import_button"><?= __t('csv.import_button', 'Import CSV') ?></span>
+            </button>
             <button id="btnAddProduct" class="btn btn-primary">
                 <i class="fas fa-plus"></i>
                 <span data-i18n="products.add_new"><?= __t('products.add_new', 'Add Product') ?></span>
@@ -198,18 +272,6 @@ $apiBase = '/api';
                 <!-- Tab: General -->
                 <div class="tab-content active" id="tab-general">
                     <div class="form-row">
-                        <div class="form-group">
-                            <label for="prodName" class="required" data-i18n="form.fields.name.label">
-                                <?= __t('form.fields.name.label', 'Product Name') ?>
-                            </label>
-                            <input type="text" id="prodName" name="name" class="form-control" required
-                                   data-i18n-placeholder="form.fields.name.placeholder"
-                                   placeholder="<?= __t('form.fields.name.placeholder', 'Enter product name') ?>">
-                            <div class="invalid-feedback" data-i18n="form.fields.name.required">
-                                <?= __t('form.fields.name.required', 'Product name is required') ?>
-                            </div>
-                        </div>
-
                         <div class="form-group">
                             <label for="prodSku" data-i18n="form.fields.sku.label">
                                 <?= __t('form.fields.sku.label', 'SKU') ?>
@@ -327,6 +389,73 @@ $apiBase = '/api';
                                 <option value="0" data-i18n="form.fields.new.no">No</option>
                                 <option value="1" data-i18n="form.fields.new.yes">Yes</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <!-- ═══════════════════════════════════════════════ -->
+                    <!-- English Content (Default Language) - Always Visible -->
+                    <!-- ═══════════════════════════════════════════════ -->
+                    <div class="english-content-section" style="margin-top:28px; padding-top:20px; border-top:2px solid var(--primary-color,#3b82f6);">
+                        <h4 style="margin-bottom:16px; color:var(--text-primary,#fff); display:flex; align-items:center; gap:10px;">
+                            <span style="background:var(--primary-color,#3b82f6); color:#fff; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:700;">EN</span>
+                            English Content <span style="color:var(--text-secondary,#94a3b8); font-size:0.8rem; font-weight:400; margin-left:6px;">(Default Language — required)</span>
+                        </h4>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enProdName" class="required">Product Name (English)</label>
+                                <input type="text" id="enProdName" name="en_name" class="form-control" required
+                                       placeholder="Enter product name in English">
+                                <div class="invalid-feedback">English product name is required</div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enProdShortDesc">Short Description (English)</label>
+                                <textarea id="enProdShortDesc" name="en_short_description" class="form-control" rows="2"
+                                          placeholder="Brief product summary in English"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enProdDesc">Full Description (English)</label>
+                                <textarea id="enProdDesc" name="en_description" class="form-control" rows="4"
+                                          placeholder="Detailed product description in English"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enProdSpecs">Specifications (English)</label>
+                                <textarea id="enProdSpecs" name="en_specifications" class="form-control" rows="3"
+                                          placeholder="Technical specifications in English"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enMetaTitle">Meta Title (English)</label>
+                                <input type="text" id="enMetaTitle" name="en_meta_title" class="form-control"
+                                       placeholder="SEO meta title in English">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enMetaDescription">Meta Description (English)</label>
+                                <textarea id="enMetaDescription" name="en_meta_description" class="form-control" rows="2"
+                                          placeholder="SEO meta description in English"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label for="enMetaKeywords">Meta Keywords (English)</label>
+                                <input type="text" id="enMetaKeywords" name="en_meta_keywords" class="form-control"
+                                       placeholder="keyword1, keyword2, keyword3">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -526,6 +655,10 @@ $apiBase = '/api';
                         <h4 style="margin-bottom:12px; color:var(--text-primary,#fff); border-bottom:1px solid var(--border-color,#263044); padding-bottom:8px;">
                             <i class="fas fa-language"></i> Translations
                         </h4>
+                        <div style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.25); border-radius:8px; padding:12px; margin-bottom:16px; font-size:0.85rem; color:var(--text-secondary,#94a3b8);">
+                            <i class="fas fa-info-circle" style="color:#3b82f6;"></i>
+                            <strong style="color:var(--text-primary,#fff);">English</strong> translation fields are in the <strong style="color:var(--text-primary,#fff);">General tab</strong>. Use this tab to add translations for other languages (Arabic, French, etc.).
+                        </div>
                         <div id="prodTranslations" class="translation-panels"></div>
                         <div class="form-group" style="margin-top:12px;">
                             <label for="prodLangSelect" data-i18n="form.translations.select_lang">Select Language</label>
@@ -691,10 +824,83 @@ $apiBase = '/api';
     </div>
 
     <!-- Media Studio Modal -->
-    <div id="prodMediaStudioModal" class="modal" style="display:none">
-        <div class="modal-content">
-            <span class="close" id="prodMediaStudioClose">&times;</span>
-            <iframe id="prodMediaStudioFrame" src="/admin/fragments/media_studio.php?embedded=1&tenant_id=<?= $tenantId ?>&lang=<?= $lang ?>" style="width:100%; height:500px; border:none;"></iframe>
+    <div id="prodMediaStudioModal" class="media-studio-overlay" style="display:none" role="dialog" aria-modal="true">
+        <div class="media-studio-container">
+            <div class="media-studio-header">
+                <h4><i class="fas fa-images" style="margin-inline-end:8px; color:var(--primary-color,#3b82f6);"></i><?= __t('common.select_image', 'استديو الصور') ?></h4>
+                <button type="button" id="prodMediaStudioClose" class="btn btn-outline btn-sm" aria-label="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <iframe id="prodMediaStudioFrame" class="media-studio-frame" src="about:blank" title="Media Studio"></iframe>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- CSV Import Modal -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div id="csvImportModal" class="modal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.7); align-items:center; justify-content:center;">
+        <div class="modal-content" style="background:var(--card-bg,#0d1b2e); border:1px solid var(--border-color,#263044); border-radius:12px; padding:28px; width:min(640px,95vw); max-height:85vh; overflow-y:auto; position:relative;">
+            <!-- Header -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h3 style="color:var(--text-primary,#fff); margin:0;">
+                    <i class="fas fa-file-csv" style="color:var(--primary-color,#3b82f6);"></i>
+                    <span data-i18n="csv.title"><?= __t('csv.title', 'Import Products via CSV') ?></span>
+                </h3>
+                <button type="button" id="csvImportClose" style="background:none; border:none; color:var(--text-secondary,#94a3b8); font-size:1.4rem; cursor:pointer; padding:4px;">&times;</button>
+            </div>
+
+            <!-- Instructions -->
+            <div style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.25); border-radius:8px; padding:14px; margin-bottom:18px;">
+                <p style="color:var(--text-secondary,#94a3b8); margin:0; font-size:0.88rem; line-height:1.6;">
+                    <i class="fas fa-info-circle" style="color:#3b82f6;"></i>
+                    <span data-i18n="csv.instructions"><?= __t('csv.instructions', 'Upload a CSV file to bulk-import products with English translations. Each row = one product. Max recommended: 1000 rows per file.') ?></span>
+                </p>
+            </div>
+
+            <!-- Download Sample -->
+            <div style="margin-bottom:18px;">
+                <button type="button" id="btnDownloadSample" class="btn btn-outline" style="width:100%;">
+                    <i class="fas fa-download"></i>
+                    <span data-i18n="csv.download_sample"><?= __t('csv.download_sample', 'Download Sample CSV Template') ?></span>
+                </button>
+            </div>
+
+            <!-- File Input -->
+            <div class="form-group" style="margin-bottom:18px;">
+                <label data-i18n="csv.choose_file" style="color:var(--text-primary,#fff); margin-bottom:8px; display:block;"><?= __t('csv.choose_file', 'Select CSV File') ?></label>
+                <input type="file" id="csvFileInput" accept=".csv,text/csv" class="form-control"
+                       style="color:var(--text-secondary,#94a3b8); padding:10px;">
+            </div>
+
+            <!-- Preview Info -->
+            <div id="csvPreviewInfo" style="display:none; margin-bottom:16px; background:rgba(0,0,0,0.2); border-radius:8px; padding:12px;">
+                <span id="csvRowCount" style="color:var(--text-primary,#fff); font-size:0.9rem;"></span>
+            </div>
+
+            <!-- Progress -->
+            <div id="csvProgressArea" style="display:none; margin-bottom:16px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                    <span id="csvProgressLabel" data-i18n="csv.importing" style="color:var(--text-secondary,#94a3b8); font-size:0.85rem;"><?= __t('csv.importing', 'Importing…') ?></span>
+                    <span id="csvProgressPct" style="color:var(--text-primary,#fff); font-size:0.85rem; font-weight:600;">0%</span>
+                </div>
+                <div style="background:rgba(255,255,255,0.1); border-radius:20px; height:8px; overflow:hidden;">
+                    <div id="csvProgressBar" style="background:var(--primary-color,#3b82f6); height:100%; width:0%; transition:width 0.3s ease; border-radius:20px;"></div>
+                </div>
+                <div id="csvProgressLog" style="margin-top:10px; max-height:150px; overflow-y:auto; font-size:0.78rem; color:var(--text-secondary,#94a3b8); font-family:monospace;"></div>
+            </div>
+
+            <!-- Result Summary -->
+            <div id="csvResultSummary" style="display:none; margin-bottom:16px; padding:12px; border-radius:8px;"></div>
+
+            <!-- Actions -->
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button type="button" id="csvImportCancel" class="btn btn-outline" data-i18n="csv.cancel"><?= __t('csv.cancel', 'Cancel') ?></button>
+                <button type="button" id="csvImportStart" class="btn btn-primary" disabled>
+                    <i class="fas fa-upload"></i>
+                    <span data-i18n="csv.import"><?= __t('csv.import', 'Start Import') ?></span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -711,6 +917,11 @@ window.APP_CONFIG.USER_ID = window.APP_CONFIG.USER_ID || <?= admin_user_id() ?>;
 window.USER_LANGUAGE = window.USER_LANGUAGE || '<?= addslashes($lang) ?>';
 window.USER_DIRECTION = window.USER_DIRECTION || '<?= addslashes($dir) ?>';
 window.CSRF_TOKEN = window.CSRF_TOKEN || '<?= addslashes($csrf) ?>';
+
+// Inject ADMIN_UI with DB theme data (colors, fonts, cards, buttons, design settings)
+if (!window.ADMIN_UI) {
+    window.ADMIN_UI = <?= json_encode($GLOBALS['ADMIN_UI'] ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+}
 
 // Page permissions available to JS
 window.PAGE_PERMISSIONS = <?= json_encode([
@@ -752,12 +963,14 @@ window.PRODUCTS_CONFIG = {
 (function(){
     async function applyTranslations() {
         try {
-            const lang = window.USER_LANGUAGE || 'en';
-            const url = `/languages/Products/${encodeURIComponent(lang)}.json`;
+            const lang = window.USER_LANGUAGE || '<?= $lang ?>';
+            const url = `/languages/Product/${encodeURIComponent(lang)}.json`;
             console.log('[Products] Loading translations from', url);
             const res = await fetch(url, { credentials: 'same-origin' });
             if (!res.ok) throw new Error('Translation fetch failed: ' + res.status);
-            const translations = await res.json();
+            const data = await res.json();
+            // Support both flat and nested (strings key) format
+            const translations = data.strings || data;
             window.PRODUCTS_TRANSLATIONS = translations;
             // apply translations to elements with data-i18n
             const container = document.getElementById('productsPageContainer');
