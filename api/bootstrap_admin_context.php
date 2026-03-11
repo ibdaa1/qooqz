@@ -99,24 +99,35 @@ elseif (!empty($_SESSION['user_id']) && $pdo) {
 
     try {
         $stmt = $pdo->prepare("
-            SELECT id, username, email, role_id, preferred_language, 
-                   is_active, timezone, created_at, updated_at
-            FROM users 
-            WHERE id = ? 
+            SELECT id, username, email, preferred_language,
+                   is_active, created_at, updated_at
+            FROM users
+            WHERE id = ?
             LIMIT 1
         ");
         $stmt->execute([$uid]);
         $userData = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($userData) {
+            // role_id and tenant_id are stored in tenant_users, not users
+            $stmt2 = $pdo->prepare("
+                SELECT tenant_id, role_id
+                FROM tenant_users
+                WHERE user_id = ? AND is_active = 1
+                ORDER BY joined_at DESC
+                LIMIT 1
+            ");
+            $stmt2->execute([$uid]);
+            $tenantUser = $stmt2->fetch(PDO::FETCH_ASSOC);
+
             $currentUser = [
                 'id' => (int)$userData['id'],
                 'username' => $userData['username'],
                 'email' => $userData['email'],
-                'role_id' => isset($userData['role_id']) ? (int)$userData['role_id'] : null,
+                'role_id' => isset($tenantUser['role_id']) ? (int)$tenantUser['role_id'] : null,
+                'tenant_id' => isset($tenantUser['tenant_id']) ? (int)$tenantUser['tenant_id'] : 1,
                 'preferred_language' => $userData['preferred_language'] ?? null,
                 'is_active' => !empty($userData['is_active']),
-                'timezone' => $userData['timezone'] ?? 'UTC',
                 'created_at' => $userData['created_at'],
                 'updated_at' => $userData['updated_at']
             ];

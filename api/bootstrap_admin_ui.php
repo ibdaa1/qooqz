@@ -90,15 +90,21 @@ if ($db instanceof PDO) {
         if (!$userId && !empty($_SESSION['user_id'])) { $userId = (int)$_SESSION['user_id']; }
         
         if ($userId > 0) {
-            $stmt = $db->prepare("SELECT * FROM users WHERE id = ? LIMIT 1");
+            $stmt = $db->prepare("SELECT id, username, email, preferred_language, is_active FROM users WHERE id = ? LIMIT 1");
             $stmt->execute([$userId]);
             $dbUser = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($dbUser) {
+                // Fetch role_id and tenant_id from tenant_users (not on users table)
+                $stmt = $db->prepare("SELECT tenant_id, role_id FROM tenant_users WHERE user_id = ? AND is_active = 1 ORDER BY joined_at DESC LIMIT 1");
+                $stmt->execute([$userId]);
+                $tenantUser = $stmt->fetch(PDO::FETCH_ASSOC);
+                $roleId   = $tenantUser['role_id']   ?? null;
+                $tenantId = $tenantUser['tenant_id'] ?? 1;
+
                 // Roles
                 $roles = [];
                 $permissions = [];
                 $isSuperAdmin = false;
-                $roleId = $dbUser['role_id'] ?? null;
                 
                 if ($roleId) {
                     $stmt = $db->prepare("SELECT * FROM roles WHERE id = ? LIMIT 1");
@@ -110,11 +116,11 @@ if ($db instanceof PDO) {
                         // Permissions
                         if ($isSuperAdmin) {
                             $stmt = $db->prepare("SELECT key_name FROM permissions WHERE tenant_id = ?");
-                            $stmt->execute([$dbUser['tenant_id']]);
+                            $stmt->execute([$tenantId]);
                             $permissions = $stmt->fetchAll(PDO::FETCH_COLUMN);
                         } else {
                             $stmt = $db->prepare("SELECT p.key_name FROM permissions p JOIN role_permissions rp ON rp.permission_id=p.id WHERE rp.role_id=? AND rp.tenant_id=?");
-                            $stmt->execute([$roleId, $dbUser['tenant_id']]);
+                            $stmt->execute([$roleId, $tenantId]);
                             $permissions = $stmt->fetchAll(PDO::FETCH_COLUMN);
                         }
                     }
@@ -124,8 +130,8 @@ if ($db instanceof PDO) {
                     'id' => $dbUser['id'],
                     'username' => $dbUser['username'],
                     'email' => $dbUser['email'],
-                    'role_id' => $dbUser['role_id'],
-                    'tenant_id' => $dbUser['tenant_id'],
+                    'role_id' => $roleId,
+                    'tenant_id' => $tenantId,
                     'preferred_language' => $dbUser['preferred_language'] ?? 'en',
                     'is_active' => !empty($dbUser['is_active'])
                 ];
