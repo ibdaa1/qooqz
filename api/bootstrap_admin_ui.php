@@ -183,6 +183,24 @@ $ADMIN_UI['direction'] = in_array(substr($lang,0,2), ['ar','fa','he','ur','ps','
 if (empty($_SESSION['csrf_token'])) { $_SESSION['csrf_token'] = bin2hex(random_bytes(32)); }
 $ADMIN_UI['csrf_token'] = $_SESSION['csrf_token'];
 
+// Load settings from system_settings table
+if ($db instanceof PDO) {
+    try {
+        $tenantId = $ADMIN_UI['user']['tenant_id'] ?? 1;
+        $stmt = $db->prepare(
+            "SELECT `key`, `value` FROM system_settings WHERE tenant_id = ? OR tenant_id IS NULL ORDER BY tenant_id ASC"
+        );
+        $stmt->execute([$tenantId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $settings = [];
+        foreach ($rows as $row) {
+            $decoded = json_decode((string)$row['value'], true);
+            $settings[$row['key']] = ($decoded !== null) ? $decoded : $row['value'];
+        }
+        $ADMIN_UI['settings'] = $settings;
+    } catch (Throwable $e) { _aui_log('Settings load failed: '.$e->getMessage()); }
+}
+
 // Load theme using AdminUiThemeLoader if available
 if ($db instanceof PDO) {
     try {
