@@ -279,24 +279,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // regenerate session id to prevent fixation and ensure Set-Cookie
         session_regenerate_id(true);
 
+        // Fetch role_id and tenant_id from tenant_users (not stored on users table)
+        $tenantRow = null;
+        $dbUserId = isset($row['id']) ? (int)$row['id'] : 0;
+        if ($dbUserId > 0) {
+            try {
+                $tuStmt = $pdo->prepare(
+                    "SELECT tenant_id, role_id FROM tenant_users WHERE user_id = ? AND is_active = 1 ORDER BY joined_at DESC LIMIT 1"
+                );
+                $tuStmt->execute([$dbUserId]);
+                $tenantRow = $tuStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            } catch (Throwable $e) {
+                if (class_exists('Logger')) Logger::error('tenant_users lookup error for user ' . $dbUserId . ': ' . $e->getMessage());
+            }
+        }
+
         // set session + global user
         $user = [
-            'id'                 => isset($row['id']) ? (int)$row['id'] : null,
+            'id'                 => $dbUserId ?: null,
             'name'               => $row['name'] ?? $row['full_name'] ?? $row['username'] ?? null,
             'username'           => $row['username'] ?? $row['email'] ?? null,
             'email'              => $row['email'] ?? null,
-            'role_id'            => isset($row['role_id']) ? (int)$row['role_id'] : null,
+            'role_id'            => isset($tenantRow['role_id']) ? (int)$tenantRow['role_id'] : null,
+            'tenant_id'          => isset($tenantRow['tenant_id']) ? (int)$tenantRow['tenant_id'] : 1,
             'preferred_language' => $row['preferred_language'] ?? null,
             'is_active'          => !empty($row['is_active']),
         ];
 
-        $rbac = _load_user_rbac($pdo, (int)$user['id'], $user['role_id'] ?? null);
+        $rbac = _load_user_rbac($pdo, (int)($user['id'] ?? 0), $user['role_id'] ?? null);
         $user['permissions'] = $rbac['permissions'] ?? [];
         $user['roles'] = $rbac['roles'] ?? [];
         $user['permissions_count'] = count($user['permissions']);
         $user['roles_count'] = count($user['roles']);
 
         $_SESSION['user_id'] = $user['id'];
+        $_SESSION['tenant_id'] = $user['tenant_id'];
         $_SESSION['user'] = $user;
         $_SESSION['permissions'] = $user['permissions'];
         $_SESSION['roles'] = $user['roles'];

@@ -12,8 +12,11 @@ function _aui_log(string $m): void {
     @file_put_contents($logFile, '[' . date('c') . '] bootstrap_admin_ui: ' . $m . PHP_EOL, FILE_APPEND | LOCK_EX);
 }
 
-// Start session if not active
+// Start session if not active — must use APP_SESSID to match auth.php / admin/login.php
 if (session_status() !== PHP_SESSION_ACTIVE) {
+    if (session_name() !== 'APP_SESSID') {
+        session_name('APP_SESSID');
+    }
     session_start([
         'cookie_secure' => !empty($_SERVER['HTTPS']),
         'cookie_httponly' => true,
