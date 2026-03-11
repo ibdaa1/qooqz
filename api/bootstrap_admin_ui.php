@@ -88,6 +88,16 @@ if ($db instanceof PDO) {
     try {
         $userId = $currentUser['id'] ?? 0;
         if (!$userId && !empty($_SESSION['user_id'])) { $userId = (int)$_SESSION['user_id']; }
+
+        // Fallback: if id is missing but username is present, look up by username
+        if (!$userId && !empty($currentUser['username'])) {
+            try {
+                $stmt = $db->prepare("SELECT id FROM users WHERE username = ? LIMIT 1");
+                $stmt->execute([$currentUser['username']]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($row) { $userId = (int)$row['id']; }
+            } catch (Throwable $e) { _aui_log('Username fallback lookup failed: ' . $e->getMessage()); }
+        }
         
         if ($userId > 0) {
             $stmt = $db->prepare("SELECT id, username, email, preferred_language, is_active FROM users WHERE id = ? LIMIT 1");
