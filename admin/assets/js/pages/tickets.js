@@ -409,17 +409,6 @@
             loadUserOrdersAndEntities(userId);
         });
 
-        // When order changes, auto-populate entity from the order's user
-        el.order?.addEventListener('change', async () => {
-            const orderId = el.order.value;
-            if (!orderId) return;
-            // If entity dropdown is empty or has no value, try to fetch based on current user
-            const userId = el.user?.value;
-            if (userId && (!el.entity?.value)) {
-                // entity options already loaded by user change — no additional fetch needed
-            }
-        });
-
         document.getElementById('btnApplyFilters')?.addEventListener('click', () => {
             state.filters = {
                 search: document.getElementById('searchInput').value,
