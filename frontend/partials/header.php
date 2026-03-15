@@ -36,9 +36,11 @@ $_navItems = [
     t('nav.tenants')    => $_basePath . '/tenants.php',
     t('nav.auctions')  => $_basePath . '/auctions.php',
 ];
-// Orders link only for logged-in users
+// Orders, tickets and returns links only for logged-in users
 if (!empty($GLOBALS['PUB_CONTEXT']['user']['id']) || !empty($_SESSION['user_id']) || !empty($_SESSION['user']['id'])) {
-    $_navItems[t('nav.orders')] = $_basePath . '/orders.php';
+    $_navItems[t('nav.orders')]  = $_basePath . '/orders.php';
+    $_navItems[t('nav.tickets')] = $_basePath . '/tickets.php';
+    $_navItems[t('nav.returns')] = $_basePath . '/returns.php';
 }
 $_cartUrl   = $_basePath . '/cart.php';
 $_cartLabel = e(t('nav.cart'));
@@ -365,6 +367,8 @@ $_fontUrl = $dir === 'rtl'
         <hr style="border-color:rgba(255,255,255,0.15);margin:12px 0;">
         <?php if ($_isLoggedIn): ?>
             <a href="/frontend/public/orders.php">📦 <?= e(t('nav.orders')) ?></a>
+            <a href="/frontend/public/tickets.php">🎫 <?= e(t('nav.tickets')) ?></a>
+            <a href="/frontend/public/returns.php">↩ <?= e(t('nav.returns')) ?></a>
             <a href="/frontend/profile.php">👤 <?= e($_user['name'] ?? $_user['username'] ?? t('nav.account')) ?></a>
             <a href="/frontend/logout.php"><?= e(t('nav.logout')) ?></a>
         <?php else: ?>
