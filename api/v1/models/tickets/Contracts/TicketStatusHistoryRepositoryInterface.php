@@ -10,12 +10,12 @@ interface TicketStatusHistoryRepositoryInterface
         array $filters = [],
         string $orderBy = 'id',
         string $orderDir = 'DESC',
-        string $lang = 'ar'
+        string $lang = 'en'
     ): array;
 
     public function count(int $tenantId, array $filters = []): int;
 
-    public function find(int $tenantId, int $id, string $lang = 'ar'): ?array;
+    public function find(int $tenantId, int $id, string $lang = 'en'): ?array;
 
     public function save(int $tenantId, array $data): int;
 

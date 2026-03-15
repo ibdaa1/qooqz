@@ -20,7 +20,7 @@ final class PdoTicketMessagesRepository implements TicketMessagesRepositoryInter
         array $filters = [],
         string $orderBy = 'id',
         string $orderDir = 'DESC',
-        string $lang = 'ar'
+        string $lang = 'en'
     ): array {
         $sql = "
             SELECT m.*, 
@@ -76,7 +76,7 @@ final class PdoTicketMessagesRepository implements TicketMessagesRepositoryInter
         return (int)$stmt->fetchColumn();
     }
 
-    public function find(int $tenantId, int $id, string $lang = 'ar'): ?array
+    public function find(int $tenantId, int $id, string $lang = 'en'): ?array
     {
         $stmt = $this->pdo->prepare("
             SELECT m.*, 

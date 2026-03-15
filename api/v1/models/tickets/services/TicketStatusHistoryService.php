@@ -17,7 +17,7 @@ final class TicketStatusHistoryService
         array $filters = [],
         string $orderBy = 'id',
         string $orderDir = 'DESC',
-        string $lang = 'ar'
+        string $lang = 'en'
     ): array {
         return $this->repo->all($tenantId, $limit, $offset, $filters, $orderBy, $orderDir, $lang);
     }
@@ -27,7 +27,7 @@ final class TicketStatusHistoryService
         return $this->repo->count($tenantId, $filters);
     }
 
-    public function get(int $tenantId, int $id, string $lang = 'ar'): array
+    public function get(int $tenantId, int $id, string $lang = 'en'): array
     {
         $data = $this->repo->find($tenantId, $id, $lang);
         if (!$data) {

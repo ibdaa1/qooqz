@@ -51,7 +51,7 @@ try {
     $service    = new SupportTicketsService($repo);
     $controller = new SupportTicketsController($service);
 
-    $lang     = $_GET['lang']      ?? 'ar';
+    $lang     = $_GET['lang']      ?? 'en';
     $page     = isset($_GET['page'])  ? max(1, (int)$_GET['page'])                   : 1;
     $limit    = isset($_GET['limit']) ? min(100, max(1, (int)$_GET['limit']))        : 20;
     $offset   = ($page - 1) * $limit;

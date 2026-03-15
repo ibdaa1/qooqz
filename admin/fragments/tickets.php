@@ -179,23 +179,23 @@ if (!function_exists('renderFragmentThemeVars')) {
                         <div class="form-group">
                             <label for="ticketStatus" data-i18n="form.fields.status.label">Status</label>
                             <select id="ticketStatus" name="status" class="form-control">
-                                <option value="open">Open</option>
-                                <option value="pending">Pending</option>
-                                <option value="awaiting_customer">Awaiting Customer</option>
-                                <option value="awaiting_vendor">Awaiting Vendor</option>
-                                <option value="in_progress">In Progress</option>
-                                <option value="resolved">Resolved</option>
-                                <option value="closed">Closed</option>
-                                <option value="cancelled">Cancelled</option>
+                                <option value="open" data-i18n="status.open">Open</option>
+                                <option value="pending" data-i18n="status.pending">Pending</option>
+                                <option value="awaiting_customer" data-i18n="status.awaiting_customer">Awaiting Customer</option>
+                                <option value="awaiting_vendor" data-i18n="status.awaiting_vendor">Awaiting Vendor</option>
+                                <option value="in_progress" data-i18n="status.in_progress">In Progress</option>
+                                <option value="resolved" data-i18n="status.resolved">Resolved</option>
+                                <option value="closed" data-i18n="status.closed">Closed</option>
+                                <option value="cancelled" data-i18n="status.cancelled">Cancelled</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label for="ticketPriority" data-i18n="form.fields.priority.label">Priority</label>
                             <select id="ticketPriority" name="priority" class="form-control">
-                                <option value="low">Low</option>
-                                <option value="normal">Normal</option>
-                                <option value="high">High</option>
-                                <option value="urgent">Urgent</option>
+                                <option value="low" data-i18n="priority.low">Low</option>
+                                <option value="normal" data-i18n="priority.normal">Normal</option>
+                                <option value="high" data-i18n="priority.high">High</option>
+                                <option value="urgent" data-i18n="priority.urgent">Urgent</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -214,9 +214,9 @@ if (!function_exists('renderFragmentThemeVars')) {
                             <textarea id="ticketReply" class="form-control" rows="3" placeholder="Type your response here..."></textarea>
                         </div>
                         <div style="display:flex; gap:10px;">
-                            <button type="button" id="btnSendReply" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Send Reply</button>
+                            <button type="button" id="btnSendReply" class="btn btn-primary"><i class="fas fa-paper-plane"></i> <span data-i18n="form.buttons.send_reply">Send Reply</span></button>
                             <label style="display:flex; align-items:center; gap:5px; color:var(--text-secondary); font-size:0.9rem;">
-                                <input type="checkbox" id="replyInternal"> Internal Note?
+                                <input type="checkbox" id="replyInternal"> <span data-i18n="form.fields.internal_note">Internal Note?</span>
                             </label>
                         </div>
                     </div>
@@ -228,10 +228,10 @@ if (!function_exists('renderFragmentThemeVars')) {
                 </div>
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" id="btnSubmitForm"><i class="fas fa-save"></i> Save</button>
-                    <button type="button" class="btn btn-outline" id="btnCancelForm">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btnSubmitForm"><i class="fas fa-save"></i> <span data-i18n="form.buttons.save">Save</span></button>
+                    <button type="button" class="btn btn-outline" id="btnCancelForm" data-i18n="form.buttons.cancel">Cancel</button>
                     <?php if ($canDelete): ?>
-                    <button type="button" id="btnDeleteTicket" class="btn btn-danger" style="display:none"><i class="fas fa-trash"></i> Delete</button>
+                    <button type="button" id="btnDeleteTicket" class="btn btn-danger" style="display:none" data-i18n="form.buttons.delete"><i class="fas fa-trash"></i> Delete</button>
                     <?php endif; ?>
                 </div>
             </form>
@@ -243,36 +243,36 @@ if (!function_exists('renderFragmentThemeVars')) {
         <div class="card-body">
             <div class="filters-grid">
                 <div class="filter-group">
-                    <label for="searchInput">Search</label>
-                    <input type="text" id="searchInput" class="form-control" placeholder="Subject or #ID">
+                    <label for="searchInput" data-i18n="filters.search">Search</label>
+                    <input type="text" id="searchInput" class="form-control" data-i18n-placeholder="filters.search_placeholder" placeholder="Subject or #ID">
                 </div>
                 <div class="filter-group">
-                    <label for="statusFilter">Status</label>
+                    <label for="statusFilter" data-i18n="filters.status">Status</label>
                     <select id="statusFilter" class="form-control">
-                        <option value="">All Statuses</option>
-                        <option value="open">Open</option>
-                        <option value="pending">Pending</option>
-                        <option value="awaiting_customer">Awaiting Customer</option>
-                        <option value="awaiting_vendor">Awaiting Vendor</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="resolved">Resolved</option>
-                        <option value="closed">Closed</option>
-                        <option value="cancelled">Cancelled</option>
+                        <option value="" data-i18n="filters.all_statuses">All Statuses</option>
+                        <option value="open" data-i18n="status.open">Open</option>
+                        <option value="pending" data-i18n="status.pending">Pending</option>
+                        <option value="awaiting_customer" data-i18n="status.awaiting_customer">Awaiting Customer</option>
+                        <option value="awaiting_vendor" data-i18n="status.awaiting_vendor">Awaiting Vendor</option>
+                        <option value="in_progress" data-i18n="status.in_progress">In Progress</option>
+                        <option value="resolved" data-i18n="status.resolved">Resolved</option>
+                        <option value="closed" data-i18n="status.closed">Closed</option>
+                        <option value="cancelled" data-i18n="status.cancelled">Cancelled</option>
                     </select>
                 </div>
                 <div class="filter-group">
-                    <label for="priorityFilter">Priority</label>
+                    <label for="priorityFilter" data-i18n="filters.priority">Priority</label>
                     <select id="priorityFilter" class="form-control">
-                        <option value="">All Priorities</option>
-                        <option value="low">Low</option>
-                        <option value="normal">Normal</option>
-                        <option value="high">High</option>
-                        <option value="urgent">Urgent</option>
+                        <option value="" data-i18n="filters.all_priorities">All Priorities</option>
+                        <option value="low" data-i18n="priority.low">Low</option>
+                        <option value="normal" data-i18n="priority.normal">Normal</option>
+                        <option value="high" data-i18n="priority.high">High</option>
+                        <option value="urgent" data-i18n="priority.urgent">Urgent</option>
                     </select>
                 </div>
                 <div class="filter-actions">
-                    <button id="btnApplyFilters" class="btn btn-secondary">Apply</button>
-                    <button id="btnResetFilters" class="btn btn-outline">Reset</button>
+                    <button id="btnApplyFilters" class="btn btn-secondary" data-i18n="filters.apply">Apply</button>
+                    <button id="btnResetFilters" class="btn btn-outline" data-i18n="filters.reset">Reset</button>
                 </div>
             </div>
         </div>
@@ -281,20 +281,20 @@ if (!function_exists('renderFragmentThemeVars')) {
     <!-- Table -->
     <div class="card table-card">
         <div class="card-body">
-            <div id="tableLoading" class="loading-state"><div class="spinner"></div><p>Loading...</p></div>
+            <div id="tableLoading" class="loading-state"><div class="spinner"></div><p data-i18n="tickets.loading">Loading...</p></div>
             <div id="tableContainer" style="display:none">
                 <div class="table-responsive">
                     <table class="data-table" id="ticketsTable">
                         <thead>
                             <tr>
-                                <th>ID</th>
-                                <th>Subject</th>
-                                <th>Customer</th>
-                                <th>Category</th>
-                                <th>Priority</th>
-                                <th>Status</th>
-                                <th>Updated</th>
-                                <th>Actions</th>
+                                <th data-i18n="table.headers.id">ID</th>
+                                <th data-i18n="table.headers.subject">Subject</th>
+                                <th data-i18n="table.headers.customer">Customer</th>
+                                <th data-i18n="table.headers.category">Category</th>
+                                <th data-i18n="table.headers.priority">Priority</th>
+                                <th data-i18n="table.headers.status">Status</th>
+                                <th data-i18n="table.headers.updated">Updated</th>
+                                <th data-i18n="table.headers.actions">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="tableBody"></tbody>
@@ -307,8 +307,8 @@ if (!function_exists('renderFragmentThemeVars')) {
             </div>
             <div id="emptyState" class="empty-state" style="display:none">
                 <div class="empty-icon">🎟️</div>
-                <h3>No Tickets Found</h3>
-                <p>There are no support tickets matching your criteria.</p>
+                <h3 data-i18n="table.empty.title">No Tickets Found</h3>
+                <p data-i18n="table.empty.message">There are no support tickets matching your criteria.</p>
             </div>
         </div>
     </div>

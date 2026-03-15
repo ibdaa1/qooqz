@@ -24,7 +24,7 @@ final class PdoSupportTicketsRepository implements SupportTicketsRepositoryInter
         array $filters = [],
         string $orderBy = 'id',
         string $orderDir = 'DESC',
-        string $lang = 'ar'
+        string $lang = 'en'
     ): array {
         $sql = "
             SELECT t.*,
@@ -100,7 +100,7 @@ final class PdoSupportTicketsRepository implements SupportTicketsRepositoryInter
         return (int)$stmt->fetchColumn();
     }
 
-    public function find(int $tenantId, int $id, string $lang = 'ar'): ?array
+    public function find(int $tenantId, int $id, string $lang = 'en'): ?array
     {
         $stmt = $this->pdo->prepare("
             SELECT t.*,

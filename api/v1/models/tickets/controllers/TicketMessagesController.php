@@ -17,14 +17,14 @@ final class TicketMessagesController
         array $filters = [],
         string $orderBy = 'id',
         string $orderDir = 'DESC',
-        string $lang = 'ar'
+        string $lang = 'en'
     ): array {
         $items = $this->service->list($tenantId, $limit, $offset, $filters, $orderBy, $orderDir, $lang);
         $total = $this->service->count($tenantId, $filters);
         return ['items' => $items, 'total' => $total];
     }
 
-    public function get(int $tenantId, int $id, string $lang = 'ar'): array
+    public function get(int $tenantId, int $id, string $lang = 'en'): array
     {
         return $this->service->get($tenantId, $id, $lang);
     }
