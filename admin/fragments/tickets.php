@@ -335,15 +335,31 @@ window.TICKETS_CONFIG = {
 <script src="/admin/assets/js/admin_framework.js?v=<?= time() ?>"></script>
 <script src="/admin/assets/js/pages/tickets.js?v=<?= time() ?>"></script>
 <script>
-(function(){
-    var attempts = 0;
-    var interval = setInterval(function(){
-        attempts++;
+(function () {
+    function doInit() {
         if (window.Tickets && typeof window.Tickets.init === 'function') {
-            clearInterval(interval);
             window.Tickets.init();
-        } else if (attempts > 50) clearInterval(interval);
-    }, 100);
+        }
+    }
+    // When loaded as a fragment, admin:i18n:applied fires after translations are ready.
+    // Fall back to a short polling loop for direct (non-fragment) page loads.
+    if (window.TRANSLATIONS) {
+        // Translations already loaded (e.g. page reload / direct visit after initial load)
+        doInit();
+    } else {
+        window.addEventListener('admin:i18n:applied', doInit, { once: true });
+        // Hard fallback: if the event never fires (direct full-page load without fragment
+        // routing), poll until translations are ready – max 3 s (30 × 100 ms).
+        var attempts = 0;
+        var maxAttempts = 30; // 30 × 100 ms = 3 seconds
+        var fallback = setInterval(function () {
+            attempts++;
+            if (window.TRANSLATIONS || attempts >= maxAttempts) {
+                clearInterval(fallback);
+                if (window.TRANSLATIONS) doInit();
+            }
+        }, 100);
+    }
 })();
 </script>
 <?php if (!$isFragment) require_once __DIR__ . '/../includes/footer.php'; ?>

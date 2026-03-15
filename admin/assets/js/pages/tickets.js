@@ -451,9 +451,7 @@
         remove: deleteTicket
     };
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        if (window.AdminFramework) init();
-    }
+    // Initialization is driven by the fragment's inline script which waits
+    // for the admin:i18n:applied event so translations are ready first.
+    // Do NOT self-invoke here to avoid running before translations are loaded.
 })();
