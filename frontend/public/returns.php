@@ -283,23 +283,47 @@ function return_status_color(string $s): string {
                 orderStatus.style.color = '#16A34A';
                 orderStatus.textContent = <?= json_encode(t('returns.order_found')) ?> + ' #' + order.order_number;
 
-                // Render items
+                // Render items using DOM methods to prevent XSS
                 if (items.length) {
-                    var html = '';
+                    itemsList.innerHTML = '';
+                    var isRtl = document.documentElement.dir === 'rtl';
                     items.forEach(function (it, idx) {
-                        var bg = idx % 2 === 0 ? 'var(--pub-bg)' : 'var(--pub-surface)';
-                        var img = it.image_url
-                            ? '<img src="' + it.image_url + '" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;margin-' + (document.documentElement.dir === 'rtl' ? 'left' : 'right') + ':10px;flex-shrink:0;">'
-                            : '<span style="width:40px;height:40px;border-radius:6px;background:var(--pub-border);display:inline-block;margin-' + (document.documentElement.dir === 'rtl' ? 'left' : 'right') + ':10px;flex-shrink:0;"></span>';
-                        html += '<div style="display:flex;align-items:center;padding:10px 14px;background:' + bg + ';border-bottom:1px solid var(--pub-border);">'
-                              + img
-                              + '<div style="flex:1;">'
-                              + '<div style="font-size:0.92rem;font-weight:600;">' + it.product_name + '</div>'
-                              + '<div style="font-size:0.8rem;color:var(--pub-muted);">' + <?= json_encode(t('returns.qty')) ?> + ': ' + it.quantity + '</div>'
-                              + '</div>'
-                              + '</div>';
+                        var row = document.createElement('div');
+                        row.style.cssText = 'display:flex;align-items:center;padding:10px 14px;background:'
+                            + (idx % 2 === 0 ? 'var(--pub-bg)' : 'var(--pub-surface)')
+                            + ';border-bottom:1px solid var(--pub-border);';
+
+                        if (it.image_url) {
+                            var img = document.createElement('img');
+                            img.src   = it.image_url;
+                            img.alt   = '';
+                            img.style.cssText = 'width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0;'
+                                + (isRtl ? 'margin-left:10px;' : 'margin-right:10px;');
+                            row.appendChild(img);
+                        } else {
+                            var ph = document.createElement('span');
+                            ph.style.cssText = 'width:40px;height:40px;border-radius:6px;background:var(--pub-border);'
+                                + 'display:inline-block;flex-shrink:0;'
+                                + (isRtl ? 'margin-left:10px;' : 'margin-right:10px;');
+                            row.appendChild(ph);
+                        }
+
+                        var info = document.createElement('div');
+                        info.style.flex = '1';
+
+                        var name = document.createElement('div');
+                        name.style.cssText = 'font-size:0.92rem;font-weight:600;';
+                        name.textContent = it.product_name;
+
+                        var qty = document.createElement('div');
+                        qty.style.cssText = 'font-size:0.8rem;color:var(--pub-muted);';
+                        qty.textContent = <?= json_encode(t('returns.qty')) ?> + ': ' + it.quantity;
+
+                        info.appendChild(name);
+                        info.appendChild(qty);
+                        row.appendChild(info);
+                        itemsList.appendChild(row);
                     });
-                    itemsList.innerHTML = html;
                     itemsWrap.style.display = 'block';
                 }
 

@@ -126,7 +126,7 @@ if ($stMethod === 'POST' && $stSub === '') {
     }
 
     $raw  = (string)(file_get_contents('php://input') ?: '');
-    $body = (str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'application/json'))
+    $body = (str_starts_with($_SERVER['CONTENT_TYPE'] ?? '', 'application/json'))
           ? (json_decode($raw, true) ?? [])
           : $_POST;
 

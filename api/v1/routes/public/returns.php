@@ -161,7 +161,7 @@ if ($retMethod === 'POST' && $retSub === '') {
     }
 
     $raw  = (string)(file_get_contents('php://input') ?: '');
-    $body = (str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'application/json'))
+    $body = (str_starts_with($_SERVER['CONTENT_TYPE'] ?? '', 'application/json'))
           ? (json_decode($raw, true) ?? [])
           : $_POST;
 
@@ -212,7 +212,7 @@ if ($retMethod === 'POST' && $retSub === '') {
     }
 
     // Generate return number
-    $returnNumber = 'RET-' . $retTenantId . '-' . time() . '-' . rand(100, 999);
+    $returnNumber = 'RET-' . $retTenantId . '-' . time() . '-' . random_int(100, 999);
 
     try {
         $pdo->beginTransaction();
