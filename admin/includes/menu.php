@@ -170,7 +170,10 @@ $ADMIN_MENU = [
     ['id'=>'coupons','i18n'=>'menu.coupons','icon'=>'🏷️','url'=>'/admin/coupons.php','load'=>'/admin/coupons.php'],
     ['id'=>'notifications','i18n'=>'menu.notifications','icon'=>'🔔','url'=>'/admin/notifications.php','load'=>'/admin/notifications.php'],
     ['id'=>'reports','i18n'=>'nav.reports','icon'=>'📈','url'=>'/admin/reports.php','load'=>'/admin/reports.php'],
-    ['id'=>'support','i18n'=>'menu.support','icon'=>'🛠️','url'=>'/admin/support.php','load'=>'/admin/support.php'],
+    ['id'=>'support','i18n'=>'menu.support','icon'=>'🛠️','url'=>'/admin/support.php','load'=>'/admin/support.php','children'=>[
+        ['id'=>'tickets','i18n'=>'menu.tickets','icon'=>'🎟️','url'=>'/admin/fragments/tickets.php','load'=>'/admin/fragments/tickets.php'],
+        ['id'=>'ticket_categories','i18n'=>'menu.ticket_categories','icon'=>'🏷️','url'=>'/admin/fragments/ticket_categories.php','load'=>'/admin/fragments/ticket_categories.php'],
+    ]],
     ['id'=>'wallet','i18n'=>'menu.wallet','icon'=>'👛','url'=>'/admin/wallet.php','load'=>'/admin/wallet.php'],
     ['id'=>'entities','i18n'=>'menu.entities','icon'=>'🏢','url'=>'/admin/fragments/entities.php','load'=>'/admin/fragments/entities.php'],
     ['id'=>'entities_Payment','i18n'=>'entities_Payment','icon'=>'🏢','url'=>'/admin/fragments/entities_Payment.php','load'=>'/admin/fragments/entities_Payment.php'],

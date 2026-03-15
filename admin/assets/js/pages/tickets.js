@@ -20,8 +20,8 @@
         tickets: [], categories: [], users: [],
         currentTicket: null, messages: [], history: [],
         filters: {}, permissions: PERMS,
-        lang: window.USER_LANGUAGE || 'en', csrfToken: window.APP_CONFIG?.CSRF_TOKEN || '',
-        tenantId: window.APP_CONFIG?.TENANT_ID || 1
+        lang: CONFIG.lang || window.USER_LANGUAGE || 'en', csrfToken: window.APP_CONFIG?.CSRF_TOKEN || '',
+        tenantId: CONFIG.tenantId || window.APP_CONFIG?.TENANT_ID || 1
     };
 
     let el = {};

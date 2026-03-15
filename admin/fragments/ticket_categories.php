@@ -280,27 +280,32 @@ window.TC_CONFIG = {
 <script src="/admin/assets/js/pages/ticket_categories.js?v=<?= time() ?>"></script>
 <script>
 (function () {
-    function doInit() {
-        if (window.TicketCategories && typeof window.TicketCategories.init === 'function') {
-            window.TicketCategories.init();
-        }
+    var initialized = false;
+
+    // Call init() only after BOTH translations and the TicketCategories module are ready.
+    function tryInit() {
+        if (initialized) return;
+        if (!window.TRANSLATIONS) return;
+        if (!window.TicketCategories || typeof window.TicketCategories.init !== 'function') return;
+        initialized = true;
+        window.TicketCategories.init();
     }
-    if (window.TRANSLATIONS) {
-        doInit();
-    } else {
-        window.addEventListener('admin:i18n:applied', doInit, { once: true });
-        // Hard fallback: if the event never fires (direct full-page load without fragment
-        // routing), poll until translations are ready – max 3 s (30 × 100 ms).
-        var attempts = 0;
-        var maxAttempts = 30; // 30 × 100 ms = 3 seconds
-        var fallback = setInterval(function () {
-            attempts++;
-            if (window.TRANSLATIONS || attempts >= maxAttempts) {
-                clearInterval(fallback);
-                if (window.TRANSLATIONS) doInit();
+
+    // Primary trigger for fragment (AJAX) loads.
+    window.addEventListener('admin:i18n:applied', function () { tryInit(); }, { once: true });
+
+    // Fallback poll for direct full-page loads and edge cases.  Runs for up to 6 s.
+    var pollCount = 0;
+    var poll = setInterval(function () {
+        pollCount++;
+        tryInit();
+        if (initialized || pollCount >= 60) {
+            clearInterval(poll);
+            if (pollCount >= 60 && !initialized) {
+                console.warn('[TicketCategories] init timed out');
             }
-        }, 100);
-    }
+        }
+    }, 100);
 })();
 </script>
 <?php if (!$isFragment) require_once __DIR__ . '/../includes/footer.php'; ?>

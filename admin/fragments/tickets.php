@@ -328,7 +328,8 @@ window.TICKETS_CONFIG = {
     ordersApi: '<?= $apiBase ?>/orders',
     entitiesApi: '<?= $apiBase ?>/entities',
     lang: '<?= addslashes($lang) ?>',
-    itemsPerPage: 20
+    itemsPerPage: 20,
+    tenantId: <?= $tenantId ?>
 };
 </script>
 
@@ -336,46 +337,35 @@ window.TICKETS_CONFIG = {
 <script src="/admin/assets/js/pages/tickets.js?v=<?= time() ?>"></script>
 <script>
 (function () {
-    function doInit() {
-        if (window.Tickets && typeof window.Tickets.init === 'function') {
-            window.Tickets.init();
-            return;
+    var initialized = false;
+
+    // Call init() only after BOTH translations and the Tickets module are ready.
+    function tryInit() {
+        if (initialized) return;
+        if (!window.TRANSLATIONS) return;
+        if (!window.Tickets || typeof window.Tickets.init !== 'function') return;
+        initialized = true;
+        window.Tickets.init();
+    }
+
+    // Primary trigger for fragment (AJAX) loads: admin:i18n:applied fires inside
+    // fetchAndInsert after applyTranslations(target) has loaded this page's strings.
+    window.addEventListener('admin:i18n:applied', function () { tryInit(); }, { once: true });
+
+    // Fallback poll covers: direct full-page loads, cases where admin:i18n:applied
+    // already fired before this script registered, and when tickets.js loads after
+    // the event fires.  Runs for up to 6 s (60 × 100 ms).
+    var pollCount = 0;
+    var poll = setInterval(function () {
+        pollCount++;
+        tryInit();
+        if (initialized || pollCount >= 60) {
+            clearInterval(poll);
+            if (pollCount >= 60 && !initialized) {
+                console.warn('[Tickets] init timed out');
+            }
         }
-        // tickets.js is loaded asynchronously by runScripts(); it may not be ready yet.
-        // Poll until window.Tickets is defined (up to 5 s) then call init().
-        var pollCount = 0;
-        var poll = setInterval(function () {
-            pollCount++;
-            if (window.Tickets && typeof window.Tickets.init === 'function') {
-                clearInterval(poll);
-                window.Tickets.init();
-            } else if (pollCount >= 50) {
-                clearInterval(poll);
-                console.warn('[Tickets] init: timed out waiting for Tickets module');
-            }
-        }, 100);
-    }
-    // When loaded as a fragment, admin:i18n:applied fires after translations are ready.
-    // Fall back to a short polling loop for direct (non-fragment) page loads.
-    if (window.TRANSLATIONS) {
-        // Translations already loaded (e.g. navigating back to this page in the same
-        // admin session). Call doInit() immediately; it will poll for window.Tickets
-        // if tickets.js has not finished loading yet.
-        doInit();
-    } else {
-        window.addEventListener('admin:i18n:applied', doInit, { once: true });
-        // Hard fallback: if the event never fires (direct full-page load without fragment
-        // routing), poll until translations are ready – max 3 s (30 × 100 ms).
-        var attempts = 0;
-        var maxAttempts = 30; // 30 × 100 ms = 3 seconds
-        var fallback = setInterval(function () {
-            attempts++;
-            if (window.TRANSLATIONS || attempts >= maxAttempts) {
-                clearInterval(fallback);
-                if (window.TRANSLATIONS) doInit();
-            }
-        }, 100);
-    }
+    }, 100);
 })();
 </script>
 <?php if (!$isFragment) require_once __DIR__ . '/../includes/footer.php'; ?>
