@@ -221,10 +221,14 @@ if ($retMethod === 'POST' && $retSub === '') {
         exit;
     }
 
-    // Resolve order — must belong to the current user and be eligible for return.
+    // Resolve order — must belong to the current tenant and be eligible for return.
+    // user_id is intentionally NOT required here so that POS cashiers, customer-service
+    // staff, or any authenticated tenant user can submit a return for a completed order
+    // by providing the order_number or order_id.  The return record is still created
+    // under the logged-in user ($retUserId).
     // When order_number looks like a plain integer, also match by id.
-    $baseWhere  = 'user_id = ? AND tenant_id = ? AND status IN (\'delivered\',\'completed\')';
-    $baseParams = [$retUserId, $retTenantId];
+    $baseWhere  = 'tenant_id = ? AND status IN (\'delivered\',\'completed\')';
+    $baseParams = [$retTenantId];
     if ($orderNumber && ctype_digit($orderNumber)) {
         $order = $pdoOne(
             "SELECT id, order_number FROM orders
@@ -251,10 +255,10 @@ if ($retMethod === 'POST' && $retSub === '') {
     }
     $resolvedOrderId = (int)$order['id'];
 
-    // Prevent duplicate return for the same order
+    // Prevent duplicate return for the same order (any user within the tenant)
     $existing = $pdoOne(
-        "SELECT id FROM returns WHERE order_id = ? AND user_id = ? AND tenant_id = ? LIMIT 1",
-        [$resolvedOrderId, $retUserId, $retTenantId]
+        "SELECT id FROM returns WHERE order_id = ? AND tenant_id = ? LIMIT 1",
+        [$resolvedOrderId, $retTenantId]
     );
     if ($existing) {
         ResponseFormatter::error('A return request for this order already exists', 409);
