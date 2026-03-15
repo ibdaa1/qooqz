@@ -103,7 +103,7 @@ if (!function_exists('renderFragmentThemeVars')) {
 </style>
 <link rel="stylesheet" href="/admin/assets/css/pages/tickets.css?v=<?= time() ?>">
 
-<meta data-page="tickets" data-assets-css="/admin/assets/css/pages/tickets.css" data-i18n-files="/languages/Ticket/<?= rawurlencode($lang) ?>.json">
+<meta data-page="tickets" data-assets-css="/admin/assets/css/pages/tickets.css" data-i18n-files="/languages/tickets/<?= rawurlencode($lang) ?>.json">
 
 <div class="page-container" id="ticketsPageContainer" dir="<?= htmlspecialchars($dir) ?>">
 
@@ -181,9 +181,12 @@ if (!function_exists('renderFragmentThemeVars')) {
                             <select id="ticketStatus" name="status" class="form-control">
                                 <option value="open">Open</option>
                                 <option value="pending">Pending</option>
+                                <option value="awaiting_customer">Awaiting Customer</option>
+                                <option value="awaiting_vendor">Awaiting Vendor</option>
                                 <option value="in_progress">In Progress</option>
                                 <option value="resolved">Resolved</option>
                                 <option value="closed">Closed</option>
+                                <option value="cancelled">Cancelled</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -249,9 +252,12 @@ if (!function_exists('renderFragmentThemeVars')) {
                         <option value="">All Statuses</option>
                         <option value="open">Open</option>
                         <option value="pending">Pending</option>
+                        <option value="awaiting_customer">Awaiting Customer</option>
+                        <option value="awaiting_vendor">Awaiting Vendor</option>
                         <option value="in_progress">In Progress</option>
                         <option value="resolved">Resolved</option>
                         <option value="closed">Closed</option>
+                        <option value="cancelled">Cancelled</option>
                     </select>
                 </div>
                 <div class="filter-group">

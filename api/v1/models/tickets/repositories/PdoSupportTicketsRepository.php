@@ -28,18 +28,20 @@ final class PdoSupportTicketsRepository implements SupportTicketsRepositoryInter
     ): array {
         $sql = "
             SELECT t.*,
-                   c.name           AS category_name,
+                   ct.name          AS category_name,
                    u.email          AS user_email,
                    e.store_name     AS entity_name,
                    ua.email         AS assigned_to_email
             FROM " . self::TABLE . " t
             LEFT JOIN ticket_categories c  ON t.category_id   = c.id
+            LEFT JOIN ticket_category_translations ct
+                ON c.id = ct.category_id AND ct.language_code = :lang
             LEFT JOIN users u              ON t.user_id       = u.id
             LEFT JOIN entities e           ON t.entity_id     = e.id
             LEFT JOIN users ua             ON t.assigned_to   = ua.id
             WHERE t.tenant_id = :tenant_id
         ";
-        $params = [':tenant_id' => $tenantId];
+        $params = [':tenant_id' => $tenantId, ':lang' => $lang];
 
         // Handle Filters
         foreach (self::FILTERABLE_COLUMNS as $col) {
@@ -102,19 +104,21 @@ final class PdoSupportTicketsRepository implements SupportTicketsRepositoryInter
     {
         $stmt = $this->pdo->prepare("
             SELECT t.*,
-                   c.name           AS category_name,
+                   ct.name          AS category_name,
                    u.email          AS user_email,
                    e.store_name     AS entity_name,
                    ua.email         AS assigned_to_email
             FROM " . self::TABLE . " t
             LEFT JOIN ticket_categories c  ON t.category_id   = c.id
+            LEFT JOIN ticket_category_translations ct
+                ON c.id = ct.category_id AND ct.language_code = :lang
             LEFT JOIN users u              ON t.user_id       = u.id
             LEFT JOIN entities e           ON t.entity_id     = e.id
             LEFT JOIN users ua             ON t.assigned_to   = ua.id
             WHERE t.tenant_id = :tenant_id AND t.id = :id
             LIMIT 1
         ");
-        $stmt->execute([':tenant_id' => $tenantId, ':id' => $id]);
+        $stmt->execute([':tenant_id' => $tenantId, ':id' => $id, ':lang' => $lang]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
     }

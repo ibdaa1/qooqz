@@ -180,7 +180,7 @@
     async function loadTicketData(id) {
         // Load Messages
         try {
-            const res = await apiCall(`${API.messages}?ticket_id=${id}`);
+            const res = await apiCall(`${API.messages}?ticket_id=${id}&tenant_id=${state.tenantId}&lang=${state.lang}`);
             if (res.success) {
                 state.messages = res.data.items || res.data || [];
                 renderMessages();
@@ -189,7 +189,7 @@
 
         // Load History
         try {
-            const res = await apiCall(`${API.history}?ticket_id=${id}`);
+            const res = await apiCall(`${API.history}?ticket_id=${id}&tenant_id=${state.tenantId}&lang=${state.lang}`);
             if (res.success) {
                 state.history = res.data.items || res.data || [];
                 renderHistory();
@@ -305,8 +305,8 @@
     }
 
     // UI Helpers
-    function showLoading() { el.loading.style.display = 'flex'; el.container.style.display = 'none'; }
-    function showTable() { el.loading.style.display = 'none'; el.container.style.display = 'block'; }
+    function showLoading() { el.loading.style.display = 'flex'; el.container.style.display = 'none'; if (el.empty) el.empty.style.display = 'none'; }
+    function showTable() { el.loading.style.display = 'none'; el.container.style.display = 'block'; if (el.empty) el.empty.style.display = 'none'; }
     function showEmpty() { el.loading.style.display = 'none'; el.container.style.display = 'none'; el.empty.style.display = 'flex'; }
     function showError(msg) { el.loading.style.display = 'none'; el.empty.style.display = 'none'; el.container.style.display = 'none'; console.error(msg); }
     function showNotification(msg, type) { alert(msg); } // Replace with framework notify
