@@ -338,6 +338,12 @@ window.TICKETS_CONFIG = {
 <script>
 (function () {
     var initialized = false;
+    var poll;
+
+    function cleanup() {
+        clearInterval(poll);
+        window.removeEventListener('admin:i18n:applied', tryInit);
+    }
 
     // Call init() only after BOTH translations and the Tickets module are ready.
     function tryInit() {
@@ -345,23 +351,27 @@ window.TICKETS_CONFIG = {
         if (!window.TRANSLATIONS) return;
         if (!window.Tickets || typeof window.Tickets.init !== 'function') return;
         initialized = true;
+        cleanup();
         window.Tickets.init();
     }
 
-    // Primary trigger for fragment (AJAX) loads: admin:i18n:applied fires inside
-    // fetchAndInsert after applyTranslations(target) has loaded this page's strings.
-    window.addEventListener('admin:i18n:applied', function () { tryInit(); }, { once: true });
+    // Primary trigger: admin:i18n:applied fires after applyTranslations() sets
+    // window.TRANSLATIONS and translates all [data-i18n] elements in the fragment.
+    window.addEventListener('admin:i18n:applied', tryInit);
 
-    // Fallback poll covers: direct full-page loads, cases where admin:i18n:applied
-    // already fired before this script registered, and when tickets.js loads after
-    // the event fires.  Runs for up to 6 s (60 × 100 ms).
+    // Also try immediately – covers re-visits where TRANSLATIONS is already set.
+    tryInit();
+
+    // Fallback poll covers: cases where admin:i18n:applied already fired before
+    // this script registered, and when tickets.js loads after the event fires.
+    // Runs for up to 6 s (60 × 100 ms).
     var pollCount = 0;
-    var poll = setInterval(function () {
+    poll = setInterval(function () {
         pollCount++;
         tryInit();
         if (initialized || pollCount >= 60) {
-            clearInterval(poll);
-            if (pollCount >= 60 && !initialized) {
+            cleanup();
+            if (!initialized) {
                 console.warn('[Tickets] init timed out');
             }
         }
