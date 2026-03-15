@@ -10,6 +10,7 @@ declare(strict_types=1);
  * Endpoints:
  *  GET  /api/public/returns                        — list the current user's return requests
  *  POST /api/public/returns                        — create a new return request
+ *  GET  /api/public/returns/eligible-orders        — list user's orders eligible for return (for dropdown)
  *  GET  /api/public/returns/order-items            — look up order items by order_number (must belong to user)
  *
  * Variables provided by the parent (public.php):
@@ -36,6 +37,32 @@ if (!$pdo instanceof PDO) {
 
 $retUserId   = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
 $retTenantId = (int)($tenantId ?? $_SESSION['pub_tenant_id'] ?? 1) ?: 1;
+
+/* -------------------------------------------------------
+ * GET /api/public/returns/eligible-orders
+ * Returns the logged-in user's orders that are eligible for return
+ * (status = delivered or completed), for use as a dropdown list.
+ * Requires login.
+ * ----------------------------------------------------- */
+if ($retMethod === 'GET' && in_array($retSub, ['eligible-orders', 'eligible_orders'], true)) {
+    if (!$retUserId) {
+        ResponseFormatter::error('Login required', 401);
+        exit;
+    }
+
+    $orders = $pdoList(
+        "SELECT id, order_number, status, grand_total, currency_code, created_at
+         FROM orders
+         WHERE user_id = ? AND tenant_id = ?
+           AND status IN ('delivered','completed')
+         ORDER BY created_at DESC
+         LIMIT 100",
+        [$retUserId, $retTenantId]
+    );
+
+    ResponseFormatter::success(['items' => $orders]);
+    exit;
+}
 
 /* -------------------------------------------------------
  * GET /api/public/returns/order-items?order_number=ORD-xxx

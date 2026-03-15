@@ -630,6 +630,9 @@
     "order_not_found": "Order not found or not eligible for return. Please check the order number.",
     "already_returned": "A return request for this order has already been submitted.",
     "order_items": "Order Items",
-    "qty": "Qty"
+    "qty": "Qty",
+    "select_order": "Select your order",
+    "loading_orders": "Loading your orders...",
+    "no_eligible_orders": "No orders eligible for return"
   }
 }

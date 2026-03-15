@@ -46,6 +46,23 @@ if ($pdo && $userId) {
     } catch (Throwable $e) { /* show empty state */ }
 }
 
+// ── Load eligible orders for return dropdown ─────────────────────────────────
+$eligibleOrders = [];
+if ($pdo && $userId) {
+    try {
+        $st = $pdo->prepare(
+            "SELECT id, order_number, status, grand_total, currency_code, created_at
+             FROM orders
+             WHERE user_id = ? AND tenant_id = ?
+               AND status IN ('delivered','completed')
+             ORDER BY created_at DESC
+             LIMIT 100"
+        );
+        $st->execute([$userId, $tenantId]);
+        $eligibleOrders = $st->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) { /* will fall back to JS API call */ }
+}
+
 // ── Status helpers ──────────────────────────────────────────────────────────
 function return_status_label(string $s): string {
     $map = [
@@ -95,24 +112,26 @@ function return_status_color(string $s): string {
         <div style="background:var(--pub-surface);border:1px solid var(--pub-border);border-radius:12px;padding:28px;">
             <h2 style="font-size:1.1rem;font-weight:700;margin:0 0 20px;"><?= e(t('returns.new_return')) ?></h2>
             <form id="returnForm">
-                <!-- Order number input + lookup -->
+                <!-- Order select dropdown -->
                 <div style="margin-bottom:16px;">
                     <label style="font-size:0.87rem;font-weight:600;display:block;margin-bottom:6px;">
                         <?= e(t('returns.order_id')) ?> *
                     </label>
-                    <div style="display:flex;gap:8px;">
-                        <input type="text" id="returnOrderNumber" name="order_number" required
-                               placeholder="<?= e(t('returns.order_placeholder')) ?>"
-                               autocomplete="off"
-                               style="flex:1;padding:10px 12px;border:1px solid var(--pub-border);
-                                      border-radius:8px;font-size:0.93rem;box-sizing:border-box;
-                                      background:var(--pub-bg);color:var(--pub-text);">
-                        <button type="button" id="returnLookupBtn"
-                                style="padding:10px 18px;background:var(--pub-primary);color:#fff;border:none;
-                                       border-radius:8px;font-size:0.93rem;font-weight:600;cursor:pointer;white-space:nowrap;">
-                            <?= e(t('returns.lookup')) ?>
-                        </button>
-                    </div>
+                    <select id="returnOrderNumber" name="order_number" required
+                            style="width:100%;padding:10px 12px;border:1px solid var(--pub-border);
+                                   border-radius:8px;font-size:0.93rem;box-sizing:border-box;
+                                   background:var(--pub-bg);color:var(--pub-text);appearance:auto;">
+                        <option value=""><?= e(t('returns.select_order')) ?></option>
+                        <?php foreach ($eligibleOrders as $eo): ?>
+                        <option value="<?= (int)$eo['id'] ?>">
+                            #<?= e($eo['order_number'] ?: $eo['id']) ?>
+                            <?php if (!empty($eo['grand_total'])): ?>
+                            — <?= e(number_format((float)$eo['grand_total'], 2)) ?> <?= e($eo['currency_code'] ?? '') ?>
+                            <?php endif; ?>
+                            (<?= e(date('Y-m-d', strtotime($eo['created_at']))) ?>)
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
                     <div id="returnOrderStatus" style="margin-top:8px;font-size:0.85rem;"></div>
                 </div>
 
@@ -235,8 +254,7 @@ function return_status_color(string $s): string {
 <script>
 (function () {
     var form        = document.getElementById('returnForm');
-    var lookupBtn   = document.getElementById('returnLookupBtn');
-    var orderInput  = document.getElementById('returnOrderNumber');
+    var orderSelect = document.getElementById('returnOrderNumber');
     var orderStatus = document.getElementById('returnOrderStatus');
     var itemsWrap   = document.getElementById('returnItemsWrap');
     var itemsList   = document.getElementById('returnItemsList');
@@ -247,15 +265,57 @@ function return_status_color(string $s): string {
 
     if (!form) return;
 
-    /* ---- Order number lookup ---- */
+    /* ---- Load eligible orders via API if PHP rendered none ---- */
+    function loadEligibleOrders() {
+        if (!orderSelect) return;
+        if (orderSelect.options.length > 1) return; // already populated by PHP
+        orderStatus.style.color = 'var(--pub-muted)';
+        orderStatus.textContent = <?= json_encode(t('returns.loading_orders')) ?>;
+        fetch('/api/public/returns/eligible-orders?tenant_id=' + tenantId, {
+            credentials: 'include'
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            orderStatus.textContent = '';
+            var orders = (res.data && Array.isArray(res.data.items)) ? res.data.items : [];
+            if (!orders.length) {
+                orderStatus.style.color = 'var(--pub-muted)';
+                orderStatus.textContent = <?= json_encode(t('returns.no_eligible_orders')) ?>;
+                return;
+            }
+            orders.forEach(function (o) {
+                var opt  = document.createElement('option');
+                opt.value = o.id;
+                var label = '#' + (o.order_number || o.id);
+                if (o.grand_total) label += ' — ' + parseFloat(o.grand_total).toFixed(2) + ' ' + (o.currency_code || '');
+                if (o.created_at) label += ' (' + o.created_at.substring(0, 10) + ')';
+                opt.textContent = label;
+                orderSelect.appendChild(opt);
+            });
+        })
+        .catch(function () {
+            orderStatus.textContent = '';
+        });
+    }
+
+    /* Load orders when the "new return" button is clicked or immediately */
+    var showBtn = document.querySelector('button[onclick*="returnFormWrap"]');
+    if (showBtn) {
+        showBtn.addEventListener('click', function () { setTimeout(loadEligibleOrders, 50); });
+    }
+    loadEligibleOrders();
+
+    /* ---- Auto-lookup when an order is selected ---- */
     function doLookup() {
-        var num = orderInput.value.trim();
+        var num = orderSelect ? orderSelect.value.trim() : '';
         if (!num) {
-            orderStatus.style.color = '#DC2626';
-            orderStatus.textContent = <?= json_encode(t('returns.order_placeholder')) ?>;
+            orderStatus.textContent = '';
+            itemsWrap.style.display  = 'none';
+            reasonWrap.style.display = 'none';
+            submitBtn.disabled       = true;
+            submitBtn.style.opacity  = '0.5';
             return;
         }
-        lookupBtn.disabled = true;
         orderStatus.style.color = 'var(--pub-muted)';
         orderStatus.textContent = <?= json_encode(t('returns.loading')) ?>;
         itemsWrap.style.display  = 'none';
@@ -268,7 +328,6 @@ function return_status_color(string $s): string {
         })
         .then(function (r) { return r.json(); })
         .then(function (res) {
-            lookupBtn.disabled = false;
             if (res.status === 'success' && res.data && res.data.order) {
                 var order = res.data.order;
                 var items = res.data.items || [];
@@ -337,16 +396,14 @@ function return_status_color(string $s): string {
             }
         })
         .catch(function () {
-            lookupBtn.disabled = false;
             orderStatus.style.color = '#DC2626';
             orderStatus.textContent = <?= json_encode(t('returns.error')) ?>;
         });
     }
 
-    lookupBtn.addEventListener('click', doLookup);
-    orderInput.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') { e.preventDefault(); doLookup(); }
-    });
+    if (orderSelect) {
+        orderSelect.addEventListener('change', doLookup);
+    }
 
     /* ---- Form submit ---- */
     form.addEventListener('submit', function (e) {
@@ -362,7 +419,7 @@ function return_status_color(string $s): string {
         submitBtn.style.opacity = '0.7';
 
         var data = {
-            order_number: orderInput.value.trim(),
+            order_number: orderSelect ? orderSelect.value.trim() : '',
             reason:       reason,
             tenant_id:    tenantId
         };

@@ -294,7 +294,7 @@ function ticket_priority_color(string $p): string {
         if (!sel) return;
         // Already populated by PHP (more than just the placeholder option)
         if (sel.options.length > 1) return;
-        fetch('/api/public/support_tickets/categories?tenant_id=' + tenantId + '&lang=' + encodeURIComponent(lang), {
+        fetch('/api/public/ticket_categories?tenant_id=' + tenantId + '&lang=' + encodeURIComponent(lang), {
             credentials: 'include'
         })
         .then(function (r) { return r.json(); })
