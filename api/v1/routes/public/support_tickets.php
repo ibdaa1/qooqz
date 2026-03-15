@@ -45,12 +45,12 @@ $stTenantId = (int)($tenantId ?? $_SESSION['pub_tenant_id'] ?? 1) ?: 1;
 if ($stMethod === 'GET' && $stSub === 'categories') {
     try {
         $cats = $pdoList(
-            "SELECT tc.id, COALESCE(tct.name, tc.slug) AS name
+            "SELECT tc.id, COALESCE(tct.name, CAST(tc.id AS CHAR)) AS name
              FROM ticket_categories tc
              LEFT JOIN ticket_category_translations tct
-                ON tct.category_id = tc.id AND tct.lang = ?
+                ON tct.category_id = tc.id AND tct.language_code = ?
              WHERE tc.tenant_id = ? AND tc.is_active = 1
-             ORDER BY tc.sort_order ASC, tc.id ASC",
+             ORDER BY tc.id ASC",
             [$lang, $stTenantId]
         );
         ResponseFormatter::success(['items' => $cats]);
@@ -58,9 +58,9 @@ if ($stMethod === 'GET' && $stSub === 'categories') {
         // Fallback: ticket_category_translations table may not exist yet.
         try {
             $cats = $pdoList(
-                "SELECT id, slug AS name FROM ticket_categories
+                "SELECT id, CAST(id AS CHAR) AS name FROM ticket_categories
                  WHERE tenant_id = ? AND is_active = 1
-                 ORDER BY sort_order ASC, id ASC",
+                 ORDER BY id ASC",
                 [$stTenantId]
             );
             ResponseFormatter::success(['items' => $cats]);
@@ -101,11 +101,11 @@ if ($stMethod === 'GET' && $stSub === '') {
 
     $rows = $pdoList(
         "SELECT st.id, st.subject, st.status, st.priority, st.created_at,
-                COALESCE(tct.name, tc.slug) AS category_name
+                COALESCE(tct.name, CAST(tc.id AS CHAR)) AS category_name
          FROM support_tickets st
          LEFT JOIN ticket_categories tc ON tc.id = st.category_id
          LEFT JOIN ticket_category_translations tct
-            ON tct.category_id = tc.id AND tct.lang = ?
+            ON tct.category_id = tc.id AND tct.language_code = ?
          $where
          ORDER BY st.created_at DESC
          LIMIT ? OFFSET ?",
@@ -116,7 +116,7 @@ if ($stMethod === 'GET' && $stSub === '') {
     if (!$rows && $total > 0) {
         $rows = $pdoList(
             "SELECT st.id, st.subject, st.status, st.priority, st.created_at,
-                    tc.slug AS category_name
+                    '' AS category_name
              FROM support_tickets st
              LEFT JOIN ticket_categories tc ON tc.id = st.category_id
              $where

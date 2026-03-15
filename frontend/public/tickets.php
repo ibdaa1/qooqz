@@ -24,22 +24,22 @@ $categories = [];
 if ($pdo) {
     try {
         $st = $pdo->prepare(
-            "SELECT tc.id, COALESCE(tct.name, tc.slug) AS name
+            "SELECT tc.id, COALESCE(tct.name, CAST(tc.id AS CHAR)) AS name
              FROM ticket_categories tc
              LEFT JOIN ticket_category_translations tct
-                ON tct.category_id = tc.id AND tct.lang = ?
+                ON tct.category_id = tc.id AND tct.language_code = ?
              WHERE tc.tenant_id = ? AND tc.is_active = 1
-             ORDER BY tc.sort_order ASC, tc.id ASC"
+             ORDER BY tc.id ASC"
         );
         $st->execute([$lang, $tenantId]);
         $categories = $st->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable $e) {
-        // Fallback: ticket_category_translations table may not exist yet — use slug as name.
+        // Fallback: ticket_category_translations table may not exist yet — use id as name.
         try {
             $st = $pdo->prepare(
-                "SELECT id, slug AS name FROM ticket_categories
+                "SELECT id, CAST(id AS CHAR) AS name FROM ticket_categories
                  WHERE tenant_id = ? AND is_active = 1
-                 ORDER BY sort_order ASC, id ASC"
+                 ORDER BY id ASC"
             );
             $st->execute([$tenantId]);
             $categories = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -62,11 +62,11 @@ if ($pdo && $userId) {
         }
         $st = $pdo->prepare(
             "SELECT st.id, st.subject, st.status, st.priority, st.created_at,
-                    COALESCE(tct.name, tc.slug) AS category_name
+                    COALESCE(tct.name, CAST(tc.id AS CHAR)) AS category_name
              FROM support_tickets st
              LEFT JOIN ticket_categories tc  ON tc.id = st.category_id
              LEFT JOIN ticket_category_translations tct
-                ON tct.category_id = tc.id AND tct.lang = ?
+                ON tct.category_id = tc.id AND tct.language_code = ?
              $where
              ORDER BY st.created_at DESC
              LIMIT 50"
@@ -84,7 +84,7 @@ if ($pdo && $userId) {
             }
             $st = $pdo->prepare(
                 "SELECT st.id, st.subject, st.status, st.priority, st.created_at,
-                        tc.slug AS category_name
+                        '' AS category_name
                  FROM support_tickets st
                  LEFT JOIN ticket_categories tc ON tc.id = st.category_id
                  $where

@@ -44,23 +44,23 @@ if (!$pdo instanceof PDO) {
  * ----------------------------------------------------- */
 try {
     $cats = $pdoList(
-        "SELECT tc.id, COALESCE(tct.name, tc.slug) AS name, tc.slug
+        "SELECT tc.id, COALESCE(tct.name, CAST(tc.id AS CHAR)) AS name
          FROM ticket_categories tc
          LEFT JOIN ticket_category_translations tct
-            ON tct.category_id = tc.id AND tct.lang = ?
+            ON tct.category_id = tc.id AND tct.language_code = ?
          WHERE tc.tenant_id = ? AND tc.is_active = 1
-         ORDER BY tc.sort_order ASC, tc.id ASC",
+         ORDER BY tc.id ASC",
         [$lang, $tcTenantId]
     );
     ResponseFormatter::success(['items' => $cats]);
 } catch (Throwable $ex) {
-    // Fallback: ticket_category_translations table may not exist yet — return categories using slug as name.
+    // Fallback: ticket_category_translations table may not exist yet.
     try {
         $cats = $pdoList(
-            "SELECT id, slug AS name
+            "SELECT id, CAST(id AS CHAR) AS name
              FROM ticket_categories
              WHERE tenant_id = ? AND is_active = 1
-             ORDER BY sort_order ASC, id ASC",
+             ORDER BY id ASC",
             [$tcTenantId]
         );
         ResponseFormatter::success(['items' => $cats]);
