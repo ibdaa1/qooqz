@@ -328,7 +328,7 @@ function return_status_color(string $s): string {
         })
         .then(function (r) { return r.json(); })
         .then(function (res) {
-            if (res.status === 'success' && res.data && res.data.order) {
+            if (res.success && res.data && res.data.order) {
                 var order = res.data.order;
                 var items = res.data.items || [];
                 var existingReturn = res.data.existing_return;
@@ -432,7 +432,7 @@ function return_status_color(string $s): string {
         })
         .then(function (r) { return r.json(); })
         .then(function (res) {
-            if (res.status === 'success' || res.success || res.id || (res.data && res.data.id)) {
+            if (res.success || res.id || (res.data && res.data.id)) {
                 formMsg.style.color = '#16A34A';
                 formMsg.textContent = <?= json_encode(t('returns.success')) ?>;
                 form.reset();
