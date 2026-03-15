@@ -54,5 +54,17 @@ try {
     );
     ResponseFormatter::success(['items' => $cats]);
 } catch (Throwable $ex) {
-    ResponseFormatter::error('Failed to load ticket categories', 500);
+    // Fallback: ticket_category_translations table may not exist yet — return categories using slug as name.
+    try {
+        $cats = $pdoList(
+            "SELECT id, slug AS name
+             FROM ticket_categories
+             WHERE tenant_id = ? AND is_active = 1
+             ORDER BY sort_order ASC, id ASC",
+            [$tcTenantId]
+        );
+        ResponseFormatter::success(['items' => $cats]);
+    } catch (Throwable $ex2) {
+        ResponseFormatter::error('Failed to load ticket categories', 500);
+    }
 }

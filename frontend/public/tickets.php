@@ -33,7 +33,18 @@ if ($pdo) {
         );
         $st->execute([$lang, $tenantId]);
         $categories = $st->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable $e) { /* ignore – form will still show */ }
+    } catch (Throwable $e) {
+        // Fallback: ticket_category_translations table may not exist yet — use slug as name.
+        try {
+            $st = $pdo->prepare(
+                "SELECT id, slug AS name FROM ticket_categories
+                 WHERE tenant_id = ? AND is_active = 1
+                 ORDER BY sort_order ASC, id ASC"
+            );
+            $st->execute([$tenantId]);
+            $categories = $st->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e2) { /* ignore – form will still show */ }
+    }
 }
 
 // ── Load user's tickets ─────────────────────────────────────────────────────
@@ -62,7 +73,28 @@ if ($pdo && $userId) {
         );
         $st->execute(array_merge([$lang], $params));
         $tickets = $st->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable $e) { /* show empty state */ }
+    } catch (Throwable $e) {
+        // Fallback: ticket_category_translations table may not exist yet.
+        try {
+            $where  = 'WHERE st.tenant_id = ? AND st.user_id = ?';
+            $params = [$tenantId, $userId];
+            if ($filterStatus) {
+                $where .= ' AND st.status = ?';
+                $params[] = $filterStatus;
+            }
+            $st = $pdo->prepare(
+                "SELECT st.id, st.subject, st.status, st.priority, st.created_at,
+                        tc.slug AS category_name
+                 FROM support_tickets st
+                 LEFT JOIN ticket_categories tc ON tc.id = st.category_id
+                 $where
+                 ORDER BY st.created_at DESC
+                 LIMIT 50"
+            );
+            $st->execute($params);
+            $tickets = $st->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e2) { /* show empty state */ }
+    }
 }
 
 // ── Status badge helper ─────────────────────────────────────────────────────

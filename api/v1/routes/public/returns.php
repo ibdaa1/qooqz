@@ -54,7 +54,7 @@ if ($retMethod === 'GET' && in_array($retSub, ['eligible-orders', 'eligible_orde
         "SELECT id, order_number, status, grand_total, currency_code, created_at
          FROM orders
          WHERE user_id = ? AND tenant_id = ?
-           AND status NOT IN ('cancelled')
+           AND status IN ('delivered','completed')
          ORDER BY created_at DESC
          LIMIT 100",
         [$retUserId, $retTenantId]

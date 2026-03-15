@@ -55,7 +55,18 @@ if ($stMethod === 'GET' && $stSub === 'categories') {
         );
         ResponseFormatter::success(['items' => $cats]);
     } catch (Throwable $ex) {
-        ResponseFormatter::error('Failed to load categories', 500);
+        // Fallback: ticket_category_translations table may not exist yet.
+        try {
+            $cats = $pdoList(
+                "SELECT id, slug AS name FROM ticket_categories
+                 WHERE tenant_id = ? AND is_active = 1
+                 ORDER BY sort_order ASC, id ASC",
+                [$stTenantId]
+            );
+            ResponseFormatter::success(['items' => $cats]);
+        } catch (Throwable $ex2) {
+            ResponseFormatter::error('Failed to load categories', 500);
+        }
     }
     exit;
 }
@@ -100,6 +111,20 @@ if ($stMethod === 'GET' && $stSub === '') {
          LIMIT ? OFFSET ?",
         array_merge([$lang], $params, [$per, $offset])
     );
+
+    // If the join query returned nothing but there IS a count, retry without translations join.
+    if (!$rows && $total > 0) {
+        $rows = $pdoList(
+            "SELECT st.id, st.subject, st.status, st.priority, st.created_at,
+                    tc.slug AS category_name
+             FROM support_tickets st
+             LEFT JOIN ticket_categories tc ON tc.id = st.category_id
+             $where
+             ORDER BY st.created_at DESC
+             LIMIT ? OFFSET ?",
+            array_merge($params, [$per, $offset])
+        );
+    }
 
     ResponseFormatter::success([
         'items' => $rows,
