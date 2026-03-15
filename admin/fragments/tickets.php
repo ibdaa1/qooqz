@@ -337,38 +337,34 @@ window.TICKETS_CONFIG = {
 <script src="/admin/assets/js/pages/tickets.js?v=<?= time() ?>"></script>
 <script>
 (function () {
-    var initialized  = false;
-    var i18nApplied  = false;   // true only after THIS page's admin:i18n:applied fires
+    var initialized = false;
     var poll;
 
     function cleanup() {
         clearInterval(poll);
-        window.removeEventListener('admin:i18n:applied', onI18nApplied);
+        window.removeEventListener('admin:i18n:applied', tryInit);
     }
 
-    // tryInit() runs only after the page-specific translation event has fired,
-    // so window.TRANSLATIONS always contains THIS page's strings, not stale ones
-    // left over from a previous fragment (e.g. Returns → Tickets navigation).
+    // Call init() only after BOTH translations and the Tickets module are ready.
     function tryInit() {
         if (initialized) return;
-        if (!i18nApplied) return;   // wait for THIS page's event
+        if (!window.TRANSLATIONS) return;
         if (!window.Tickets || typeof window.Tickets.init !== 'function') return;
         initialized = true;
         cleanup();
         window.Tickets.init();
     }
 
-    // Primary trigger: fires after applyTranslations() has loaded THIS page's
-    // strings into window.TRANSLATIONS and translated all [data-i18n] elements.
-    function onI18nApplied() {
-        i18nApplied = true;
-        tryInit();
-    }
-    window.addEventListener('admin:i18n:applied', onI18nApplied);
+    // Primary trigger: admin:i18n:applied fires after applyTranslations() sets
+    // window.TRANSLATIONS and translates all [data-i18n] elements in the fragment.
+    window.addEventListener('admin:i18n:applied', tryInit);
 
-    // Fallback poll: handles the case where admin:i18n:applied fired before this
-    // script registered (re-visit on same page), and when tickets.js loads async
-    // after the event. Runs for up to 6 s (60 × 100 ms).
+    // Also try immediately – covers re-visits where TRANSLATIONS is already set.
+    tryInit();
+
+    // Fallback poll covers cases where admin:i18n:applied already fired before
+    // this script registered, and when tickets.js loads after the event fires.
+    // Runs for up to 6 s (60 × 100 ms).
     var pollCount = 0;
     poll = setInterval(function () {
         pollCount++;
