@@ -40,8 +40,8 @@ $retTenantId = (int)($tenantId ?? $_SESSION['pub_tenant_id'] ?? 1) ?: 1;
 
 /* -------------------------------------------------------
  * GET /api/public/returns/eligible-orders
- * Returns the logged-in user's orders that are eligible for return
- * (status = delivered or completed), for use as a dropdown list.
+ * Returns the logged-in user's orders for the return dropdown.
+ * Shows all non-cancelled orders so users can select one to return.
  * Requires login.
  * ----------------------------------------------------- */
 if ($retMethod === 'GET' && in_array($retSub, ['eligible-orders', 'eligible_orders'], true)) {
@@ -54,7 +54,7 @@ if ($retMethod === 'GET' && in_array($retSub, ['eligible-orders', 'eligible_orde
         "SELECT id, order_number, status, grand_total, currency_code, created_at
          FROM orders
          WHERE user_id = ? AND tenant_id = ?
-           AND status IN ('delivered','completed')
+           AND status NOT IN ('cancelled')
          ORDER BY created_at DESC
          LIMIT 100",
         [$retUserId, $retTenantId]
@@ -66,7 +66,7 @@ if ($retMethod === 'GET' && in_array($retSub, ['eligible-orders', 'eligible_orde
 
 /* -------------------------------------------------------
  * GET /api/public/returns/order-items?order_number=ORD-xxx
- * Looks up a completed/delivered order that belongs to the logged-in user
+ * Looks up an order that belongs to the logged-in user
  * and returns its items so the user can review before submitting a return.
  * Requires login.
  * ----------------------------------------------------- */
@@ -82,7 +82,9 @@ if ($retMethod === 'GET' && in_array($retSub, ['order-items', 'order_items'], tr
         exit;
     }
 
-    // Verify the order belongs to this user and is eligible for return.
+    // Verify the order belongs to this user.
+    // All non-cancelled orders are shown in the preview — the actual return creation
+    // (POST /api/public/returns) enforces the stricter delivered/completed requirement.
     // Accept a numeric order ID (e.g. "7") as well as the full order_number string.
     $isNumericId = ctype_digit($orderNumber);
     if ($isNumericId) {
@@ -90,7 +92,7 @@ if ($retMethod === 'GET' && in_array($retSub, ['order-items', 'order_items'], tr
             "SELECT id, order_number, status, grand_total, currency_code
              FROM orders
              WHERE (id = ? OR order_number = ?) AND user_id = ? AND tenant_id = ?
-               AND status IN ('delivered','completed')
+               AND status NOT IN ('cancelled')
              LIMIT 1",
             [(int)$orderNumber, $orderNumber, $retUserId, $retTenantId]
         );
@@ -99,14 +101,14 @@ if ($retMethod === 'GET' && in_array($retSub, ['order-items', 'order_items'], tr
             "SELECT id, order_number, status, grand_total, currency_code
              FROM orders
              WHERE order_number = ? AND user_id = ? AND tenant_id = ?
-               AND status IN ('delivered','completed')
+               AND status NOT IN ('cancelled')
              LIMIT 1",
             [$orderNumber, $retUserId, $retTenantId]
         );
     }
 
     if (!$order) {
-        ResponseFormatter::error('Order not found or not eligible for return', 404);
+        ResponseFormatter::error('Order not found or does not belong to your account', 404);
         exit;
     }
 

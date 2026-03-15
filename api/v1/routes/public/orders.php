@@ -8,13 +8,82 @@ declare(strict_types=1);
  */
 
 if ($first === 'orders') {
-    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-    if ($method !== 'POST') {
-        ResponseFormatter::error('Method not allowed', 405);
+    $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+
+    if ($method === 'OPTIONS') {
+        if (!headers_sent()) {
+            header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+            header('Access-Control-Allow-Headers: Content-Type, Authorization, X-CSRF-Token, X-Requested-With');
+            http_response_code(204);
+        }
         exit;
     }
+
     if (!$pdo instanceof PDO) {
         ResponseFormatter::error('Database unavailable', 503);
+        exit;
+    }
+
+    /* -------------------------------------------------------
+     * GET /api/public/orders
+     * Returns the logged-in user's orders (newest first).
+     * Used for searchable order dropdown in forms.
+     * Supports: ?search=ORDER_NUMBER, ?status=xxx
+     * Requires login.
+     * ----------------------------------------------------- */
+    if ($method === 'GET') {
+        $sessUserId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
+        if (!$sessUserId) {
+            ResponseFormatter::error('Login required', 401);
+            exit;
+        }
+        $ordTenantId = (int)($tenantId ?? $_SESSION['pub_tenant_id'] ?? 1) ?: 1;
+
+        $search       = trim((string)($_GET['search'] ?? ''));
+        if (strlen($search) > 100) {
+            $search = substr($search, 0, 100);
+        }
+        $filterStatus = isset($_GET['status']) ? trim((string)$_GET['status']) : '';
+
+        $where  = 'WHERE user_id = ? AND tenant_id = ?';
+        $params = [$sessUserId, $ordTenantId];
+
+        if ($search !== '') {
+            // Escape LIKE special characters to treat them as literals
+            $likeSearch = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search) . '%';
+            $where   .= ' AND order_number LIKE ?';
+            $params[] = $likeSearch;
+        }
+        if ($filterStatus !== '') {
+            $where   .= ' AND status = ?';
+            $params[] = $filterStatus;
+        }
+
+        $total = $pdoCount("SELECT COUNT(*) FROM orders $where", $params);
+
+        $rows = $pdoList(
+            "SELECT id, order_number, status, payment_status, grand_total, currency_code, created_at
+             FROM orders
+             $where
+             ORDER BY created_at DESC
+             LIMIT ? OFFSET ?",
+            array_merge($params, [$per, $offset])
+        );
+
+        ResponseFormatter::success([
+            'items' => $rows,
+            'meta'  => [
+                'total'       => $total,
+                'page'        => $page,
+                'per_page'    => $per,
+                'total_pages' => $per > 0 ? (int)ceil($total / $per) : 1,
+            ],
+        ]);
+        exit;
+    }
+
+    if ($method !== 'POST') {
+        ResponseFormatter::error('Method not allowed', 405);
         exit;
     }
 
