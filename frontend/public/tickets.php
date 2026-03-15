@@ -299,7 +299,7 @@ function ticket_priority_color(string $p): string {
             description: document.getElementById('ticketDesc').value.trim()
         };
 
-        fetch('/api/v1/support_tickets?tenant_id=<?= (int)$tenantId ?>', {
+        fetch('/api/public/support_tickets?tenant_id=<?= (int)$tenantId ?>', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },

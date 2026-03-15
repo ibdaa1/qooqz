@@ -165,6 +165,8 @@ $_pubRoutes = [
     'compare'            => 'compare',
     'bundles'            => 'bundles',
     'auctions'           => 'auctions',
+    'support_tickets'    => 'support_tickets',
+    'returns'            => 'returns',
 ];
 
 $_pubFile = isset($_pubRoutes[$first])

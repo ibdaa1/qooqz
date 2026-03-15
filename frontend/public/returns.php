@@ -19,22 +19,6 @@ $userId   = (int)($_SESSION['user_id'] ?? $_SESSION['user']['id'] ?? 0);
 $tenantId = (int)($_SESSION['pub_tenant_id'] ?? 1);
 $pdo      = pub_get_pdo();
 
-// ── Load user's completed orders (for the return form) ─────────────────────
-$userOrders = [];
-if ($pdo && $userId) {
-    try {
-        $st = $pdo->prepare(
-            "SELECT id, order_number FROM orders
-             WHERE user_id = ? AND tenant_id = ?
-               AND status IN ('delivered','completed')
-             ORDER BY created_at DESC
-             LIMIT 100"
-        );
-        $st->execute([$userId, $tenantId]);
-        $userOrders = $st->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable $e) { /* ignore */ }
-}
-
 // ── Load user's return requests ─────────────────────────────────────────────
 $returns      = [];
 $filterStatus = in_array($_GET['status'] ?? '', ['pending','approved','rejected','processing','completed','cancelled'])
@@ -111,39 +95,48 @@ function return_status_color(string $s): string {
         <div style="background:var(--pub-surface);border:1px solid var(--pub-border);border-radius:12px;padding:28px;">
             <h2 style="font-size:1.1rem;font-weight:700;margin:0 0 20px;"><?= e(t('returns.new_return')) ?></h2>
             <form id="returnForm">
-                <!-- Order selection -->
+                <!-- Order number input + lookup -->
                 <div style="margin-bottom:16px;">
                     <label style="font-size:0.87rem;font-weight:600;display:block;margin-bottom:6px;">
                         <?= e(t('returns.order_id')) ?> *
                     </label>
-                    <?php if (!empty($userOrders)): ?>
-                    <select name="order_id" id="returnOrderId" required
-                            style="width:100%;padding:10px 12px;border:1px solid var(--pub-border);
-                                   border-radius:8px;font-size:0.93rem;background:var(--pub-bg);color:var(--pub-text);">
-                        <option value=""><?= e(t('returns.order_placeholder')) ?></option>
-                        <?php foreach ($userOrders as $ord): ?>
-                            <option value="<?= (int)$ord['id'] ?>">#<?= e($ord['order_number']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <?php else: ?>
-                    <input type="number" name="order_id" id="returnOrderId" required min="1"
-                           placeholder="<?= e(t('returns.order_placeholder')) ?>"
-                           style="width:100%;padding:10px 12px;border:1px solid var(--pub-border);
-                                  border-radius:8px;font-size:0.93rem;box-sizing:border-box;
-                                  background:var(--pub-bg);color:var(--pub-text);">
-                    <?php endif; ?>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="returnOrderNumber" name="order_number" required
+                               placeholder="<?= e(t('returns.order_placeholder')) ?>"
+                               autocomplete="off"
+                               style="flex:1;padding:10px 12px;border:1px solid var(--pub-border);
+                                      border-radius:8px;font-size:0.93rem;box-sizing:border-box;
+                                      background:var(--pub-bg);color:var(--pub-text);">
+                        <button type="button" id="returnLookupBtn"
+                                style="padding:10px 18px;background:var(--pub-primary);color:#fff;border:none;
+                                       border-radius:8px;font-size:0.93rem;font-weight:600;cursor:pointer;white-space:nowrap;">
+                            <?= e(t('returns.lookup')) ?>
+                        </button>
+                    </div>
+                    <div id="returnOrderStatus" style="margin-top:8px;font-size:0.85rem;"></div>
                 </div>
+
+                <!-- Order items preview (shown after successful lookup) -->
+                <div id="returnItemsWrap" style="display:none;margin-bottom:16px;">
+                    <label style="font-size:0.87rem;font-weight:600;display:block;margin-bottom:8px;">
+                        <?= e(t('returns.order_items')) ?>
+                    </label>
+                    <div id="returnItemsList"
+                         style="border:1px solid var(--pub-border);border-radius:8px;overflow:hidden;"></div>
+                </div>
+
                 <!-- Reason -->
-                <div style="margin-bottom:20px;">
+                <div id="returnReasonWrap" style="display:none;margin-bottom:20px;">
                     <label style="font-size:0.87rem;font-weight:600;display:block;margin-bottom:6px;">
                         <?= e(t('returns.reason')) ?> *
                     </label>
-                    <textarea name="reason" id="returnReason" required rows="5"
+                    <textarea name="reason" id="returnReason" rows="4"
                               placeholder="<?= e(t('returns.reason_placeholder')) ?>"
                               style="width:100%;padding:10px 12px;border:1px solid var(--pub-border);
                                      border-radius:8px;font-size:0.93rem;resize:vertical;box-sizing:border-box;
                                      background:var(--pub-bg);color:var(--pub-text);"></textarea>
                 </div>
+
                 <!-- Buttons -->
                 <div style="display:flex;gap:12px;justify-content:flex-end;">
                     <button type="button" onclick="document.getElementById('returnFormWrap').style.display='none';
@@ -152,9 +145,9 @@ function return_status_color(string $s): string {
                                    border-radius:8px;font-size:0.95rem;cursor:pointer;color:var(--pub-text);">
                         <?= e(t('returns.cancel')) ?>
                     </button>
-                    <button type="submit" id="returnSubmitBtn"
+                    <button type="submit" id="returnSubmitBtn" disabled
                             style="padding:10px 22px;background:var(--pub-primary);color:#fff;border:none;
-                                   border-radius:8px;font-size:0.95rem;font-weight:600;cursor:pointer;">
+                                   border-radius:8px;font-size:0.95rem;font-weight:600;cursor:pointer;opacity:0.5;">
                         <?= e(t('returns.submit')) ?>
                     </button>
                 </div>
@@ -241,24 +234,116 @@ function return_status_color(string $s): string {
 
 <script>
 (function () {
-    var form = document.getElementById('returnForm');
+    var form        = document.getElementById('returnForm');
+    var lookupBtn   = document.getElementById('returnLookupBtn');
+    var orderInput  = document.getElementById('returnOrderNumber');
+    var orderStatus = document.getElementById('returnOrderStatus');
+    var itemsWrap   = document.getElementById('returnItemsWrap');
+    var itemsList   = document.getElementById('returnItemsList');
+    var reasonWrap  = document.getElementById('returnReasonWrap');
+    var submitBtn   = document.getElementById('returnSubmitBtn');
+    var formMsg     = document.getElementById('returnFormMsg');
+    var tenantId    = <?= (int)$tenantId ?>;
+
     if (!form) return;
 
+    /* ---- Order number lookup ---- */
+    function doLookup() {
+        var num = orderInput.value.trim();
+        if (!num) {
+            orderStatus.style.color = '#DC2626';
+            orderStatus.textContent = <?= json_encode(t('returns.order_placeholder')) ?>;
+            return;
+        }
+        lookupBtn.disabled = true;
+        orderStatus.style.color = 'var(--pub-muted)';
+        orderStatus.textContent = <?= json_encode(t('returns.loading')) ?>;
+        itemsWrap.style.display  = 'none';
+        reasonWrap.style.display = 'none';
+        submitBtn.disabled       = true;
+        submitBtn.style.opacity  = '0.5';
+
+        fetch('/api/public/returns/order-items?order_number=' + encodeURIComponent(num) + '&tenant_id=' + tenantId, {
+            credentials: 'include'
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            lookupBtn.disabled = false;
+            if (res.status === 'success' && res.data && res.data.order) {
+                var order = res.data.order;
+                var items = res.data.items || [];
+                var existingReturn = res.data.existing_return;
+
+                if (existingReturn) {
+                    orderStatus.style.color = '#D97706';
+                    orderStatus.textContent = <?= json_encode(t('returns.already_returned')) ?>;
+                    return;
+                }
+
+                orderStatus.style.color = '#16A34A';
+                orderStatus.textContent = <?= json_encode(t('returns.order_found')) ?> + ' #' + order.order_number;
+
+                // Render items
+                if (items.length) {
+                    var html = '';
+                    items.forEach(function (it, idx) {
+                        var bg = idx % 2 === 0 ? 'var(--pub-bg)' : 'var(--pub-surface)';
+                        var img = it.image_url
+                            ? '<img src="' + it.image_url + '" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;margin-' + (document.documentElement.dir === 'rtl' ? 'left' : 'right') + ':10px;flex-shrink:0;">'
+                            : '<span style="width:40px;height:40px;border-radius:6px;background:var(--pub-border);display:inline-block;margin-' + (document.documentElement.dir === 'rtl' ? 'left' : 'right') + ':10px;flex-shrink:0;"></span>';
+                        html += '<div style="display:flex;align-items:center;padding:10px 14px;background:' + bg + ';border-bottom:1px solid var(--pub-border);">'
+                              + img
+                              + '<div style="flex:1;">'
+                              + '<div style="font-size:0.92rem;font-weight:600;">' + it.product_name + '</div>'
+                              + '<div style="font-size:0.8rem;color:var(--pub-muted);">' + <?= json_encode(t('returns.qty')) ?> + ': ' + it.quantity + '</div>'
+                              + '</div>'
+                              + '</div>';
+                    });
+                    itemsList.innerHTML = html;
+                    itemsWrap.style.display = 'block';
+                }
+
+                reasonWrap.style.display = 'block';
+                document.getElementById('returnReason').required = true;
+                submitBtn.disabled      = false;
+                submitBtn.style.opacity = '1';
+            } else {
+                orderStatus.style.color = '#DC2626';
+                orderStatus.textContent = res.message || <?= json_encode(t('returns.order_not_found')) ?>;
+            }
+        })
+        .catch(function () {
+            lookupBtn.disabled = false;
+            orderStatus.style.color = '#DC2626';
+            orderStatus.textContent = <?= json_encode(t('returns.error')) ?>;
+        });
+    }
+
+    lookupBtn.addEventListener('click', doLookup);
+    orderInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); doLookup(); }
+    });
+
+    /* ---- Form submit ---- */
     form.addEventListener('submit', function (e) {
         e.preventDefault();
-        var btn = document.getElementById('returnSubmitBtn');
-        var msg = document.getElementById('returnFormMsg');
-        btn.disabled = true;
+        var reason = document.getElementById('returnReason').value.trim();
+        if (!reason) {
+            formMsg.style.color = '#DC2626';
+            formMsg.textContent = <?= json_encode(t('returns.reason')) ?>;
+            return;
+        }
 
-        var orderEl = document.getElementById('returnOrderId');
+        submitBtn.disabled      = true;
+        submitBtn.style.opacity = '0.7';
+
         var data = {
-            user_id:   <?= (int)$userId ?>,
-            tenant_id: <?= (int)$tenantId ?>,
-            order_id:  parseInt(orderEl.value, 10),
-            reason:    document.getElementById('returnReason').value.trim()
+            order_number: orderInput.value.trim(),
+            reason:       reason,
+            tenant_id:    tenantId
         };
 
-        fetch('/api/v1/returns?tenant_id=<?= (int)$tenantId ?>', {
+        fetch('/api/public/returns?tenant_id=' + tenantId, {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -266,19 +351,23 @@ function return_status_color(string $s): string {
         })
         .then(function (r) { return r.json(); })
         .then(function (res) {
-            if (res.success || res.id || (res.data && res.data.id)) {
-                msg.style.color = '#16A34A';
-                msg.textContent = <?= json_encode(t('returns.success')) ?>;
+            if (res.status === 'success' || res.success || res.id || (res.data && res.data.id)) {
+                formMsg.style.color = '#16A34A';
+                formMsg.textContent = <?= json_encode(t('returns.success')) ?>;
                 form.reset();
+                itemsWrap.style.display  = 'none';
+                reasonWrap.style.display = 'none';
+                orderStatus.textContent  = '';
                 setTimeout(function () { location.reload(); }, 1500);
             } else {
                 throw new Error(res.message || res.error || 'error');
             }
         })
-        .catch(function () {
-            msg.style.color = '#DC2626';
-            msg.textContent = <?= json_encode(t('returns.error')) ?>;
-            btn.disabled = false;
+        .catch(function (err) {
+            formMsg.style.color     = '#DC2626';
+            formMsg.textContent     = err.message !== 'error' ? err.message : <?= json_encode(t('returns.error')) ?>;
+            submitBtn.disabled      = false;
+            submitBtn.style.opacity = '1';
         });
     });
 })();
