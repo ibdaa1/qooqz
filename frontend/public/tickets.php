@@ -114,7 +114,8 @@ function ticket_priority_color(string $p): string {
             <h1 style="font-size:1.6rem;font-weight:700;margin:0;"><?= e(t('tickets.page_title')) ?></h1>
             <p style="font-size:0.92rem;color:var(--pub-muted);margin:4px 0 0;"><?= e(t('tickets.page_subtitle')) ?></p>
         </div>
-        <button onclick="document.getElementById('ticketFormWrap').style.display='block';this.style.display='none';window.scrollTo({top:0,behavior:'smooth'});"
+        <button id="ticketNewBtn"
+                onclick="document.getElementById('ticketFormWrap').style.display='block';this.style.display='none';window.scrollTo({top:0,behavior:'smooth'});"
                 style="padding:10px 22px;background:var(--pub-primary);color:#fff;border:none;border-radius:8px;
                        font-size:0.95rem;font-weight:600;cursor:pointer;">
             + <?= e(t('tickets.new_ticket')) ?>
@@ -284,6 +285,39 @@ function ticket_priority_color(string $p): string {
     var form = document.getElementById('ticketForm');
     if (!form) return;
 
+    var tenantId = <?= (int)$tenantId ?>;
+    var lang     = <?= json_encode($lang) ?>;
+
+    /* ---- Load categories via API if the PHP-rendered list is empty ---- */
+    function loadCategories() {
+        var sel = document.getElementById('ticketCategory');
+        if (!sel) return;
+        // Already populated by PHP (more than just the placeholder option)
+        if (sel.options.length > 1) return;
+        fetch('/api/public/support_tickets/categories?tenant_id=' + tenantId + '&lang=' + encodeURIComponent(lang), {
+            credentials: 'include'
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            var cats = (res.data && Array.isArray(res.data.items)) ? res.data.items : [];
+            cats.forEach(function (cat) {
+                var opt = document.createElement('option');
+                opt.value       = cat.id;
+                opt.textContent = cat.name || cat.slug || String(cat.id);
+                sel.appendChild(opt);
+            });
+        })
+        .catch(function () { /* silently ignore; placeholder already shown */ });
+    }
+
+    /* Trigger category load when the new-ticket button shows the form */
+    var showBtn = document.getElementById('ticketNewBtn');
+    if (showBtn) {
+        showBtn.addEventListener('click', loadCategories);
+    }
+    /* Also try immediately in case form is already visible */
+    loadCategories();
+
     form.addEventListener('submit', function (e) {
         e.preventDefault();
         var btn = document.getElementById('ticketSubmitBtn');
@@ -292,14 +326,14 @@ function ticket_priority_color(string $p): string {
 
         var data = {
             user_id:     <?= (int)$userId ?>,
-            tenant_id:   <?= (int)$tenantId ?>,
-            category_id: parseInt(document.getElementById('ticketCategory').value, 10),
+            tenant_id:   tenantId,
+            category_id: parseInt(document.getElementById('ticketCategory').value, 10) || null,
             priority:    document.getElementById('ticketPriority').value,
             subject:     document.getElementById('ticketSubject').value.trim(),
             description: document.getElementById('ticketDesc').value.trim()
         };
 
-        fetch('/api/public/support_tickets?tenant_id=<?= (int)$tenantId ?>', {
+        fetch('/api/public/support_tickets?tenant_id=' + tenantId, {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },

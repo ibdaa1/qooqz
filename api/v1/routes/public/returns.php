@@ -55,15 +55,28 @@ if ($retMethod === 'GET' && in_array($retSub, ['order-items', 'order_items'], tr
         exit;
     }
 
-    // Verify the order belongs to this user and is eligible for return
-    $order = $pdoOne(
-        "SELECT id, order_number, status, grand_total, currency_code
-         FROM orders
-         WHERE order_number = ? AND user_id = ? AND tenant_id = ?
-           AND status IN ('delivered','completed')
-         LIMIT 1",
-        [$orderNumber, $retUserId, $retTenantId]
-    );
+    // Verify the order belongs to this user and is eligible for return.
+    // Accept a numeric order ID (e.g. "7") as well as the full order_number string.
+    $isNumericId = ctype_digit($orderNumber);
+    if ($isNumericId) {
+        $order = $pdoOne(
+            "SELECT id, order_number, status, grand_total, currency_code
+             FROM orders
+             WHERE (id = ? OR order_number = ?) AND user_id = ? AND tenant_id = ?
+               AND status IN ('delivered','completed')
+             LIMIT 1",
+            [(int)$orderNumber, $orderNumber, $retUserId, $retTenantId]
+        );
+    } else {
+        $order = $pdoOne(
+            "SELECT id, order_number, status, grand_total, currency_code
+             FROM orders
+             WHERE order_number = ? AND user_id = ? AND tenant_id = ?
+               AND status IN ('delivered','completed')
+             LIMIT 1",
+            [$orderNumber, $retUserId, $retTenantId]
+        );
+    }
 
     if (!$order) {
         ResponseFormatter::error('Order not found or not eligible for return', 404);
@@ -179,21 +192,29 @@ if ($retMethod === 'POST' && $retSub === '') {
         exit;
     }
 
-    // Resolve order — must belong to the current user and be eligible for return
-    $orderWhere  = 'user_id = ? AND tenant_id = ? AND status IN (\'delivered\',\'completed\')';
-    $orderParams = [$retUserId, $retTenantId];
-    if ($orderNumber) {
-        $orderWhere  .= ' AND order_number = ?';
-        $orderParams[] = $orderNumber;
+    // Resolve order — must belong to the current user and be eligible for return.
+    // When order_number looks like a plain integer, also match by id.
+    $baseWhere  = 'user_id = ? AND tenant_id = ? AND status IN (\'delivered\',\'completed\')';
+    $baseParams = [$retUserId, $retTenantId];
+    if ($orderNumber && ctype_digit($orderNumber)) {
+        $order = $pdoOne(
+            "SELECT id, order_number FROM orders
+             WHERE (id = ? OR order_number = ?) AND $baseWhere LIMIT 1",
+            array_merge([(int)$orderNumber, $orderNumber], $baseParams)
+        );
+    } elseif ($orderNumber) {
+        $order = $pdoOne(
+            "SELECT id, order_number FROM orders
+             WHERE order_number = ? AND $baseWhere LIMIT 1",
+            array_merge([$orderNumber], $baseParams)
+        );
     } else {
-        $orderWhere  .= ' AND id = ?';
-        $orderParams[] = $orderId;
+        $order = $pdoOne(
+            "SELECT id, order_number FROM orders
+             WHERE id = ? AND $baseWhere LIMIT 1",
+            array_merge([$orderId], $baseParams)
+        );
     }
-
-    $order = $pdoOne(
-        "SELECT id, order_number FROM orders WHERE $orderWhere LIMIT 1",
-        $orderParams
-    );
 
     if (!$order) {
         ResponseFormatter::error('Order not found or not eligible for return', 404);
