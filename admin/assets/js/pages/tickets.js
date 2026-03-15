@@ -25,8 +25,14 @@
 
     let el = {};
 
-    // Simple Translation placeholder
-    function t(key, fb = '') { return fb || key; }
+    // Translation helper – delegates to admin i18n when available
+    function t(key, fb = '') {
+        if (window._admin && typeof window._admin.t === 'function') {
+            const val = window._admin.t(key);
+            if (val && val !== key) return val;
+        }
+        return fb || key;
+    }
     function esc(text) { if (!text) return ''; const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
 
     // API Helper

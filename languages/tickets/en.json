@@ -1,133 +1,133 @@
 {
-    "direction": "rtl",
+    "direction": "ltr",
     "strings": {
         "tickets": {
-            "title": "تذاكر الدعم",
-            "subtitle": "إدارة طلبات دعم العملاء",
-            "add_new": "تذكرة جديدة",
-            "loading": "جاري تحميل التذاكر...",
-            "retry": "إعادة المحاولة"
+            "title": "Support Tickets",
+            "subtitle": "Manage customer support requests",
+            "add_new": "New Ticket",
+            "loading": "Loading tickets...",
+            "retry": "Retry"
         },
         "tabs": {
-            "details": "التفاصيل",
-            "messages": "المحادثة",
-            "history": "سجل الحالة"
+            "details": "Details",
+            "messages": "Messages",
+            "history": "Status History"
         },
         "form": {
-            "add_title": "تذكرة دعم جديدة",
-            "edit_title": "تعديل التذكرة",
+            "add_title": "New Support Ticket",
+            "edit_title": "Edit Ticket",
             "fields": {
                 "subject": {
-                    "label": "الموضوع",
-                    "placeholder": "أدخل موضوع التذكرة"
+                    "label": "Subject",
+                    "placeholder": "Enter ticket subject"
                 },
                 "description": {
-                    "label": "الوصف",
-                    "placeholder": "اشرح المشكلة بالتفصيل"
+                    "label": "Description",
+                    "placeholder": "Describe the issue in detail"
                 },
                 "category": {
-                    "label": "التصنيف",
-                    "select": "اختر التصنيف"
+                    "label": "Category",
+                    "select": "Select category"
                 },
                 "user": {
-                    "label": "العميل",
-                    "select": "اختر العميل"
+                    "label": "Customer",
+                    "select": "Select customer"
                 },
                 "order": {
-                    "label": "الطلب المرتبط",
-                    "select": "اختر الطلب (اختياري)"
+                    "label": "Related Order",
+                    "select": "Select order (optional)"
                 },
                 "entity": {
-                    "label": "الكيان",
-                    "select": "اختر الكيان"
+                    "label": "Entity",
+                    "select": "Select entity"
                 },
                 "status": {
-                    "label": "الحالة"
+                    "label": "Status"
                 },
                 "priority": {
-                    "label": "الأولوية"
+                    "label": "Priority"
                 },
                 "assigned_to": {
-                    "label": "مكلف بـ",
-                    "unassigned": "غير مكلف"
+                    "label": "Assigned To",
+                    "unassigned": "Unassigned"
                 },
                 "reply": {
-                    "label": "إضافة رد",
-                    "placeholder": "اكتب ردك هنا..."
+                    "label": "Add Reply",
+                    "placeholder": "Type your response here..."
                 },
-                "internal_note": "ملاحظة داخلية؟"
+                "internal_note": "Internal Note?"
             },
             "buttons": {
-                "save": "حفظ التذكرة",
-                "cancel": "إلغاء",
-                "delete": "حذف التذكرة",
-                "send_reply": "إرسال الرد"
+                "save": "Save Ticket",
+                "cancel": "Cancel",
+                "delete": "Delete Ticket",
+                "send_reply": "Send Reply"
             }
         },
         "filters": {
-            "search": "بحث",
-            "search_placeholder": "ابحث بالموضوع أو الرقم...",
-            "status": "الحالة",
-            "priority": "الأولوية",
-            "category": "التصنيف",
-            "all_statuses": "كل الحالات",
-            "all_priorities": "كل الأولويات",
-            "all_categories": "كل التصنيفات",
-            "apply": "تطبيق الفلتر",
-            "reset": "إعادة تعيين"
+            "search": "Search",
+            "search_placeholder": "Search by subject or #ID...",
+            "status": "Status",
+            "priority": "Priority",
+            "category": "Category",
+            "all_statuses": "All Statuses",
+            "all_priorities": "All Priorities",
+            "all_categories": "All Categories",
+            "apply": "Apply Filters",
+            "reset": "Reset"
         },
         "table": {
             "headers": {
-                "id": "الرقم",
-                "subject": "الموضوع",
-                "customer": "العميل",
-                "category": "التصنيف",
-                "priority": "الأولوية",
-                "status": "الحالة",
-                "updated": "آخر تحديث",
-                "actions": "الإجراءات"
+                "id": "ID",
+                "subject": "Subject",
+                "customer": "Customer",
+                "category": "Category",
+                "priority": "Priority",
+                "status": "Status",
+                "updated": "Last Updated",
+                "actions": "Actions"
             },
             "empty": {
-                "title": "لا توجد تذاكر",
-                "message": "لا توجد تذاكر دعم تطابق معايير البحث.",
-                "add_first": "إنشاء تذكرة جديدة"
+                "title": "No Tickets Found",
+                "message": "There are no support tickets matching your criteria.",
+                "add_first": "Create First Ticket"
             },
             "actions": {
-                "edit": "تعديل",
-                "delete": "حذف",
-                "view": "عرض التفاصيل"
+                "edit": "Edit",
+                "delete": "Delete",
+                "view": "View Details"
             }
         },
         "status": {
-            "open": "مفتوح",
-            "pending": "قيد الانتظار",
-            "in_progress": "قيد التنفيذ",
-            "awaiting_customer": "في انتظار العميل",
-            "awaiting_vendor": "في انتظار البائع",
-            "resolved": "تم الحل",
-            "closed": "مغلق",
-            "cancelled": "ملغي"
+            "open": "Open",
+            "pending": "Pending",
+            "in_progress": "In Progress",
+            "awaiting_customer": "Awaiting Customer",
+            "awaiting_vendor": "Awaiting Vendor",
+            "resolved": "Resolved",
+            "closed": "Closed",
+            "cancelled": "Cancelled"
         },
         "priority": {
-            "low": "منخفض",
-            "normal": "عادي",
-            "high": "مرتفع",
-            "urgent": "عاجل"
+            "low": "Low",
+            "normal": "Normal",
+            "high": "High",
+            "urgent": "Urgent"
         },
         "messages": {
-            "created": "تم إنشاء التذكرة بنجاح",
-            "updated": "تم تحديث التذكرة بنجاح",
-            "deleted": "تم حذف التذكرة بنجاح",
-            "reply_sent": "تم إرسال الرد بنجاح",
-            "confirm_delete": "هل أنت متأكد من حذف هذه التذكرة؟",
+            "created": "Ticket created successfully",
+            "updated": "Ticket updated successfully",
+            "deleted": "Ticket deleted successfully",
+            "reply_sent": "Reply sent successfully",
+            "confirm_delete": "Are you sure you want to delete this ticket?",
             "error": {
-                "load_failed": "فشل تحميل التذاكر",
-                "save_failed": "فشل حفظ التذكرة"
+                "load_failed": "Failed to load tickets",
+                "save_failed": "Failed to save ticket"
             }
         },
         "history": {
-            "changed_by": "تم التعديل بواسطة",
-            "note": "ملاحظة"
+            "changed_by": "Changed by",
+            "note": "Note"
         }
     }
 }

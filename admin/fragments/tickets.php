@@ -317,6 +317,7 @@ if (!function_exists('renderFragmentThemeVars')) {
 <script type="text/javascript">
 window.APP_CONFIG = { API_BASE: '<?= $apiBase ?>', TENANT_ID: <?= $tenantId ?>, CSRF_TOKEN: '<?= addslashes($csrf) ?>' };
 window.USER_LANGUAGE = '<?= addslashes($lang) ?>';
+window.ADMIN_LANG = window.ADMIN_LANG || '<?= addslashes($lang) ?>';
 window.PAGE_PERMISSIONS = <?= json_encode(['canCreate'=>$canCreate, 'canEdit'=>$canEdit, 'canDelete'=>$canDelete]) ?>;
 window.TICKETS_CONFIG = {
     apiUrl: '<?= $apiBase ?>/support_tickets',
