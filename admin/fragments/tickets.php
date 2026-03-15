@@ -339,12 +339,28 @@ window.TICKETS_CONFIG = {
     function doInit() {
         if (window.Tickets && typeof window.Tickets.init === 'function') {
             window.Tickets.init();
+            return;
         }
+        // tickets.js is loaded asynchronously by runScripts(); it may not be ready yet.
+        // Poll until window.Tickets is defined (up to 5 s) then call init().
+        var pollCount = 0;
+        var poll = setInterval(function () {
+            pollCount++;
+            if (window.Tickets && typeof window.Tickets.init === 'function') {
+                clearInterval(poll);
+                window.Tickets.init();
+            } else if (pollCount >= 50) {
+                clearInterval(poll);
+                console.warn('[Tickets] init: timed out waiting for Tickets module');
+            }
+        }, 100);
     }
     // When loaded as a fragment, admin:i18n:applied fires after translations are ready.
     // Fall back to a short polling loop for direct (non-fragment) page loads.
     if (window.TRANSLATIONS) {
-        // Translations already loaded (e.g. page reload / direct visit after initial load)
+        // Translations already loaded (e.g. navigating back to this page in the same
+        // admin session). Call doInit() immediately; it will poll for window.Tickets
+        // if tickets.js has not finished loading yet.
         doInit();
     } else {
         window.addEventListener('admin:i18n:applied', doInit, { once: true });
