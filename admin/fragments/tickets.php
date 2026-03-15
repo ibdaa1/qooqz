@@ -324,8 +324,9 @@ window.TICKETS_CONFIG = {
     categoriesApi: '<?= $apiBase ?>/ticket_categories',
     messagesApi: '<?= $apiBase ?>/ticket_messages',
     historyApi: '<?= $apiBase ?>/ticket_status_history',
-    usersApi: '<?= $apiBase ?>/users', // Assuming generic users endpoint
-    ordersApi: '<?= $apiBase ?>/orders', // Assuming generic orders endpoint
+    usersApi: '<?= $apiBase ?>/users',
+    ordersApi: '<?= $apiBase ?>/orders',
+    entitiesApi: '<?= $apiBase ?>/entities',
     lang: '<?= addslashes($lang) ?>',
     itemsPerPage: 20
 };

@@ -11,7 +11,8 @@
         messages: CONFIG.messagesApi || '/api/ticket_messages',
         history: CONFIG.historyApi || '/api/ticket_status_history',
         users: CONFIG.usersApi || '/api/users',
-        orders: CONFIG.ordersApi || '/api/orders'
+        orders: CONFIG.ordersApi || '/api/orders',
+        entities: CONFIG.entitiesApi || '/api/entities'
     };
 
     const state = {
@@ -78,18 +79,45 @@
             const catRes = await apiCall(`${API.categories}?tenant_id=${state.tenantId}&lang=${state.lang}`);
             if (catRes.success) {
                 state.categories = catRes.data.items || catRes.data || [];
-                populateSelect(el.category, state.categories, 'id', 'name', 'Select Category');
+                populateSelect(el.category, state.categories, 'id', 'name', t('form.fields.category.select', 'Select Category'));
             }
             
-            // Users (Staff for assignment)
-            // Note: You might need a specific endpoint for staff/admins
+            // Users
             const userRes = await apiCall(`${API.users}?limit=100`); 
             if (userRes.success) {
                 state.users = userRes.data.items || userRes.data || [];
-                populateSelect(el.user, state.users, 'id', 'email', 'Select Customer');
-                populateSelect(el.assigned, state.users, 'id', 'email', 'Unassigned', true);
+                populateSelect(el.user, state.users, 'id', 'email', t('form.fields.user.select', 'Select Customer'));
+                populateSelect(el.assigned, state.users, 'id', 'email', t('form.fields.assigned_to.unassigned', 'Unassigned'), true);
             }
+
+            // Initialize empty order/entity dropdowns
+            populateSelect(el.order, [], 'id', 'order_number', t('form.fields.order.select', 'Select order (optional)'));
+            populateSelect(el.entity, [], 'id', 'store_name', t('form.fields.entity.select', 'Select entity'));
         } catch (e) { console.warn("Failed to load dropdowns", e); }
+    }
+
+    // Load orders and entities for a specific user
+    async function loadUserOrdersAndEntities(userId) {
+        if (!userId) {
+            populateSelect(el.order, [], 'id', 'order_number', t('form.fields.order.select', 'Select order (optional)'));
+            populateSelect(el.entity, [], 'id', 'store_name', t('form.fields.entity.select', 'Select entity'));
+            return;
+        }
+        try {
+            const orderRes = await apiCall(`${API.orders}?user_id=${userId}&tenant_id=${state.tenantId}&limit=100&lang=${state.lang}`);
+            if (orderRes.success) {
+                const orders = orderRes.data.items || orderRes.data || [];
+                populateSelect(el.order, orders, 'id', 'order_number', t('form.fields.order.select', 'Select order (optional)'));
+            }
+        } catch (e) { console.warn('Failed to load orders for user', e); }
+        try {
+            const entityRes = await apiCall(`${API.entities}?user_id=${userId}&tenant_id=${state.tenantId}&limit=100&lang=${state.lang}`);
+            if (entityRes.success) {
+                const entities = entityRes.data.items || entityRes.data || [];
+                populateSelect(el.entity, entities, 'id', 'store_name', t('form.fields.entity.select', 'Select entity'));
+                if (entities.length === 1 && el.entity) el.entity.value = entities[0].id;
+            }
+        } catch (e) { console.warn('Failed to load entities for user', e); }
     }
 
     function populateSelect(sel, items, valKey, txtKey, placeholder, includeEmpty = false) {
@@ -143,7 +171,7 @@
     }
 
     // Form Handling
-    function showForm(data = null) {
+    async function showForm(data = null) {
         state.currentTicket = data;
         state.messages = [];
         state.history = [];
@@ -159,22 +187,31 @@
         document.getElementById('tab-details').style.display = 'block';
 
         if (data) {
-            el.formTitle.textContent = `Edit Ticket #${data.id}`;
+            el.formTitle.textContent = `${t('form.edit_title', 'Edit Ticket')} #${data.id}`;
             el.formId.value = data.id;
             el.subject.value = data.subject;
             el.description.value = data.description;
             el.status.value = data.status;
             el.priority.value = data.priority;
             if (data.category_id) el.category.value = data.category_id;
-            if (data.user_id) el.user.value = data.user_id;
+            if (data.user_id) {
+                el.user.value = data.user_id;
+                // Load orders and entities for this user, then set values
+                await loadUserOrdersAndEntities(data.user_id);
+                if (data.order_id && el.order) el.order.value = data.order_id;
+                if (data.entity_id && el.entity) el.entity.value = data.entity_id;
+            }
             if (data.assigned_to) el.assigned.value = data.assigned_to;
             
             el.btnDelete.style.display = 'block';
             loadTicketData(data.id);
         } else {
-            el.formTitle.textContent = "New Ticket";
+            el.formTitle.textContent = t('form.add_title', 'New Ticket');
             el.formId.value = '';
             el.btnDelete.style.display = 'none';
+            // Reset order/entity dropdowns
+            populateSelect(el.order, [], 'id', 'order_number', t('form.fields.order.select', 'Select order (optional)'));
+            populateSelect(el.entity, [], 'id', 'store_name', t('form.fields.entity.select', 'Select entity'));
         }
     }
 
@@ -348,6 +385,8 @@
             priority: document.getElementById('ticketPriority'),
             category: document.getElementById('ticketCategory'),
             user: document.getElementById('ticketUser'),
+            order: document.getElementById('ticketOrder'),
+            entity: document.getElementById('ticketEntity'),
             assigned: document.getElementById('ticketAssigned'),
             messagesList: document.getElementById('ticketMessagesList'),
             historyList: document.getElementById('ticketHistoryList'),
@@ -363,6 +402,24 @@
         el.form?.addEventListener('submit', saveTicket);
         el.btnDelete?.addEventListener('click', () => deleteTicket(state.currentTicket?.id));
         document.getElementById('btnSendReply')?.addEventListener('click', sendReply);
+
+        // When user changes, load their orders and entities
+        el.user?.addEventListener('change', () => {
+            const userId = el.user.value;
+            loadUserOrdersAndEntities(userId);
+        });
+
+        // When order changes, auto-populate entity from the order's user
+        el.order?.addEventListener('change', async () => {
+            const orderId = el.order.value;
+            if (!orderId) return;
+            // If entity dropdown is empty or has no value, try to fetch based on current user
+            const userId = el.user?.value;
+            if (userId && (!el.entity?.value)) {
+                // entity options already loaded by user change — no additional fetch needed
+            }
+        });
+
         document.getElementById('btnApplyFilters')?.addEventListener('click', () => {
             state.filters = {
                 search: document.getElementById('searchInput').value,
@@ -399,7 +456,7 @@
         edit: async (id) => {
             try {
                 const res = await apiCall(`${API.tickets}?id=${id}&tenant_id=${state.tenantId}`);
-                if (res.success) showForm(res.data);
+                if (res.success) await showForm(res.data);
             } catch (e) { console.error(e); }
         },
         remove: deleteTicket
