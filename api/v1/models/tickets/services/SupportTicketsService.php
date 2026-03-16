@@ -17,7 +17,7 @@ final class SupportTicketsService
         array $filters = [],
         string $orderBy = 'id',
         string $orderDir = 'DESC',
-        string $lang = 'en'
+        string $lang = 'ar'
     ): array {
         return $this->repo->all($tenantId, $limit, $offset, $filters, $orderBy, $orderDir, $lang);
     }
@@ -27,7 +27,7 @@ final class SupportTicketsService
         return $this->repo->count($tenantId, $filters);
     }
 
-    public function get(int $tenantId, int $id, string $lang = 'en'): array
+    public function get(int $tenantId, int $id, string $lang = 'ar'): array
     {
         $data = $this->repo->find($tenantId, $id, $lang);
         if (!$data) {

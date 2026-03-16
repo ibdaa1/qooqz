@@ -21,7 +21,7 @@ final class PdoTicketCategoriesRepository implements TicketCategoriesRepositoryI
         array $filters = [],
         string $orderBy = 'id',
         string $orderDir = 'DESC',
-        string $lang = 'en'
+        string $lang = 'ar'
     ): array {
         // تم تصحيح أسماء المعاملات لتجنب تكرار :lang
         $sql = "
@@ -105,7 +105,7 @@ final class PdoTicketCategoriesRepository implements TicketCategoriesRepositoryI
         return (int)$stmt->fetchColumn();
     }
 
-    public function find(int $tenantId, int $id, string $lang = 'en'): ?array
+    public function find(int $tenantId, int $id, string $lang = 'ar'): ?array
     {
         $stmt = $this->pdo->prepare("
             SELECT c.*, 

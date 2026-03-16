@@ -20,7 +20,7 @@ final class PdoTicketStatusHistoryRepository implements TicketStatusHistoryRepos
         array $filters = [],
         string $orderBy = 'id',
         string $orderDir = 'DESC',
-        string $lang = 'en'
+        string $lang = 'ar'
     ): array {
         // نحتاج للربط مع جدول support_tickets للتحقق من tenant_id
         // لأن جدول التاريخ لا يحتوي على tenant_id مباشرة
@@ -83,7 +83,7 @@ final class PdoTicketStatusHistoryRepository implements TicketStatusHistoryRepos
         return (int)$stmt->fetchColumn();
     }
 
-    public function find(int $tenantId, int $id, string $lang = 'en'): ?array
+    public function find(int $tenantId, int $id, string $lang = 'ar'): ?array
     {
         $stmt = $this->pdo->prepare("
             SELECT h.*,
