@@ -81,6 +81,7 @@
         "error": {
             "load_failed": "Failed to load categories",
             "save_failed": "Failed to save category",
+            "name_required": "Please enter at least one category name.",
             "delete_failed": "Failed to delete category"
         }
     }

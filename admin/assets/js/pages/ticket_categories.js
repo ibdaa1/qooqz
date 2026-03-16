@@ -313,9 +313,9 @@
         e.preventDefault();
 
         const translations = collectTranslations();
-        const enTrans = translations.find(tr => tr.language_code === 'en');
-        if (!enTrans?.name) {
-            notify(t('messages.error.save_failed', 'Please enter an English category name.'), 'error');
+        const firstTrans = translations.find(tr => tr.name);
+        if (!firstTrans) {
+            notify(t('messages.error.name_required', 'Please enter at least one category name.'), 'error');
             return;
         }
 
@@ -325,9 +325,9 @@
             parent_id:      el.tcParent?.value   ? parseInt(el.tcParent.value, 10) : null,
             priority_level: parseInt(el.tcPriority?.value || '3', 10),
             is_active:      parseInt(el.tcStatus?.value   || '1', 10),
-            name:           enTrans.name,
-            description:    enTrans.description,
-            language_code:  'en',
+            name:           firstTrans.name,
+            description:    firstTrans.description,
+            language_code:  firstTrans.language_code,
             translations
         };
 
