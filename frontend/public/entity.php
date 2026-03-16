@@ -17,9 +17,11 @@ $tenantId = $ctx['tenant_id'];
 
 /* -------------------------------------------------------
  * Entity ID from URL
+ * Supports Shopify-style URLs: /entity/{id}/{slug} (via .htaccess rewrite)
+ * Also supports legacy: ?id=1 or ?slug=store-name
  * ----------------------------------------------------- */
 $entityId = (int)($_GET['id'] ?? $_GET['entity_id'] ?? 0);
-$slug     = $_GET['slug'] ?? '';
+$slug     = trim($_GET['slug'] ?? '');
 
 if (!$entityId && !$slug) {
     header('Location: /frontend/public/entities.php');
@@ -44,9 +46,9 @@ if ($pdo) {
                     (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url,
                     (SELECT i2.url FROM images i2 WHERE i2.owner_id = e.id ORDER BY i2.id ASC LIMIT 1 OFFSET 1) AS cover_url
                FROM entities e
-              WHERE e.id = ? AND e.status NOT IN ('suspended','rejected') LIMIT 1"
+              WHERE (" . ($entityId ? "e.id = ?" : "e.slug = ?") . ") AND e.status NOT IN ('suspended','rejected') LIMIT 1"
         );
-        $eStmt->execute([$entityId]);
+        $eStmt->execute([$entityId ?: $slug]);
         $entity = $eStmt->fetch(PDO::FETCH_ASSOC) ?: [];
         if ($entity) {
             // Translation override
@@ -280,6 +282,46 @@ if ($pdo) {
     } catch (Throwable $_) {}
 }
 
+/* Fetch banners for this entity */
+$entityBanners = [];
+if ($pdo) {
+    try {
+        $bnStmt = $pdo->prepare(
+            "SELECT b.id, b.link_url, b.position, b.is_active,
+                    COALESCE(bt.title, b.title) AS title,
+                    COALESCE(bt.subtitle, b.subtitle) AS subtitle,
+                    COALESCE(bt.link_text, b.link_text) AS link_text,
+                    (SELECT i.url FROM images i WHERE i.owner_id = b.id ORDER BY i.id ASC LIMIT 1) AS image_url
+               FROM banners b
+          LEFT JOIN banner_translations bt ON bt.banner_id = b.id AND bt.language_code = ?
+              WHERE b.entity_id = ? AND b.is_active = 1
+              ORDER BY b.position ASC, b.id ASC LIMIT 10"
+        );
+        $bnStmt->execute([$lang, $entityId]);
+        $entityBanners = $bnStmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $_) { $entityBanners = []; }
+}
+
+/* Fetch active jobs for this entity */
+$entityJobs = [];
+if ($pdo) {
+    try {
+        $jStmt = $pdo->prepare(
+            "SELECT j.id, j.title, j.job_type, j.experience_level, j.salary_min, j.salary_max,
+                    j.currency_code, j.location, j.is_remote, j.deadline, j.created_at,
+                    COALESCE(jt.title, j.title) AS job_title,
+                    COALESCE(jt.description, j.description) AS job_description
+               FROM jobs j
+          LEFT JOIN job_translations jt ON jt.job_id = j.id AND jt.language_code = ?
+              WHERE j.entity_id = ? AND j.status = 'active'
+                AND (j.deadline IS NULL OR j.deadline >= CURDATE())
+              ORDER BY j.created_at DESC LIMIT 20"
+        );
+        $jStmt->execute([$lang, $entityId]);
+        $entityJobs = $jStmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $_) { $entityJobs = []; }
+}
+
 $GLOBALS['PUB_PAGE_TITLE'] = e($entity['store_name'] ?? '') . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_DESC']  = e($entity['description'] ?? '');
 
@@ -309,12 +351,16 @@ if ($pdo) {
 
 // SEO meta — load from seo_meta table, fallback to entity_translations fields
 $seoMeta = function_exists('pub_get_seo_meta') ? pub_get_seo_meta('entity', $entity['id'] ?? $entityId, $lang) : [];
+// Build pretty canonical URL: /entity/{id}/{slug}
+$_canonicalSlug = $entity['slug'] ?? $slug;
+$_canonicalId   = (int)($entity['id'] ?? $entityId);
+$_canonicalBase = '/entity/' . $_canonicalId . ($_canonicalSlug ? '/' . $_canonicalSlug : '');
 $GLOBALS['PUB_SEO'] = [
     'title'       => $seoMeta['meta_title']       ?? ($entity['meta_title']       ?? $entity['store_name'] ?? ''),
     'description' => $seoMeta['meta_description'] ?? ($entity['meta_description'] ?? $entity['description'] ?? ''),
     'keywords'    => $seoMeta['meta_keywords']     ?? ($entity['meta_keywords']    ?? ''),
     'og_image'    => $seoMeta['og_image']          ?? ($entity['logo_url']         ?? $entity['cover_url'] ?? ''),
-    'canonical'   => $seoMeta['canonical_url']     ?? '',
+    'canonical'   => $seoMeta['canonical_url']     ?? $_canonicalBase,
     'robots'      => $seoMeta['robots']            ?? 'index,follow',
     'schema_markup'=> $seoMeta['schema_markup']    ?? '',
     'schema_type' => 'LocalBusiness',
@@ -516,6 +562,43 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
         </div>
     </div>
 
+    <!-- Entity Banners Carousel (entity-controlled) -->
+    <?php if (!empty($entityBanners)): ?>
+    <div class="pub-entity-banners" style="margin-top:20px;" aria-label="<?= e(t('entity.banners_label', 'Promotions')) ?>">
+        <div class="pub-entity-banner-carousel" id="entityBannerCarousel">
+            <?php foreach ($entityBanners as $bi => $banner): ?>
+            <div class="pub-entity-banner-slide <?= $bi === 0 ? 'active' : '' ?>" role="listitem">
+                <?php if (!empty($banner['link_url'])): ?>
+                <a href="<?= e($banner['link_url']) ?>" target="_blank" rel="noopener" style="display:block;text-decoration:none;">
+                <?php endif; ?>
+                <?php if (!empty($banner['image_url'])): ?>
+                    <img src="<?= e(pub_img($banner['image_url'], 'banner')) ?>"
+                         alt="<?= e($banner['title'] ?? '') ?>"
+                         loading="lazy"
+                         class="pub-entity-banner-carousel-img">
+                <?php endif; ?>
+                <?php if (!empty($banner['title']) || !empty($banner['subtitle'])): ?>
+                <div class="pub-entity-banner-caption">
+                    <?php if (!empty($banner['title'])): ?><strong><?= e($banner['title']) ?></strong><?php endif; ?>
+                    <?php if (!empty($banner['subtitle'])): ?><span><?= e($banner['subtitle']) ?></span><?php endif; ?>
+                    <?php if (!empty($banner['link_text'])): ?><em><?= e($banner['link_text']) ?></em><?php endif; ?>
+                </div>
+                <?php endif; ?>
+                <?php if (!empty($banner['link_url'])): ?></a><?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php if (count($entityBanners) > 1): ?>
+        <div class="pub-entity-banner-dots" aria-label="banner navigation">
+            <?php foreach ($entityBanners as $bi => $banner): ?>
+            <button class="pub-entity-banner-dot <?= $bi === 0 ? 'active' : '' ?>"
+                    data-index="<?= $bi ?>" aria-label="Banner <?= $bi + 1 ?>"></button>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
     <!-- Main tabs -->
     <div class="pub-tabs" style="margin-top:24px;" role="tablist">
         <button class="pub-tab active" data-tab="products" role="tab"
@@ -539,6 +622,13 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
                 aria-selected="false" aria-controls="tabDiscounts">
             🏷️ <?= e(t('entity.discounts_tab')) ?>
             <span class="pub-tab-count"><?= count($discounts) ?></span>
+        </button>
+        <?php endif; ?>
+        <?php if (!empty($entityJobs)): ?>
+        <button class="pub-tab" data-tab="jobs" role="tab"
+                aria-selected="false" aria-controls="tabJobs">
+            💼 <?= e(t('entity.jobs_tab', 'Jobs')) ?>
+            <span class="pub-tab-count"><?= count($entityJobs) ?></span>
         </button>
         <?php endif; ?>
         <?php if ($entityShowReviews): ?>
@@ -1002,6 +1092,73 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
     </div>
     <?php endif; // end show_reviews ?>
 
+    <!-- TAB: Jobs -->
+    <?php if (!empty($entityJobs)): ?>
+    <div class="pub-tab-panel" id="tabJobs" style="display:none;">
+        <div style="padding:16px 0;">
+            <div style="display:grid;gap:16px;">
+            <?php foreach ($entityJobs as $job): ?>
+                <?php
+                $jobId    = (int)($job['id'] ?? 0);
+                $jobTitle = e($job['job_title'] ?? $job['title'] ?? '');
+                $jobType  = e($job['job_type'] ?? '');
+                $jobLevel = e($job['experience_level'] ?? '');
+                $jobLoc   = e($job['location'] ?? '');
+                $jobRemote = !empty($job['is_remote']);
+                $jobMin   = $job['salary_min'] ?? null;
+                $jobMax   = $job['salary_max'] ?? null;
+                $jobCur   = e($job['currency_code'] ?? '');
+                $jobDeadline = $job['deadline'] ?? null;
+                ?>
+                <div class="pub-job-card" style="background:var(--pub-surface);border:1px solid var(--pub-border);border-radius:10px;padding:16px 20px;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+                        <div>
+                            <h3 style="margin:0 0 6px;font-size:1.05rem;">
+                                <a href="/frontend/public/job.php?id=<?= $jobId ?>" style="color:var(--pub-primary);text-decoration:none;">
+                                    <?= $jobTitle ?>
+                                </a>
+                            </h3>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:0.83rem;color:var(--pub-muted);">
+                                <?php if ($jobType): ?><span>💼 <?= $jobType ?></span><?php endif; ?>
+                                <?php if ($jobLevel): ?><span>🎓 <?= $jobLevel ?></span><?php endif; ?>
+                                <?php if ($jobRemote): ?>
+                                    <span style="color:#22c55e;">🌐 <?= e(t('jobs.remote', 'Remote')) ?></span>
+                                <?php elseif ($jobLoc): ?>
+                                    <span>📍 <?= $jobLoc ?></span>
+                                <?php endif; ?>
+                                <?php if ($jobMin || $jobMax): ?>
+                                    <span>💰
+                                        <?php if ($jobMin && $jobMax): ?>
+                                            <?= number_format((float)$jobMin) ?> – <?= number_format((float)$jobMax) ?> <?= $jobCur ?>
+                                        <?php elseif ($jobMin): ?>
+                                            <?= e(t('jobs.from', 'From')) ?> <?= number_format((float)$jobMin) ?> <?= $jobCur ?>
+                                        <?php else: ?>
+                                            <?= e(t('jobs.up_to', 'Up to')) ?> <?= number_format((float)$jobMax) ?> <?= $jobCur ?>
+                                        <?php endif; ?>
+                                    </span>
+                                <?php endif; ?>
+                                <?php if ($jobDeadline): ?>
+                                    <span>⏰ <?= e(t('jobs.deadline', 'Deadline')) ?>: <?= e(date('Y-m-d', strtotime($jobDeadline))) ?></span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <a href="/frontend/public/job.php?id=<?= $jobId ?>"
+                           class="pub-btn pub-btn--sm" style="white-space:nowrap;">
+                            <?= e(t('jobs.apply_now', 'Apply Now')) ?>
+                        </a>
+                    </div>
+                    <?php if (!empty($job['job_description'])): ?>
+                    <p style="margin:10px 0 0;font-size:0.88rem;color:var(--pub-text);opacity:0.8;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">
+                        <?= e(strip_tags($job['job_description'])) ?>
+                    </p>
+                    <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
 </div><!-- /.pub-container discounts -->
 
 <script>
@@ -1210,6 +1367,20 @@ echo '<style>
     background: rgba(255,255,255,0.5); transition: background 0.3s;
 }
 .pub-slide-dot--active { background: rgba(255,255,255,0.95); }
+/* Entity banners carousel */
+.pub-entity-banners { position:relative; }
+.pub-entity-banner-carousel { position:relative; border-radius:10px; overflow:hidden; background:var(--pub-surface); }
+.pub-entity-banner-slide { display:none; }
+.pub-entity-banner-slide.active { display:block; }
+.pub-entity-banner-carousel-img { width:100%; height:200px; object-fit:cover; display:block; }
+@media(min-width:600px){ .pub-entity-banner-carousel-img { height:260px; } }
+.pub-entity-banner-caption { padding:10px 16px; background:var(--pub-surface); }
+.pub-entity-banner-caption strong { display:block; font-size:1rem; font-weight:700; color:var(--pub-text); }
+.pub-entity-banner-caption span  { display:block; font-size:0.85rem; color:var(--pub-muted); }
+.pub-entity-banner-caption em    { display:inline-block; margin-top:6px; font-size:0.82rem; font-style:normal; color:var(--pub-primary); font-weight:600; }
+.pub-entity-banner-dots { display:flex; justify-content:center; gap:6px; margin-top:8px; }
+.pub-entity-banner-dot { width:8px; height:8px; border-radius:50%; border:none; background:var(--pub-border); cursor:pointer; padding:0; transition:background 0.2s; }
+.pub-entity-banner-dot.active { background:var(--pub-primary); }
 </style>';
 ?>
 <script>
@@ -1239,6 +1410,32 @@ echo '<style>
         card.addEventListener('mouseenter', stopAuto);
         card.addEventListener('mouseleave', startAuto);
     });
+}());
+</script>
+<script>
+// Entity banners carousel
+(function() {
+    var carousel = document.getElementById('entityBannerCarousel');
+    if (!carousel) return;
+    var slides = carousel.querySelectorAll('.pub-entity-banner-slide');
+    var dots   = document.querySelectorAll('.pub-entity-banner-dot');
+    if (slides.length < 2) return;
+    var cur = 0, timer = null;
+    function show(n) {
+        slides[cur].classList.remove('active');
+        if (dots[cur]) dots[cur].classList.remove('active');
+        cur = (n + slides.length) % slides.length;
+        slides[cur].classList.add('active');
+        if (dots[cur]) dots[cur].classList.add('active');
+    }
+    function start() { if (!timer) timer = setInterval(function(){ show(cur+1); }, 4000); }
+    function stop()  { if (timer) { clearInterval(timer); timer = null; } }
+    dots.forEach(function(dot, i) {
+        dot.addEventListener('click', function() { show(i); stop(); start(); });
+    });
+    carousel.addEventListener('mouseenter', stop);
+    carousel.addEventListener('mouseleave', start);
+    start();
 }());
 </script>
 

@@ -10,5 +10,6 @@ RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# Entity pretty URLs: /entity/store-slug → entity.php?slug=store-slug
+# Entity pretty URLs (Shopify-style): /entity/{id}/{slug} or /entity/{slug}
+RewriteRule ^entity/([0-9]+)/([a-zA-Z0-9_-]+)/?$ entity.php?id=$1&slug=$2 [L,QSA]
 RewriteRule ^entity/([a-zA-Z0-9_-]+)/?$ entity.php?slug=$1 [L,QSA]
