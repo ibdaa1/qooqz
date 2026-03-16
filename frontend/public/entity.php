@@ -498,7 +498,7 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
         <div class="pub-entity-banner-slide<?= $bnIdx === 0 ? ' active' : '' ?>"
              <?php if (!empty($bn['background_color'])): ?>style="background:<?= e($bn['background_color']) ?>;"<?php endif; ?>>
             <?php if (!empty($bn['image_url'])): ?>
-                <a href="<?= e($bn['link_url'] ?? '#') ?>" <?= !empty($bn['link_url']) ? 'target="_blank" rel="noopener"' : '' ?>>
+                <a href="<?= e($bn['link_url'] ?? '#') ?>" <?= !empty($bn['link_url']) ? 'target="_blank" rel="noopener noreferrer"' : '' ?>>
                     <img src="<?= e(pub_img($bn['image_url'], 'banner')) ?>"
                          alt="<?= e($bn['title'] ?? '') ?>"
                          class="pub-entity-banner-slide-img"
@@ -840,7 +840,7 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
         <?php
         $totalPg = (int)($productMeta['total_pages'] ?? 1);
         if ($totalPg > 1):
-            $pg_url = fn(int $pg) => e($_entityUrl(array_filter(['cat' => $selectedCat ?: null, 'page' => $pg]))) . '#tabProducts';
+            $pg_url = fn(int $pg) => $_entityUrl(array_filter(['cat' => $selectedCat ?: null, 'page' => $pg])) . '#tabProducts';
         ?>
         <nav class="pub-pagination" style="margin-top:24px;">
             <a href="<?= $pg_url(max(1,$productPage-1)) ?>" class="pub-page-btn <?= $productPage<=1?'disabled':'' ?>">
