@@ -1,0 +1,14 @@
+# frontend/public/.htaccess
+# Pretty URL routing for QOOQZ public frontend pages
+# Allows Shopify-style entity URLs: /entity/store-slug → entity.php?slug=store-slug
+
+Options -Indexes
+RewriteEngine On
+
+# Pass through existing files and directories
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Entity pretty URLs: /entity/store-slug → entity.php?slug=store-slug
+RewriteRule ^entity/([a-zA-Z0-9_-]+)/?$ entity.php?slug=$1 [L,QSA]

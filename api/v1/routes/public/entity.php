@@ -8,13 +8,31 @@ declare(strict_types=1);
  */
 
 if ($first === 'entity') {
-    $entityId = isset($segments[1]) && ctype_digit((string)$segments[1]) ? (int)$segments[1] : (int)($_GET['id'] ?? 0);
-    $sub      = strtolower($segments[2] ?? '');
+    // Support both numeric ID and slug: /api/public/entity/123 or /api/public/entity/my-store-slug
+    $entityId = 0;
+    $entitySlug = '';
+    if (isset($segments[1])) {
+        if (ctype_digit((string)$segments[1])) {
+            $entityId = (int)$segments[1];
+        } else {
+            $entitySlug = trim($segments[1]);
+        }
+    }
+    if (!$entityId) $entityId = (int)($_GET['id'] ?? 0);
+    if (!$entitySlug) $entitySlug = trim($_GET['slug'] ?? '');
+
+    // Resolve slug → entity ID
+    if (!$entityId && $entitySlug) {
+        $slugRow = $pdoOne('SELECT id FROM entities WHERE slug = ? AND status NOT IN (\'suspended\',\'rejected\') LIMIT 1', [$entitySlug]);
+        if ($slugRow) $entityId = (int)$slugRow['id'];
+    }
 
     if (!$entityId) {
-        ResponseFormatter::notFound('Entity ID required');
+        ResponseFormatter::notFound('Entity ID or slug required');
         exit;
     }
+
+    $sub      = strtolower($segments[2] ?? '');
 
     // Sub-route: entity categories — categories with products in this entity's tenant
     if ($sub === 'categories') {
@@ -46,6 +64,45 @@ if ($first === 'entity') {
               WHERE d.entity_id = ?
                 AND d.status NOT IN ('cancelled','deleted')
               ORDER BY d.status ASC, d.priority DESC, d.id DESC LIMIT 30",
+            [$lang, $entityId]
+        );
+        ResponseFormatter::success(['ok' => true, 'data' => $rows]);
+        exit;
+    }
+
+    // Sub-route: entity banners — active banners for this entity with images
+    if ($sub === 'banners') {
+        $rows = $pdoList(
+            "SELECT b.id, b.link_url, b.background_color, b.text_color, b.button_style,
+                    b.sort_order, b.position,
+                    COALESCE(bt.title,    b.title)    AS title,
+                    COALESCE(bt.subtitle, b.subtitle) AS subtitle,
+                    COALESCE(bt.link_text, b.link_text) AS link_text,
+                    img.url AS image_url, img.thumb_url
+               FROM banners b
+          LEFT JOIN banner_translations bt ON b.id = bt.banner_id AND bt.language_code = ?
+          LEFT JOIN images img ON img.owner_id = b.id AND img.image_type_id = 9 AND img.is_main = 1
+             WHERE b.entity_id = ? AND b.is_active = 1
+               AND (b.start_date IS NULL OR b.start_date <= NOW())
+               AND (b.end_date   IS NULL OR b.end_date   >= NOW())
+             ORDER BY b.sort_order ASC, b.id ASC LIMIT 10",
+            [$lang, $entityId]
+        );
+        ResponseFormatter::success(['ok' => true, 'data' => $rows]);
+        exit;
+    }
+
+    // Sub-route: entity jobs — active job listings for this entity
+    if ($sub === 'jobs') {
+        $rows = $pdoList(
+            "SELECT j.id, j.job_type AS employment_type, j.is_remote, j.is_featured, j.is_urgent,
+                    j.application_deadline AS deadline, j.salary_min, j.salary_max, j.salary_currency,
+                    j.created_at, COALESCE(jt.job_title, j.slug) AS title,
+                    jt.description, jt.requirements, jt.benefits
+               FROM jobs j
+          LEFT JOIN job_translations jt ON jt.job_id = j.id AND jt.language_code = ?
+             WHERE j.entity_id = ? AND j.status NOT IN ('cancelled','filled','closed')
+             ORDER BY j.is_featured DESC, j.is_urgent DESC, j.created_at DESC LIMIT 50",
             [$lang, $entityId]
         );
         ResponseFormatter::success(['ok' => true, 'data' => $rows]);
@@ -223,6 +280,35 @@ if ($first === 'entity') {
         );
     }
 
+    // Entity banners
+    $entityBanners = $pdoList(
+        "SELECT b.id, b.link_url, b.background_color, b.text_color, b.sort_order, b.position,
+                COALESCE(bt.title, b.title) AS title,
+                COALESCE(bt.subtitle, b.subtitle) AS subtitle,
+                COALESCE(bt.link_text, b.link_text) AS link_text,
+                img.url AS image_url, img.thumb_url
+           FROM banners b
+      LEFT JOIN banner_translations bt ON b.id = bt.banner_id AND bt.language_code = ?
+      LEFT JOIN images img ON img.owner_id = b.id AND img.image_type_id = 9 AND img.is_main = 1
+         WHERE b.entity_id = ? AND b.is_active = 1
+           AND (b.start_date IS NULL OR b.start_date <= NOW())
+           AND (b.end_date   IS NULL OR b.end_date   >= NOW())
+         ORDER BY b.sort_order ASC, b.id ASC LIMIT 10",
+        [$lang, $entityId]
+    );
+
+    // Entity jobs
+    $entityJobs = $pdoList(
+        "SELECT j.id, j.job_type AS employment_type, j.is_remote, j.is_featured, j.is_urgent,
+                j.application_deadline AS deadline, j.salary_min, j.salary_max, j.salary_currency,
+                j.created_at, COALESCE(jt.job_title, j.slug) AS title
+           FROM jobs j
+      LEFT JOIN job_translations jt ON jt.job_id = j.id AND jt.language_code = ?
+         WHERE j.entity_id = ? AND j.status NOT IN ('cancelled','filled','closed')
+         ORDER BY j.is_featured DESC, j.is_urgent DESC, j.created_at DESC LIMIT 20",
+        [$lang, $entityId]
+    );
+
     ResponseFormatter::success([
         'ok'      => true,
         'data'    => array_merge($entity, [
@@ -232,6 +318,8 @@ if ($first === 'entity') {
             'attributes'      => $attributes,
             'settings'        => $entitySettings ?: [],
             'card_style'      => $entityCardStyle,
+            'banners'         => $entityBanners,
+            'jobs'            => $entityJobs,
         ]),
     ]);
     exit;

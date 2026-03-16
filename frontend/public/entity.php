@@ -16,10 +16,11 @@ $dir      = $ctx['dir'];
 $tenantId = $ctx['tenant_id'];
 
 /* -------------------------------------------------------
- * Entity ID from URL
+ * Entity ID from URL — supports both ?id=1 and ?slug=store-slug
+ * Pretty URLs: /entity/store-slug → ?slug=store-slug (via .htaccess)
  * ----------------------------------------------------- */
 $entityId = (int)($_GET['id'] ?? $_GET['entity_id'] ?? 0);
-$slug     = $_GET['slug'] ?? '';
+$slug     = trim($_GET['slug'] ?? '');
 
 if (!$entityId && !$slug) {
     header('Location: /frontend/public/entities.php');
@@ -35,8 +36,23 @@ $GLOBALS['PUB_BASE_PATH'] = '/frontend/public';
 $qs   = 'lang=' . urlencode($lang) . '&tenant_id=' . $tenantId;
 $entity = [];
 $pdo = pub_get_pdo();
+
+/* Resolve slug → entity ID (when accessed via pretty URL /entity/slug) */
+if (!$entityId && $slug && $pdo) {
+    try {
+        $slugStmt = $pdo->prepare(
+            "SELECT id FROM entities WHERE slug = ? AND status NOT IN ('suspended','rejected') LIMIT 1"
+        );
+        $slugStmt->execute([$slug]);
+        $slugRow = $slugStmt->fetch(PDO::FETCH_ASSOC);
+        if ($slugRow) $entityId = (int)$slugRow['id'];
+    } catch (Throwable $_) {}
+}
+
 if ($pdo) {
     try {
+        $eWhere = $entityId ? 'e.id = ?' : 'e.slug = ?';
+        $eParam = $entityId ?: $slug;
         $eStmt = $pdo->prepare(
             "SELECT e.id, e.store_name, e.slug, e.vendor_type, e.store_type,
                     e.is_verified, e.phone, e.mobile, e.email, e.website_url AS website,
@@ -44,9 +60,9 @@ if ($pdo) {
                     (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url,
                     (SELECT i2.url FROM images i2 WHERE i2.owner_id = e.id ORDER BY i2.id ASC LIMIT 1 OFFSET 1) AS cover_url
                FROM entities e
-              WHERE e.id = ? AND e.status NOT IN ('suspended','rejected') LIMIT 1"
+              WHERE $eWhere AND e.status NOT IN ('suspended','rejected') LIMIT 1"
         );
-        $eStmt->execute([$entityId]);
+        $eStmt->execute([$eParam]);
         $entity = $eStmt->fetch(PDO::FETCH_ASSOC) ?: [];
         if ($entity) {
             // Translation override
@@ -105,10 +121,13 @@ if ($pdo) {
         $entity = [];
     }
 }
-// HTTP fallback
+// HTTP fallback — try slug or ID
 if (empty($entity)) {
-    $resp = pub_fetch(pub_api_url('public/entity/' . $entityId) . '?' . $qs);
+    $apiSeg = $entityId ? $entityId : urlencode($slug);
+    $resp = pub_fetch(pub_api_url('public/entity/' . $apiSeg) . '?' . $qs);
     $entity = $resp['data']['data'] ?? $resp['data'] ?? [];
+    // Update $entityId from API response if it was resolved from slug
+    if (empty($entityId) && !empty($entity['id'])) $entityId = (int)$entity['id'];
 }
 
 if (empty($entity)) {
@@ -118,6 +137,11 @@ if (empty($entity)) {
     include dirname(__DIR__) . '/partials/footer.php';
     exit;
 }
+
+/* Ensure $entityId is always set from loaded entity record */
+if (!$entityId && !empty($entity['id'])) $entityId = (int)$entity['id'];
+/* Ensure $slug is always set from loaded entity record */
+if (!$slug && !empty($entity['slug'])) $slug = $entity['slug'];
 
 /* -------------------------------------------------------
  * Fetch entity_settings and respect them
@@ -280,6 +304,62 @@ if ($pdo) {
     } catch (Throwable $_) {}
 }
 
+/* -------------------------------------------------------
+ * Fetch entity banners (from banners table where entity_id matches,
+ * with image from images table via image_type_id = 9 for banners)
+ * ----------------------------------------------------- */
+$entityBanners = [];
+if ($pdo && $entityId) {
+    try {
+        $bnStmt = $pdo->prepare(
+            "SELECT b.id, b.link_url, b.background_color, b.text_color, b.sort_order, b.position,
+                    COALESCE(bt.title,    b.title)    AS title,
+                    COALESCE(bt.subtitle, b.subtitle) AS subtitle,
+                    COALESCE(bt.link_text, b.link_text) AS link_text,
+                    img.url AS image_url, img.thumb_url
+               FROM banners b
+          LEFT JOIN banner_translations bt ON b.id = bt.banner_id AND bt.language_code = ?
+          LEFT JOIN images img ON img.owner_id = b.id AND img.image_type_id = 9 AND img.is_main = 1
+              WHERE b.entity_id = ? AND b.is_active = 1
+                AND (b.start_date IS NULL OR b.start_date <= NOW())
+                AND (b.end_date   IS NULL OR b.end_date   >= NOW())
+              ORDER BY b.sort_order ASC, b.id ASC LIMIT 10"
+        );
+        $bnStmt->execute([$lang, $entityId]);
+        $entityBanners = $bnStmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $_) {}
+}
+// HTTP fallback: if PDO not available, try API
+if (empty($entityBanners) && $entityId) {
+    try {
+        $bnResp = pub_fetch(pub_api_url('public/entity/' . $entityId . '/banners') . '?lang=' . urlencode($lang));
+        $entityBanners = $bnResp['data']['data'] ?? [];
+    } catch (Throwable $_) {}
+}
+
+/* -------------------------------------------------------
+ * Fetch entity jobs (jobs WHERE entity_id = ?)
+ * ----------------------------------------------------- */
+$entityJobs = [];
+$entityJobsTotal = 0;
+if ($pdo && $entityId) {
+    try {
+        $jbStmt = $pdo->prepare(
+            "SELECT j.id, j.job_type AS employment_type, j.is_remote, j.is_featured, j.is_urgent,
+                    j.application_deadline AS deadline, j.salary_min, j.salary_max, j.salary_currency,
+                    j.created_at, COALESCE(jt.job_title, j.slug) AS title,
+                    jt.description, jt.requirements, jt.benefits
+               FROM jobs j
+          LEFT JOIN job_translations jt ON jt.job_id = j.id AND jt.language_code = ?
+             WHERE j.entity_id = ? AND j.status NOT IN ('cancelled','filled','closed')
+             ORDER BY j.is_featured DESC, j.is_urgent DESC, j.created_at DESC LIMIT 20"
+        );
+        $jbStmt->execute([$lang, $entityId]);
+        $entityJobs = $jbStmt->fetchAll(PDO::FETCH_ASSOC);
+        $entityJobsTotal = count($entityJobs);
+    } catch (Throwable $_) {}
+}
+
 $GLOBALS['PUB_PAGE_TITLE'] = e($entity['store_name'] ?? '') . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_DESC']  = e($entity['description'] ?? '');
 
@@ -309,12 +389,22 @@ if ($pdo) {
 
 // SEO meta — load from seo_meta table, fallback to entity_translations fields
 $seoMeta = function_exists('pub_get_seo_meta') ? pub_get_seo_meta('entity', $entity['id'] ?? $entityId, $lang) : [];
+/* Canonical URL: prefer slug-based pretty URL /entity/{slug} over ?id= query string */
+$_entityCanonical = $seoMeta['canonical_url'] ?? '';
+if (empty($_entityCanonical)) {
+    $_entitySlugForUrl = $entity['slug'] ?? $slug;
+    if ($_entitySlugForUrl) {
+        $_entityCanonical = '/entity/' . rawurlencode($_entitySlugForUrl);
+    } elseif ($entityId) {
+        $_entityCanonical = '/frontend/public/entity.php?id=' . $entityId;
+    }
+}
 $GLOBALS['PUB_SEO'] = [
     'title'       => $seoMeta['meta_title']       ?? ($entity['meta_title']       ?? $entity['store_name'] ?? ''),
     'description' => $seoMeta['meta_description'] ?? ($entity['meta_description'] ?? $entity['description'] ?? ''),
     'keywords'    => $seoMeta['meta_keywords']     ?? ($entity['meta_keywords']    ?? ''),
     'og_image'    => $seoMeta['og_image']          ?? ($entity['logo_url']         ?? $entity['cover_url'] ?? ''),
-    'canonical'   => $seoMeta['canonical_url']     ?? '',
+    'canonical'   => $_entityCanonical,
     'robots'      => $seoMeta['robots']            ?? 'index,follow',
     'schema_markup'=> $seoMeta['schema_markup']    ?? '',
     'schema_type' => 'LocalBusiness',
@@ -374,6 +464,22 @@ $dayNames = [
     6 => t('entity.day_saturday'),
 ];
 
+/* Base URL for this entity page — prefer pretty slug URL */
+$_entitySlugForUrl = $entity['slug'] ?? $slug;
+$_entityBaseUrl = $_entitySlugForUrl
+    ? '/entity/' . rawurlencode($_entitySlugForUrl)
+    : '/frontend/public/entity.php?id=' . $entityId;
+/* URL builder helper for entity sub-pages (products, categories, etc.) */
+$_entityUrl = function(array $extra = []) use ($entityId, $_entitySlugForUrl): string {
+    $base = $_entitySlugForUrl
+        ? '/entity/' . rawurlencode($_entitySlugForUrl)
+        : '/frontend/public/entity.php?id=' . $entityId;
+    if ($extra) {
+        $base .= (str_contains($base, '?') ? '&' : '?') . http_build_query($extra);
+    }
+    return $base;
+};
+
 include dirname(__DIR__) . '/partials/header.php';
 
 // Resolve card styles from DB card_styles for cards rendered on this page
@@ -384,7 +490,48 @@ $_entityDiscountCardStyle = pub_card_inline_style('discount');
 $_entityDiscountCardClass = pub_card_css_class('discount');
 ?>
 
-<!-- Entity Banner -->
+<?php if (!$entityInMaintenance && !empty($entityBanners)): ?>
+<!-- Entity Banners Carousel -->
+<div class="pub-entity-banners-slider" id="pubEntityBannersSlider">
+    <div class="pub-entity-banners-track" id="pubEntityBannersTrack">
+        <?php foreach ($entityBanners as $bnIdx => $bn): ?>
+        <div class="pub-entity-banner-slide<?= $bnIdx === 0 ? ' active' : '' ?>"
+             <?php if (!empty($bn['background_color'])): ?>style="background:<?= e($bn['background_color']) ?>;"<?php endif; ?>>
+            <?php if (!empty($bn['image_url'])): ?>
+                <a href="<?= e($bn['link_url'] ?? '#') ?>" <?= !empty($bn['link_url']) ? 'target="_blank" rel="noopener"' : '' ?>>
+                    <img src="<?= e(pub_img($bn['image_url'], 'banner')) ?>"
+                         alt="<?= e($bn['title'] ?? '') ?>"
+                         class="pub-entity-banner-slide-img"
+                         loading="<?= $bnIdx === 0 ? 'eager' : 'lazy' ?>"
+                         onerror="this.closest('.pub-entity-banner-slide').style.display='none'">
+                </a>
+            <?php elseif (!empty($bn['title'])): ?>
+            <div class="pub-entity-banner-slide-text"
+                 <?php if (!empty($bn['text_color'])): ?>style="color:<?= e($bn['text_color']) ?>;"<?php endif; ?>>
+                <h2><?= e($bn['title']) ?></h2>
+                <?php if (!empty($bn['subtitle'])): ?><p><?= e($bn['subtitle']) ?></p><?php endif; ?>
+                <?php if (!empty($bn['link_url']) && !empty($bn['link_text'])): ?>
+                <a href="<?= e($bn['link_url']) ?>" class="pub-btn pub-btn--primary"><?= e($bn['link_text']) ?></a>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php if (count($entityBanners) > 1): ?>
+    <div class="pub-entity-banners-dots">
+        <?php foreach ($entityBanners as $bnIdx => $bn): ?>
+        <button class="pub-entity-banner-dot<?= $bnIdx === 0 ? ' active' : '' ?>"
+                onclick="pubBannerGoTo(<?= $bnIdx ?>)" aria-label="Banner <?= $bnIdx+1 ?>"></button>
+        <?php endforeach; ?>
+    </div>
+    <button class="pub-entity-banners-prev" onclick="pubBannerPrev()" aria-label="Previous">‹</button>
+    <button class="pub-entity-banners-next" onclick="pubBannerNext()" aria-label="Next">›</button>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<!-- Entity Banner (cover image) -->
 <?php if ($entityInMaintenance): ?>
 <div class="pub-container" style="padding:40px 0;text-align:center;">
     <div style="background:var(--pub-surface);border:1px solid var(--pub-border);border-radius:var(--pub-radius);padding:40px 20px;">
@@ -548,6 +695,13 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
             <?php if ($entityRatingTotal > 0): ?><span class="pub-tab-count"><?= $entityRatingTotal ?></span><?php endif; ?>
         </button>
         <?php endif; ?>
+        <?php if (!empty($entityJobs)): ?>
+        <button class="pub-tab" data-tab="jobs" role="tab"
+                aria-selected="false" aria-controls="tabJobs">
+            💼 <?= e(t('jobs.page_title', 'Jobs')) ?>
+            <span class="pub-tab-count"><?= $entityJobsTotal ?></span>
+        </button>
+        <?php endif; ?>
     </div>
 
     <!-- TAB: Products -->
@@ -566,7 +720,7 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
         ?>
         <!-- Main category tabs (parent categories) -->
         <div class="pub-cat-tabs pub-cat-tabs--main" style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;overflow-x:auto;padding-bottom:4px;" role="tablist">
-            <a href="?id=<?= $entityId ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
+            <a href="<?= e($_entityUrl()) ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
                class="pub-cat-tab-btn <?= !$selectedCat ? 'active' : '' ?>" role="tab"
                aria-selected="<?= !$selectedCat ? 'true' : 'false' ?>">
                 <?= e(t('entity.all_categories')) ?>
@@ -575,7 +729,7 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
                 $mainId      = (int)($mainCat['id'] ?? 0);
                 $parentActive = ($activePrimaryId === $mainId);
             ?>
-            <a href="?id=<?= $entityId ?>&cat=<?= $mainId ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
+            <a href="<?= e($_entityUrl(['cat' => $mainId])) ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
                class="pub-cat-tab-btn <?= $parentActive ? 'active' : '' ?>" role="tab"
                aria-selected="<?= $parentActive ? 'true' : 'false' ?>">
                 <?= e($mainCat['name'] ?? '') ?>
@@ -591,14 +745,14 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
         ?>
         <!-- Sub-category tabs -->
         <div class="pub-cat-tabs pub-cat-tabs--sub" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;overflow-x:auto;padding-bottom:4px;padding-inline-start:16px;" role="tablist">
-            <a href="?id=<?= $entityId ?>&cat=<?= $activePrimaryId ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
+            <a href="<?= e($_entityUrl(['cat' => $activePrimaryId])) ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
                class="pub-cat-tab-btn pub-cat-tab-btn--sub <?= ($selectedCat === $activePrimaryId) ? 'active' : '' ?>">
                 <?= e(t('entity.all_in_category', 'All items')) ?>
             </a>
             <?php foreach ($children as $subCat):
                 $subId = (int)($subCat['id'] ?? 0);
             ?>
-            <a href="?id=<?= $entityId ?>&cat=<?= $subId ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
+            <a href="<?= e($_entityUrl(['cat' => $subId])) ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
                class="pub-cat-tab-btn pub-cat-tab-btn--sub <?= $selectedCat === $subId ? 'active' : '' ?>">
                 <?= e($subCat['name'] ?? '') ?>
             </a>
@@ -608,8 +762,8 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
         <?php endif; ?>
 
         <!-- Product search within entity -->
-        <form method="get" style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <input type="hidden" name="id" value="<?= $entityId ?>">
+        <form method="get" action="<?= e($_entityBaseUrl) ?>" style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <?php if (!$_entitySlugForUrl): ?><input type="hidden" name="id" value="<?= $entityId ?>"><?php endif; ?>
             <?php if ($selectedCat): ?><input type="hidden" name="cat" value="<?= $selectedCat ?>"><?php endif; ?>
             <input type="search" name="q" class="pub-search-input"
                    style="max-width:320px;"
@@ -617,7 +771,7 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
                    value="<?= e($productSearch) ?>">
             <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm"><?= e(t('products.filter')) ?></button>
             <?php if ($productSearch): ?>
-                <a href="?id=<?= $entityId ?><?= $selectedCat ? '&cat=' . $selectedCat : '' ?>"
+                <a href="<?= e($_entityUrl($selectedCat ? ['cat' => $selectedCat] : [])) ?>"
                    class="pub-btn pub-btn--ghost pub-btn--sm"><?= e(t('products.clear')) ?></a>
             <?php endif; ?>
         </form>
@@ -686,7 +840,7 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
         <?php
         $totalPg = (int)($productMeta['total_pages'] ?? 1);
         if ($totalPg > 1):
-            $pg_url = fn(int $pg) => '?id=' . $entityId . ($selectedCat ? '&cat=' . $selectedCat : '') . '&page=' . $pg . '#tabProducts';
+            $pg_url = fn(int $pg) => e($_entityUrl(array_filter(['cat' => $selectedCat ?: null, 'page' => $pg]))) . '#tabProducts';
         ?>
         <nav class="pub-pagination" style="margin-top:24px;">
             <a href="<?= $pg_url(max(1,$productPage-1)) ?>" class="pub-page-btn <?= $productPage<=1?'disabled':'' ?>">
@@ -1002,6 +1156,75 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
     </div>
     <?php endif; // end show_reviews ?>
 
+    <!-- TAB: Jobs -->
+    <?php if (!empty($entityJobs)): ?>
+    <div class="pub-tab-panel" id="tabJobs" style="display:none;">
+        <div style="margin-top:20px;display:grid;gap:14px;">
+            <?php foreach ($entityJobs as $jb):
+                $jobTypeLabel = match(trim($jb['employment_type'] ?? '')) {
+                    'full_time'  => t('jobs.type_full_time',  'Full Time'),
+                    'part_time'  => t('jobs.type_part_time',  'Part Time'),
+                    'contract'   => t('jobs.type_contract',   'Contract'),
+                    'freelance'  => t('jobs.type_freelance',  'Freelance'),
+                    'internship' => t('jobs.type_internship', 'Internship'),
+                    default      => e($jb['employment_type'] ?? ''),
+                };
+            ?>
+            <div class="pub-job-card" style="background:var(--pub-surface);border:1px solid var(--pub-border);border-radius:var(--pub-radius);padding:16px 18px;">
+                <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+                            <h3 style="margin:0;font-size:1rem;font-weight:700;color:var(--pub-text);">
+                                <a href="/frontend/public/job.php?id=<?= (int)$jb['id'] ?>" style="text-decoration:none;color:inherit;">
+                                    <?= e($jb['title'] ?? '') ?>
+                                </a>
+                            </h3>
+                            <?php if (!empty($jb['is_featured'])): ?>
+                                <span class="pub-tag" style="background:#fef3c7;color:#92400e;font-size:0.72rem;">⭐ <?= e(t('jobs.featured', 'Featured')) ?></span>
+                            <?php endif; ?>
+                            <?php if (!empty($jb['is_urgent'])): ?>
+                                <span class="pub-tag" style="background:#fee2e2;color:#991b1b;font-size:0.72rem;">🔥 <?= e(t('jobs.urgent', 'Urgent')) ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+                            <?php if ($jb['employment_type']): ?>
+                                <span class="pub-tag" style="font-size:0.78rem;">💼 <?= e($jobTypeLabel) ?></span>
+                            <?php endif; ?>
+                            <?php if (!empty($jb['is_remote'])): ?>
+                                <span class="pub-tag" style="font-size:0.78rem;">🌐 <?= e(t('jobs.remote', 'Remote')) ?></span>
+                            <?php endif; ?>
+                            <?php if (!empty($jb['salary_min']) || !empty($jb['salary_max'])): ?>
+                                <span class="pub-tag" style="font-size:0.78rem;">
+                                    💰 <?= e(number_format((float)($jb['salary_min'] ?? 0))) ?>–<?= e(number_format((float)($jb['salary_max'] ?? 0))) ?> <?= e($jb['salary_currency'] ?? '') ?>
+                                </span>
+                            <?php endif; ?>
+                            <?php if (!empty($jb['deadline'])): ?>
+                                <span style="font-size:0.78rem;color:var(--pub-muted);">⏰ <?= e(t('jobs.deadline', 'Deadline')) ?>: <?= e(substr($jb['deadline'], 0, 10)) ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <?php if (!empty($jb['description'])): ?>
+                            <p style="margin:0;font-size:0.85rem;color:var(--pub-muted);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">
+                                <?= e($jb['description']) ?>
+                            </p>
+                        <?php endif; ?>
+                    </div>
+                    <a href="/frontend/public/job.php?id=<?= (int)$jb['id'] ?>" class="pub-btn pub-btn--primary pub-btn--sm" style="flex-shrink:0;">
+                        <?= e(t('jobs.apply', 'Apply')) ?>
+                    </a>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php if ($entityJobsTotal >= 20): ?>
+        <div style="text-align:center;margin-top:16px;">
+            <a href="/frontend/public/jobs.php" class="pub-btn pub-btn--ghost pub-btn--sm">
+                <?= e(t('jobs.view_all', 'View All Jobs')) ?>
+            </a>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
 </div><!-- /.pub-container discounts -->
 
 <script>
@@ -1210,6 +1433,31 @@ echo '<style>
     background: rgba(255,255,255,0.5); transition: background 0.3s;
 }
 .pub-slide-dot--active { background: rgba(255,255,255,0.95); }
+/* Entity banners carousel */
+.pub-entity-banners-slider { position:relative; width:100%; height:260px; overflow:hidden; background:var(--pub-surface); }
+@media(min-width:900px){ .pub-entity-banners-slider { height:380px; } }
+.pub-entity-banners-track { width:100%; height:100%; }
+.pub-entity-banner-slide { position:absolute; top:0; left:0; width:100%; height:100%;
+  opacity:0; transition:opacity 0.6s ease; background:var(--pub-surface); }
+.pub-entity-banner-slide.active { opacity:1; }
+.pub-entity-banner-slide-img { width:100%; height:100%; object-fit:cover; display:block; }
+.pub-entity-banner-slide-text { display:flex; flex-direction:column; justify-content:center; align-items:center;
+  text-align:center; height:100%; padding:20px; }
+.pub-entity-banner-slide-text h2 { font-size:1.6rem; font-weight:900; margin:0 0 10px; }
+.pub-entity-banner-slide-text p { font-size:1rem; margin:0 0 16px; opacity:0.85; }
+.pub-entity-banners-dots { position:absolute; bottom:12px; left:0; right:0;
+  display:flex; justify-content:center; gap:6px; }
+.pub-entity-banner-dot { width:10px; height:10px; border-radius:50%; border:none; cursor:pointer;
+  background:rgba(255,255,255,0.5); transition:background 0.3s; padding:0; }
+.pub-entity-banner-dot.active { background:rgba(255,255,255,0.95); }
+.pub-entity-banners-prev, .pub-entity-banners-next { position:absolute; top:50%; transform:translateY(-50%);
+  background:rgba(0,0,0,0.3); color:#fff; border:none; font-size:1.8rem; line-height:1; padding:6px 14px;
+  cursor:pointer; border-radius:4px; z-index:5; transition:background 0.2s; }
+.pub-entity-banners-prev { left:10px; }
+.pub-entity-banners-next { right:10px; }
+.pub-entity-banners-prev:hover, .pub-entity-banners-next:hover { background:rgba(0,0,0,0.55); }
+/* Job cards */
+.pub-job-card a:hover h3 { text-decoration:underline; }
 </style>';
 ?>
 <script>
@@ -1241,6 +1489,42 @@ echo '<style>
     });
 }());
 </script>
+<?php if (!empty($entityBanners) && count($entityBanners) > 1): ?>
+<script>
+(function () {
+    var slides = document.querySelectorAll('#pubEntityBannersSlider .pub-entity-banner-slide');
+    var dots   = document.querySelectorAll('#pubEntityBannersSlider .pub-entity-banner-dot');
+    var cur    = 0;
+    var timer  = null;
+    var total  = slides.length;
+    if (total < 2) return;
+
+    function goTo(n) {
+        slides[cur].classList.remove('active');
+        if (dots[cur]) dots[cur].classList.remove('active');
+        cur = (n + total) % total;
+        slides[cur].classList.add('active');
+        if (dots[cur]) dots[cur].classList.add('active');
+    }
+    function startAuto() {
+        if (timer) clearInterval(timer);
+        timer = setInterval(function () { goTo(cur + 1); }, 4000);
+    }
+    function stopAuto() { if (timer) { clearInterval(timer); timer = null; } }
+
+    window.pubBannerGoTo = function(n) { goTo(n); startAuto(); };
+    window.pubBannerPrev = function() { goTo(cur - 1); startAuto(); };
+    window.pubBannerNext = function() { goTo(cur + 1); startAuto(); };
+
+    var slider = document.getElementById('pubEntityBannersSlider');
+    if (slider) {
+        slider.addEventListener('mouseenter', stopAuto);
+        slider.addEventListener('mouseleave', startAuto);
+    }
+    startAuto();
+}());
+</script>
+<?php endif; ?>
 
 <?php endif; // end maintenance check ?>
 <?php include dirname(__DIR__) . '/partials/footer.php'; ?>
