@@ -51,7 +51,7 @@ try {
     $service    = new TicketMessagesService($repo);
     $controller = new TicketMessagesController($service);
 
-    $lang = $_GET['lang'] ?? 'en';
+    $lang     = $_GET['lang']      ?? 'ar';
     $page     = isset($_GET['page'])  ? max(1, (int)$_GET['page'])                   : 1;
     $limit    = isset($_GET['limit']) ? min(100, max(1, (int)$_GET['limit']))        : 50; // More messages per page usually
     $offset   = ($page - 1) * $limit;

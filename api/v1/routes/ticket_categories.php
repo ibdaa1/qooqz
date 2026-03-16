@@ -51,7 +51,7 @@ try {
     $service    = new TicketCategoriesService($repo);
     $controller = new TicketCategoriesController($service);
 
-    $lang     = $_GET['lang']      ?? 'en';
+    $lang     = $_GET['lang']      ?? 'ar';
     $page     = isset($_GET['page'])  ? max(1, (int)$_GET['page'])                   : 1;
     $limit    = isset($_GET['limit']) ? min(1000, max(1, (int)$_GET['limit']))        : 25;
     $offset   = ($page - 1) * $limit;
