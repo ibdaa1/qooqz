@@ -1,5 +1,25 @@
 الاعلانات
 
+CREATE TABLE ad_placements (
+id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+
+tenant_id INT UNSIGNED NOT NULL,
+
+name VARCHAR(255) NOT NULL,
+placement_key VARCHAR(100) NOT NULL,
+description TEXT NULL,
+
+status ENUM('active','inactive') DEFAULT 'active',
+
+created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+
+UNIQUE KEY uniq_tenant_placement_key (tenant_id, placement_key)
+);
+////////////////
+
 CREATE TABLE ad_campaigns (
 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
 
