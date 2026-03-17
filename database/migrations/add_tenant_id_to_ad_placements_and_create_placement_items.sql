@@ -20,26 +20,41 @@ CREATE TABLE IF NOT EXISTS ad_placements (
     UNIQUE KEY uniq_tenant_placement_key (tenant_id, placement_key)
 );
 
--- Step 2: If the table already existed without tenant_id, add the column.
---         We use a temporary NULL default so the statement succeeds even when
---         existing rows are present; the column is made NOT NULL after backfill.
+-- Step 2a: If the table already existed without tenant_id, add the column.
+--          We use a temporary NULL default so the statement succeeds even when
+--          existing rows are present; the column is made NOT NULL after backfill.
 ALTER TABLE ad_placements
     ADD COLUMN IF NOT EXISTS tenant_id INT UNSIGNED NULL AFTER id;
 
--- Step 3: Backfill tenant_id to the smallest existing tenant id for any NULL rows.
---         This is only relevant when the table had rows before the migration.
+-- Step 2b: If the table already existed without placement_key, add the column.
+ALTER TABLE ad_placements
+    ADD COLUMN IF NOT EXISTS placement_key VARCHAR(100) NULL AFTER name;
+
+-- Step 3a: Backfill tenant_id to the smallest existing tenant id for any NULL rows.
+--          This is only relevant when the table had rows before the migration.
 UPDATE ad_placements ap
 SET    ap.tenant_id = (SELECT MIN(id) FROM tenants)
 WHERE  ap.tenant_id IS NULL;
 
--- Step 4: Enforce NOT NULL now that all rows have a value.
+-- Step 3b: Backfill placement_key for any NULL rows (generate a unique slug from id).
+UPDATE ad_placements
+SET    placement_key = CONCAT('placement_', id)
+WHERE  placement_key IS NULL OR placement_key = '';
+
+-- Step 4: Enforce NOT NULL now that all rows have values.
 ALTER TABLE ad_placements
     MODIFY COLUMN tenant_id INT UNSIGNED NOT NULL;
 
--- Step 5: Add the FK to tenants (safe – ignored if the constraint already exists).
+ALTER TABLE ad_placements
+    MODIFY COLUMN placement_key VARCHAR(100) NOT NULL;
+
+-- Step 5: Add the FK to tenants and unique key (safe – ignored if already exist).
 ALTER TABLE ad_placements
     ADD CONSTRAINT IF NOT EXISTS fk_ad_placements_tenant
     FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
+
+ALTER TABLE ad_placements
+    ADD UNIQUE KEY IF NOT EXISTS uniq_tenant_placement_key (tenant_id, placement_key);
 
 -- Step 6: Create ad_placement_items table if it does not already exist.
 CREATE TABLE IF NOT EXISTS ad_placement_items (
