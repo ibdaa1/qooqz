@@ -1,0 +1,69 @@
+{
+    "strings": {
+        "title": "إدارة الإعلانات",
+        "subtitle": "إدارة وحدات الإعلانات المرتبطة بالحملات",
+        "add_ad": "إضافة إعلان",
+        "edit_ad": "تعديل إعلان",
+        "filter": {
+            "search_placeholder": "ابحث في الإعلانات...",
+            "all_statuses": "كل الحالات",
+            "all_target_types": "كل أنواع الهدف",
+            "all_campaigns": "كل الحملات",
+            "apply": "تطبيق",
+            "clear": "مسح الفلاتر"
+        },
+        "status": {
+            "active": "نشط",
+            "paused": "متوقف",
+            "rejected": "مرفوض"
+        },
+        "target_type": {
+            "url": "رابط",
+            "entity": "كيان"
+        },
+        "table": {
+            "id": "المعرف",
+            "campaign": "الحملة",
+            "target_type": "نوع الهدف",
+            "target_value": "قيمة الهدف",
+            "status": "الحالة",
+            "views": "المشاهدات",
+            "clicks": "النقرات",
+            "created_at": "تاريخ الإنشاء",
+            "actions": "الإجراءات",
+            "no_records": "لا توجد إعلانات",
+            "edit": "تعديل",
+            "delete": "حذف"
+        },
+        "modal": {
+            "add_title": "إضافة إعلان",
+            "edit_title": "تعديل إعلان"
+        },
+        "form": {
+            "campaign_id": "الحملة",
+            "select_campaign": "-- اختر الحملة --",
+            "target_type": "نوع الهدف",
+            "target_value": "قيمة الهدف",
+            "target_value_placeholder_url": "https://example.com",
+            "target_value_placeholder_entity": "معرف أو رمز الكيان",
+            "status": "الحالة",
+            "views_count": "عدد المشاهدات",
+            "clicks_count": "عدد النقرات",
+            "save": "حفظ",
+            "cancel": "إلغاء"
+        },
+        "pagination": {
+            "showing": "عرض",
+            "of": "من",
+            "prev": "السابق",
+            "next": "التالي"
+        },
+        "saved": "تم حفظ الإعلان بنجاح",
+        "deleted": "تم حذف الإعلان بنجاح",
+        "confirm_delete": "هل أنت متأكد من حذف هذا الإعلان؟",
+        "error_load": "فشل تحميل الإعلانات",
+        "error_save": "فشل حفظ الإعلان",
+        "error_delete": "فشل حذف الإعلان",
+        "error_campaigns_load": "فشل تحميل الحملات"
+    }
+}

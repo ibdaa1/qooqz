@@ -1,0 +1,69 @@
+{
+    "strings": {
+        "title": "Ads Management",
+        "subtitle": "Manage advertising units linked to campaigns",
+        "add_ad": "Add Ad",
+        "edit_ad": "Edit Ad",
+        "filter": {
+            "search_placeholder": "Search ads...",
+            "all_statuses": "All Statuses",
+            "all_target_types": "All Target Types",
+            "all_campaigns": "All Campaigns",
+            "apply": "Filter",
+            "clear": "Clear Filters"
+        },
+        "status": {
+            "active": "Active",
+            "paused": "Paused",
+            "rejected": "Rejected"
+        },
+        "target_type": {
+            "url": "URL",
+            "entity": "Entity"
+        },
+        "table": {
+            "id": "ID",
+            "campaign": "Campaign",
+            "target_type": "Target Type",
+            "target_value": "Target Value",
+            "status": "Status",
+            "views": "Views",
+            "clicks": "Clicks",
+            "created_at": "Created At",
+            "actions": "Actions",
+            "no_records": "No ads found",
+            "edit": "Edit",
+            "delete": "Delete"
+        },
+        "modal": {
+            "add_title": "Add Ad",
+            "edit_title": "Edit Ad"
+        },
+        "form": {
+            "campaign_id": "Campaign",
+            "select_campaign": "-- Select Campaign --",
+            "target_type": "Target Type",
+            "target_value": "Target Value",
+            "target_value_placeholder_url": "https://example.com",
+            "target_value_placeholder_entity": "Entity ID or slug",
+            "status": "Status",
+            "views_count": "Views Count",
+            "clicks_count": "Clicks Count",
+            "save": "Save",
+            "cancel": "Cancel"
+        },
+        "pagination": {
+            "showing": "Showing",
+            "of": "of",
+            "prev": "Previous",
+            "next": "Next"
+        },
+        "saved": "Ad saved successfully",
+        "deleted": "Ad deleted successfully",
+        "confirm_delete": "Are you sure you want to delete this ad?",
+        "error_load": "Failed to load ads",
+        "error_save": "Failed to save ad",
+        "error_delete": "Failed to delete ad",
+        "error_campaigns_load": "Failed to load campaigns"
+    }
+}
