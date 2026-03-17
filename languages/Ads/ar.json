@@ -1,21 +1,34 @@
 {
     "strings": {
         "title": "إدارة الإعلانات",
-        "subtitle": "إدارة وحدات الإعلانات المرتبطة بالحملات",
-        "add_ad": "إضافة إعلان",
-        "edit_ad": "تعديل إعلان",
+        "subtitle": "إدارة حملات الإعلانات ووحدات الإعلان",
+        "tab_campaigns": "الحملات",
+        "tab_ads": "وحدات الإعلان",
+        "add_ad": "إضافة وحدة إعلانية",
+        "edit_ad": "تعديل وحدة إعلانية",
+        "add_campaign": "إضافة حملة",
+        "edit_campaign": "تعديل حملة",
         "filter": {
             "search_placeholder": "ابحث في الإعلانات...",
+            "search_campaigns_placeholder": "ابحث في الحملات...",
             "all_statuses": "كل الحالات",
             "all_target_types": "كل أنواع الهدف",
             "all_campaigns": "كل الحملات",
+            "all_pricing_models": "كل نماذج التسعير",
             "apply": "تطبيق",
             "clear": "مسح الفلاتر"
         },
         "status": {
             "active": "نشط",
             "paused": "متوقف",
-            "rejected": "مرفوض"
+            "rejected": "مرفوض",
+            "draft": "مسودة",
+            "completed": "مكتمل"
+        },
+        "pricing_model": {
+            "fixed": "ثابت",
+            "cpm": "CPM",
+            "cpc": "CPC"
         },
         "target_type": {
             "url": "رابط",
@@ -35,9 +48,23 @@
             "edit": "تعديل",
             "delete": "حذف"
         },
+        "campaigns_table": {
+            "id": "المعرف",
+            "name": "الاسم",
+            "budget": "الميزانية",
+            "currency": "العملة",
+            "pricing_model": "نموذج التسعير",
+            "start_date": "تاريخ البدء",
+            "end_date": "تاريخ الانتهاء",
+            "status": "الحالة",
+            "actions": "الإجراءات",
+            "no_records": "لا توجد حملات"
+        },
         "modal": {
-            "add_title": "إضافة إعلان",
-            "edit_title": "تعديل إعلان"
+            "add_title": "إضافة وحدة إعلانية",
+            "edit_title": "تعديل وحدة إعلانية",
+            "add_campaign_title": "إضافة حملة",
+            "edit_campaign_title": "تعديل حملة"
         },
         "form": {
             "campaign_id": "الحملة",
@@ -49,6 +76,15 @@
             "status": "الحالة",
             "views_count": "عدد المشاهدات",
             "clicks_count": "عدد النقرات",
+            "name": "اسم الحملة",
+            "budget": "الميزانية",
+            "currency_id": "العملة",
+            "select_currency": "-- اختر العملة --",
+            "pricing_model": "نموذج التسعير",
+            "start_date": "تاريخ البدء",
+            "end_date": "تاريخ الانتهاء",
+            "entity_id": "الكيان (اختياري)",
+            "select_entity": "-- بدون كيان --",
             "save": "حفظ",
             "cancel": "إلغاء"
         },
@@ -61,9 +97,15 @@
         "saved": "تم حفظ الإعلان بنجاح",
         "deleted": "تم حذف الإعلان بنجاح",
         "confirm_delete": "هل أنت متأكد من حذف هذا الإعلان؟",
+        "campaign_saved": "تم حفظ الحملة بنجاح",
+        "campaign_deleted": "تم حذف الحملة بنجاح",
+        "confirm_campaign_delete": "هل أنت متأكد من حذف هذه الحملة؟ سيتم حذف جميع الإعلانات المرتبطة بها أيضًا.",
         "error_load": "فشل تحميل الإعلانات",
         "error_save": "فشل حفظ الإعلان",
         "error_delete": "فشل حذف الإعلان",
-        "error_campaigns_load": "فشل تحميل الحملات"
+        "error_campaigns_load": "فشل تحميل الحملات",
+        "error_campaign_save": "فشل حفظ الحملة",
+        "error_campaign_delete": "فشل حذف الحملة",
+        "error_currencies_load": "فشل تحميل العملات"
     }
 }

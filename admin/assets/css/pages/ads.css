@@ -319,6 +319,39 @@
     vertical-align: middle;
 }
 
+/* Tabs */
+.ads-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 18px;
+    border-bottom: 2px solid var(--border-color, #263044);
+}
+
+.ads-tab-btn {
+    padding: 10px 20px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    color: var(--text-secondary, #94a3b8);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+
+.ads-tab-btn:hover { color: var(--text-primary, #fff); }
+
+.ads-tab-btn.active {
+    color: var(--accent-color, #3b82f6);
+    border-bottom-color: var(--accent-color, #3b82f6);
+}
+
+/* Status Badges (campaign statuses) */
+.badge-draft     { background: rgba(148,163,184,0.15); color: #94a3b8; }
+.badge-completed { background: rgba(99,102,241,0.15);  color: #818cf8; }
+
 /* Responsive */
 @media (max-width: 768px) {
     .page-header { flex-direction: column; align-items: flex-start; }
@@ -327,4 +360,5 @@
     .data-table td:nth-child(4),
     .data-table th:nth-child(8),
     .data-table td:nth-child(8) { display: none; }
+    .ads-tabs { overflow-x: auto; }
 }

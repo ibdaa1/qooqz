@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 /**
  * /admin/fragments/ads.php
- * Ads Management - Production Ready
+ * Ads Management - Campaigns + Ad Units
  */
 
 // ════════════════════════════════════════════════════════════
@@ -104,92 +104,285 @@ $apiBase = '/api';
     <div class="page-header">
         <div>
             <h1 data-i18n="title"><?= htmlspecialchars(_adst('title', 'Ads Management'), ENT_QUOTES, 'UTF-8') ?></h1>
-            <p data-i18n="subtitle"><?= htmlspecialchars(_adst('subtitle', 'Manage advertising units linked to campaigns'), ENT_QUOTES, 'UTF-8') ?></p>
+            <p data-i18n="subtitle"><?= htmlspecialchars(_adst('subtitle', 'Manage ad campaigns and advertising units'), ENT_QUOTES, 'UTF-8') ?></p>
         </div>
-        <div class="page-header-actions">
+        <div class="page-header-actions" id="adsHeaderActions">
             <?php if ($canCreate): ?>
-                <button id="btnAddAd" class="btn btn-primary" data-i18n="add_ad">
-                    <?= htmlspecialchars(_adst('add_ad', 'Add Ad'), ENT_QUOTES, 'UTF-8') ?>
+                <button id="btnAddCampaign" class="btn btn-primary" data-i18n="add_campaign" style="display:none;">
+                    <?= htmlspecialchars(_adst('add_campaign', 'Add Campaign'), ENT_QUOTES, 'UTF-8') ?>
+                </button>
+                <button id="btnAddAd" class="btn btn-primary" data-i18n="add_ad" style="display:none;">
+                    <?= htmlspecialchars(_adst('add_ad', 'Add Ad Unit'), ENT_QUOTES, 'UTF-8') ?>
                 </button>
             <?php endif; ?>
         </div>
     </div>
 
-    <!-- Filter Bar -->
-    <div class="card">
-        <div class="card-body filter-bar">
-            <input type="text" id="filterSearch" class="form-control"
-                   placeholder="<?= htmlspecialchars(_adst('filter.search_placeholder', 'Search ads...'), ENT_QUOTES, 'UTF-8') ?>"
-                   data-i18n-placeholder="filter.search_placeholder">
-
-            <select id="filterStatus" class="form-control">
-                <option value=""><?= htmlspecialchars(_adst('filter.all_statuses', 'All Statuses'), ENT_QUOTES, 'UTF-8') ?></option>
-                <option value="active"><?= htmlspecialchars(_adst('status.active', 'Active'), ENT_QUOTES, 'UTF-8') ?></option>
-                <option value="paused"><?= htmlspecialchars(_adst('status.paused', 'Paused'), ENT_QUOTES, 'UTF-8') ?></option>
-                <option value="rejected"><?= htmlspecialchars(_adst('status.rejected', 'Rejected'), ENT_QUOTES, 'UTF-8') ?></option>
-            </select>
-
-            <select id="filterTargetType" class="form-control">
-                <option value=""><?= htmlspecialchars(_adst('filter.all_target_types', 'All Target Types'), ENT_QUOTES, 'UTF-8') ?></option>
-                <option value="url"><?= htmlspecialchars(_adst('target_type.url', 'URL'), ENT_QUOTES, 'UTF-8') ?></option>
-                <option value="entity"><?= htmlspecialchars(_adst('target_type.entity', 'Entity'), ENT_QUOTES, 'UTF-8') ?></option>
-            </select>
-
-            <select id="filterCampaign" class="form-control">
-                <option value=""><?= htmlspecialchars(_adst('filter.all_campaigns', 'All Campaigns'), ENT_QUOTES, 'UTF-8') ?></option>
-            </select>
-
-            <button id="btnFilter" class="btn btn-primary" data-i18n="filter.apply">
-                <?= htmlspecialchars(_adst('filter.apply', 'Filter'), ENT_QUOTES, 'UTF-8') ?>
-            </button>
-            <button id="btnClearFilters" class="btn btn-secondary" data-i18n="filter.clear">
-                <?= htmlspecialchars(_adst('filter.clear', 'Clear Filters'), ENT_QUOTES, 'UTF-8') ?>
-            </button>
-        </div>
+    <!-- Tabs -->
+    <div class="ads-tabs">
+        <button class="ads-tab-btn active" data-tab="campaigns" data-i18n="tab_campaigns">
+            <?= htmlspecialchars(_adst('tab_campaigns', 'Campaigns'), ENT_QUOTES, 'UTF-8') ?>
+        </button>
+        <button class="ads-tab-btn" data-tab="ads" data-i18n="tab_ads">
+            <?= htmlspecialchars(_adst('tab_ads', 'Ad Units'), ENT_QUOTES, 'UTF-8') ?>
+        </button>
     </div>
 
-    <!-- Data Table -->
-    <div class="card">
-        <div class="card-body" style="padding:0;">
-            <table class="data-table" id="adsTable">
-                <thead>
-                    <tr>
-                        <th data-i18n="table.id"><?= htmlspecialchars(_adst('table.id', 'ID'), ENT_QUOTES, 'UTF-8') ?></th>
-                        <th data-i18n="table.campaign"><?= htmlspecialchars(_adst('table.campaign', 'Campaign'), ENT_QUOTES, 'UTF-8') ?></th>
-                        <th data-i18n="table.target_type"><?= htmlspecialchars(_adst('table.target_type', 'Target Type'), ENT_QUOTES, 'UTF-8') ?></th>
-                        <th data-i18n="table.target_value"><?= htmlspecialchars(_adst('table.target_value', 'Target Value'), ENT_QUOTES, 'UTF-8') ?></th>
-                        <th data-i18n="table.status"><?= htmlspecialchars(_adst('table.status', 'Status'), ENT_QUOTES, 'UTF-8') ?></th>
-                        <th data-i18n="table.views"><?= htmlspecialchars(_adst('table.views', 'Views'), ENT_QUOTES, 'UTF-8') ?></th>
-                        <th data-i18n="table.clicks"><?= htmlspecialchars(_adst('table.clicks', 'Clicks'), ENT_QUOTES, 'UTF-8') ?></th>
-                        <th data-i18n="table.created_at"><?= htmlspecialchars(_adst('table.created_at', 'Created At'), ENT_QUOTES, 'UTF-8') ?></th>
-                        <th data-i18n="table.actions"><?= htmlspecialchars(_adst('table.actions', 'Actions'), ENT_QUOTES, 'UTF-8') ?></th>
-                    </tr>
-                </thead>
-                <tbody id="adsTableBody">
-                    <tr>
-                        <td colspan="9" class="text-center">
-                            <?= htmlspecialchars(_adst('table.no_records', 'No ads found'), ENT_QUOTES, 'UTF-8') ?>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+    <!-- ══════════════════════════════════════
+         CAMPAIGNS TAB
+    ══════════════════════════════════════ -->
+    <div id="tabCampaigns" class="ads-tab-panel">
 
-        <!-- Pagination -->
-        <div class="pagination-wrapper">
-            <div class="pagination-info">
-                <span data-i18n="pagination.showing"><?= htmlspecialchars(_adst('pagination.showing', 'Showing'), ENT_QUOTES, 'UTF-8') ?></span>
-                <span id="adsPaginationInfo">0-0 <?= htmlspecialchars(_adst('pagination.of', 'of'), ENT_QUOTES, 'UTF-8') ?> 0</span>
+        <!-- Filter Bar -->
+        <div class="card">
+            <div class="card-body filter-bar">
+                <input type="text" id="filterCampaignSearch" class="form-control"
+                       placeholder="<?= htmlspecialchars(_adst('filter.search_campaigns_placeholder', 'Search campaigns...'), ENT_QUOTES, 'UTF-8') ?>"
+                       data-i18n-placeholder="filter.search_campaigns_placeholder">
+
+                <select id="filterCampaignStatus" class="form-control">
+                    <option value=""><?= htmlspecialchars(_adst('filter.all_statuses', 'All Statuses'), ENT_QUOTES, 'UTF-8') ?></option>
+                    <option value="draft"><?= htmlspecialchars(_adst('status.draft', 'Draft'), ENT_QUOTES, 'UTF-8') ?></option>
+                    <option value="active"><?= htmlspecialchars(_adst('status.active', 'Active'), ENT_QUOTES, 'UTF-8') ?></option>
+                    <option value="paused"><?= htmlspecialchars(_adst('status.paused', 'Paused'), ENT_QUOTES, 'UTF-8') ?></option>
+                    <option value="completed"><?= htmlspecialchars(_adst('status.completed', 'Completed'), ENT_QUOTES, 'UTF-8') ?></option>
+                </select>
+
+                <select id="filterCampaignPricingModel" class="form-control">
+                    <option value=""><?= htmlspecialchars(_adst('filter.all_pricing_models', 'All Pricing Models'), ENT_QUOTES, 'UTF-8') ?></option>
+                    <option value="fixed"><?= htmlspecialchars(_adst('pricing_model.fixed', 'Fixed'), ENT_QUOTES, 'UTF-8') ?></option>
+                    <option value="cpm"><?= htmlspecialchars(_adst('pricing_model.cpm', 'CPM'), ENT_QUOTES, 'UTF-8') ?></option>
+                    <option value="cpc"><?= htmlspecialchars(_adst('pricing_model.cpc', 'CPC'), ENT_QUOTES, 'UTF-8') ?></option>
+                </select>
+
+                <button id="btnCampaignFilter" class="btn btn-primary" data-i18n="filter.apply">
+                    <?= htmlspecialchars(_adst('filter.apply', 'Filter'), ENT_QUOTES, 'UTF-8') ?>
+                </button>
+                <button id="btnClearCampaignFilters" class="btn btn-secondary" data-i18n="filter.clear">
+                    <?= htmlspecialchars(_adst('filter.clear', 'Clear Filters'), ENT_QUOTES, 'UTF-8') ?>
+                </button>
             </div>
-            <div class="pagination" id="adsPagination"></div>
+        </div>
+
+        <!-- Campaigns Table -->
+        <div class="card">
+            <div class="card-body" style="padding:0;">
+                <table class="data-table" id="campaignsTable">
+                    <thead>
+                        <tr>
+                            <th data-i18n="campaigns_table.id"><?= htmlspecialchars(_adst('campaigns_table.id', 'ID'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="campaigns_table.name"><?= htmlspecialchars(_adst('campaigns_table.name', 'Name'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="campaigns_table.budget"><?= htmlspecialchars(_adst('campaigns_table.budget', 'Budget'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="campaigns_table.currency"><?= htmlspecialchars(_adst('campaigns_table.currency', 'Currency'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="campaigns_table.pricing_model"><?= htmlspecialchars(_adst('campaigns_table.pricing_model', 'Pricing Model'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="campaigns_table.start_date"><?= htmlspecialchars(_adst('campaigns_table.start_date', 'Start Date'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="campaigns_table.end_date"><?= htmlspecialchars(_adst('campaigns_table.end_date', 'End Date'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="campaigns_table.status"><?= htmlspecialchars(_adst('campaigns_table.status', 'Status'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="campaigns_table.actions"><?= htmlspecialchars(_adst('campaigns_table.actions', 'Actions'), ENT_QUOTES, 'UTF-8') ?></th>
+                        </tr>
+                    </thead>
+                    <tbody id="campaignsTableBody">
+                        <tr>
+                            <td colspan="9" class="text-center">
+                                <?= htmlspecialchars(_adst('campaigns_table.no_records', 'No campaigns found'), ENT_QUOTES, 'UTF-8') ?>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Campaigns Pagination -->
+            <div class="pagination-wrapper">
+                <div class="pagination-info">
+                    <span data-i18n="pagination.showing"><?= htmlspecialchars(_adst('pagination.showing', 'Showing'), ENT_QUOTES, 'UTF-8') ?></span>
+                    <span id="campaignsPaginationInfo">0-0 <?= htmlspecialchars(_adst('pagination.of', 'of'), ENT_QUOTES, 'UTF-8') ?> 0</span>
+                </div>
+                <div class="pagination" id="campaignsPagination"></div>
+            </div>
+        </div>
+
+    </div><!-- /tabCampaigns -->
+
+    <!-- ══════════════════════════════════════
+         ADS TAB
+    ══════════════════════════════════════ -->
+    <div id="tabAds" class="ads-tab-panel" style="display:none;">
+
+        <!-- Filter Bar -->
+        <div class="card">
+            <div class="card-body filter-bar">
+                <input type="text" id="filterSearch" class="form-control"
+                       placeholder="<?= htmlspecialchars(_adst('filter.search_placeholder', 'Search ads...'), ENT_QUOTES, 'UTF-8') ?>"
+                       data-i18n-placeholder="filter.search_placeholder">
+
+                <select id="filterStatus" class="form-control">
+                    <option value=""><?= htmlspecialchars(_adst('filter.all_statuses', 'All Statuses'), ENT_QUOTES, 'UTF-8') ?></option>
+                    <option value="active"><?= htmlspecialchars(_adst('status.active', 'Active'), ENT_QUOTES, 'UTF-8') ?></option>
+                    <option value="paused"><?= htmlspecialchars(_adst('status.paused', 'Paused'), ENT_QUOTES, 'UTF-8') ?></option>
+                    <option value="rejected"><?= htmlspecialchars(_adst('status.rejected', 'Rejected'), ENT_QUOTES, 'UTF-8') ?></option>
+                </select>
+
+                <select id="filterTargetType" class="form-control">
+                    <option value=""><?= htmlspecialchars(_adst('filter.all_target_types', 'All Target Types'), ENT_QUOTES, 'UTF-8') ?></option>
+                    <option value="url"><?= htmlspecialchars(_adst('target_type.url', 'URL'), ENT_QUOTES, 'UTF-8') ?></option>
+                    <option value="entity"><?= htmlspecialchars(_adst('target_type.entity', 'Entity'), ENT_QUOTES, 'UTF-8') ?></option>
+                </select>
+
+                <select id="filterCampaign" class="form-control">
+                    <option value=""><?= htmlspecialchars(_adst('filter.all_campaigns', 'All Campaigns'), ENT_QUOTES, 'UTF-8') ?></option>
+                </select>
+
+                <button id="btnFilter" class="btn btn-primary" data-i18n="filter.apply">
+                    <?= htmlspecialchars(_adst('filter.apply', 'Filter'), ENT_QUOTES, 'UTF-8') ?>
+                </button>
+                <button id="btnClearFilters" class="btn btn-secondary" data-i18n="filter.clear">
+                    <?= htmlspecialchars(_adst('filter.clear', 'Clear Filters'), ENT_QUOTES, 'UTF-8') ?>
+                </button>
+            </div>
+        </div>
+
+        <!-- Ads Data Table -->
+        <div class="card">
+            <div class="card-body" style="padding:0;">
+                <table class="data-table" id="adsTable">
+                    <thead>
+                        <tr>
+                            <th data-i18n="table.id"><?= htmlspecialchars(_adst('table.id', 'ID'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="table.campaign"><?= htmlspecialchars(_adst('table.campaign', 'Campaign'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="table.target_type"><?= htmlspecialchars(_adst('table.target_type', 'Target Type'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="table.target_value"><?= htmlspecialchars(_adst('table.target_value', 'Target Value'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="table.status"><?= htmlspecialchars(_adst('table.status', 'Status'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="table.views"><?= htmlspecialchars(_adst('table.views', 'Views'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="table.clicks"><?= htmlspecialchars(_adst('table.clicks', 'Clicks'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="table.created_at"><?= htmlspecialchars(_adst('table.created_at', 'Created At'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="table.actions"><?= htmlspecialchars(_adst('table.actions', 'Actions'), ENT_QUOTES, 'UTF-8') ?></th>
+                        </tr>
+                    </thead>
+                    <tbody id="adsTableBody">
+                        <tr>
+                            <td colspan="9" class="text-center">
+                                <?= htmlspecialchars(_adst('table.no_records', 'No ads found'), ENT_QUOTES, 'UTF-8') ?>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Ads Pagination -->
+            <div class="pagination-wrapper">
+                <div class="pagination-info">
+                    <span data-i18n="pagination.showing"><?= htmlspecialchars(_adst('pagination.showing', 'Showing'), ENT_QUOTES, 'UTF-8') ?></span>
+                    <span id="adsPaginationInfo">0-0 <?= htmlspecialchars(_adst('pagination.of', 'of'), ENT_QUOTES, 'UTF-8') ?> 0</span>
+                </div>
+                <div class="pagination" id="adsPagination"></div>
+            </div>
+        </div>
+
+    </div><!-- /tabAds -->
+
+    <!-- ══════════════════════════════════════
+         CAMPAIGN Add / Edit Modal
+    ══════════════════════════════════════ -->
+    <div id="campaignModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h3 id="campaignModalTitle" data-i18n="modal.add_campaign_title">
+                <?= htmlspecialchars(_adst('modal.add_campaign_title', 'Add Campaign'), ENT_QUOTES, 'UTF-8') ?>
+            </h3>
+            <form id="campaignForm" onsubmit="return false;">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
+                <input type="hidden" id="campaignId" name="id" value="">
+
+                <!-- Name -->
+                <div class="form-group">
+                    <label for="campaignName" data-i18n="form.name">
+                        <?= htmlspecialchars(_adst('form.name', 'Campaign Name'), ENT_QUOTES, 'UTF-8') ?> *
+                    </label>
+                    <input type="text" id="campaignName" name="name" class="form-control"
+                           required maxlength="255">
+                </div>
+
+                <!-- Budget -->
+                <div class="form-group">
+                    <label for="campaignBudget" data-i18n="form.budget">
+                        <?= htmlspecialchars(_adst('form.budget', 'Budget'), ENT_QUOTES, 'UTF-8') ?>
+                    </label>
+                    <input type="number" id="campaignBudget" name="budget" class="form-control"
+                           value="0" min="0" step="0.01">
+                </div>
+
+                <!-- Currency -->
+                <div class="form-group">
+                    <label for="campaignCurrencyId" data-i18n="form.currency_id">
+                        <?= htmlspecialchars(_adst('form.currency_id', 'Currency'), ENT_QUOTES, 'UTF-8') ?> *
+                    </label>
+                    <select id="campaignCurrencyId" name="currency_id" class="form-control" required>
+                        <option value="">
+                            <?= htmlspecialchars(_adst('form.select_currency', '-- Select Currency --'), ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    </select>
+                </div>
+
+                <!-- Pricing Model -->
+                <div class="form-group">
+                    <label for="campaignPricingModel" data-i18n="form.pricing_model">
+                        <?= htmlspecialchars(_adst('form.pricing_model', 'Pricing Model'), ENT_QUOTES, 'UTF-8') ?>
+                    </label>
+                    <select id="campaignPricingModel" name="pricing_model" class="form-control">
+                        <option value="fixed"><?= htmlspecialchars(_adst('pricing_model.fixed', 'Fixed'), ENT_QUOTES, 'UTF-8') ?></option>
+                        <option value="cpm"><?= htmlspecialchars(_adst('pricing_model.cpm', 'CPM'), ENT_QUOTES, 'UTF-8') ?></option>
+                        <option value="cpc"><?= htmlspecialchars(_adst('pricing_model.cpc', 'CPC'), ENT_QUOTES, 'UTF-8') ?></option>
+                    </select>
+                </div>
+
+                <!-- Start Date -->
+                <div class="form-group">
+                    <label for="campaignStartDate" data-i18n="form.start_date">
+                        <?= htmlspecialchars(_adst('form.start_date', 'Start Date'), ENT_QUOTES, 'UTF-8') ?>
+                    </label>
+                    <input type="date" id="campaignStartDate" name="start_date" class="form-control">
+                </div>
+
+                <!-- End Date -->
+                <div class="form-group">
+                    <label for="campaignEndDate" data-i18n="form.end_date">
+                        <?= htmlspecialchars(_adst('form.end_date', 'End Date'), ENT_QUOTES, 'UTF-8') ?>
+                    </label>
+                    <input type="date" id="campaignEndDate" name="end_date" class="form-control">
+                </div>
+
+                <!-- Status -->
+                <div class="form-group">
+                    <label for="campaignStatus" data-i18n="form.status">
+                        <?= htmlspecialchars(_adst('form.status', 'Status'), ENT_QUOTES, 'UTF-8') ?>
+                    </label>
+                    <select id="campaignStatus" name="status" class="form-control">
+                        <option value="draft"><?= htmlspecialchars(_adst('status.draft', 'Draft'), ENT_QUOTES, 'UTF-8') ?></option>
+                        <option value="active"><?= htmlspecialchars(_adst('status.active', 'Active'), ENT_QUOTES, 'UTF-8') ?></option>
+                        <option value="paused"><?= htmlspecialchars(_adst('status.paused', 'Paused'), ENT_QUOTES, 'UTF-8') ?></option>
+                        <option value="completed"><?= htmlspecialchars(_adst('status.completed', 'Completed'), ENT_QUOTES, 'UTF-8') ?></option>
+                    </select>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" id="campaignSaveBtn" class="btn btn-primary" data-i18n="form.save">
+                        <?= htmlspecialchars(_adst('form.save', 'Save'), ENT_QUOTES, 'UTF-8') ?>
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-close-ads-modal"
+                            data-modal="campaignModal" data-i18n="form.cancel">
+                        <?= htmlspecialchars(_adst('form.cancel', 'Cancel'), ENT_QUOTES, 'UTF-8') ?>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
-    <!-- Add / Edit Modal -->
+    <!-- ══════════════════════════════════════
+         AD UNIT Add / Edit Modal
+    ══════════════════════════════════════ -->
     <div id="adModal" class="modal" style="display:none;">
         <div class="modal-content">
             <h3 id="adModalTitle" data-i18n="modal.add_title">
-                <?= htmlspecialchars(_adst('modal.add_title', 'Add Ad'), ENT_QUOTES, 'UTF-8') ?>
+                <?= htmlspecialchars(_adst('modal.add_title', 'Add Ad Unit'), ENT_QUOTES, 'UTF-8') ?>
             </h3>
             <form id="adForm" onsubmit="return false;">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
