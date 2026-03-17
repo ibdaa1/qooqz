@@ -362,3 +362,236 @@
     .data-table td:nth-child(8) { display: none; }
     .ads-tabs { overflow-x: auto; }
 }
+
+/* ─────────────────────────────────────────────
+ * Ad Modal – Wide + Header
+ * ───────────────────────────────────────────── */
+.modal-content-wide {
+    width: min(700px, 96vw);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color, #263044);
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--text-primary, #fff);
+}
+
+.modal-header .btn-close-ads-modal {
+    background: none;
+    border: none;
+    color: var(--text-secondary, #94a3b8);
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+}
+
+.modal-header .btn-close-ads-modal:hover {
+    color: var(--text-primary, #fff);
+    background: rgba(255,255,255,0.07);
+}
+
+/* ─────────────────────────────────────────────
+ * Ad Modal Inner Tabs (Basic / Translations / Images)
+ * ───────────────────────────────────────────── */
+.ad-modal-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    border-bottom: 2px solid var(--border-color, #263044);
+}
+
+.ad-modal-tab-btn {
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    color: var(--text-secondary, #94a3b8);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+
+.ad-modal-tab-btn:hover  { color: var(--text-primary, #fff); }
+
+.ad-modal-tab-btn.active {
+    color: var(--accent-color, #3b82f6);
+    border-bottom-color: var(--accent-color, #3b82f6);
+}
+
+/* ─────────────────────────────────────────────
+ * Translations Section
+ * ───────────────────────────────────────────── */
+.ad-translations-info {
+    background: rgba(59,130,246,0.08);
+    border: 1px solid rgba(59,130,246,0.25);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.83rem;
+    color: var(--text-secondary, #94a3b8);
+    margin-bottom: 14px;
+}
+
+.ad-translation-add-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-start;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border-color, #263044);
+    border-radius: 8px;
+}
+
+.ad-translation-add-row .form-control { flex: 1; min-width: 130px; }
+
+.ad-translation-add-row textarea.form-control {
+    min-height: 56px;
+    resize: vertical;
+    width: 100%;
+    flex: 1 0 100%;
+}
+
+.ad-translations-table {
+    font-size: 0.85rem;
+    width: 100%;
+}
+
+.ad-trans-empty {
+    color: var(--text-secondary, #94a3b8);
+    font-size: 0.85rem;
+    padding: 10px 0;
+}
+
+/* ─────────────────────────────────────────────
+ * Images Section
+ * ───────────────────────────────────────────── */
+.image-upload-section { width: 100%; }
+
+.ad-images-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.ad-image-item {
+    position: relative;
+    display: inline-block;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border-color, #263044);
+}
+
+.ad-image-item img {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    display: block;
+}
+
+.ad-image-remove {
+    position: absolute;
+    top: 3px;
+    inset-inline-end: 3px;
+    background: rgba(0,0,0,0.65);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 0.9rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+.ad-image-remove:hover { background: rgba(220,38,38,0.85); }
+
+/* Thumbnail in ads table */
+.ad-thumb-img {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #263044);
+    display: block;
+}
+
+.ad-no-img {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    font-size: 1.3rem;
+    background: rgba(255,255,255,0.04);
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #263044);
+}
+
+/* ─────────────────────────────────────────────
+ * Media Studio Overlay
+ * ───────────────────────────────────────────── */
+.ad-media-studio-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0,0,0,0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ad-media-studio-container {
+    background: var(--background-secondary, #0f1724);
+    border: 1px solid var(--border-color, #263044);
+    border-radius: 12px;
+    width: min(900px, 96vw);
+    height: min(700px, 90vh);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.ad-media-studio-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-color, #263044);
+    flex-shrink: 0;
+}
+
+.ad-media-studio-header h4 {
+    margin: 0;
+    color: var(--text-primary, #fff);
+    font-size: 1rem;
+}
+
+.ad-media-studio-frame {
+    flex: 1;
+    border: none;
+    width: 100%;
+    min-height: 0;
+}

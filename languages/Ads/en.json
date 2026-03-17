@@ -106,6 +106,38 @@
         "error_campaigns_load": "Failed to load campaigns",
         "error_campaign_save": "Failed to save campaign",
         "error_campaign_delete": "Failed to delete campaign",
-        "error_currencies_load": "Failed to load currencies"
+        "error_currencies_load": "Failed to load currencies",
+        "error_translations_load": "Failed to load translations",
+        "error_translation_save": "Failed to save translation",
+        "error_translation_delete": "Failed to delete translation",
+        "error_images_load": "Failed to load images",
+        "tabs": {
+            "basic": "Basic",
+            "translations": "Translations",
+            "images": "Images"
+        },
+        "table": {
+            "image": "Image"
+        },
+        "translations": {
+            "title": "Translations",
+            "info": "Add title and description for each language.",
+            "language": "Language",
+            "select_language": "-- Select Language --",
+            "ad_title": "Title",
+            "ad_title_placeholder": "Ad title...",
+            "description": "Description",
+            "description_placeholder": "Ad description...",
+            "add": "Add Translation",
+            "no_records": "No translations added yet.",
+            "saved": "Translation saved",
+            "deleted": "Translation deleted",
+            "confirm_delete": "Delete this translation?"
+        },
+        "images": {
+            "label": "Ad Images",
+            "select_from_studio": "Select Images from Studio",
+            "save_first": "Please save the ad first before adding images."
+        }
     }
 }

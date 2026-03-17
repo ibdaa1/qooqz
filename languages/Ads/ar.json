@@ -106,6 +106,38 @@
         "error_campaigns_load": "فشل تحميل الحملات",
         "error_campaign_save": "فشل حفظ الحملة",
         "error_campaign_delete": "فشل حذف الحملة",
-        "error_currencies_load": "فشل تحميل العملات"
+        "error_currencies_load": "فشل تحميل العملات",
+        "error_translations_load": "فشل تحميل الترجمات",
+        "error_translation_save": "فشل حفظ الترجمة",
+        "error_translation_delete": "فشل حذف الترجمة",
+        "error_images_load": "فشل تحميل الصور",
+        "tabs": {
+            "basic": "أساسي",
+            "translations": "الترجمات",
+            "images": "الصور"
+        },
+        "table": {
+            "image": "الصورة"
+        },
+        "translations": {
+            "title": "الترجمات",
+            "info": "أضف العنوان والوصف لكل لغة.",
+            "language": "اللغة",
+            "select_language": "-- اختر اللغة --",
+            "ad_title": "العنوان",
+            "ad_title_placeholder": "عنوان الإعلان...",
+            "description": "الوصف",
+            "description_placeholder": "وصف الإعلان...",
+            "add": "إضافة ترجمة",
+            "no_records": "لا توجد ترجمات بعد.",
+            "saved": "تم حفظ الترجمة",
+            "deleted": "تم حذف الترجمة",
+            "confirm_delete": "حذف هذه الترجمة؟"
+        },
+        "images": {
+            "label": "صور الإعلان",
+            "select_from_studio": "اختر الصور من الاستديو",
+            "save_first": "يرجى حفظ الإعلان أولاً قبل إضافة الصور."
+        }
     }
 }

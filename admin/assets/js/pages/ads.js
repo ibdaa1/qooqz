@@ -1,6 +1,6 @@
 /**
  * /admin/assets/js/pages/ads.js
- * Ads Management - Campaigns + Ad Units
+ * Ads Management - Campaigns + Ad Units (with Images & Translations)
  */
 (function () {
     'use strict';
@@ -20,6 +20,9 @@
     // Ads state
     var adsPage    = 1;
     var adsFilters = {};
+
+    // Ad modal state
+    var adSelectedImages = [];
 
     // Active tab
     var activeTab = 'campaigns';
@@ -496,7 +499,12 @@
         }
         var html = '';
         items.forEach(function (ad) {
+            var thumb = ad.main_image_url || ad.image_url || '';
+            var imgCell = thumb
+                ? '<img src="' + esc(thumb) + '" alt="" class="ad-thumb-img">'
+                : '<span class="ad-no-img">📢</span>';
             html += '<tr>';
+            html += '<td>' + imgCell + '</td>';
             html += '<td>' + esc(ad.id) + '</td>';
             html += '<td>' + esc(ad.campaign_name || ad.campaign_id) + '</td>';
             html += '<td>' + esc(t('target_type.' + ad.target_type, ad.target_type)) + '</td>';
@@ -567,6 +575,15 @@
         var campSel = document.getElementById('adCampaignId');
         if (campSel) populateCampaignSelect(campSel, null);
 
+        // Reset images & translations
+        adSelectedImages = [];
+        renderAdImagesPreview();
+        var transList = document.getElementById('adTranslationsList');
+        if (transList) transList.innerHTML = '<p class="ad-trans-empty">' + esc(t('translations.no_records', 'No translations added yet.')) + '</p>';
+
+        // Switch to basic tab
+        switchAdModalTab('basic');
+
         openModal('adModal');
     }
 
@@ -595,6 +612,15 @@
                 setVal('adStatus',      ad.status);
                 setVal('adViewsCount',  ad.views_count);
                 setVal('adClicksCount', ad.clicks_count);
+
+                // Reset then load images & translations
+                adSelectedImages = [];
+                renderAdImagesPreview();
+                loadAdImages(ad.id);
+                loadAdTranslations(ad.id);
+
+                // Switch to basic tab
+                switchAdModalTab('basic');
 
                 openModal('adModal');
             })
@@ -643,6 +669,224 @@
             })
             .catch(function () { showNotification(t('error_save', 'Failed to save ad'), 'error'); })
             .finally(function () { if (btn) btn.disabled = false; });
+    }
+
+    /* ══════════════════════════════════════════════
+     * AD MODAL TABS
+     * ══════════════════════════════════════════ */
+    function switchAdModalTab(tabName) {
+        document.querySelectorAll('.ad-modal-tab-btn').forEach(function (btn) {
+            btn.classList.toggle('active', btn.dataset.modalTab === tabName);
+        });
+        document.querySelectorAll('.ad-modal-tab-content').forEach(function (panel) {
+            panel.style.display = (panel.id === 'adTab-' + tabName) ? '' : 'none';
+        });
+    }
+
+    /* ══════════════════════════════════════════════
+     * AD IMAGES
+     * ══════════════════════════════════════════ */
+    function loadAdImages(adId) {
+        var imgTypeId = (CFG.adImageTypeId || 20);
+        var url = (CFG.imagesApi || '/api/images') + '/by_owner?owner_id=' + adId + '&image_type_id=' + imgTypeId;
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                var imgs = Array.isArray(json.data) ? json.data : (json.data && Array.isArray(json.data.items) ? json.data.items : []);
+                adSelectedImages = imgs;
+                renderAdImagesPreview();
+            })
+            .catch(function () {
+                showNotification(t('error_images_load', 'Failed to load images'), 'warning');
+            });
+    }
+
+    function renderAdImagesPreview() {
+        var container = document.getElementById('adImagesPreview');
+        if (!container) return;
+        if (!adSelectedImages || adSelectedImages.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-secondary,#94a3b8); font-size:0.85rem;">' + esc(t('images.no_images', 'No images yet.')) + '</p>';
+            return;
+        }
+        var html = '';
+        adSelectedImages.forEach(function (img, idx) {
+            var src = img.url || img.thumb_url || img.image_url || '';
+            html += '<div class="ad-image-item" data-index="' + idx + '">';
+            html += '<img src="' + esc(src) + '" alt="">';
+            html += '<button type="button" class="ad-image-remove" data-index="' + idx + '">&times;</button>';
+            html += '</div>';
+        });
+        container.innerHTML = html;
+        container.querySelectorAll('.ad-image-remove').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var i = parseInt(btn.dataset.index, 10);
+                adSelectedImages.splice(i, 1);
+                renderAdImagesPreview();
+            });
+        });
+    }
+
+    function openAdMediaStudio() {
+        var idEl = document.getElementById('adId');
+        var adId = idEl ? parseInt(idEl.value, 10) : 0;
+        if (!adId) {
+            showNotification(t('images.save_first', 'Please save the ad first before adding images.'), 'warning');
+            return;
+        }
+        var overlay = document.getElementById('adMediaStudioModal');
+        var frame   = document.getElementById('adMediaStudioFrame');
+        if (!overlay || !frame) return;
+        var imgTypeId = CFG.adImageTypeId || 20;
+        frame.src = '/admin/fragments/media_studio.php?embedded=1&tenant_id=' + encodeURIComponent(CFG.tenantId || '') +
+                    '&lang=' + encodeURIComponent(CFG.lang || 'en') +
+                    '&owner_id=' + adId +
+                    '&image_type_id=' + imgTypeId;
+        overlay.style.display = 'flex';
+    }
+
+    function closeAdMediaStudio() {
+        var overlay = document.getElementById('adMediaStudioModal');
+        var frame   = document.getElementById('adMediaStudioFrame');
+        if (overlay) overlay.style.display = 'none';
+        if (frame)   frame.src = 'about:blank';
+    }
+
+    /* ══════════════════════════════════════════════
+     * AD TRANSLATIONS
+     * ══════════════════════════════════════════ */
+    function loadAdTranslations(adId) {
+        var url = (CFG.translationsApi || '/api/ad_translations') + '?ad_id=' + adId + '&limit=100';
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                var items = (json.data && json.data.items) ? json.data.items : (Array.isArray(json.data) ? json.data : []);
+                renderAdTranslationsList(items);
+            })
+            .catch(function () {
+                showNotification(t('error_translations_load', 'Failed to load translations'), 'warning');
+            });
+    }
+
+    function renderAdTranslationsList(items) {
+        var container = document.getElementById('adTranslationsList');
+        if (!container) return;
+        if (!items || items.length === 0) {
+            container.innerHTML = '<p class="ad-trans-empty">' + esc(t('translations.no_records', 'No translations added yet.')) + '</p>';
+            return;
+        }
+        var html = '<table class="data-table ad-translations-table"><thead><tr>' +
+            '<th>' + esc(t('translations.language', 'Language')) + '</th>' +
+            '<th>' + esc(t('translations.ad_title', 'Title')) + '</th>' +
+            '<th>' + esc(t('translations.description', 'Description')) + '</th>' +
+            '<th>' + esc(t('table.actions', 'Actions')) + '</th>' +
+            '</tr></thead><tbody>';
+        items.forEach(function (tr) {
+            html += '<tr>';
+            html += '<td><strong>' + esc(tr.language_code) + '</strong></td>';
+            html += '<td>' + esc(tr.title || '-') + '</td>';
+            html += '<td>' + esc(tr.description ? tr.description.substring(0, 60) + (tr.description.length > 60 ? '…' : '') : '-') + '</td>';
+            html += '<td><div class="row-actions">';
+            if (CAN_EDIT) {
+                html += '<button class="btn btn-secondary btn-sm btn-edit-trans" data-id="' + esc(tr.id) + '" data-lang="' + esc(tr.language_code) + '" data-title="' + esc(tr.title || '') + '" data-desc="' + esc(tr.description || '') + '">' + esc(t('table.edit', 'Edit')) + '</button>';
+            }
+            if (CAN_DELETE) {
+                html += '<button class="btn btn-danger btn-sm btn-delete-trans" data-id="' + esc(tr.id) + '">' + esc(t('table.delete', 'Delete')) + '</button>';
+            }
+            html += '</div></td>';
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+
+        container.querySelectorAll('.btn-edit-trans').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var langEl  = document.getElementById('adTransLang');
+                var titleEl = document.getElementById('adTransTitle');
+                var descEl  = document.getElementById('adTransDesc');
+                if (langEl)  langEl.value  = btn.dataset.lang  || '';
+                if (titleEl) titleEl.value = btn.dataset.title || '';
+                if (descEl)  descEl.value  = btn.dataset.desc  || '';
+                // Store the translation ID for updating
+                var addBtn = document.getElementById('btnAddAdTranslation');
+                if (addBtn) addBtn.dataset.editId = btn.dataset.id;
+            });
+        });
+        container.querySelectorAll('.btn-delete-trans').forEach(function (btn) {
+            btn.addEventListener('click', function () { deleteAdTranslation(parseInt(btn.dataset.id, 10)); });
+        });
+    }
+
+    function saveAdTranslation() {
+        var idEl   = document.getElementById('adId');
+        var adId   = idEl ? parseInt(idEl.value, 10) : 0;
+        var langEl = document.getElementById('adTransLang');
+        var titEl  = document.getElementById('adTransTitle');
+        var desEl  = document.getElementById('adTransDesc');
+        var addBtn = document.getElementById('btnAddAdTranslation');
+
+        var langCode = langEl ? langEl.value.trim() : '';
+        var title    = titEl  ? titEl.value.trim()  : '';
+        var desc     = desEl  ? desEl.value.trim()  : '';
+        var editId   = addBtn && addBtn.dataset.editId ? parseInt(addBtn.dataset.editId, 10) : 0;
+
+        if (!langCode) { showNotification(t('translations.select_language', '-- Select Language --'), 'warning'); return; }
+        if (!adId) {
+            showNotification(t('images.save_first', 'Please save the ad first.'), 'warning');
+            return;
+        }
+
+        var data = { ad_id: adId, language_code: langCode, title: title, description: desc };
+        var method = 'POST';
+        if (editId > 0) { data.id = editId; method = 'PUT'; }
+
+        var url = (CFG.translationsApi || '/api/ad_translations');
+        if (CFG.tenantId) url += '?tenant_id=' + CFG.tenantId;
+
+        fetch(url, {
+            method: method,
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                if (json.success || json.status === 'success') {
+                    showNotification(t('translations.saved', 'Translation saved'), 'success');
+                    // Clear inputs
+                    if (langEl)  langEl.value  = '';
+                    if (titEl)   titEl.value   = '';
+                    if (desEl)   desEl.value   = '';
+                    if (addBtn)  delete addBtn.dataset.editId;
+                    loadAdTranslations(adId);
+                } else {
+                    showNotification(json.message || t('error_translation_save', 'Failed to save translation'), 'error');
+                }
+            })
+            .catch(function () { showNotification(t('error_translation_save', 'Failed to save translation'), 'error'); });
+    }
+
+    function deleteAdTranslation(id) {
+        if (!confirm(t('translations.confirm_delete', 'Delete this translation?'))) return;
+        var url = (CFG.translationsApi || '/api/ad_translations');
+        if (CFG.tenantId) url += '?tenant_id=' + CFG.tenantId;
+        fetch(url, {
+            method: 'DELETE',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id })
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                if (json.success || json.status === 'success') {
+                    showNotification(t('translations.deleted', 'Translation deleted'), 'success');
+                    var idEl = document.getElementById('adId');
+                    var adId = idEl ? parseInt(idEl.value, 10) : 0;
+                    if (adId) loadAdTranslations(adId);
+                } else {
+                    showNotification(json.message || t('error_translation_delete', 'Failed to delete translation'), 'error');
+                }
+            })
+            .catch(function () { showNotification(t('error_translation_delete', 'Failed to delete translation'), 'error'); });
     }
 
     function confirmDeleteAd(id) {
@@ -706,6 +950,11 @@
             btn.addEventListener('click', function () { switchTab(btn.dataset.tab); });
         });
 
+        // Ad modal tab switching
+        document.querySelectorAll('.ad-modal-tab-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () { switchAdModalTab(btn.dataset.modalTab); });
+        });
+
         // Campaign events
         on('btnAddCampaign',          'click', openAddCampaignModal);
         on('btnCampaignFilter',       'click', applyCampaignFilters);
@@ -716,10 +965,13 @@
         if (campSearch) campSearch.addEventListener('keydown', function (e) { if (e.key === 'Enter') applyCampaignFilters(); });
 
         // Ad events
-        on('btnAddAd',        'click', openAddAdModal);
-        on('btnFilter',       'click', applyAdsFilters);
-        on('btnClearFilters', 'click', clearAdsFilters);
-        on('adSaveBtn',       'click', saveAd);
+        on('btnAddAd',              'click', openAddAdModal);
+        on('btnFilter',             'click', applyAdsFilters);
+        on('btnClearFilters',       'click', clearAdsFilters);
+        on('adSaveBtn',             'click', saveAd);
+        on('btnAddAdTranslation',   'click', saveAdTranslation);
+        on('adSelectImageBtn',      'click', openAdMediaStudio);
+        on('adMediaStudioClose',    'click', closeAdMediaStudio);
 
         var adSearch = document.getElementById('filterSearch');
         if (adSearch) adSearch.addEventListener('keydown', function (e) { if (e.key === 'Enter') applyAdsFilters(); });
@@ -736,6 +988,15 @@
                 modal.addEventListener('click', function (e) {
                     if (e.target === modal) closeModal(modalId);
                 });
+            }
+        });
+
+        // Media studio message: images selected
+        window.addEventListener('message', function (e) {
+            if (e.data && e.data.type === 'media-selected') {
+                adSelectedImages = e.data.images || [];
+                renderAdImagesPreview();
+                closeAdMediaStudio();
             }
         });
     }

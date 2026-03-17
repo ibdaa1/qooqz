@@ -247,6 +247,7 @@ $apiBase = '/api';
                 <table class="data-table" id="adsTable">
                     <thead>
                         <tr>
+                            <th data-i18n="table.image"><?= htmlspecialchars(_adst('table.image', 'Image'), ENT_QUOTES, 'UTF-8') ?></th>
                             <th data-i18n="table.id"><?= htmlspecialchars(_adst('table.id', 'ID'), ENT_QUOTES, 'UTF-8') ?></th>
                             <th data-i18n="table.campaign"><?= htmlspecialchars(_adst('table.campaign', 'Campaign'), ENT_QUOTES, 'UTF-8') ?></th>
                             <th data-i18n="table.target_type"><?= htmlspecialchars(_adst('table.target_type', 'Target Type'), ENT_QUOTES, 'UTF-8') ?></th>
@@ -260,7 +261,7 @@ $apiBase = '/api';
                     </thead>
                     <tbody id="adsTableBody">
                         <tr>
-                            <td colspan="9" class="text-center">
+                            <td colspan="10" class="text-center">
                                 <?= htmlspecialchars(_adst('table.no_records', 'No ads found'), ENT_QUOTES, 'UTF-8') ?>
                             </td>
                         </tr>
@@ -380,79 +381,156 @@ $apiBase = '/api';
          AD UNIT Add / Edit Modal
     ══════════════════════════════════════ -->
     <div id="adModal" class="modal" style="display:none;">
-        <div class="modal-content">
-            <h3 id="adModalTitle" data-i18n="modal.add_title">
-                <?= htmlspecialchars(_adst('modal.add_title', 'Add Ad Unit'), ENT_QUOTES, 'UTF-8') ?>
-            </h3>
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <h3 id="adModalTitle" data-i18n="modal.add_title">
+                    <?= htmlspecialchars(_adst('modal.add_title', 'Add Ad Unit'), ENT_QUOTES, 'UTF-8') ?>
+                </h3>
+                <button type="button" class="btn-close-ads-modal" data-modal="adModal" aria-label="Close">&times;</button>
+            </div>
+
+            <!-- Modal Tabs -->
+            <div class="ad-modal-tabs">
+                <button type="button" class="ad-modal-tab-btn active" data-modal-tab="basic">
+                    <?= htmlspecialchars(_adst('tabs.basic', 'Basic'), ENT_QUOTES, 'UTF-8') ?>
+                </button>
+                <button type="button" class="ad-modal-tab-btn" data-modal-tab="translations">
+                    <?= htmlspecialchars(_adst('tabs.translations', 'Translations'), ENT_QUOTES, 'UTF-8') ?>
+                </button>
+                <button type="button" class="ad-modal-tab-btn" data-modal-tab="images">
+                    <?= htmlspecialchars(_adst('tabs.images', 'Images'), ENT_QUOTES, 'UTF-8') ?>
+                </button>
+            </div>
+
             <form id="adForm" onsubmit="return false;">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
                 <input type="hidden" id="adId" name="id" value="">
 
-                <!-- Campaign -->
-                <div class="form-group">
-                    <label for="adCampaignId" data-i18n="form.campaign_id">
-                        <?= htmlspecialchars(_adst('form.campaign_id', 'Campaign'), ENT_QUOTES, 'UTF-8') ?> *
-                    </label>
-                    <select id="adCampaignId" name="campaign_id" class="form-control" required>
-                        <option value="">
-                            <?= htmlspecialchars(_adst('form.select_campaign', '-- Select Campaign --'), ENT_QUOTES, 'UTF-8') ?>
-                        </option>
-                    </select>
-                </div>
+                <!-- ── TAB: Basic ── -->
+                <div id="adTab-basic" class="ad-modal-tab-content active">
 
-                <!-- Target Type -->
-                <div class="form-group">
-                    <label for="adTargetType" data-i18n="form.target_type">
-                        <?= htmlspecialchars(_adst('form.target_type', 'Target Type'), ENT_QUOTES, 'UTF-8') ?>
-                    </label>
-                    <select id="adTargetType" name="target_type" class="form-control">
-                        <option value="url"><?= htmlspecialchars(_adst('target_type.url', 'URL'), ENT_QUOTES, 'UTF-8') ?></option>
-                        <option value="entity"><?= htmlspecialchars(_adst('target_type.entity', 'Entity'), ENT_QUOTES, 'UTF-8') ?></option>
-                    </select>
-                </div>
+                    <!-- Campaign -->
+                    <div class="form-group">
+                        <label for="adCampaignId" data-i18n="form.campaign_id">
+                            <?= htmlspecialchars(_adst('form.campaign_id', 'Campaign'), ENT_QUOTES, 'UTF-8') ?> *
+                        </label>
+                        <select id="adCampaignId" name="campaign_id" class="form-control" required>
+                            <option value="">
+                                <?= htmlspecialchars(_adst('form.select_campaign', '-- Select Campaign --'), ENT_QUOTES, 'UTF-8') ?>
+                            </option>
+                        </select>
+                    </div>
 
-                <!-- Target Value -->
-                <div class="form-group">
-                    <label for="adTargetValue" data-i18n="form.target_value">
-                        <?= htmlspecialchars(_adst('form.target_value', 'Target Value'), ENT_QUOTES, 'UTF-8') ?>
-                    </label>
-                    <input type="text" id="adTargetValue" name="target_value" class="form-control"
-                           placeholder="<?= htmlspecialchars(_adst('form.target_value_placeholder_url', 'https://example.com'), ENT_QUOTES, 'UTF-8') ?>"
-                           maxlength="500">
-                </div>
+                    <!-- Target Type -->
+                    <div class="form-group">
+                        <label for="adTargetType" data-i18n="form.target_type">
+                            <?= htmlspecialchars(_adst('form.target_type', 'Target Type'), ENT_QUOTES, 'UTF-8') ?>
+                        </label>
+                        <select id="adTargetType" name="target_type" class="form-control">
+                            <option value="url"><?= htmlspecialchars(_adst('target_type.url', 'URL'), ENT_QUOTES, 'UTF-8') ?></option>
+                            <option value="entity"><?= htmlspecialchars(_adst('target_type.entity', 'Entity'), ENT_QUOTES, 'UTF-8') ?></option>
+                        </select>
+                    </div>
 
-                <!-- Status -->
-                <div class="form-group">
-                    <label for="adStatus" data-i18n="form.status">
-                        <?= htmlspecialchars(_adst('form.status', 'Status'), ENT_QUOTES, 'UTF-8') ?>
-                    </label>
-                    <select id="adStatus" name="status" class="form-control">
-                        <option value="active"><?= htmlspecialchars(_adst('status.active', 'Active'), ENT_QUOTES, 'UTF-8') ?></option>
-                        <option value="paused"><?= htmlspecialchars(_adst('status.paused', 'Paused'), ENT_QUOTES, 'UTF-8') ?></option>
-                        <option value="rejected"><?= htmlspecialchars(_adst('status.rejected', 'Rejected'), ENT_QUOTES, 'UTF-8') ?></option>
-                    </select>
-                </div>
+                    <!-- Target Value -->
+                    <div class="form-group">
+                        <label for="adTargetValue" data-i18n="form.target_value">
+                            <?= htmlspecialchars(_adst('form.target_value', 'Target Value'), ENT_QUOTES, 'UTF-8') ?>
+                        </label>
+                        <input type="text" id="adTargetValue" name="target_value" class="form-control"
+                               placeholder="<?= htmlspecialchars(_adst('form.target_value_placeholder_url', 'https://example.com'), ENT_QUOTES, 'UTF-8') ?>"
+                               maxlength="500">
+                    </div>
 
-                <!-- Views Count (admin only) -->
-                <?php if (is_super_admin()): ?>
-                <div class="form-group">
-                    <label for="adViewsCount" data-i18n="form.views_count">
-                        <?= htmlspecialchars(_adst('form.views_count', 'Views Count'), ENT_QUOTES, 'UTF-8') ?>
-                    </label>
-                    <input type="number" id="adViewsCount" name="views_count" class="form-control" value="0" min="0">
-                </div>
+                    <!-- Status -->
+                    <div class="form-group">
+                        <label for="adStatus" data-i18n="form.status">
+                            <?= htmlspecialchars(_adst('form.status', 'Status'), ENT_QUOTES, 'UTF-8') ?>
+                        </label>
+                        <select id="adStatus" name="status" class="form-control">
+                            <option value="active"><?= htmlspecialchars(_adst('status.active', 'Active'), ENT_QUOTES, 'UTF-8') ?></option>
+                            <option value="paused"><?= htmlspecialchars(_adst('status.paused', 'Paused'), ENT_QUOTES, 'UTF-8') ?></option>
+                            <option value="rejected"><?= htmlspecialchars(_adst('status.rejected', 'Rejected'), ENT_QUOTES, 'UTF-8') ?></option>
+                        </select>
+                    </div>
 
-                <!-- Clicks Count (admin only) -->
-                <div class="form-group">
-                    <label for="adClicksCount" data-i18n="form.clicks_count">
-                        <?= htmlspecialchars(_adst('form.clicks_count', 'Clicks Count'), ENT_QUOTES, 'UTF-8') ?>
-                    </label>
-                    <input type="number" id="adClicksCount" name="clicks_count" class="form-control" value="0" min="0">
-                </div>
-                <?php else: ?>
-                <input type="hidden" id="adViewsCount"  name="views_count"  value="0">
-                <input type="hidden" id="adClicksCount" name="clicks_count" value="0">
-                <?php endif; ?>
+                    <!-- Views / Clicks Count (super admin only) -->
+                    <?php if (is_super_admin()): ?>
+                    <div class="form-group">
+                        <label for="adViewsCount" data-i18n="form.views_count">
+                            <?= htmlspecialchars(_adst('form.views_count', 'Views Count'), ENT_QUOTES, 'UTF-8') ?>
+                        </label>
+                        <input type="number" id="adViewsCount" name="views_count" class="form-control" value="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="adClicksCount" data-i18n="form.clicks_count">
+                            <?= htmlspecialchars(_adst('form.clicks_count', 'Clicks Count'), ENT_QUOTES, 'UTF-8') ?>
+                        </label>
+                        <input type="number" id="adClicksCount" name="clicks_count" class="form-control" value="0" min="0">
+                    </div>
+                    <?php else: ?>
+                    <input type="hidden" id="adViewsCount"  name="views_count"  value="0">
+                    <input type="hidden" id="adClicksCount" name="clicks_count" value="0">
+                    <?php endif; ?>
+
+                </div><!-- /adTab-basic -->
+
+                <!-- ── TAB: Translations ── -->
+                <div id="adTab-translations" class="ad-modal-tab-content" style="display:none;">
+                    <div class="ad-translations-info">
+                        <i class="fas fa-info-circle"></i>
+                        <?= htmlspecialchars(_adst('translations.info', 'Add title and description for each language.'), ENT_QUOTES, 'UTF-8') ?>
+                    </div>
+
+                    <!-- Add translation form -->
+                    <div class="ad-translation-add-row">
+                        <select id="adTransLang" class="form-control">
+                            <option value=""><?= htmlspecialchars(_adst('translations.select_language', '-- Select Language --'), ENT_QUOTES, 'UTF-8') ?></option>
+                            <option value="ar">العربية (ar)</option>
+                            <option value="en">English (en)</option>
+                            <option value="fr">Français (fr)</option>
+                            <option value="tr">Türkçe (tr)</option>
+                            <option value="ur">اردو (ur)</option>
+                            <option value="de">Deutsch (de)</option>
+                            <option value="es">Español (es)</option>
+                            <option value="fa">فارسی (fa)</option>
+                            <option value="he">עברית (he)</option>
+                            <option value="hi">हिन्दी (hi)</option>
+                            <option value="zh">中文 (zh)</option>
+                            <option value="ja">日本語 (ja)</option>
+                            <option value="ko">한국어 (ko)</option>
+                            <option value="pt">Português (pt)</option>
+                            <option value="ru">Русский (ru)</option>
+                            <option value="it">Italiano (it)</option>
+                            <option value="nl">Nederlands (nl)</option>
+                        </select>
+                        <input type="text" id="adTransTitle" class="form-control"
+                               placeholder="<?= htmlspecialchars(_adst('translations.ad_title_placeholder', 'Ad title...'), ENT_QUOTES, 'UTF-8') ?>">
+                        <textarea id="adTransDesc" class="form-control" rows="2"
+                                  placeholder="<?= htmlspecialchars(_adst('translations.description_placeholder', 'Ad description...'), ENT_QUOTES, 'UTF-8') ?>"></textarea>
+                        <button type="button" id="btnAddAdTranslation" class="btn btn-primary">
+                            <?= htmlspecialchars(_adst('translations.add', 'Add Translation'), ENT_QUOTES, 'UTF-8') ?>
+                        </button>
+                    </div>
+
+                    <!-- Existing translations list -->
+                    <div id="adTranslationsList"></div>
+                </div><!-- /adTab-translations -->
+
+                <!-- ── TAB: Images ── -->
+                <div id="adTab-images" class="ad-modal-tab-content" style="display:none;">
+                    <div class="form-group">
+                        <label><?= htmlspecialchars(_adst('images.label', 'Ad Images'), ENT_QUOTES, 'UTF-8') ?></label>
+                        <div class="image-upload-section">
+                            <button type="button" id="adSelectImageBtn" class="btn btn-secondary"
+                                    style="width:100%; margin-bottom:15px;">
+                                <i class="fas fa-images"></i>
+                                <?= htmlspecialchars(_adst('images.select_from_studio', 'Select Images from Studio'), ENT_QUOTES, 'UTF-8') ?>
+                            </button>
+                            <div id="adImagesPreview" class="ad-images-grid"></div>
+                        </div>
+                    </div>
+                </div><!-- /adTab-images -->
 
                 <div class="form-actions">
                     <button type="button" id="adSaveBtn" class="btn btn-primary" data-i18n="form.save">
@@ -467,19 +545,40 @@ $apiBase = '/api';
         </div>
     </div>
 
+    <!-- ══════════════════════════════════════
+         Media Studio Overlay (for Ad Images)
+    ══════════════════════════════════════ -->
+    <div id="adMediaStudioModal" class="ad-media-studio-overlay" style="display:none;" role="dialog" aria-modal="true">
+        <div class="ad-media-studio-container">
+            <div class="ad-media-studio-header">
+                <h4>
+                    <i class="fas fa-images" style="margin-inline-end:8px;"></i>
+                    <?= htmlspecialchars(_adst('images.select_from_studio', 'Select Images from Studio'), ENT_QUOTES, 'UTF-8') ?>
+                </h4>
+                <button type="button" id="adMediaStudioClose" class="btn btn-secondary btn-sm" aria-label="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <iframe id="adMediaStudioFrame" class="ad-media-studio-frame" src="about:blank" title="Media Studio"></iframe>
+        </div>
+    </div>
+
 </div>
 
 <script>
 window.ADS_CONFIG = {
-    apiBase:   <?= json_encode($apiBase) ?>,
-    csrfToken: <?= json_encode($csrf) ?>,
-    tenantId:  <?= (int)$tenantId ?>,
-    lang:      <?= json_encode($_safeLang) ?>,
-    dir:       <?= json_encode($dir) ?>,
-    strings:   <?= json_encode($_adsStrings, JSON_UNESCAPED_UNICODE) ?>,
-    canCreate: <?= json_encode($canCreate) ?>,
-    canEdit:   <?= json_encode($canEdit) ?>,
-    canDelete: <?= json_encode($canDelete) ?>
+    apiBase:        <?= json_encode($apiBase) ?>,
+    csrfToken:      <?= json_encode($csrf) ?>,
+    tenantId:       <?= (int)$tenantId ?>,
+    lang:           <?= json_encode($_safeLang) ?>,
+    dir:            <?= json_encode($dir) ?>,
+    strings:        <?= json_encode($_adsStrings, JSON_UNESCAPED_UNICODE) ?>,
+    canCreate:      <?= json_encode($canCreate) ?>,
+    canEdit:        <?= json_encode($canEdit) ?>,
+    canDelete:      <?= json_encode($canDelete) ?>,
+    imagesApi:      <?= json_encode($apiBase . '/images') ?>,
+    translationsApi:<?= json_encode($apiBase . '/ad_translations') ?>,
+    adImageTypeId:  20
 };
 </script>
 <script src="/admin/assets/js/pages/ads.js?v=<?= time() ?>"></script>
