@@ -32,7 +32,7 @@ final class PdoAdCampaignsRepository implements AdCampaignsRepositoryInterface
                     c.symbol_position AS currency_symbol_position,
                     c.decimal_places  AS currency_decimal_places,
                     e.store_name      AS entity_store_name,
-                    u.name            AS created_by_name
+                    u.username        AS created_by_name
                 FROM " . self::TABLE . " ac
                 LEFT JOIN currencies c ON ac.currency_id  = c.id
                 LEFT JOIN entities   e ON ac.entity_id    = e.id AND ac.tenant_id = e.tenant_id
@@ -117,7 +117,7 @@ final class PdoAdCampaignsRepository implements AdCampaignsRepositoryInterface
                     c.symbol_position AS currency_symbol_position,
                     c.decimal_places  AS currency_decimal_places,
                     e.store_name      AS entity_store_name,
-                    u.name            AS created_by_name
+                    u.username        AS created_by_name
              FROM " . self::TABLE . " ac
              LEFT JOIN currencies c ON ac.currency_id  = c.id
              LEFT JOIN entities   e ON ac.entity_id    = e.id AND ac.tenant_id = e.tenant_id
