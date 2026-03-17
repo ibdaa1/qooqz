@@ -160,8 +160,10 @@
     async function loadEntitiesByType(entityType, targetSelectEl) {
         if (!targetSelectEl) return;
         targetSelectEl.innerHTML = '<option value="">' + t('common.loading', 'Loading…') + '</option>';
+        targetSelectEl.disabled = true;
         if (!entityType) {
             targetSelectEl.innerHTML = '<option value="">' + t('form.fields.buyer_entity_id.select', 'Select entity') + '</option>';
+            targetSelectEl.disabled = false;
             return;
         }
         try {
@@ -171,13 +173,25 @@
             if (res.success) {
                 const data = Array.isArray(res.data) ? res.data
                     : (res.data && res.data.items ? res.data.items : (res.data && res.data.data ? res.data.data : []));
-                populateDropdown(targetSelectEl, data, 'id', 'store_name',
+                // Use store_name field (from entities table); fall back to name if not present
+                const labelKey = (data.length && data[0].store_name !== undefined) ? 'store_name' : 'name';
+                populateDropdown(targetSelectEl, data, 'id', labelKey,
                     t('form.fields.buyer_entity_id.select', 'Select entity'));
             }
         } catch (err) {
             console.warn('[Escrow] Failed to load entities:', err);
             targetSelectEl.innerHTML = '<option value="">' + t('common.load_error', 'Load failed') + '</option>';
+        } finally {
+            targetSelectEl.disabled = false;
         }
+    }
+
+    // ─── Load and set entity (helper for showForm) ────────────
+    async function loadAndSetEntity(entityType, entityId, typeEl, idEl) {
+        if (!typeEl) return;
+        typeEl.value = entityType || '';
+        await loadEntitiesByType(entityType, idEl);
+        if (idEl) idEl.value = entityId || '';
     }
 
     // ─── Status badge ─────────────────────────────────────────
@@ -311,18 +325,11 @@
             if (el.autoRelease)   el.autoRelease.value       = data.auto_release_days || '7';
             if (el.notes)         el.notes.value             = data.notes || '';
 
-            // Buyer: first load entities for this type, then set the value
-            if (el.buyerEntityType) {
-                el.buyerEntityType.value = data.buyer_entity_type || '';
-                await loadEntitiesByType(data.buyer_entity_type, el.buyerEntityId);
-                if (el.buyerEntityId) el.buyerEntityId.value = data.buyer_entity_id || '';
-            }
-            // Seller: first load entities for this type, then set the value
-            if (el.sellerEntityType) {
-                el.sellerEntityType.value = data.seller_entity_type || '';
-                await loadEntitiesByType(data.seller_entity_type, el.sellerEntityId);
-                if (el.sellerEntityId) el.sellerEntityId.value = data.seller_entity_id || '';
-            }
+            // Buyer / Seller: load entities for the given type, then set the selected value
+            await loadAndSetEntity(data.buyer_entity_type, data.buyer_entity_id,
+                el.buyerEntityType, el.buyerEntityId);
+            await loadAndSetEntity(data.seller_entity_type, data.seller_entity_id,
+                el.sellerEntityType, el.sellerEntityId);
 
             if (el.btnDelete) el.btnDelete.style.display = 'inline-flex';
             await loadTransactionDetails(data.id);
