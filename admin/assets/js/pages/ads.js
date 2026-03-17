@@ -115,7 +115,7 @@
             btn.classList.toggle('active', btn.dataset.tab === tabName);
         });
         document.querySelectorAll('.ads-tab-panel').forEach(function (panel) {
-            panel.style.display = (panel.id === 'tab' + capitalise(tabName)) ? '' : 'none';
+            panel.style.display = (panel.id === 'tab' + capitalize(tabName)) ? '' : 'none';
         });
 
         var btnAddCampaign = document.getElementById('btnAddCampaign');
@@ -124,7 +124,7 @@
         if (btnAddAd)       btnAddAd.style.display       = (tabName === 'ads'       && CAN_CREATE) ? '' : 'none';
     }
 
-    function capitalise(str) {
+    function capitalize(str) {
         return str.charAt(0).toUpperCase() + str.slice(1);
     }
 
@@ -162,8 +162,8 @@
     }
 
     /* Load campaigns (used by campaign tab + ads filter + ad form) */
-    function loadCampaignsData(callback, bustCache) {
-        if (!bustCache && campaignCache.length > 0) { callback(campaignCache); return; }
+    function loadCampaignsData(callback, ignoreCache) {
+        if (!ignoreCache && campaignCache.length > 0) { callback(campaignCache); return; }
         var url = (CFG.apiBase || '/api') + '/ad_campaigns?limit=500&order_by=id&order_dir=ASC';
         if (CFG.tenantId) url += '&tenant_id=' + CFG.tenantId;
         fetch(url, { credentials: 'same-origin' })
