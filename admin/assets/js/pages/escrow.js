@@ -4,25 +4,33 @@
     /**
      * /admin/assets/js/pages/escrow.js
      * Escrow Management Module
+     *
+     * Relations: currencies (/api/currencies), orders (/api/orders),
+     *            entity_types (/api/entity_types), entities (/api/entities)
      */
 
     const CONFIG = window.ESCROW_CONFIG || {};
     const PERMS  = window.PAGE_PERMISSIONS || {};
 
     const API = {
-        escrow:   CONFIG.apiUrl      || '/api/escrow_transactions',
-        history:  CONFIG.historyApi  || '/api/escrow_status_history',
-        disputes: CONFIG.disputesApi || '/api/escrow_disputes',
-        ledger:   CONFIG.ledgerApi   || '/api/escrow_ledger'
+        escrow:      CONFIG.apiUrl         || '/api/escrow_transactions',
+        history:     CONFIG.historyApi     || '/api/escrow_status_history',
+        disputes:    CONFIG.disputesApi    || '/api/escrow_disputes',
+        ledger:      CONFIG.ledgerApi      || '/api/escrow_ledger',
+        currencies:  CONFIG.currenciesApi  || '/api/currencies',
+        orders:      CONFIG.ordersApi      || '/api/orders',
+        entityTypes: CONFIG.entityTypesApi || '/api/entity_types',
+        entities:    CONFIG.entitiesApi    || '/api/entities'
     };
 
     const state = {
         page: 1, perPage: CONFIG.itemsPerPage || 20, total: 0,
         transactions: [], currentTransaction: null,
         disputesList: [], historyList: [], ledgerList: [],
+        currencies: [], orders: [], entityTypes: [], entities: [],
         filters: {}, permissions: PERMS,
-        lang: CONFIG.lang || window.USER_LANGUAGE || 'en',
-        csrfToken: window.APP_CONFIG && window.APP_CONFIG.CSRF_TOKEN ? window.APP_CONFIG.CSRF_TOKEN : '',
+        lang: CONFIG.lang || (window.APP_CONFIG && window.APP_CONFIG.LANG) || 'en',
+        csrfToken: CONFIG.csrfToken || (window.APP_CONFIG && window.APP_CONFIG.CSRF_TOKEN ? window.APP_CONFIG.CSRF_TOKEN : ''),
         tenantId: CONFIG.tenantId || (window.APP_CONFIG && window.APP_CONFIG.TENANT_ID ? window.APP_CONFIG.TENANT_ID : 1)
     };
 
@@ -33,6 +41,15 @@
         if (window._admin && typeof window._admin.t === 'function') {
             const val = window._admin.t(key);
             if (val && val !== key) return val;
+        }
+        if (window.TRANSLATIONS) {
+            const parts = key.split('.');
+            let val = window.TRANSLATIONS;
+            for (const p of parts) {
+                if (val == null || typeof val !== 'object') { val = undefined; break; }
+                val = val[p];
+            }
+            if (val !== undefined && val !== null && typeof val === 'string') return val;
         }
         return fb !== undefined ? fb : key;
     }
@@ -63,10 +80,130 @@
         return data;
     }
 
+    // ─── Populate dropdown ────────────────────────────────────
+    function populateDropdown(selectEl, data, valueKey, textKey, placeholder) {
+        if (!selectEl) return;
+        selectEl.innerHTML = '';
+        if (placeholder !== undefined) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = placeholder;
+            selectEl.appendChild(opt);
+        }
+        (data || []).forEach(function (item) {
+            const opt = document.createElement('option');
+            opt.value = item[valueKey];
+            opt.textContent = item[textKey];
+            selectEl.appendChild(opt);
+        });
+    }
+
+    // ─── Load all dropdown reference data ─────────────────────
+    async function loadDropdownData() {
+        // Currencies
+        try {
+            const res = await apiCall(API.currencies + '?format=json');
+            if (res.success) {
+                const data = Array.isArray(res.data) ? res.data
+                    : (res.data && res.data.items ? res.data.items : (res.data && res.data.data ? res.data.data : []));
+                state.currencies = data;
+            }
+        } catch (err) {
+            console.warn('[Escrow] Failed to load currencies:', err);
+            state.currencies = [
+                { code: 'SAR', name: 'SAR – Saudi Riyal' },
+                { code: 'USD', name: 'USD – US Dollar' },
+                { code: 'EUR', name: 'EUR – Euro' },
+                { code: 'AED', name: 'AED – UAE Dirham' }
+            ];
+        }
+        populateDropdown(el.currencyCode, state.currencies, 'code', 'name',
+            t('form.fields.currency_code.select', 'Select currency'));
+        // Also populate the filter dropdown
+        populateDropdown(document.getElementById('esc-currencyFilter'), state.currencies, 'code', 'code',
+            t('filters.all_currencies', 'All Currencies'));
+
+        // Entity types
+        try {
+            const res = await apiCall(API.entityTypes + '?format=json');
+            if (res.success) {
+                const data = Array.isArray(res.data) ? res.data
+                    : (res.data && res.data.items ? res.data.items : (res.data && res.data.data ? res.data.data : []));
+                state.entityTypes = data;
+            }
+        } catch (err) {
+            console.warn('[Escrow] Failed to load entity types:', err);
+        }
+        populateDropdown(el.buyerEntityType, state.entityTypes, 'code', 'name',
+            t('form.fields.buyer_entity_type.select', 'Select entity type'));
+        populateDropdown(el.sellerEntityType, state.entityTypes, 'code', 'name',
+            t('form.fields.seller_entity_type.select', 'Select entity type'));
+
+        // Orders (for current tenant)
+        try {
+            const res = await apiCall(API.orders + '?format=json&tenant_id=' + state.tenantId + '&limit=500');
+            if (res.success) {
+                const data = Array.isArray(res.data) ? res.data
+                    : (res.data && res.data.items ? res.data.items : (res.data && res.data.data ? res.data.data : []));
+                state.orders = data;
+            }
+        } catch (err) {
+            console.warn('[Escrow] Failed to load orders:', err);
+        }
+        populateDropdown(el.orderId, state.orders, 'id', 'order_number',
+            t('form.fields.order_id.select', 'Select order (optional)'));
+
+        console.log('[Escrow] Dropdown data loaded');
+    }
+
+    // ─── Load entities by type ────────────────────────────────
+    async function loadEntitiesByType(entityType, targetSelectEl) {
+        if (!targetSelectEl) return;
+        targetSelectEl.innerHTML = '<option value="">' + t('common.loading', 'Loading…') + '</option>';
+        if (!entityType) {
+            targetSelectEl.innerHTML = '<option value="">' + t('form.fields.buyer_entity_id.select', 'Select entity') + '</option>';
+            return;
+        }
+        try {
+            const res = await apiCall(
+                API.entities + '?format=json&tenant_id=' + state.tenantId + '&limit=500'
+            );
+            if (res.success) {
+                const data = Array.isArray(res.data) ? res.data
+                    : (res.data && res.data.items ? res.data.items : (res.data && res.data.data ? res.data.data : []));
+                populateDropdown(targetSelectEl, data, 'id', 'store_name',
+                    t('form.fields.buyer_entity_id.select', 'Select entity'));
+            }
+        } catch (err) {
+            console.warn('[Escrow] Failed to load entities:', err);
+            targetSelectEl.innerHTML = '<option value="">' + t('common.load_error', 'Load failed') + '</option>';
+        }
+    }
+
     // ─── Status badge ─────────────────────────────────────────
     function statusBadge(status) {
         return '<span class="badge badge-' + esc(status) + '">' +
                esc(t('status.' + status, status)) + '</span>';
+    }
+
+    // ─── Format amount with currency ──────────────────────────
+    function formatAmount(amount, currencyCode) {
+        if (amount == null) return '-';
+        const formatted = parseFloat(amount).toFixed(2);
+        return esc(formatted) + ' ' + esc(currencyCode || 'USD');
+    }
+
+    // ─── Get order number by id ───────────────────────────────
+    function getOrderNumber(orderId) {
+        if (!orderId) return '-';
+        const order = state.orders.find(function (o) { return String(o.id) === String(orderId); });
+        return order ? esc(order.order_number) : ('#' + orderId);
+    }
+
+    // ─── Get entity name by id ────────────────────────────────
+    function getEntityLabel(entityId, entityType) {
+        if (!entityId) return '-';
+        return esc(entityType || '') + ' #' + esc(entityId);
     }
 
     // ─── Load list ────────────────────────────────────────────
@@ -84,13 +221,15 @@
             });
             const result = await apiCall(API.escrow + '?' + params);
             if (result.success) {
-                state.transactions = result.data.items || result.data || [];
-                state.total        = (result.data.meta && result.data.meta.total) || state.transactions.length;
+                state.transactions = result.data && result.data.items ? result.data.items
+                    : (Array.isArray(result.data) ? result.data : []);
+                state.total = (result.data && result.data.meta && result.data.meta.total)
+                    ? result.data.meta.total : state.transactions.length;
                 renderTable(state.transactions);
                 updatePagination(state.total);
                 showTable();
             } else {
-                throw new Error(result.message);
+                throw new Error(result.message || t('messages.error.load_failed', 'Failed to load'));
             }
         } catch (err) {
             showError(err.message);
@@ -103,20 +242,23 @@
         if (!items.length) { showEmpty(); return; }
         el.tbody.innerHTML = items.map(function (r) {
             return '<tr data-id="' + r.id + '">' +
-                '<td>#' + r.id + '</td>' +
+                '<td>#' + esc(r.id) + '</td>' +
                 '<td><strong>' + esc(r.escrow_number || '-') + '</strong></td>' +
-                '<td>' + esc(r.order_id || '-') + '</td>' +
-                '<td>' + (r.amount != null ? parseFloat(r.amount).toFixed(2) : '-') + '</td>' +
-                '<td>' + esc(r.currency_code || 'USD') + '</td>' +
+                '<td>' + getOrderNumber(r.order_id) + '</td>' +
+                '<td>' + getEntityLabel(r.buyer_entity_id, r.buyer_entity_type) + '</td>' +
+                '<td>' + getEntityLabel(r.seller_entity_id, r.seller_entity_type) + '</td>' +
+                '<td>' + formatAmount(r.amount, r.currency_code) + '</td>' +
                 '<td>' + statusBadge(r.status) + '</td>' +
                 '<td>' + (r.created_at ? new Date(r.created_at).toLocaleDateString() : '-') + '</td>' +
                 '<td>' +
                     '<div class="table-actions">' +
-                        '<button class="btn btn-sm btn-secondary" onclick="Escrow.edit(' + r.id + ')" ' +
-                            'title="' + t('form.edit_title', 'Edit') + '"><i class="fas fa-edit"></i></button>' +
+                        (state.permissions.canEdit !== false
+                            ? '<button class="btn btn-sm btn-secondary" onclick="Escrow.edit(' + r.id + ')" ' +
+                              'title="' + esc(t('form.edit_title', 'Edit')) + '"><i class="fas fa-edit"></i></button>'
+                            : '') +
                         (state.permissions.canDelete
                             ? '<button class="btn btn-sm btn-danger" onclick="Escrow.remove(' + r.id + ')" ' +
-                              'title="' + t('form.buttons.delete', 'Delete') + '"><i class="fas fa-trash"></i></button>'
+                              'title="' + esc(t('form.buttons.delete', 'Delete')) + '"><i class="fas fa-trash"></i></button>'
                             : '') +
                     '</div>' +
                 '</td>' +
@@ -132,40 +274,69 @@
         state.ledgerList   = [];
 
         if (el.form) el.form.reset();
-        if (el.formContainer) el.formContainer.style.display = 'block';
-        if (el.formContainer) el.formContainer.scrollIntoView({ behavior: 'smooth' });
+        if (el.formContainer) {
+            el.formContainer.style.display = 'block';
+            el.formContainer.scrollIntoView({ behavior: 'smooth' });
+        }
 
         // Reset tabs
         if (el.formContainer) {
             el.formContainer.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
             el.formContainer.querySelectorAll('.tab-content').forEach(function (c) { c.style.display = 'none'; });
         }
-        const firstTab  = el.formContainer && el.formContainer.querySelector('.tab-btn[data-tab="details"]');
-        const detailsPn = document.getElementById('esc-tab-details');
-        if (firstTab) firstTab.classList.add('active');
-        if (detailsPn) detailsPn.style.display = 'block';
+        const firstTabBtn  = el.formContainer && el.formContainer.querySelector('.tab-btn[data-tab="details"]');
+        const detailsPane  = document.getElementById('esc-tab-details');
+        if (firstTabBtn) firstTabBtn.classList.add('active');
+        if (detailsPane) detailsPane.style.display = 'block';
+
+        // Re-populate dropdowns (in case data wasn't loaded yet)
+        populateDropdown(el.currencyCode, state.currencies, 'code', 'name',
+            t('form.fields.currency_code.select', 'Select currency'));
+        populateDropdown(el.buyerEntityType, state.entityTypes, 'code', 'name',
+            t('form.fields.buyer_entity_type.select', 'Select entity type'));
+        populateDropdown(el.sellerEntityType, state.entityTypes, 'code', 'name',
+            t('form.fields.seller_entity_type.select', 'Select entity type'));
+        populateDropdown(el.orderId, state.orders, 'id', 'order_number',
+            t('form.fields.order_id.select', 'Select order (optional)'));
 
         if (data) {
-            if (el.formTitle)      el.formTitle.textContent    = t('form.edit_title', 'Edit Escrow') + ' #' + data.id;
-            if (el.formId)         el.formId.value             = data.id;
-            if (el.escrowNumber)   el.escrowNumber.value       = data.escrow_number || '';
-            if (el.status)         el.status.value             = data.status || 'pending';
-            if (el.orderId)        el.orderId.value            = data.order_id || '';
-            if (el.amount)         el.amount.value             = data.amount || '';
-            if (el.escrowFee)      el.escrowFee.value          = data.escrow_fee || '0';
-            if (el.currencyCode)   el.currencyCode.value       = data.currency_code || 'USD';
-            if (el.autoRelease)    el.autoRelease.value        = data.auto_release_days || '7';
-            if (el.buyerEntityId)  el.buyerEntityId.value      = data.buyer_entity_id || '';
-            if (el.buyerEntityType) el.buyerEntityType.value   = data.buyer_entity_type || '';
-            if (el.sellerEntityId)  el.sellerEntityId.value    = data.seller_entity_id || '';
-            if (el.sellerEntityType) el.sellerEntityType.value = data.seller_entity_type || '';
-            if (el.notes)          el.notes.value              = data.notes || '';
-            if (el.btnDelete)      el.btnDelete.style.display  = 'inline-flex';
+            if (el.formTitle)     el.formTitle.textContent   = t('form.edit_title', 'Edit Escrow') + ' #' + data.id;
+            if (el.formId)        el.formId.value            = data.id;
+            if (el.escrowNumber)  el.escrowNumber.value      = data.escrow_number || '';
+            if (el.status)        el.status.value            = data.status || 'pending';
+            if (el.orderId)       el.orderId.value           = data.order_id || '';
+            if (el.amount)        el.amount.value            = data.amount || '';
+            if (el.escrowFee)     el.escrowFee.value         = data.escrow_fee || '0';
+            if (el.currencyCode)  el.currencyCode.value      = data.currency_code || 'USD';
+            if (el.autoRelease)   el.autoRelease.value       = data.auto_release_days || '7';
+            if (el.notes)         el.notes.value             = data.notes || '';
+
+            // Buyer: first load entities for this type, then set the value
+            if (el.buyerEntityType) {
+                el.buyerEntityType.value = data.buyer_entity_type || '';
+                await loadEntitiesByType(data.buyer_entity_type, el.buyerEntityId);
+                if (el.buyerEntityId) el.buyerEntityId.value = data.buyer_entity_id || '';
+            }
+            // Seller: first load entities for this type, then set the value
+            if (el.sellerEntityType) {
+                el.sellerEntityType.value = data.seller_entity_type || '';
+                await loadEntitiesByType(data.seller_entity_type, el.sellerEntityId);
+                if (el.sellerEntityId) el.sellerEntityId.value = data.seller_entity_id || '';
+            }
+
+            if (el.btnDelete) el.btnDelete.style.display = 'inline-flex';
             await loadTransactionDetails(data.id);
         } else {
-            if (el.formTitle)  el.formTitle.textContent  = t('form.add_title', 'New Escrow Transaction');
-            if (el.formId)     el.formId.value           = '';
+            if (el.formTitle)  el.formTitle.textContent   = t('form.add_title', 'New Escrow Transaction');
+            if (el.formId)     el.formId.value            = '';
             if (el.btnDelete)  el.btnDelete.style.display = 'none';
+            // Reset entity dropdowns
+            if (el.buyerEntityId) {
+                el.buyerEntityId.innerHTML = '<option value="">' + t('form.fields.buyer_entity_id.select', 'Select buyer') + '</option>';
+            }
+            if (el.sellerEntityId) {
+                el.sellerEntityId.innerHTML = '<option value="">' + t('form.fields.seller_entity_id.select', 'Select seller') + '</option>';
+            }
         }
     }
 
@@ -183,7 +354,8 @@
                 '&tenant_id=' + state.tenantId + '&order_by=id&order_dir=ASC'
             );
             if (res.success) {
-                state.historyList = res.data.items || res.data || [];
+                state.historyList = res.data && res.data.items ? res.data.items
+                    : (Array.isArray(res.data) ? res.data : []);
                 renderHistory();
             }
         } catch (e) { /* silent */ }
@@ -194,7 +366,8 @@
                 API.disputes + '?escrow_id=' + escrowId + '&tenant_id=' + state.tenantId
             );
             if (res.success) {
-                state.disputesList = res.data.items || res.data || [];
+                state.disputesList = res.data && res.data.items ? res.data.items
+                    : (Array.isArray(res.data) ? res.data : []);
                 renderDisputes();
             }
         } catch (e) { /* silent */ }
@@ -205,7 +378,8 @@
                 API.ledger + '?escrow_id=' + escrowId + '&tenant_id=' + state.tenantId
             );
             if (res.success) {
-                state.ledgerList = res.data.items || res.data || [];
+                state.ledgerList = res.data && res.data.items ? res.data.items
+                    : (Array.isArray(res.data) ? res.data : []);
                 renderLedger();
             }
         } catch (e) { /* silent */ }
@@ -226,7 +400,7 @@
                     '<div class="history-item-content">' +
                     '<div>' + statusBadge(h.status) +
                     (h.changed_by_entity_id
-                        ? ' &nbsp;<small style="color:var(--text-secondary)">by #' + h.changed_by_entity_id + '</small>'
+                        ? ' &nbsp;<small style="color:var(--text-secondary)">by #' + esc(h.changed_by_entity_id) + '</small>'
                         : '') +
                     '</div>' +
                     (h.notes
@@ -282,19 +456,19 @@
         }
         el.ledgerList.innerHTML = '<div class="items-table-wrapper"><table class="items-table">' +
             '<thead><tr>' +
-            '<th>' + t('ledger.headers.type',       'Type')       + '</th>' +
-            '<th>' + t('ledger.headers.amount',     'Amount')     + '</th>' +
-            '<th>' + t('ledger.headers.currency',   'Currency')   + '</th>' +
-            '<th>' + t('ledger.headers.entity',     'Entity')     + '</th>' +
-            '<th>' + t('ledger.headers.notes',      'Notes')      + '</th>' +
-            '<th>' + t('ledger.headers.created_at', 'Date')       + '</th>' +
+            '<th>' + t('ledger.headers.type',       'Type')     + '</th>' +
+            '<th>' + t('ledger.headers.amount',     'Amount')   + '</th>' +
+            '<th>' + t('ledger.headers.currency',   'Currency') + '</th>' +
+            '<th>' + t('ledger.headers.entity',     'Entity')   + '</th>' +
+            '<th>' + t('ledger.headers.notes',      'Notes')    + '</th>' +
+            '<th>' + t('ledger.headers.created_at', 'Date')     + '</th>' +
             '</tr></thead><tbody>' +
             state.ledgerList.map(function (entry) {
                 return '<tr>' +
                     '<td>' + esc(entry.transaction_type || '-') + '</td>' +
-                    '<td><strong>' + (entry.amount != null ? parseFloat(entry.amount).toFixed(2) : '-') + '</strong></td>' +
+                    '<td><strong>' + formatAmount(entry.amount, entry.currency_code) + '</strong></td>' +
                     '<td>' + esc(entry.currency_code || 'USD') + '</td>' +
-                    '<td>' + esc(entry.entity_type || '') + ' #' + esc(entry.entity_id || '') + '</td>' +
+                    '<td>' + getEntityLabel(entry.entity_id, entry.entity_type) + '</td>' +
                     '<td>' + esc(entry.notes || '-') + '</td>' +
                     '<td>' + (entry.created_at ? new Date(entry.created_at).toLocaleDateString() : '-') + '</td>' +
                     '</tr>';
@@ -310,7 +484,7 @@
 
         const data = {
             tenant_id:          state.tenantId,
-            status:             formData.get('status'),
+            status:             formData.get('status') || 'pending',
             order_id:           formData.get('order_id') ? parseInt(formData.get('order_id'), 10) : null,
             amount:             formData.get('amount') ? parseFloat(formData.get('amount')) : null,
             escrow_fee:         formData.get('escrow_fee') ? parseFloat(formData.get('escrow_fee')) : 0,
@@ -323,6 +497,12 @@
             notes:              formData.get('notes') || null
         };
         if (id) data.id = parseInt(id, 10);
+
+        // Basic validation
+        if (!data.amount) {
+            showNotification(t('form.fields.amount.required', 'Amount is required'), 'error');
+            return;
+        }
 
         try {
             const method = id ? 'PUT' : 'POST';
@@ -340,7 +520,7 @@
                 hideForm();
                 loadEscrow(state.page);
             } else {
-                throw new Error(res.message);
+                throw new Error(res.message || t('messages.error.save_failed', 'Save failed'));
             }
         } catch (err) {
             showNotification(err.message, 'error');
@@ -414,7 +594,7 @@
     }
 
     // ─── Init ─────────────────────────────────────────────────
-    function init() {
+    async function init() {
         el = {
             container:        document.getElementById('esc-tableContainer'),
             loading:          document.getElementById('esc-tableLoading'),
@@ -433,10 +613,10 @@
             escrowFee:        document.getElementById('esc-escrowFee'),
             currencyCode:     document.getElementById('esc-currencyCode'),
             autoRelease:      document.getElementById('esc-autoReleaseDays'),
-            buyerEntityId:    document.getElementById('esc-buyerEntityId'),
             buyerEntityType:  document.getElementById('esc-buyerEntityType'),
-            sellerEntityId:   document.getElementById('esc-sellerEntityId'),
+            buyerEntityId:    document.getElementById('esc-buyerEntityId'),
             sellerEntityType: document.getElementById('esc-sellerEntityType'),
+            sellerEntityId:   document.getElementById('esc-sellerEntityId'),
             notes:            document.getElementById('esc-notes'),
             btnDelete:        document.getElementById('esc-btnDelete'),
             historyList:      document.getElementById('esc-historyList'),
@@ -444,13 +624,30 @@
             ledgerList:       document.getElementById('esc-ledgerList')
         };
 
-        // Bind events
-        document.getElementById('esc-btnAdd') &&
-            document.getElementById('esc-btnAdd').addEventListener('click', function () { showForm(); });
-        document.getElementById('esc-btnCloseForm') &&
-            document.getElementById('esc-btnCloseForm').addEventListener('click', hideForm);
-        document.getElementById('esc-btnCancelForm') &&
-            document.getElementById('esc-btnCancelForm').addEventListener('click', hideForm);
+        // Load all reference data (currencies, entity types, orders)
+        await loadDropdownData();
+
+        // Bind entity type change → reload entity list
+        if (el.buyerEntityType) {
+            el.buyerEntityType.addEventListener('change', function () {
+                loadEntitiesByType(this.value, el.buyerEntityId);
+            });
+        }
+        if (el.sellerEntityType) {
+            el.sellerEntityType.addEventListener('change', function () {
+                loadEntitiesByType(this.value, el.sellerEntityId);
+            });
+        }
+
+        // Bind Add / Close / Cancel
+        const btnAdd = document.getElementById('esc-btnAdd');
+        if (btnAdd) btnAdd.addEventListener('click', function () { showForm(); });
+
+        const btnClose = document.getElementById('esc-btnCloseForm');
+        if (btnClose) btnClose.addEventListener('click', hideForm);
+
+        const btnCancel = document.getElementById('esc-btnCancelForm');
+        if (btnCancel) btnCancel.addEventListener('click', hideForm);
 
         if (el.form) el.form.addEventListener('submit', saveEscrow);
 
@@ -462,24 +659,29 @@
         }
 
         // Filter events
-        document.getElementById('esc-btnApplyFilters') &&
-            document.getElementById('esc-btnApplyFilters').addEventListener('click', function () {
+        const btnApply = document.getElementById('esc-btnApplyFilters');
+        if (btnApply) {
+            btnApply.addEventListener('click', function () {
                 state.filters = {
-                    search: (document.getElementById('esc-searchInput') || {}).value || '',
-                    status: (document.getElementById('esc-statusFilter') || {}).value || ''
+                    search:        (document.getElementById('esc-searchInput') || {}).value || '',
+                    status:        (document.getElementById('esc-statusFilter') || {}).value || '',
+                    currency_code: (document.getElementById('esc-currencyFilter') || {}).value || ''
                 };
                 loadEscrow(1);
             });
+        }
 
-        document.getElementById('esc-btnResetFilters') &&
-            document.getElementById('esc-btnResetFilters').addEventListener('click', function () {
+        const btnReset = document.getElementById('esc-btnResetFilters');
+        if (btnReset) {
+            btnReset.addEventListener('click', function () {
                 state.filters = {};
-                const si = document.getElementById('esc-searchInput');
-                const sf = document.getElementById('esc-statusFilter');
-                if (si) si.value = '';
-                if (sf) sf.value = '';
+                ['esc-searchInput', 'esc-statusFilter', 'esc-currencyFilter'].forEach(function (id) {
+                    const el2 = document.getElementById(id);
+                    if (el2) el2.value = '';
+                });
                 loadEscrow(1);
             });
+        }
 
         // Tab switching
         if (el.formContainer) {
@@ -498,23 +700,23 @@
             });
         }
 
-        loadEscrow(1);
+        // Load initial data
+        await loadEscrow(1);
     }
 
     // ─── Public API ───────────────────────────────────────────
     window.Escrow = {
-        init: init,
-        load: loadEscrow,
-        edit: async function (id) {
+        init:   init,
+        load:   loadEscrow,
+        edit:   async function (id) {
             try {
                 const res = await apiCall(API.escrow + '?id=' + id + '&tenant_id=' + state.tenantId);
                 if (res.success) await showForm(res.data);
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error('[Escrow] edit failed:', e); }
         },
         remove: deleteEscrow
     };
 
-    // Initialization is driven by the fragment's inline script which waits
-    // for the admin:i18n:applied event so translations are ready first.
+    // Initialization is driven by the fragment's inline script.
     // Do NOT self-invoke init() here.
 })();

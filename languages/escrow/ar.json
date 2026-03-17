@@ -9,39 +9,54 @@
     "form": {
         "add_title": "معاملة ضمان جديدة",
         "edit_title": "تعديل الضمان",
+        "parties": {
+            "info": "اختر كيانات المشتري والبائع المشاركين في هذه المعاملة."
+        },
+        "sections": {
+            "buyer": "المشتري",
+            "seller": "البائع"
+        },
         "fields": {
             "escrow_number": {
-                "label": "رقم الضمان"
+                "label": "رقم الضمان",
+                "placeholder": "يُولَّد تلقائياً إذا تُرك فارغاً"
             },
             "status": {
                 "label": "الحالة"
             },
             "order_id": {
-                "label": "رقم الطلب"
+                "label": "الطلب المرتبط",
+                "select": "اختر طلباً (اختياري)"
             },
             "amount": {
-                "label": "المبلغ"
+                "label": "المبلغ",
+                "required": "المبلغ مطلوب"
             },
             "escrow_fee": {
                 "label": "رسوم الضمان"
             },
             "currency_code": {
-                "label": "العملة"
+                "label": "العملة",
+                "select": "اختر العملة"
             },
             "auto_release_days": {
                 "label": "أيام الإفراج التلقائي"
             },
-            "buyer_entity_id": {
-                "label": "معرّف المشتري"
-            },
             "buyer_entity_type": {
-                "label": "نوع كيان المشتري"
+                "label": "نوع كيان المشتري",
+                "select": "اختر نوع الكيان"
             },
-            "seller_entity_id": {
-                "label": "معرّف البائع"
+            "buyer_entity_id": {
+                "label": "كيان المشتري",
+                "select": "اختر المشتري"
             },
             "seller_entity_type": {
-                "label": "نوع كيان البائع"
+                "label": "نوع كيان البائع",
+                "select": "اختر نوع الكيان"
+            },
+            "seller_entity_id": {
+                "label": "كيان البائع",
+                "select": "اختر البائع"
             },
             "notes": {
                 "label": "ملاحظات",
@@ -55,6 +70,7 @@
         },
         "tabs": {
             "details": "التفاصيل",
+            "parties": "الأطراف",
             "disputes": "النزاعات",
             "history": "سجل الحالات",
             "ledger": "سجل المعاملات"
@@ -65,6 +81,8 @@
         "search_placeholder": "البحث برقم الضمان…",
         "status": "الحالة",
         "all_statuses": "جميع الحالات",
+        "currency": "العملة",
+        "all_currencies": "جميع العملات",
         "apply": "تطبيق الفلاتر",
         "reset": "إعادة تعيين"
     },
@@ -72,9 +90,10 @@
         "headers": {
             "id": "المعرّف",
             "escrow_number": "رقم الضمان",
-            "order_id": "الطلب",
+            "order": "الطلب",
+            "buyer": "المشتري",
+            "seller": "البائع",
             "amount": "المبلغ",
-            "currency": "العملة",
             "status": "الحالة",
             "created_at": "تاريخ الإنشاء",
             "actions": "الإجراءات"
@@ -132,6 +151,13 @@
             "created_at": "التاريخ"
         },
         "empty": "لا توجد إدخالات في السجل بعد"
+    },
+    "common": {
+        "loading": "جاري التحميل…",
+        "load_error": "فشل التحميل"
+    },
+    "accessibility": {
+        "close": "إغلاق"
     },
     "messages": {
         "created": "تم إنشاء معاملة الضمان بنجاح",

@@ -9,39 +9,54 @@
     "form": {
         "add_title": "New Escrow Transaction",
         "edit_title": "Edit Escrow",
+        "parties": {
+            "info": "Select the buyer and seller entities involved in this escrow transaction."
+        },
+        "sections": {
+            "buyer": "Buyer",
+            "seller": "Seller"
+        },
         "fields": {
             "escrow_number": {
-                "label": "Escrow Number"
+                "label": "Escrow Number",
+                "placeholder": "Auto-generated if empty"
             },
             "status": {
                 "label": "Status"
             },
             "order_id": {
-                "label": "Order ID"
+                "label": "Linked Order",
+                "select": "Select order (optional)"
             },
             "amount": {
-                "label": "Amount"
+                "label": "Amount",
+                "required": "Amount is required"
             },
             "escrow_fee": {
                 "label": "Escrow Fee"
             },
             "currency_code": {
-                "label": "Currency"
+                "label": "Currency",
+                "select": "Select currency"
             },
             "auto_release_days": {
                 "label": "Auto-Release Days"
             },
-            "buyer_entity_id": {
-                "label": "Buyer Entity ID"
-            },
             "buyer_entity_type": {
-                "label": "Buyer Entity Type"
+                "label": "Buyer Entity Type",
+                "select": "Select entity type"
             },
-            "seller_entity_id": {
-                "label": "Seller Entity ID"
+            "buyer_entity_id": {
+                "label": "Buyer Entity",
+                "select": "Select buyer"
             },
             "seller_entity_type": {
-                "label": "Seller Entity Type"
+                "label": "Seller Entity Type",
+                "select": "Select entity type"
+            },
+            "seller_entity_id": {
+                "label": "Seller Entity",
+                "select": "Select seller"
             },
             "notes": {
                 "label": "Notes",
@@ -55,6 +70,7 @@
         },
         "tabs": {
             "details": "Details",
+            "parties": "Parties",
             "disputes": "Disputes",
             "history": "Status History",
             "ledger": "Ledger"
@@ -65,6 +81,8 @@
         "search_placeholder": "Search by escrow number…",
         "status": "Status",
         "all_statuses": "All Statuses",
+        "currency": "Currency",
+        "all_currencies": "All Currencies",
         "apply": "Apply Filters",
         "reset": "Reset"
     },
@@ -72,9 +90,10 @@
         "headers": {
             "id": "ID",
             "escrow_number": "Escrow #",
-            "order_id": "Order",
+            "order": "Order",
+            "buyer": "Buyer",
+            "seller": "Seller",
             "amount": "Amount",
-            "currency": "Currency",
             "status": "Status",
             "created_at": "Created",
             "actions": "Actions"
@@ -132,6 +151,13 @@
             "created_at": "Date"
         },
         "empty": "No ledger entries yet"
+    },
+    "common": {
+        "loading": "Loading…",
+        "load_error": "Load failed"
+    },
+    "accessibility": {
+        "close": "Close"
     },
     "messages": {
         "created": "Escrow transaction created successfully",
