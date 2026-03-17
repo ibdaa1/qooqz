@@ -201,22 +201,34 @@
     }
 
     // ─── Format amount with currency ──────────────────────────
-    function formatAmount(amount, currencyCode) {
+    function formatAmount(amount, currencyCode, row) {
         if (amount == null) return '-';
-        const formatted = parseFloat(amount).toFixed(2);
-        return esc(formatted) + ' ' + esc(currencyCode || 'USD');
+        const decimalPlaces = (row && row.currency_decimal_places != null)
+            ? parseInt(row.currency_decimal_places, 10) : 2;
+        const formatted = parseFloat(amount).toFixed(decimalPlaces);
+        if (row && row.currency_symbol) {
+            const pos = row.currency_symbol_position || 'before';
+            return pos === 'after'
+                ? esc(formatted) + '\u00a0' + esc(row.currency_symbol)
+                : esc(row.currency_symbol) + '\u00a0' + esc(formatted);
+        }
+        return esc(formatted) + '\u00a0' + esc(currencyCode || 'USD');
     }
 
     // ─── Get order number by id ───────────────────────────────
-    function getOrderNumber(orderId) {
+    function getOrderNumber(orderId, row) {
         if (!orderId) return '-';
+        // Prefer enriched field returned by API
+        if (row && row.order_number) return esc(row.order_number);
         const order = state.orders.find(function (o) { return String(o.id) === String(orderId); });
         return order ? esc(order.order_number) : ('#' + orderId);
     }
 
     // ─── Get entity name by id ────────────────────────────────
-    function getEntityLabel(entityId, entityType) {
+    function getEntityLabel(entityId, entityType, storeName) {
         if (!entityId) return '-';
+        // Prefer enriched store_name returned by API
+        if (storeName) return esc(storeName);
         return esc(entityType || '') + ' #' + esc(entityId);
     }
 
@@ -258,10 +270,10 @@
             return '<tr data-id="' + r.id + '">' +
                 '<td>#' + esc(r.id) + '</td>' +
                 '<td><strong>' + esc(r.escrow_number || '-') + '</strong></td>' +
-                '<td>' + getOrderNumber(r.order_id) + '</td>' +
-                '<td>' + getEntityLabel(r.buyer_entity_id, r.buyer_entity_type) + '</td>' +
-                '<td>' + getEntityLabel(r.seller_entity_id, r.seller_entity_type) + '</td>' +
-                '<td>' + formatAmount(r.amount, r.currency_code) + '</td>' +
+                '<td>' + getOrderNumber(r.order_id, r) + '</td>' +
+                '<td>' + getEntityLabel(r.buyer_entity_id, r.buyer_entity_type, r.buyer_store_name) + '</td>' +
+                '<td>' + getEntityLabel(r.seller_entity_id, r.seller_entity_type, r.seller_store_name) + '</td>' +
+                '<td>' + formatAmount(r.amount, r.currency_code, r) + '</td>' +
                 '<td>' + statusBadge(r.status) + '</td>' +
                 '<td>' + (r.created_at ? new Date(r.created_at).toLocaleDateString() : '-') + '</td>' +
                 '<td>' +

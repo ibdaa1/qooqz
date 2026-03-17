@@ -25,25 +25,38 @@ final class PdoEscrowTransactionsRepository implements EscrowTransactionsReposit
         string $orderBy = 'id',
         string $orderDir = 'DESC'
     ): array {
-        $sql = "SELECT * FROM " . self::TABLE . " WHERE tenant_id = :tenant_id";
+        $sql = "SELECT et.*,
+                    c.name            AS currency_name,
+                    c.symbol          AS currency_symbol,
+                    c.symbol_position AS currency_symbol_position,
+                    c.decimal_places  AS currency_decimal_places,
+                    o.order_number,
+                    be.store_name     AS buyer_store_name,
+                    se.store_name     AS seller_store_name
+                FROM " . self::TABLE . " et
+                LEFT JOIN currencies c  ON et.currency_code    = c.code
+                LEFT JOIN orders     o  ON et.order_id         = o.id AND et.tenant_id = o.tenant_id
+                LEFT JOIN entities   be ON et.buyer_entity_id  = be.id AND et.tenant_id = be.tenant_id
+                LEFT JOIN entities   se ON et.seller_entity_id = se.id AND et.tenant_id = se.tenant_id
+                WHERE et.tenant_id = :tenant_id";
         $params = [':tenant_id' => $tenantId];
 
         foreach (self::FILTERABLE_COLUMNS as $col) {
             if (isset($filters[$col]) && $filters[$col] !== '') {
-                $sql .= " AND {$col} = :{$col}";
+                $sql .= " AND et.{$col} = :{$col}";
                 $params[":{$col}"] = $filters[$col];
             }
         }
 
         if (!empty($filters['search'])) {
-            $sql .= " AND (escrow_number LIKE :search OR notes LIKE :search2)";
+            $sql .= " AND (et.escrow_number LIKE :search OR et.notes LIKE :search2)";
             $params[':search']  = '%' . $filters['search'] . '%';
             $params[':search2'] = '%' . $filters['search'] . '%';
         }
 
         $orderBy  = in_array($orderBy, self::ALLOWED_ORDER_BY, true) ? $orderBy : 'id';
         $orderDir = strtoupper($orderDir) === 'ASC' ? 'ASC' : 'DESC';
-        $sql .= " ORDER BY {$orderBy} {$orderDir}";
+        $sql .= " ORDER BY et.{$orderBy} {$orderDir}";
 
         if ($limit !== null) {
             $sql .= " LIMIT :limit OFFSET :offset";
@@ -80,14 +93,31 @@ final class PdoEscrowTransactionsRepository implements EscrowTransactionsReposit
         }
 
         $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->execute();
         return (int)$stmt->fetchColumn();
     }
 
     public function find(int $tenantId, int $id): ?array
     {
         $stmt = $this->pdo->prepare(
-            "SELECT * FROM " . self::TABLE . " WHERE tenant_id = :tenant_id AND id = :id LIMIT 1"
+            "SELECT et.*,
+                    c.name            AS currency_name,
+                    c.symbol          AS currency_symbol,
+                    c.symbol_position AS currency_symbol_position,
+                    c.decimal_places  AS currency_decimal_places,
+                    o.order_number,
+                    be.store_name     AS buyer_store_name,
+                    se.store_name     AS seller_store_name
+             FROM " . self::TABLE . " et
+             LEFT JOIN currencies c  ON et.currency_code    = c.code
+             LEFT JOIN orders     o  ON et.order_id         = o.id AND et.tenant_id = o.tenant_id
+             LEFT JOIN entities   be ON et.buyer_entity_id  = be.id AND et.tenant_id = be.tenant_id
+             LEFT JOIN entities   se ON et.seller_entity_id = se.id AND et.tenant_id = se.tenant_id
+             WHERE et.tenant_id = :tenant_id AND et.id = :id
+             LIMIT 1"
         );
         $stmt->execute([':tenant_id' => $tenantId, ':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
