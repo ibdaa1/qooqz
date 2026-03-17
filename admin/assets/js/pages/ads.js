@@ -27,6 +27,12 @@
     // Active tab
     var activeTab = 'campaigns';
 
+    // Placements state
+    var placementsPage    = 1;
+    var placementsFilters = {};
+    var currentPlacementId = null;
+    var placementItemsPage = 1;
+
     function reloadConfig() {
         CFG        = window.ADS_CONFIG || {};
         CSRF       = CFG.csrfToken || '';
@@ -121,10 +127,12 @@
             panel.style.display = (panel.id === 'tab' + capitalize(tabName)) ? '' : 'none';
         });
 
-        var btnAddCampaign = document.getElementById('btnAddCampaign');
-        var btnAddAd       = document.getElementById('btnAddAd');
-        if (btnAddCampaign) btnAddCampaign.style.display = (tabName === 'campaigns' && CAN_CREATE) ? '' : 'none';
-        if (btnAddAd)       btnAddAd.style.display       = (tabName === 'ads'       && CAN_CREATE) ? '' : 'none';
+        var btnAddCampaign   = document.getElementById('btnAddCampaign');
+        var btnAddAd         = document.getElementById('btnAddAd');
+        var btnAddPlacement  = document.getElementById('btnAddPlacement');
+        if (btnAddCampaign)  btnAddCampaign.style.display  = (tabName === 'campaigns'  && CAN_CREATE) ? '' : 'none';
+        if (btnAddAd)        btnAddAd.style.display        = (tabName === 'ads'        && CAN_CREATE) ? '' : 'none';
+        if (btnAddPlacement) btnAddPlacement.style.display = (tabName === 'placements' && CAN_CREATE) ? '' : 'none';
     }
 
     function capitalize(str) {
@@ -581,6 +589,12 @@
         var transList = document.getElementById('adTranslationsList');
         if (transList) transList.innerHTML = '<p class="ad-trans-empty">' + esc(t('translations.no_records', 'No translations added yet.')) + '</p>';
 
+        // Clear English translation fields
+        var enTitleEl = document.getElementById('adEnTitle');
+        var enDescEl  = document.getElementById('adEnDescription');
+        if (enTitleEl) enTitleEl.value = '';
+        if (enDescEl)  enDescEl.value  = '';
+
         // Reset image type selector
         var imgTypeSel = document.getElementById('adImageType');
         if (imgTypeSel) imgTypeSel.value = '';
@@ -630,6 +644,21 @@
                 loadAdImages(ad.id, 20);
                 loadAdTranslations(ad.id);
 
+                // Load English translation for the Basic tab fields
+                var enUrl = (CFG.translationsApi || '/api/ad_translations') + '?ad_id=' + ad.id + '&language_code=en';
+                fetch(enUrl, { credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (json) {
+                        var items = (json.data && json.data.items) ? json.data.items : (Array.isArray(json.data) ? json.data : []);
+                        var enTrans = null;
+                        items.forEach(function (tr) { if (tr.language_code === 'en') enTrans = tr; });
+                        var enTitleEl = document.getElementById('adEnTitle');
+                        var enDescEl  = document.getElementById('adEnDescription');
+                        if (enTitleEl) enTitleEl.value = enTrans ? (enTrans.title       || '') : '';
+                        if (enDescEl)  enDescEl.value  = enTrans ? (enTrans.description || '') : '';
+                    })
+                    .catch(function () {});
+
                 // Switch to basic tab
                 switchAdModalTab('basic');
 
@@ -641,6 +670,16 @@
     function saveAd() {
         var idEl = document.getElementById('adId');
         var id   = idEl ? parseInt(idEl.value, 10) : 0;
+
+        // Validate English title (required)
+        var enTitleEl  = document.getElementById('adEnTitle');
+        var enDescEl   = document.getElementById('adEnDescription');
+        var enTitleVal = enTitleEl ? enTitleEl.value.trim() : '';
+        if (!enTitleVal) {
+            showNotification(t('en_translation_required', 'English title is required'), 'warning');
+            switchAdModalTab('basic');
+            return;
+        }
 
         var getVal = function (elId) { var el = document.getElementById(elId); return el ? el.value.trim() : ''; };
 
@@ -670,6 +709,20 @@
             .then(function (r) { return r.json(); })
             .then(function (json) {
                 if (json.success || json.status === 'success') {
+                    // Auto-save English translation
+                    var savedId = (json.data && json.data.id) ? json.data.id : (id > 0 ? id : 0);
+                    if (savedId && enTitleVal) {
+                        var enDescVal = enDescEl ? enDescEl.value.trim() : '';
+                        var transData = { ad_id: savedId, language_code: 'en', title: enTitleVal, description: enDescVal };
+                        var transUrl  = (CFG.translationsApi || '/api/ad_translations');
+                        if (CFG.tenantId) transUrl += '?tenant_id=' + CFG.tenantId;
+                        fetch(transUrl, {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(transData)
+                        }).catch(function () {});
+                    }
                     closeModal('adModal');
                     showNotification(t('saved', 'Ad saved successfully'), 'success');
                     loadAds({ page: adsPage, filters: adsFilters });
@@ -692,6 +745,12 @@
         document.querySelectorAll('.ad-modal-tab-content').forEach(function (panel) {
             panel.style.display = (panel.id === 'adTab-' + tabName) ? '' : 'none';
         });
+        // Load all images when switching to the Images tab (if ad is saved)
+        if (tabName === 'images') {
+            var idEl = document.getElementById('adId');
+            var adId = idEl ? parseInt(idEl.value, 10) : 0;
+            if (adId) loadAllAdImages(adId);
+        }
     }
 
     /* ══════════════════════════════════════════════
@@ -719,14 +778,39 @@
             container.innerHTML = '<p style="color:var(--text-secondary,#94a3b8); font-size:0.85rem;">' + esc(t('images.no_images', 'No images yet.')) + '</p>';
             return;
         }
+        var hasGroups = adSelectedImages.some(function (img) { return img.image_type_name; });
         var html = '';
-        adSelectedImages.forEach(function (img, idx) {
-            var src = img.url || img.thumb_url || img.image_url || '';
-            html += '<div class="ad-image-item" data-index="' + idx + '">';
-            html += '<img src="' + esc(src) + '" alt="">';
-            html += '<button type="button" class="ad-image-remove" data-index="' + idx + '">&times;</button>';
-            html += '</div>';
-        });
+        if (hasGroups) {
+            var groups = {};
+            var groupOrder = [];
+            adSelectedImages.forEach(function (img) {
+                var grp = img.image_type_name || t('images.label', 'Ad Images');
+                if (!groups[grp]) { groups[grp] = []; groupOrder.push(grp); }
+                groups[grp].push(img);
+            });
+            groupOrder.forEach(function (grp) {
+                html += '<div class="ad-images-group" style="margin-bottom:1rem;">';
+                html += '<h5 style="font-size:0.82rem; color:var(--text-secondary,#94a3b8); margin:0 0 0.35rem; font-weight:600;">' + esc(grp) + '</h5>';
+                html += '<div style="display:flex; flex-wrap:wrap; gap:8px;">';
+                groups[grp].forEach(function (img) {
+                    var idx = adSelectedImages.indexOf(img);
+                    var src = img.url || img.thumb_url || img.image_url || '';
+                    html += '<div class="ad-image-item" data-index="' + idx + '">';
+                    html += '<img src="' + esc(src) + '" alt="">';
+                    html += '<button type="button" class="ad-image-remove" data-index="' + idx + '">&times;</button>';
+                    html += '</div>';
+                });
+                html += '</div></div>';
+            });
+        } else {
+            adSelectedImages.forEach(function (img, idx) {
+                var src = img.url || img.thumb_url || img.image_url || '';
+                html += '<div class="ad-image-item" data-index="' + idx + '">';
+                html += '<img src="' + esc(src) + '" alt="">';
+                html += '<button type="button" class="ad-image-remove" data-index="' + idx + '">&times;</button>';
+                html += '</div>';
+            });
+        }
         container.innerHTML = html;
         container.querySelectorAll('.ad-image-remove').forEach(function (btn) {
             btn.addEventListener('click', function () {
@@ -734,6 +818,37 @@
                 adSelectedImages.splice(i, 1);
                 renderAdImagesPreview();
             });
+        });
+    }
+
+    function loadAllAdImages(adId) {
+        var typeIds   = [13, 14, 15, 16, 17, 18, 19, 20];
+        var typeNames = {
+            13: t('images.types.ad_homepage_banner', 'Homepage Banner'),
+            14: t('images.types.ad_section_banner',  'Section Banner'),
+            15: t('images.types.ad_square',           'Square Ad'),
+            16: t('images.types.ad_store_banner',     'Store Banner'),
+            17: t('images.types.ad_small',            'Small Ad'),
+            18: t('images.types.ad_search_banner',    'Search Banner'),
+            19: t('images.types.ad_mobile_banner',    'Mobile Banner'),
+            20: t('images.types.ad_thumb',            'Thumbnail'),
+        };
+        var promises = typeIds.map(function (typeId) {
+            var url = (CFG.imagesApi || '/api/images') + '/by_owner?owner_id=' + adId + '&image_type_id=' + typeId;
+            return fetch(url, { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (json) {
+                    var imgs = Array.isArray(json.data) ? json.data : (json.data && Array.isArray(json.data.items) ? json.data.items : []);
+                    imgs.forEach(function (img) { img.image_type_name = typeNames[typeId] || ('Type ' + typeId); });
+                    return imgs;
+                })
+                .catch(function () { return []; });
+        });
+        Promise.all(promises).then(function (results) {
+            var all = [];
+            results.forEach(function (arr) { arr.forEach(function (img) { all.push(img); }); });
+            adSelectedImages = all;
+            renderAdImagesPreview();
         });
     }
 
@@ -952,6 +1067,443 @@
         loadAds({ page: 1, filters: {} });
     }
 
+    /* ══════════════════════════════════════════════
+     * PLACEMENTS
+     * ══════════════════════════════════════════ */
+
+    function loadPlacements(params) {
+        params = params || {};
+        var page    = params.page    || placementsPage;
+        var filters = params.filters || placementsFilters;
+        var offset  = (page - 1) * PER_PAGE;
+
+        var url = (CFG.placementsApi || '/api/ad_placements') + '?limit=' + PER_PAGE + '&offset=' + offset + '&order_by=id&order_dir=DESC';
+        if (CFG.tenantId) url += '&tenant_id=' + CFG.tenantId;
+        if (filters.status) url += '&status=' + encodeURIComponent(filters.status);
+        if (filters.search) url += '&search=' + encodeURIComponent(filters.search);
+
+        var tbody = document.getElementById('placementsTableBody');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center">...</td></tr>';
+
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                var items = (json.data && json.data.items) ? json.data.items : [];
+                var total = (json.data && json.data.meta) ? (json.data.meta.total || 0) : 0;
+                renderPlacementsTable(items);
+                renderPlacementsPagination(page, total);
+                updatePlacementsPaginationInfo(page, items.length, total);
+            })
+            .catch(function () {
+                showNotification(t('error_placements_load', 'Failed to load placements'), 'error');
+                if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center">' + esc(t('placements_table.no_records', 'No placements found')) + '</td></tr>';
+            });
+    }
+
+    function renderPlacementsTable(items) {
+        var tbody = document.getElementById('placementsTableBody');
+        if (!tbody) return;
+        if (!items || items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">' + esc(t('placements_table.no_records', 'No placements found')) + '</td></tr>';
+            return;
+        }
+        var html = '';
+        items.forEach(function (p) {
+            html += '<tr>';
+            html += '<td>' + esc(p.id) + '</td>';
+            html += '<td><strong>' + esc(p.name) + '</strong></td>';
+            html += '<td><code>' + esc(p.placement_key) + '</code></td>';
+            html += '<td>' + statusBadge(p.status) + '</td>';
+            html += '<td>' + esc((p.created_at || '').replace('T', ' ').substring(0, 16)) + '</td>';
+            html += '<td><div class="row-actions">';
+            if (CAN_EDIT) {
+                html += '<button class="btn btn-secondary btn-sm btn-edit-placement" data-id="' + esc(p.id) + '">' + esc(t('table.edit', 'Edit')) + '</button>';
+            }
+            html += '<button class="btn btn-secondary btn-sm btn-view-placement-items" data-id="' + esc(p.id) + '" data-name="' + esc(p.name) + '">' + esc(t('placement_items_title', 'Items')) + '</button>';
+            if (CAN_DELETE) {
+                html += '<button class="btn btn-danger btn-sm btn-delete-placement" data-id="' + esc(p.id) + '">' + esc(t('table.delete', 'Delete')) + '</button>';
+            }
+            html += '</div></td>';
+            html += '</tr>';
+        });
+        tbody.innerHTML = html;
+
+        tbody.querySelectorAll('.btn-edit-placement').forEach(function (btn) {
+            btn.addEventListener('click', function () { openEditPlacementModal(parseInt(btn.dataset.id, 10)); });
+        });
+        tbody.querySelectorAll('.btn-view-placement-items').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                viewPlacementItems(parseInt(btn.dataset.id, 10), btn.dataset.name || ('#' + btn.dataset.id));
+            });
+        });
+        tbody.querySelectorAll('.btn-delete-placement').forEach(function (btn) {
+            btn.addEventListener('click', function () { confirmDeletePlacement(parseInt(btn.dataset.id, 10)); });
+        });
+    }
+
+    function renderPlacementsPagination(page, total) {
+        var totalPages = Math.ceil(total / PER_PAGE) || 1;
+        var pg = document.getElementById('placementsPagination');
+        if (!pg) return;
+        var html = '';
+        html += '<button class="page-btn" ' + (page <= 1 ? 'disabled' : '') + ' data-page="' + (page - 1) + '">' + esc(t('pagination.prev', 'Prev')) + '</button>';
+        var start = Math.max(1, page - 2);
+        var end   = Math.min(totalPages, start + 4);
+        if (end - start < 4) start = Math.max(1, end - 4);
+        for (var i = start; i <= end; i++) {
+            html += '<button class="page-btn' + (i === page ? ' active' : '') + '" data-page="' + i + '">' + i + '</button>';
+        }
+        html += '<button class="page-btn" ' + (page >= totalPages ? 'disabled' : '') + ' data-page="' + (page + 1) + '">' + esc(t('pagination.next', 'Next')) + '</button>';
+        pg.innerHTML = html;
+        pg.querySelectorAll('.page-btn:not([disabled])').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                placementsPage = parseInt(btn.dataset.page, 10);
+                loadPlacements({ page: placementsPage, filters: placementsFilters });
+            });
+        });
+    }
+
+    function updatePlacementsPaginationInfo(page, count, total) {
+        var el = document.getElementById('placementsPaginationInfo');
+        if (!el) return;
+        var from = total === 0 ? 0 : (page - 1) * PER_PAGE + 1;
+        var to   = (page - 1) * PER_PAGE + count;
+        el.textContent = from + '-' + to + ' ' + t('pagination.of', 'of') + ' ' + total;
+    }
+
+    function openAddPlacementModal() {
+        reloadConfig();
+        var form = document.getElementById('placementForm');
+        if (form) form.reset();
+        var idEl = document.getElementById('placementId');
+        if (idEl) idEl.value = '';
+        var titleEl = document.getElementById('placementModalTitle');
+        if (titleEl) titleEl.textContent = t('add_placement', 'Add Placement');
+        openModal('placementModal');
+    }
+
+    function openEditPlacementModal(id) {
+        reloadConfig();
+        var url = (CFG.placementsApi || '/api/ad_placements') + '?id=' + id;
+        if (CFG.tenantId) url += '&tenant_id=' + CFG.tenantId;
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                var p = json.data || json;
+                if (!p || !p.id) { showNotification(t('error_placements_load', 'Failed to load placement'), 'error'); return; }
+                var setVal = function (elId, val) { var el = document.getElementById(elId); if (el) el.value = val || ''; };
+                setVal('placementId',          p.id);
+                setVal('placementName',        p.name);
+                setVal('placementKey',         p.placement_key);
+                setVal('placementDescription', p.description);
+                setVal('placementStatus',      p.status);
+                var titleEl = document.getElementById('placementModalTitle');
+                if (titleEl) titleEl.textContent = t('edit_placement', 'Edit Placement');
+                openModal('placementModal');
+            })
+            .catch(function () { showNotification(t('error_placements_load', 'Failed to load placement'), 'error'); });
+    }
+
+    function savePlacement() {
+        var idEl = document.getElementById('placementId');
+        var id   = idEl ? parseInt(idEl.value, 10) : 0;
+        var getVal = function (elId) { var el = document.getElementById(elId); return el ? el.value.trim() : ''; };
+
+        var name = getVal('placementName');
+        var key  = getVal('placementKey');
+        if (!name) { showNotification(t('placement_form.name', 'Placement Name') + ' is required', 'warning'); return; }
+        if (!key)  { showNotification(t('placement_form.placement_key', 'Placement Key') + ' is required', 'warning'); return; }
+
+        var data = {
+            name:          name,
+            placement_key: key,
+            description:   getVal('placementDescription'),
+            status:        getVal('placementStatus') || 'active',
+        };
+        if (id > 0) data.id = id;
+
+        var url    = (CFG.placementsApi || '/api/ad_placements') + (CFG.tenantId ? '?tenant_id=' + CFG.tenantId : '');
+        var method = id > 0 ? 'PUT' : 'POST';
+        var btn    = document.getElementById('placementSaveBtn');
+        if (btn) btn.disabled = true;
+
+        fetch(url, {
+            method: method,
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                if (json.success || json.status === 'success') {
+                    closeModal('placementModal');
+                    showNotification(t('placement_saved', 'Placement saved successfully'), 'success');
+                    loadPlacements({ page: placementsPage, filters: placementsFilters });
+                } else {
+                    showNotification(json.message || t('error_placement_save', 'Failed to save placement'), 'error');
+                }
+            })
+            .catch(function () { showNotification(t('error_placement_save', 'Failed to save placement'), 'error'); })
+            .finally(function () { if (btn) btn.disabled = false; });
+    }
+
+    function confirmDeletePlacement(id) {
+        if (!confirm(t('confirm_placement_delete', 'Are you sure you want to delete this placement?'))) return;
+        deletePlacement(id);
+    }
+
+    function deletePlacement(id) {
+        var url = (CFG.placementsApi || '/api/ad_placements') + (CFG.tenantId ? '?tenant_id=' + CFG.tenantId : '');
+        fetch(url, {
+            method: 'DELETE',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id })
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                if (json.success || json.status === 'success') {
+                    showNotification(t('placement_deleted', 'Placement deleted successfully'), 'success');
+                    loadPlacements({ page: placementsPage, filters: placementsFilters });
+                    if (currentPlacementId === id) {
+                        currentPlacementId = null;
+                        var section = document.getElementById('placementItemsSection');
+                        if (section) section.style.display = 'none';
+                    }
+                } else {
+                    showNotification(json.message || t('error_placement_delete', 'Failed to delete placement'), 'error');
+                }
+            })
+            .catch(function () { showNotification(t('error_placement_delete', 'Failed to delete placement'), 'error'); });
+    }
+
+    function applyPlacementsFilters() {
+        placementsPage = 1;
+        var getEl = function (id) { return document.getElementById(id); };
+        placementsFilters = {
+            search: (getEl('filterPlacementsSearch') ? getEl('filterPlacementsSearch').value.trim() : ''),
+            status: (getEl('filterPlacementStatus')  ? getEl('filterPlacementStatus').value         : ''),
+        };
+        loadPlacements({ page: placementsPage, filters: placementsFilters });
+    }
+
+    function clearPlacementsFilters() {
+        ['filterPlacementsSearch', 'filterPlacementStatus'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        placementsFilters = {};
+        placementsPage    = 1;
+        loadPlacements({ page: 1, filters: {} });
+    }
+
+    /* ══════════════════════════════════════════════
+     * PLACEMENT ITEMS
+     * ══════════════════════════════════════════ */
+
+    function viewPlacementItems(placementId, placementName) {
+        currentPlacementId = placementId;
+        var section = document.getElementById('placementItemsSection');
+        if (section) section.style.display = '';
+        var titleEl = document.getElementById('placementItemsTitle');
+        if (titleEl) titleEl.textContent = t('placement_items_title', 'Placement Items') + ': ' + placementName;
+        placementItemsPage = 1;
+        loadPlacementItems(placementId, 1);
+        if (section) section.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function loadPlacementItems(placementId, page) {
+        page = page || placementItemsPage;
+        var offset = (page - 1) * PER_PAGE;
+        var url = (CFG.placementItemsApi || '/api/ad_placement_items') + '?placement_id=' + placementId +
+                  '&limit=' + PER_PAGE + '&offset=' + offset + '&order_by=priority&order_dir=ASC';
+        if (CFG.tenantId) url += '&tenant_id=' + CFG.tenantId;
+
+        var tbody = document.getElementById('placementItemsTableBody');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="text-center">...</td></tr>';
+
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                var items = (json.data && json.data.items) ? json.data.items : (Array.isArray(json.data) ? json.data : []);
+                renderPlacementItemsTable(items, placementId);
+            })
+            .catch(function () {
+                showNotification(t('error_placement_items_load', 'Failed to load placement items'), 'error');
+                if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="text-center">' + esc(t('placement_items_table.no_records', 'No placement items found')) + '</td></tr>';
+            });
+    }
+
+    function renderPlacementItemsTable(items, placementId) {
+        var tbody = document.getElementById('placementItemsTableBody');
+        if (!tbody) return;
+        if (!items || items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">' + esc(t('placement_items_table.no_records', 'No placement items found')) + '</td></tr>';
+            return;
+        }
+        var html = '';
+        items.forEach(function (item) {
+            html += '<tr>';
+            html += '<td>' + esc(item.id) + '</td>';
+            html += '<td>' + esc(item.ad_title || ('#' + item.ad_id) || '-') + '</td>';
+            html += '<td>' + esc(item.priority != null ? item.priority : 1) + '</td>';
+            html += '<td>' + esc(item.weight   != null ? item.weight   : 1) + '</td>';
+            html += '<td>' + esc(item.start_date ? item.start_date.substring(0, 10) : '-') + '</td>';
+            html += '<td>' + esc(item.end_date   ? item.end_date.substring(0, 10)   : '-') + '</td>';
+            html += '<td><div class="row-actions">';
+            if (CAN_EDIT) {
+                html += '<button class="btn btn-secondary btn-sm btn-edit-placement-item" data-id="' + esc(item.id) + '">' + esc(t('table.edit', 'Edit')) + '</button>';
+            }
+            if (CAN_DELETE) {
+                html += '<button class="btn btn-danger btn-sm btn-delete-placement-item" data-id="' + esc(item.id) + '">' + esc(t('table.delete', 'Delete')) + '</button>';
+            }
+            html += '</div></td>';
+            html += '</tr>';
+        });
+        tbody.innerHTML = html;
+
+        tbody.querySelectorAll('.btn-edit-placement-item').forEach(function (btn) {
+            btn.addEventListener('click', function () { openEditPlacementItemModal(parseInt(btn.dataset.id, 10)); });
+        });
+        tbody.querySelectorAll('.btn-delete-placement-item').forEach(function (btn) {
+            btn.addEventListener('click', function () { confirmDeletePlacementItem(parseInt(btn.dataset.id, 10)); });
+        });
+    }
+
+    function openAddPlacementItemModal(placementId) {
+        reloadConfig();
+        var form = document.getElementById('placementItemForm');
+        if (form) form.reset();
+        var idEl = document.getElementById('placementItemId');
+        if (idEl) idEl.value = '';
+        var pidEl = document.getElementById('placementItemPlacementId');
+        if (pidEl) pidEl.value = placementId || (currentPlacementId || '');
+        var priorityEl = document.getElementById('placementItemPriority');
+        if (priorityEl) priorityEl.value = '1';
+        var weightEl = document.getElementById('placementItemWeight');
+        if (weightEl) weightEl.value = '1';
+        var titleEl = document.getElementById('placementItemModalTitle');
+        if (titleEl) titleEl.textContent = t('add_placement_item', 'Add Item');
+        var adSel = document.getElementById('placementItemAdId');
+        if (adSel) populateAdSelectForPlacementItem(adSel, null);
+        openModal('placementItemModal');
+    }
+
+    function openEditPlacementItemModal(id) {
+        reloadConfig();
+        var url = (CFG.placementItemsApi || '/api/ad_placement_items') + '?id=' + id;
+        if (CFG.tenantId) url += '&tenant_id=' + CFG.tenantId;
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                var item = json.data || json;
+                if (!item || !item.id) { showNotification(t('error_placement_items_load', 'Failed to load placement item'), 'error'); return; }
+                var setVal = function (elId, val) { var el = document.getElementById(elId); if (el) el.value = val || ''; };
+                setVal('placementItemId',          item.id);
+                setVal('placementItemPlacementId', item.placement_id);
+                setVal('placementItemPriority',    item.priority != null ? item.priority : 1);
+                setVal('placementItemWeight',      item.weight   != null ? item.weight   : 1);
+                setVal('placementItemStartDate',   item.start_date ? item.start_date.substring(0, 10) : '');
+                setVal('placementItemEndDate',     item.end_date   ? item.end_date.substring(0, 10)   : '');
+                var titleEl = document.getElementById('placementItemModalTitle');
+                if (titleEl) titleEl.textContent = t('edit_placement_item', 'Edit Item');
+                var adSel = document.getElementById('placementItemAdId');
+                if (adSel) populateAdSelectForPlacementItem(adSel, item.ad_id);
+                openModal('placementItemModal');
+            })
+            .catch(function () { showNotification(t('error_placement_items_load', 'Failed to load placement item'), 'error'); });
+    }
+
+    function savePlacementItem() {
+        var idEl  = document.getElementById('placementItemId');
+        var id    = idEl ? parseInt(idEl.value, 10) : 0;
+        var pidEl = document.getElementById('placementItemPlacementId');
+        var pid   = pidEl ? parseInt(pidEl.value, 10) : 0;
+        var getVal = function (elId) { var el = document.getElementById(elId); return el ? el.value.trim() : ''; };
+
+        var adId = parseInt(getVal('placementItemAdId'), 10) || 0;
+        if (!adId) { showNotification(t('placement_item_form.ad_id', 'Ad Unit') + ' is required', 'warning'); return; }
+
+        var data = {
+            placement_id: pid,
+            ad_id:        adId,
+            priority:     parseInt(getVal('placementItemPriority'), 10) || 1,
+            weight:       parseInt(getVal('placementItemWeight'),   10) || 1,
+            start_date:   getVal('placementItemStartDate') || null,
+            end_date:     getVal('placementItemEndDate')   || null,
+        };
+        if (id > 0) data.id = id;
+
+        var url    = (CFG.placementItemsApi || '/api/ad_placement_items') + (CFG.tenantId ? '?tenant_id=' + CFG.tenantId : '');
+        var method = id > 0 ? 'PUT' : 'POST';
+        var btn    = document.getElementById('placementItemSaveBtn');
+        if (btn) btn.disabled = true;
+
+        fetch(url, {
+            method: method,
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                if (json.success || json.status === 'success') {
+                    closeModal('placementItemModal');
+                    showNotification(t('placement_item_saved', 'Placement item saved'), 'success');
+                    if (currentPlacementId) loadPlacementItems(currentPlacementId, placementItemsPage);
+                } else {
+                    showNotification(json.message || t('error_placement_item_save', 'Failed to save placement item'), 'error');
+                }
+            })
+            .catch(function () { showNotification(t('error_placement_item_save', 'Failed to save placement item'), 'error'); })
+            .finally(function () { if (btn) btn.disabled = false; });
+    }
+
+    function confirmDeletePlacementItem(id) {
+        if (!confirm(t('confirm_placement_item_delete', 'Delete this placement item?'))) return;
+        deletePlacementItem(id);
+    }
+
+    function deletePlacementItem(id) {
+        var url = (CFG.placementItemsApi || '/api/ad_placement_items') + (CFG.tenantId ? '?tenant_id=' + CFG.tenantId : '');
+        fetch(url, {
+            method: 'DELETE',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id })
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                if (json.success || json.status === 'success') {
+                    showNotification(t('placement_item_deleted', 'Placement item deleted'), 'success');
+                    if (currentPlacementId) loadPlacementItems(currentPlacementId, placementItemsPage);
+                } else {
+                    showNotification(json.message || t('error_placement_item_delete', 'Failed to delete placement item'), 'error');
+                }
+            })
+            .catch(function () { showNotification(t('error_placement_item_delete', 'Failed to delete placement item'), 'error'); });
+    }
+
+    function populateAdSelectForPlacementItem(selectEl, selectedId) {
+        var url = (CFG.apiBase || '/api') + '/ads?limit=500&order_by=id&order_dir=ASC';
+        if (CFG.tenantId) url += '&tenant_id=' + CFG.tenantId;
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                var ads  = (json.data && json.data.items) ? json.data.items : [];
+                var html = '<option value="">' + esc(t('placement_item_form.select_ad', '-- Select Ad --')) + '</option>';
+                ads.forEach(function (ad) {
+                    var label = '#' + ad.id + (ad.campaign_name ? ' - ' + ad.campaign_name : '') + (ad.target_value ? ' (' + String(ad.target_value).substring(0, 40) + ')' : '');
+                    var sel   = (selectedId && String(ad.id) === String(selectedId)) ? ' selected' : '';
+                    html += '<option value="' + esc(ad.id) + '"' + sel + '>' + esc(label) + '</option>';
+                });
+                selectEl.innerHTML = html;
+            })
+            .catch(function () {
+                selectEl.innerHTML = '<option value="">' + esc(t('placement_item_form.select_ad', '-- Select Ad --')) + '</option>';
+            });
+    }
+
     /* ──────────────────────────────────────────────
      * Wire DOM events
      * ──────────────────────────────────────────── */
@@ -989,6 +1541,17 @@
         on('adSelectImageBtn',      'click', openAdMediaStudio);
         on('adMediaStudioClose',    'click', closeAdMediaStudio);
 
+        // Placement events
+        on('btnAddPlacement',          'click', openAddPlacementModal);
+        on('placementSaveBtn',         'click', savePlacement);
+        on('btnPlacementFilter',       'click', applyPlacementsFilters);
+        on('btnClearPlacementFilters', 'click', clearPlacementsFilters);
+        on('btnAddPlacementItemInline','click', function () { openAddPlacementItemModal(currentPlacementId); });
+        on('placementItemSaveBtn',     'click', savePlacementItem);
+
+        var placementSearch = document.getElementById('filterPlacementsSearch');
+        if (placementSearch) placementSearch.addEventListener('keydown', function (e) { if (e.key === 'Enter') applyPlacementsFilters(); });
+
         // Reload images when image type selection changes
         var imgTypeSel = document.getElementById('adImageType');
         if (imgTypeSel) {
@@ -1014,7 +1577,7 @@
         });
 
         // Close modals on backdrop click
-        ['campaignModal', 'adModal'].forEach(function (modalId) {
+        ['campaignModal', 'adModal', 'placementModal', 'placementItemModal'].forEach(function (modalId) {
             var modal = document.getElementById(modalId);
             if (modal) {
                 modal.addEventListener('click', function (e) {
@@ -1055,6 +1618,7 @@
         // Load data
         loadCampaigns({ page: 1, filters: {} });
         loadAds({ page: 1, filters: {} });
+        loadPlacements({ page: 1, filters: {} });
     }
 
     /* ──────────────────────────────────────────────

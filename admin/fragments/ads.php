@@ -114,6 +114,9 @@ $apiBase = '/api';
                 <button id="btnAddAd" class="btn btn-primary" data-i18n="add_ad" style="display:none;">
                     <?= htmlspecialchars(_adst('add_ad', 'Add Ad Unit'), ENT_QUOTES, 'UTF-8') ?>
                 </button>
+                <button id="btnAddPlacement" class="btn btn-primary" data-i18n="add_placement" style="display:none;">
+                    <?= htmlspecialchars(_adst('add_placement', 'Add Placement'), ENT_QUOTES, 'UTF-8') ?>
+                </button>
             <?php endif; ?>
         </div>
     </div>
@@ -125,6 +128,9 @@ $apiBase = '/api';
         </button>
         <button class="ads-tab-btn" data-tab="ads" data-i18n="tab_ads">
             <?= htmlspecialchars(_adst('tab_ads', 'Ad Units'), ENT_QUOTES, 'UTF-8') ?>
+        </button>
+        <button class="ads-tab-btn" data-tab="placements" data-i18n="tab_placements">
+            <?= htmlspecialchars(_adst('tab_placements', 'Placements'), ENT_QUOTES, 'UTF-8') ?>
         </button>
     </div>
 
@@ -280,6 +286,109 @@ $apiBase = '/api';
         </div>
 
     </div><!-- /tabAds -->
+
+    <!-- ══════════════════════════════════════
+         PLACEMENTS TAB
+    ══════════════════════════════════════ -->
+    <div id="tabPlacements" class="ads-tab-panel" style="display:none;">
+
+        <!-- Filter Bar -->
+        <div class="card">
+            <div class="card-body filter-bar">
+                <input type="text" id="filterPlacementsSearch" class="form-control"
+                       placeholder="<?= htmlspecialchars(_adst('filter.search_placeholder', 'Search placements...'), ENT_QUOTES, 'UTF-8') ?>"
+                       data-i18n-placeholder="filter.search_placeholder">
+
+                <select id="filterPlacementStatus" class="form-control">
+                    <option value=""><?= htmlspecialchars(_adst('filter.all_statuses', 'All Statuses'), ENT_QUOTES, 'UTF-8') ?></option>
+                    <option value="active"><?= htmlspecialchars(_adst('status.active', 'Active'), ENT_QUOTES, 'UTF-8') ?></option>
+                    <option value="inactive"><?= htmlspecialchars(_adst('status.inactive', 'Inactive'), ENT_QUOTES, 'UTF-8') ?></option>
+                </select>
+
+                <button id="btnPlacementFilter" class="btn btn-primary" data-i18n="filter.apply">
+                    <?= htmlspecialchars(_adst('filter.apply', 'Filter'), ENT_QUOTES, 'UTF-8') ?>
+                </button>
+                <button id="btnClearPlacementFilters" class="btn btn-secondary" data-i18n="filter.clear">
+                    <?= htmlspecialchars(_adst('filter.clear', 'Clear Filters'), ENT_QUOTES, 'UTF-8') ?>
+                </button>
+            </div>
+        </div>
+
+        <!-- Placements Table -->
+        <div class="card">
+            <div class="card-body" style="padding:0;">
+                <table class="data-table" id="placementsTable">
+                    <thead>
+                        <tr>
+                            <th data-i18n="placements_table.id"><?= htmlspecialchars(_adst('placements_table.id', 'ID'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="placements_table.name"><?= htmlspecialchars(_adst('placements_table.name', 'Name'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="placements_table.placement_key"><?= htmlspecialchars(_adst('placements_table.placement_key', 'Key'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="placements_table.status"><?= htmlspecialchars(_adst('placements_table.status', 'Status'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="placements_table.created_at"><?= htmlspecialchars(_adst('placements_table.created_at', 'Created At'), ENT_QUOTES, 'UTF-8') ?></th>
+                            <th data-i18n="placements_table.actions"><?= htmlspecialchars(_adst('placements_table.actions', 'Actions'), ENT_QUOTES, 'UTF-8') ?></th>
+                        </tr>
+                    </thead>
+                    <tbody id="placementsTableBody">
+                        <tr>
+                            <td colspan="6" class="text-center">
+                                <?= htmlspecialchars(_adst('placements_table.no_records', 'No placements found'), ENT_QUOTES, 'UTF-8') ?>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Placements Pagination -->
+            <div class="pagination-wrapper">
+                <div class="pagination-info">
+                    <span data-i18n="pagination.showing"><?= htmlspecialchars(_adst('pagination.showing', 'Showing'), ENT_QUOTES, 'UTF-8') ?></span>
+                    <span id="placementsPaginationInfo">0-0 <?= htmlspecialchars(_adst('pagination.of', 'of'), ENT_QUOTES, 'UTF-8') ?> 0</span>
+                </div>
+                <div class="pagination" id="placementsPagination"></div>
+            </div>
+        </div>
+
+        <!-- Placement Items Sub-section -->
+        <div id="placementItemsSection" style="display:none;">
+            <div class="card">
+                <div class="card-body">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+                        <h4 id="placementItemsTitle" data-i18n="placement_items_title">
+                            <?= htmlspecialchars(_adst('placement_items_title', 'Placement Items'), ENT_QUOTES, 'UTF-8') ?>
+                        </h4>
+                        <?php if ($canCreate): ?>
+                        <button id="btnAddPlacementItemInline" class="btn btn-primary btn-sm" data-i18n="add_placement_item">
+                            <?= htmlspecialchars(_adst('add_placement_item', 'Add Item'), ENT_QUOTES, 'UTF-8') ?>
+                        </button>
+                        <?php endif; ?>
+                    </div>
+                    <div style="padding:0;">
+                        <table class="data-table" id="placementItemsTable">
+                            <thead>
+                                <tr>
+                                    <th data-i18n="placement_items_table.id"><?= htmlspecialchars(_adst('placement_items_table.id', 'ID'), ENT_QUOTES, 'UTF-8') ?></th>
+                                    <th data-i18n="placement_items_table.ad"><?= htmlspecialchars(_adst('placement_items_table.ad', 'Ad'), ENT_QUOTES, 'UTF-8') ?></th>
+                                    <th data-i18n="placement_items_table.priority"><?= htmlspecialchars(_adst('placement_items_table.priority', 'Priority'), ENT_QUOTES, 'UTF-8') ?></th>
+                                    <th data-i18n="placement_items_table.weight"><?= htmlspecialchars(_adst('placement_items_table.weight', 'Weight'), ENT_QUOTES, 'UTF-8') ?></th>
+                                    <th data-i18n="placement_items_table.start_date"><?= htmlspecialchars(_adst('placement_items_table.start_date', 'Start Date'), ENT_QUOTES, 'UTF-8') ?></th>
+                                    <th data-i18n="placement_items_table.end_date"><?= htmlspecialchars(_adst('placement_items_table.end_date', 'End Date'), ENT_QUOTES, 'UTF-8') ?></th>
+                                    <th data-i18n="placement_items_table.actions"><?= htmlspecialchars(_adst('placement_items_table.actions', 'Actions'), ENT_QUOTES, 'UTF-8') ?></th>
+                                </tr>
+                            </thead>
+                            <tbody id="placementItemsTableBody">
+                                <tr>
+                                    <td colspan="7" class="text-center">
+                                        <?= htmlspecialchars(_adst('placement_items_table.no_records', 'No placement items found'), ENT_QUOTES, 'UTF-8') ?>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /tabPlacements -->
 
     <!-- ══════════════════════════════════════
          CAMPAIGN Add / Edit Modal
@@ -473,6 +582,28 @@ $apiBase = '/api';
                     <input type="hidden" id="adClicksCount" name="clicks_count" value="0">
                     <?php endif; ?>
 
+                    <!-- English Translation (Required) -->
+                    <div class="form-group">
+                        <label for="adEnTitle" data-i18n="en_title_label">
+                            <?= htmlspecialchars(_adst('en_title_label', 'English Title'), ENT_QUOTES, 'UTF-8') ?> *
+                        </label>
+                        <input type="text" id="adEnTitle" name="en_title" class="form-control"
+                               placeholder="<?= htmlspecialchars(_adst('en_title_placeholder', 'English title...'), ENT_QUOTES, 'UTF-8') ?>"
+                               data-i18n-placeholder="en_title_placeholder"
+                               maxlength="500">
+                    </div>
+                    <div class="form-group">
+                        <label for="adEnDescription" data-i18n="en_description_label">
+                            <?= htmlspecialchars(_adst('en_description_label', 'English Description'), ENT_QUOTES, 'UTF-8') ?>
+                        </label>
+                        <textarea id="adEnDescription" name="en_description" class="form-control" rows="2"
+                                  placeholder="<?= htmlspecialchars(_adst('en_description_placeholder', 'English description...'), ENT_QUOTES, 'UTF-8') ?>"
+                                  data-i18n-placeholder="en_description_placeholder"></textarea>
+                    </div>
+                    <p class="ad-translations-info" data-i18n="en_translation_note">
+                        <?= htmlspecialchars(_adst('en_translation_note', 'English translation is required and will be saved automatically.'), ENT_QUOTES, 'UTF-8') ?>
+                    </p>
+
                 </div><!-- /adTab-basic -->
 
                 <!-- ── TAB: Translations ── -->
@@ -565,6 +696,140 @@ $apiBase = '/api';
     </div>
 
     <!-- ══════════════════════════════════════
+         PLACEMENT Add / Edit Modal
+    ══════════════════════════════════════ -->
+    <div id="placementModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h3 id="placementModalTitle" data-i18n="add_placement">
+                <?= htmlspecialchars(_adst('add_placement', 'Add Placement'), ENT_QUOTES, 'UTF-8') ?>
+            </h3>
+            <form id="placementForm" onsubmit="return false;">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
+                <input type="hidden" id="placementId" name="id" value="">
+
+                <!-- Name -->
+                <div class="form-group">
+                    <label for="placementName" data-i18n="placement_form.name">
+                        <?= htmlspecialchars(_adst('placement_form.name', 'Placement Name'), ENT_QUOTES, 'UTF-8') ?> *
+                    </label>
+                    <input type="text" id="placementName" name="name" class="form-control"
+                           required maxlength="255">
+                </div>
+
+                <!-- Placement Key -->
+                <div class="form-group">
+                    <label for="placementKey" data-i18n="placement_form.placement_key">
+                        <?= htmlspecialchars(_adst('placement_form.placement_key', 'Placement Key'), ENT_QUOTES, 'UTF-8') ?> *
+                    </label>
+                    <input type="text" id="placementKey" name="placement_key" class="form-control"
+                           required maxlength="100" pattern="[a-zA-Z0-9_-]+">
+                </div>
+
+                <!-- Description -->
+                <div class="form-group">
+                    <label for="placementDescription" data-i18n="placement_form.description">
+                        <?= htmlspecialchars(_adst('placement_form.description', 'Description'), ENT_QUOTES, 'UTF-8') ?>
+                    </label>
+                    <textarea id="placementDescription" name="description" class="form-control" rows="3"></textarea>
+                </div>
+
+                <!-- Status -->
+                <div class="form-group">
+                    <label for="placementStatus" data-i18n="placement_form.status">
+                        <?= htmlspecialchars(_adst('placement_form.status', 'Status'), ENT_QUOTES, 'UTF-8') ?>
+                    </label>
+                    <select id="placementStatus" name="status" class="form-control">
+                        <option value="active"><?= htmlspecialchars(_adst('status.active', 'Active'), ENT_QUOTES, 'UTF-8') ?></option>
+                        <option value="inactive"><?= htmlspecialchars(_adst('status.inactive', 'Inactive'), ENT_QUOTES, 'UTF-8') ?></option>
+                    </select>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" id="placementSaveBtn" class="btn btn-primary" data-i18n="form.save">
+                        <?= htmlspecialchars(_adst('form.save', 'Save'), ENT_QUOTES, 'UTF-8') ?>
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-close-ads-modal"
+                            data-modal="placementModal" data-i18n="form.cancel">
+                        <?= htmlspecialchars(_adst('form.cancel', 'Cancel'), ENT_QUOTES, 'UTF-8') ?>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PLACEMENT ITEM Add / Edit Modal
+    ══════════════════════════════════════ -->
+    <div id="placementItemModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h3 id="placementItemModalTitle" data-i18n="add_placement_item">
+                <?= htmlspecialchars(_adst('add_placement_item', 'Add Item'), ENT_QUOTES, 'UTF-8') ?>
+            </h3>
+            <form id="placementItemForm" onsubmit="return false;">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
+                <input type="hidden" id="placementItemId"          name="id"           value="">
+                <input type="hidden" id="placementItemPlacementId" name="placement_id" value="">
+
+                <!-- Ad Unit -->
+                <div class="form-group">
+                    <label for="placementItemAdId" data-i18n="placement_item_form.ad_id">
+                        <?= htmlspecialchars(_adst('placement_item_form.ad_id', 'Ad Unit'), ENT_QUOTES, 'UTF-8') ?> *
+                    </label>
+                    <select id="placementItemAdId" name="ad_id" class="form-control" required>
+                        <option value="">
+                            <?= htmlspecialchars(_adst('placement_item_form.select_ad', '-- Select Ad --'), ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    </select>
+                </div>
+
+                <!-- Priority -->
+                <div class="form-group">
+                    <label for="placementItemPriority" data-i18n="placement_item_form.priority">
+                        <?= htmlspecialchars(_adst('placement_item_form.priority', 'Priority'), ENT_QUOTES, 'UTF-8') ?>
+                    </label>
+                    <input type="number" id="placementItemPriority" name="priority"
+                           class="form-control" value="1" min="1">
+                </div>
+
+                <!-- Weight -->
+                <div class="form-group">
+                    <label for="placementItemWeight" data-i18n="placement_item_form.weight">
+                        <?= htmlspecialchars(_adst('placement_item_form.weight', 'Weight'), ENT_QUOTES, 'UTF-8') ?>
+                    </label>
+                    <input type="number" id="placementItemWeight" name="weight"
+                           class="form-control" value="1" min="1">
+                </div>
+
+                <!-- Start Date -->
+                <div class="form-group">
+                    <label for="placementItemStartDate" data-i18n="placement_item_form.start_date">
+                        <?= htmlspecialchars(_adst('placement_item_form.start_date', 'Start Date'), ENT_QUOTES, 'UTF-8') ?>
+                    </label>
+                    <input type="date" id="placementItemStartDate" name="start_date" class="form-control">
+                </div>
+
+                <!-- End Date -->
+                <div class="form-group">
+                    <label for="placementItemEndDate" data-i18n="placement_item_form.end_date">
+                        <?= htmlspecialchars(_adst('placement_item_form.end_date', 'End Date'), ENT_QUOTES, 'UTF-8') ?>
+                    </label>
+                    <input type="date" id="placementItemEndDate" name="end_date" class="form-control">
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" id="placementItemSaveBtn" class="btn btn-primary" data-i18n="form.save">
+                        <?= htmlspecialchars(_adst('form.save', 'Save'), ENT_QUOTES, 'UTF-8') ?>
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-close-ads-modal"
+                            data-modal="placementItemModal" data-i18n="form.cancel">
+                        <?= htmlspecialchars(_adst('form.cancel', 'Cancel'), ENT_QUOTES, 'UTF-8') ?>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
          Media Studio Overlay (for Ad Images)
     ══════════════════════════════════════ -->
     <div id="adMediaStudioModal" class="ad-media-studio-overlay" style="display:none;" role="dialog" aria-modal="true">
@@ -586,18 +851,20 @@ $apiBase = '/api';
 
 <script>
 window.ADS_CONFIG = {
-    apiBase:        <?= json_encode($apiBase) ?>,
-    csrfToken:      <?= json_encode($csrf) ?>,
-    tenantId:       <?= (int)$tenantId ?>,
-    lang:           <?= json_encode($_safeLang) ?>,
-    dir:            <?= json_encode($dir) ?>,
-    strings:        <?= json_encode($_adsStrings, JSON_UNESCAPED_UNICODE) ?>,
-    canCreate:      <?= json_encode($canCreate) ?>,
-    canEdit:        <?= json_encode($canEdit) ?>,
-    canDelete:      <?= json_encode($canDelete) ?>,
-    imagesApi:      <?= json_encode($apiBase . '/images') ?>,
-    translationsApi:<?= json_encode($apiBase . '/ad_translations') ?>,
-    adImageTypeId:  20
+    apiBase:           <?= json_encode($apiBase) ?>,
+    csrfToken:         <?= json_encode($csrf) ?>,
+    tenantId:          <?= (int)$tenantId ?>,
+    lang:              <?= json_encode($_safeLang) ?>,
+    dir:               <?= json_encode($dir) ?>,
+    strings:           <?= json_encode($_adsStrings, JSON_UNESCAPED_UNICODE) ?>,
+    canCreate:         <?= json_encode($canCreate) ?>,
+    canEdit:           <?= json_encode($canEdit) ?>,
+    canDelete:         <?= json_encode($canDelete) ?>,
+    imagesApi:         <?= json_encode($apiBase . '/images') ?>,
+    translationsApi:   <?= json_encode($apiBase . '/ad_translations') ?>,
+    placementsApi:     <?= json_encode($apiBase . '/ad_placements') ?>,
+    placementItemsApi: <?= json_encode($apiBase . '/ad_placement_items') ?>,
+    adImageTypeId:     20
 };
 </script>
 <script src="/admin/assets/js/pages/ads.js?v=<?= time() ?>"></script>
