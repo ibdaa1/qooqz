@@ -117,10 +117,10 @@
                 { code: 'AED', name: 'AED – UAE Dirham' }
             ];
         }
-        populateDropdown(el.currencyCode, state.currencies, 'code', 'name',
+        populateDropdown(el.currencyCode, state.currencies, 'id', 'name',
             t('form.fields.currency_code.select', 'Select currency'));
         // Also populate the filter dropdown
-        populateDropdown(document.getElementById('esc-currencyFilter'), state.currencies, 'code', 'code',
+        populateDropdown(document.getElementById('esc-currencyFilter'), state.currencies, 'id', 'code',
             t('filters.all_currencies', 'All Currencies'));
 
         // Entity types
@@ -134,9 +134,9 @@
         } catch (err) {
             console.warn('[Escrow] Failed to load entity types:', err);
         }
-        populateDropdown(el.buyerEntityType, state.entityTypes, 'code', 'name',
+        populateDropdown(el.buyerEntityType, state.entityTypes, 'id', 'name',
             t('form.fields.buyer_entity_type.select', 'Select entity type'));
-        populateDropdown(el.sellerEntityType, state.entityTypes, 'code', 'name',
+        populateDropdown(el.sellerEntityType, state.entityTypes, 'id', 'name',
             t('form.fields.seller_entity_type.select', 'Select entity type'));
 
         // Orders (for current tenant)
@@ -316,11 +316,11 @@
         if (detailsPane) detailsPane.style.display = 'block';
 
         // Re-populate dropdowns (in case data wasn't loaded yet)
-        populateDropdown(el.currencyCode, state.currencies, 'code', 'name',
+        populateDropdown(el.currencyCode, state.currencies, 'id', 'name',
             t('form.fields.currency_code.select', 'Select currency'));
-        populateDropdown(el.buyerEntityType, state.entityTypes, 'code', 'name',
+        populateDropdown(el.buyerEntityType, state.entityTypes, 'id', 'name',
             t('form.fields.buyer_entity_type.select', 'Select entity type'));
-        populateDropdown(el.sellerEntityType, state.entityTypes, 'code', 'name',
+        populateDropdown(el.sellerEntityType, state.entityTypes, 'id', 'name',
             t('form.fields.seller_entity_type.select', 'Select entity type'));
         populateDropdown(el.orderId, state.orders, 'id', 'order_number',
             t('form.fields.order_id.select', 'Select order (optional)'));
@@ -333,14 +333,14 @@
             if (el.orderId)       el.orderId.value           = data.order_id || '';
             if (el.amount)        el.amount.value            = data.amount || '';
             if (el.escrowFee)     el.escrowFee.value         = data.escrow_fee || '0';
-            if (el.currencyCode)  el.currencyCode.value      = data.currency_code || 'USD';
+            if (el.currencyCode)  el.currencyCode.value      = data.currency_id || '';
             if (el.autoRelease)   el.autoRelease.value       = data.auto_release_days || '7';
             if (el.notes)         el.notes.value             = data.notes || '';
 
             // Buyer / Seller: load entities for the given type, then set the selected value
-            await loadAndSetEntity(data.buyer_entity_type, data.buyer_entity_id,
+            await loadAndSetEntity(data.buyer_entity_type_id, data.buyer_entity_id,
                 el.buyerEntityType, el.buyerEntityId);
-            await loadAndSetEntity(data.seller_entity_type, data.seller_entity_id,
+            await loadAndSetEntity(data.seller_entity_type_id, data.seller_entity_id,
                 el.sellerEntityType, el.sellerEntityId);
 
             if (el.btnDelete) el.btnDelete.style.display = 'inline-flex';
@@ -507,12 +507,12 @@
             order_id:           formData.get('order_id') ? parseInt(formData.get('order_id'), 10) : null,
             amount:             formData.get('amount') ? parseFloat(formData.get('amount')) : null,
             escrow_fee:         formData.get('escrow_fee') ? parseFloat(formData.get('escrow_fee')) : 0,
-            currency_code:      formData.get('currency_code') || 'USD',
+            currency_id:        formData.get('currency_id') ? parseInt(formData.get('currency_id'), 10) : null,
             auto_release_days:  formData.get('auto_release_days') ? parseInt(formData.get('auto_release_days'), 10) : 7,
             buyer_entity_id:    formData.get('buyer_entity_id') ? parseInt(formData.get('buyer_entity_id'), 10) : null,
-            buyer_entity_type:  formData.get('buyer_entity_type') || null,
+            buyer_entity_type_id:  formData.get('buyer_entity_type_id') ? parseInt(formData.get('buyer_entity_type_id'), 10) : null,
             seller_entity_id:   formData.get('seller_entity_id') ? parseInt(formData.get('seller_entity_id'), 10) : null,
-            seller_entity_type: formData.get('seller_entity_type') || null,
+            seller_entity_type_id: formData.get('seller_entity_type_id') ? parseInt(formData.get('seller_entity_type_id'), 10) : null,
             notes:              formData.get('notes') || null
         };
         if (id) data.id = parseInt(id, 10);
@@ -684,7 +684,7 @@
                 state.filters = {
                     search:        (document.getElementById('esc-searchInput') || {}).value || '',
                     status:        (document.getElementById('esc-statusFilter') || {}).value || '',
-                    currency_code: (document.getElementById('esc-currencyFilter') || {}).value || ''
+                    currency_id: (document.getElementById('esc-currencyFilter') || {}).value || ''
                 };
                 loadEscrow(1);
             });

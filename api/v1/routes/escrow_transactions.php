@@ -62,7 +62,7 @@ try {
         'order_id'          => isset($_GET['order_id']) && is_numeric($_GET['order_id'])          ? (int)$_GET['order_id']          : null,
         'buyer_entity_id'   => isset($_GET['buyer_entity_id']) && is_numeric($_GET['buyer_entity_id'])   ? (int)$_GET['buyer_entity_id']   : null,
         'seller_entity_id'  => isset($_GET['seller_entity_id']) && is_numeric($_GET['seller_entity_id'])  ? (int)$_GET['seller_entity_id']  : null,
-        'currency_code'     => $_GET['currency_code']     ?? null,
+        'currency_id'       => isset($_GET['currency_id']) && is_numeric($_GET['currency_id'])       ? (int)$_GET['currency_id']       : null,
         'search'            => $_GET['search']            ?? null,
     ];
 

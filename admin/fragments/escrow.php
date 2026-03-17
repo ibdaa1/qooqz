@@ -322,7 +322,7 @@ if (!function_exists('renderEscrowFragmentThemeVars')) {
                             <label for="esc-currencyCode" data-i18n="form.fields.currency_code.label">
                                 <?= __escrow_t('form.fields.currency_code.label', 'Currency') ?>
                             </label>
-                            <select id="esc-currencyCode" name="currency_code" class="form-control">
+                            <select id="esc-currencyCode" name="currency_id" class="form-control">
                                 <option value=""><?= __escrow_t('form.fields.currency_code.select', 'Select currency') ?></option>
                             </select>
                         </div>
@@ -356,7 +356,7 @@ if (!function_exists('renderEscrowFragmentThemeVars')) {
                                     <?= __escrow_t('form.fields.buyer_entity_type.label', 'Buyer Entity Type') ?>
                                     <span class="required">*</span>
                                 </label>
-                                <select id="esc-buyerEntityType" name="buyer_entity_type" class="form-control" required>
+                                <select id="esc-buyerEntityType" name="buyer_entity_type_id" class="form-control" required>
                                     <option value=""><?= __escrow_t('form.fields.buyer_entity_type.select', 'Select entity type') ?></option>
                                 </select>
                             </div>
@@ -384,7 +384,7 @@ if (!function_exists('renderEscrowFragmentThemeVars')) {
                                     <?= __escrow_t('form.fields.seller_entity_type.label', 'Seller Entity Type') ?>
                                     <span class="required">*</span>
                                 </label>
-                                <select id="esc-sellerEntityType" name="seller_entity_type" class="form-control" required>
+                                <select id="esc-sellerEntityType" name="seller_entity_type_id" class="form-control" required>
                                     <option value=""><?= __escrow_t('form.fields.seller_entity_type.select', 'Select entity type') ?></option>
                                 </select>
                             </div>

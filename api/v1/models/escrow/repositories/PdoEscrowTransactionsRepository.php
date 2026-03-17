@@ -53,9 +53,9 @@ final class PdoEscrowTransactionsRepository implements EscrowTransactionsReposit
             }
         }
 
-        if (!empty($filters['currency_code'])) {
-            $sql .= " AND et.currency_id = (SELECT id FROM currencies WHERE code = :currency_code LIMIT 1)";
-            $params[':currency_code'] = $filters['currency_code'];
+        if (!empty($filters['currency_id'])) {
+            $sql .= " AND et.currency_id = :currency_id";
+            $params[':currency_id'] = (int)$filters['currency_id'];
         }
 
         if (!empty($filters['search'])) {
@@ -96,9 +96,9 @@ final class PdoEscrowTransactionsRepository implements EscrowTransactionsReposit
             }
         }
 
-        if (!empty($filters['currency_code'])) {
-            $sql .= " AND currency_id = (SELECT id FROM currencies WHERE code = :currency_code LIMIT 1)";
-            $params[':currency_code'] = $filters['currency_code'];
+        if (!empty($filters['currency_id'])) {
+            $sql .= " AND currency_id = :currency_id";
+            $params[':currency_id'] = (int)$filters['currency_id'];
         }
 
         if (!empty($filters['search'])) {
@@ -153,23 +153,23 @@ final class PdoEscrowTransactionsRepository implements EscrowTransactionsReposit
         }
 
         $params = [
-            ':buyer_entity_id'      => (int)$data['buyer_entity_id'],
-            ':buyer_entity_type_id' => $this->resolveEntityTypeId($data['buyer_entity_type'] ?? null, 'buyer_entity_type'),
-            ':seller_entity_id'     => (int)$data['seller_entity_id'],
-            ':seller_entity_type_id'=> $this->resolveEntityTypeId($data['seller_entity_type'] ?? null, 'seller_entity_type'),
-            ':amount'               => $data['amount'],
-            ':currency_id'          => $this->resolveCurrencyId($data['currency_code'] ?? 'USD'),
-            ':escrow_fee'           => $data['escrow_fee'] ?? 0,
-            ':status'               => $data['status'] ?? 'pending',
-            ':auto_release_days'    => isset($data['auto_release_days']) ? (int)$data['auto_release_days'] : 7,
-            ':order_id'             => isset($data['order_id']) ? (int)$data['order_id'] : null,
-            ':funded_at'            => $data['funded_at'] ?? null,
-            ':shipped_at'           => $data['shipped_at'] ?? null,
-            ':delivered_at'         => $data['delivered_at'] ?? null,
-            ':released_at'          => $data['released_at'] ?? null,
-            ':disputed_at'          => $data['disputed_at'] ?? null,
-            ':resolved_at'          => $data['resolved_at'] ?? null,
-            ':notes'                => $data['notes'] ?? null,
+            ':buyer_entity_id'       => (int)$data['buyer_entity_id'],
+            ':buyer_entity_type_id'  => (int)$data['buyer_entity_type_id'],
+            ':seller_entity_id'      => (int)$data['seller_entity_id'],
+            ':seller_entity_type_id' => (int)$data['seller_entity_type_id'],
+            ':amount'                => $data['amount'],
+            ':currency_id'           => (int)$data['currency_id'],
+            ':escrow_fee'            => $data['escrow_fee'] ?? 0,
+            ':status'                => $data['status'] ?? 'pending',
+            ':auto_release_days'     => isset($data['auto_release_days']) ? (int)$data['auto_release_days'] : 7,
+            ':order_id'              => isset($data['order_id']) ? (int)$data['order_id'] : null,
+            ':funded_at'             => $data['funded_at'] ?? null,
+            ':shipped_at'            => $data['shipped_at'] ?? null,
+            ':delivered_at'          => $data['delivered_at'] ?? null,
+            ':released_at'           => $data['released_at'] ?? null,
+            ':disputed_at'           => $data['disputed_at'] ?? null,
+            ':resolved_at'           => $data['resolved_at'] ?? null,
+            ':notes'                 => $data['notes'] ?? null,
         ];
 
         if ($isUpdate) {
@@ -219,31 +219,6 @@ final class PdoEscrowTransactionsRepository implements EscrowTransactionsReposit
         $params[':escrow_number'] = $data['escrow_number'];
         $stmt->execute($params);
         return (int)$this->pdo->lastInsertId();
-    }
-
-    private function resolveEntityTypeId(?string $typeCode, string $fieldName): int
-    {
-        if (empty($typeCode)) {
-            throw new \InvalidArgumentException("Field '{$fieldName}' is required");
-        }
-        $stmt = $this->pdo->prepare("SELECT id FROM entity_types WHERE code = :code LIMIT 1");
-        $stmt->execute([':code' => $typeCode]);
-        $id = $stmt->fetchColumn();
-        if ($id === false) {
-            throw new \InvalidArgumentException("Invalid {$fieldName}: '{$typeCode}'");
-        }
-        return (int)$id;
-    }
-
-    private function resolveCurrencyId(string $currencyCode): int
-    {
-        $stmt = $this->pdo->prepare("SELECT id FROM currencies WHERE code = :code LIMIT 1");
-        $stmt->execute([':code' => $currencyCode]);
-        $id = $stmt->fetchColumn();
-        if ($id === false) {
-            throw new \InvalidArgumentException("Invalid currency_code: '{$currencyCode}'");
-        }
-        return (int)$id;
     }
 
     public function delete(int $tenantId, int $id): bool

@@ -21,10 +21,16 @@ final class EscrowTransactionsValidator
         }
 
         if ($scenario === 'create') {
-            foreach (['buyer_entity_id', 'buyer_entity_type', 'seller_entity_id', 'seller_entity_type', 'amount'] as $field) {
+            foreach (['buyer_entity_id', 'buyer_entity_type_id', 'seller_entity_id', 'seller_entity_type_id', 'amount', 'currency_id'] as $field) {
                 if (empty($data[$field])) {
                     $this->errors[] = "Field '{$field}' is required";
                 }
+            }
+        }
+
+        foreach (['buyer_entity_type_id', 'seller_entity_type_id', 'currency_id', 'buyer_entity_id', 'seller_entity_id'] as $intField) {
+            if (!empty($data[$intField]) && (!is_numeric($data[$intField]) || (int)$data[$intField] < 1)) {
+                $this->errors[] = "Field '{$intField}' must be a positive integer";
             }
         }
 
