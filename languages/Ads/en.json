@@ -121,14 +121,14 @@
         },
         "translations": {
             "title": "Translations",
-            "info": "Add title and description for each language.",
+            "info": "Add title and description for each language. English is the default.",
             "language": "Language",
             "select_language": "-- Select Language --",
             "ad_title": "Title",
             "ad_title_placeholder": "Ad title...",
             "description": "Description",
             "description_placeholder": "Ad description...",
-            "add": "Add Translation",
+            "add": "Add / Update Translation",
             "no_records": "No translations added yet.",
             "saved": "Translation saved",
             "deleted": "Translation deleted",
@@ -136,8 +136,22 @@
         },
         "images": {
             "label": "Ad Images",
-            "select_from_studio": "Select Images from Studio",
-            "save_first": "Please save the ad first before adding images."
+            "image_type_label": "Image Type",
+            "image_type_placeholder": "-- Select Image Type --",
+            "select_type_first": "Please select an image type first.",
+            "select_from_studio": "Open Image Studio",
+            "save_first": "Please save the ad first before adding images.",
+            "no_images": "No images yet.",
+            "types": {
+                "ad_homepage_banner": "Homepage Banner (1440×400)",
+                "ad_section_banner": "Section Banner (1200×300)",
+                "ad_square": "Square Ad (400×400)",
+                "ad_store_banner": "Store Banner (1200×300)",
+                "ad_small": "Small Ad (300×250)",
+                "ad_search_banner": "Search Banner (1200×200)",
+                "ad_mobile_banner": "Mobile Banner (768×250)",
+                "ad_thumb": "Thumbnail (300×150)"
+            }
         }
     }
 }

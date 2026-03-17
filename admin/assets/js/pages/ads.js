@@ -581,6 +581,14 @@
         var transList = document.getElementById('adTranslationsList');
         if (transList) transList.innerHTML = '<p class="ad-trans-empty">' + esc(t('translations.no_records', 'No translations added yet.')) + '</p>';
 
+        // Reset image type selector
+        var imgTypeSel = document.getElementById('adImageType');
+        if (imgTypeSel) imgTypeSel.value = '';
+
+        // Pre-select English as default translation language
+        var langEl = document.getElementById('adTransLang');
+        if (langEl) langEl.value = 'en';
+
         // Switch to basic tab
         switchAdModalTab('basic');
 
@@ -616,7 +624,10 @@
                 // Reset then load images & translations
                 adSelectedImages = [];
                 renderAdImagesPreview();
-                loadAdImages(ad.id);
+                // Reset image type selector to default (thumbnail) and load those images
+                var imgTypeSel = document.getElementById('adImageType');
+                if (imgTypeSel) imgTypeSel.value = '20';
+                loadAdImages(ad.id, 20);
                 loadAdTranslations(ad.id);
 
                 // Switch to basic tab
@@ -686,8 +697,8 @@
     /* ══════════════════════════════════════════════
      * AD IMAGES
      * ══════════════════════════════════════════ */
-    function loadAdImages(adId) {
-        var imgTypeId = (CFG.adImageTypeId || 20);
+    function loadAdImages(adId, imgTypeId) {
+        imgTypeId = imgTypeId || (CFG.adImageTypeId || 20);
         var url = (CFG.imagesApi || '/api/images') + '/by_owner?owner_id=' + adId + '&image_type_id=' + imgTypeId;
         fetch(url, { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
@@ -733,10 +744,15 @@
             showNotification(t('images.save_first', 'Please save the ad first before adding images.'), 'warning');
             return;
         }
+        var imgTypeSel = document.getElementById('adImageType');
+        var imgTypeId  = imgTypeSel ? parseInt(imgTypeSel.value, 10) : 0;
+        if (!imgTypeId) {
+            showNotification(t('images.select_type_first', 'Please select an image type first.'), 'warning');
+            return;
+        }
         var overlay = document.getElementById('adMediaStudioModal');
         var frame   = document.getElementById('adMediaStudioFrame');
         if (!overlay || !frame) return;
-        var imgTypeId = CFG.adImageTypeId || 20;
         frame.src = '/admin/fragments/media_studio.php?embedded=1&tenant_id=' + encodeURIComponent(CFG.tenantId || '') +
                     '&lang=' + encodeURIComponent(CFG.lang || 'en') +
                     '&owner_id=' + adId +
@@ -973,6 +989,22 @@
         on('adSelectImageBtn',      'click', openAdMediaStudio);
         on('adMediaStudioClose',    'click', closeAdMediaStudio);
 
+        // Reload images when image type selection changes
+        var imgTypeSel = document.getElementById('adImageType');
+        if (imgTypeSel) {
+            imgTypeSel.addEventListener('change', function () {
+                var idEl = document.getElementById('adId');
+                var adId = idEl ? parseInt(idEl.value, 10) : 0;
+                var typeId = parseInt(imgTypeSel.value, 10);
+                if (adId && typeId) {
+                    loadAdImages(adId, typeId);
+                } else {
+                    adSelectedImages = [];
+                    renderAdImagesPreview();
+                }
+            });
+        }
+
         var adSearch = document.getElementById('filterSearch');
         if (adSearch) adSearch.addEventListener('keydown', function (e) { if (e.key === 'Enter') applyAdsFilters(); });
 
@@ -997,6 +1029,12 @@
                 adSelectedImages = e.data.images || [];
                 renderAdImagesPreview();
                 closeAdMediaStudio();
+                // Reload images for the selected type to reflect the new uploads
+                var idEl       = document.getElementById('adId');
+                var adId       = idEl ? parseInt(idEl.value, 10) : 0;
+                var imgTypeSel = document.getElementById('adImageType');
+                var typeId     = imgTypeSel ? parseInt(imgTypeSel.value, 10) : 0;
+                if (adId && typeId) loadAdImages(adId, typeId);
             }
         });
     }

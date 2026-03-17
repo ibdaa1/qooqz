@@ -479,15 +479,15 @@ $apiBase = '/api';
                 <div id="adTab-translations" class="ad-modal-tab-content" style="display:none;">
                     <div class="ad-translations-info">
                         <i class="fas fa-info-circle"></i>
-                        <?= htmlspecialchars(_adst('translations.info', 'Add title and description for each language.'), ENT_QUOTES, 'UTF-8') ?>
+                        <?= htmlspecialchars(_adst('translations.info', 'Add title and description for each language. English is the default.'), ENT_QUOTES, 'UTF-8') ?>
                     </div>
 
                     <!-- Add translation form -->
                     <div class="ad-translation-add-row">
                         <select id="adTransLang" class="form-control">
                             <option value=""><?= htmlspecialchars(_adst('translations.select_language', '-- Select Language --'), ENT_QUOTES, 'UTF-8') ?></option>
-                            <option value="ar">العربية (ar)</option>
                             <option value="en">English (en)</option>
+                            <option value="ar">العربية (ar)</option>
                             <option value="fr">Français (fr)</option>
                             <option value="tr">Türkçe (tr)</option>
                             <option value="ur">اردو (ur)</option>
@@ -509,7 +509,7 @@ $apiBase = '/api';
                         <textarea id="adTransDesc" class="form-control" rows="2"
                                   placeholder="<?= htmlspecialchars(_adst('translations.description_placeholder', 'Ad description...'), ENT_QUOTES, 'UTF-8') ?>"></textarea>
                         <button type="button" id="btnAddAdTranslation" class="btn btn-primary">
-                            <?= htmlspecialchars(_adst('translations.add', 'Add Translation'), ENT_QUOTES, 'UTF-8') ?>
+                            <?= htmlspecialchars(_adst('translations.add', 'Add / Update Translation'), ENT_QUOTES, 'UTF-8') ?>
                         </button>
                     </div>
 
@@ -519,13 +519,32 @@ $apiBase = '/api';
 
                 <!-- ── TAB: Images ── -->
                 <div id="adTab-images" class="ad-modal-tab-content" style="display:none;">
+                    <!-- Image Type Selector (required before opening studio) -->
+                    <div class="form-group">
+                        <label for="adImageType" data-i18n="images.image_type_label">
+                            <?= htmlspecialchars(_adst('images.image_type_label', 'Image Type'), ENT_QUOTES, 'UTF-8') ?> *
+                        </label>
+                        <select id="adImageType" class="form-control">
+                            <option value="">
+                                <?= htmlspecialchars(_adst('images.image_type_placeholder', '-- Select Image Type --'), ENT_QUOTES, 'UTF-8') ?>
+                            </option>
+                            <option value="13"><?= htmlspecialchars(_adst('images.types.ad_homepage_banner', 'Homepage Banner (1440×400)'), ENT_QUOTES, 'UTF-8') ?></option>
+                            <option value="14"><?= htmlspecialchars(_adst('images.types.ad_section_banner', 'Section Banner (1200×300)'), ENT_QUOTES, 'UTF-8') ?></option>
+                            <option value="15"><?= htmlspecialchars(_adst('images.types.ad_square', 'Square Ad (400×400)'), ENT_QUOTES, 'UTF-8') ?></option>
+                            <option value="16"><?= htmlspecialchars(_adst('images.types.ad_store_banner', 'Store Banner (1200×300)'), ENT_QUOTES, 'UTF-8') ?></option>
+                            <option value="17"><?= htmlspecialchars(_adst('images.types.ad_small', 'Small Ad (300×250)'), ENT_QUOTES, 'UTF-8') ?></option>
+                            <option value="18"><?= htmlspecialchars(_adst('images.types.ad_search_banner', 'Search Banner (1200×200)'), ENT_QUOTES, 'UTF-8') ?></option>
+                            <option value="19"><?= htmlspecialchars(_adst('images.types.ad_mobile_banner', 'Mobile Banner (768×250)'), ENT_QUOTES, 'UTF-8') ?></option>
+                            <option value="20"><?= htmlspecialchars(_adst('images.types.ad_thumb', 'Thumbnail (300×150)'), ENT_QUOTES, 'UTF-8') ?></option>
+                        </select>
+                    </div>
                     <div class="form-group">
                         <label><?= htmlspecialchars(_adst('images.label', 'Ad Images'), ENT_QUOTES, 'UTF-8') ?></label>
                         <div class="image-upload-section">
                             <button type="button" id="adSelectImageBtn" class="btn btn-secondary"
                                     style="width:100%; margin-bottom:15px;">
                                 <i class="fas fa-images"></i>
-                                <?= htmlspecialchars(_adst('images.select_from_studio', 'Select Images from Studio'), ENT_QUOTES, 'UTF-8') ?>
+                                <?= htmlspecialchars(_adst('images.select_from_studio', 'Open Image Studio'), ENT_QUOTES, 'UTF-8') ?>
                             </button>
                             <div id="adImagesPreview" class="ad-images-grid"></div>
                         </div>
