@@ -30,34 +30,27 @@ FOREIGN KEY (currency_id) REFERENCES currencies(id),
 FOREIGN KEY (created_by) REFERENCES users(id)
 );
 ////////////////
-CREATE TABLE ad_campaigns (
+
+CREATE TABLE ads (
 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
 
-tenant_id INT UNSIGNED NULL,
-entity_id BIGINT UNSIGNED NULL,
+campaign_id BIGINT UNSIGNED NOT NULL,
 
-name VARCHAR(255) NOT NULL,
+-- الهدف
+target_type ENUM('url','entity') DEFAULT 'url',
+target_value VARCHAR(500),
 
-budget DECIMAL(12,2) DEFAULT 0.00,
-currency_id SMALLINT UNSIGNED NOT NULL,
+-- التحكم
+status ENUM('active','paused','rejected') DEFAULT 'active',
 
-pricing_model ENUM('fixed','cpm','cpc') DEFAULT 'fixed',
-
-start_date DATETIME,
-end_date DATETIME,
-
-status ENUM('draft','active','paused','completed') DEFAULT 'draft',
-
-created_by INT UNSIGNED NULL,
+views_count INT DEFAULT 0,
+clicks_count INT DEFAULT 0,
 
 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
 -- العلاقات
-FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE,
-FOREIGN KEY (currency_id) REFERENCES currencies(id),
-FOREIGN KEY (created_by) REFERENCES users(id)
+FOREIGN KEY (campaign_id) REFERENCES ad_campaigns(id) ON DELETE CASCADE
 );
 //////////////////
 CREATE TABLE ad_translations (
