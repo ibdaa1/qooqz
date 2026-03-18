@@ -1196,6 +1196,11 @@
                 setVal('placementName',        p.name);
                 setVal('placementKey',         p.placement_key);
                 setVal('placementDescription', p.description);
+                setVal('placementCode',        p.code);
+                setVal('placementPage',        p.page);
+                setVal('placementWidth',       p.width);
+                setVal('placementHeight',      p.height);
+                setVal('placementMaxAds',      p.max_ads !== undefined && p.max_ads !== null ? p.max_ads : 1);
                 setVal('placementStatus',      p.status);
                 var titleEl = document.getElementById('placementModalTitle');
                 if (titleEl) titleEl.textContent = t('edit_placement', 'Edit Placement');
@@ -1218,6 +1223,11 @@
             name:          name,
             placement_key: key,
             description:   getVal('placementDescription'),
+            code:          getVal('placementCode') || null,
+            page:          getVal('placementPage') || null,
+            width:         getVal('placementWidth') ? parseInt(getVal('placementWidth'), 10) : null,
+            height:        getVal('placementHeight') ? parseInt(getVal('placementHeight'), 10) : null,
+            max_ads:       getVal('placementMaxAds') ? parseInt(getVal('placementMaxAds'), 10) : 1,
             status:        getVal('placementStatus') || 'active',
         };
         if (id > 0) data.id = id;

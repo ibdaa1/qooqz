@@ -129,6 +129,11 @@
             "name": "Placement Name",
             "placement_key": "Placement Key",
             "description": "Description",
+            "code": "Code",
+            "page": "Page",
+            "width": "Width (px)",
+            "height": "Height (px)",
+            "max_ads": "Max Ads",
             "status": "Status"
         },
         "placement_saved": "Placement saved successfully",

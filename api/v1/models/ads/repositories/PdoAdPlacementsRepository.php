@@ -98,8 +98,13 @@ final class PdoAdPlacementsRepository implements AdPlacementsRepositoryInterface
         $params = [
             ':tenant_id'     => $tenantId,
             ':name'          => trim((string)($data['name'] ?? '')),
+            ':code'          => isset($data['code']) && trim((string)$data['code']) !== '' ? trim((string)$data['code']) : null,
             ':placement_key' => trim((string)($data['placement_key'] ?? '')),
-            ':description'   => isset($data['description']) ? (string)$data['description'] : null,
+            ':description'   => isset($data['description']) && (string)$data['description'] !== '' ? (string)$data['description'] : null,
+            ':page'          => isset($data['page']) && trim((string)$data['page']) !== '' ? trim((string)$data['page']) : null,
+            ':width'         => isset($data['width']) && $data['width'] !== '' && $data['width'] !== null ? (int)$data['width'] : null,
+            ':height'        => isset($data['height']) && $data['height'] !== '' && $data['height'] !== null ? (int)$data['height'] : null,
+            ':max_ads'       => isset($data['max_ads']) && $data['max_ads'] !== '' && $data['max_ads'] !== null ? (int)$data['max_ads'] : 1,
             ':status'        => $data['status'] ?? 'active',
         ];
 
@@ -107,10 +112,14 @@ final class PdoAdPlacementsRepository implements AdPlacementsRepositoryInterface
             $stmt = $this->pdo->prepare("
                 UPDATE " . self::TABLE . " SET
                     name          = :name,
+                    code          = :code,
                     placement_key = :placement_key,
                     description   = :description,
-                    status        = :status,
-                    updated_at    = NOW()
+                    page          = :page,
+                    width         = :width,
+                    height        = :height,
+                    max_ads       = :max_ads,
+                    status        = :status
                 WHERE id = :id AND tenant_id = :tenant_id
             ");
             $params[':id'] = (int)$data['id'];
@@ -119,8 +128,10 @@ final class PdoAdPlacementsRepository implements AdPlacementsRepositoryInterface
         }
 
         $stmt = $this->pdo->prepare("
-            INSERT INTO " . self::TABLE . " (tenant_id, name, placement_key, description, status)
-            VALUES (:tenant_id, :name, :placement_key, :description, :status)
+            INSERT INTO " . self::TABLE . "
+                (tenant_id, name, code, placement_key, description, page, width, height, max_ads, status)
+            VALUES
+                (:tenant_id, :name, :code, :placement_key, :description, :page, :width, :height, :max_ads, :status)
         ");
         $stmt->execute($params);
         return (int)$this->pdo->lastInsertId();

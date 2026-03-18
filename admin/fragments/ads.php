@@ -733,6 +733,47 @@ $apiBase = '/api';
                     <textarea id="placementDescription" name="description" class="form-control" rows="3"></textarea>
                 </div>
 
+                <!-- Code -->
+                <div class="form-group">
+                    <label for="placementCode" data-i18n="placement_form.code">
+                        <?= htmlspecialchars(_adst('placement_form.code', 'Code'), ENT_QUOTES, 'UTF-8') ?>
+                    </label>
+                    <input type="text" id="placementCode" name="code" class="form-control"
+                           maxlength="100" pattern="[a-zA-Z0-9_-]*">
+                </div>
+
+                <!-- Page -->
+                <div class="form-group">
+                    <label for="placementPage" data-i18n="placement_form.page">
+                        <?= htmlspecialchars(_adst('placement_form.page', 'Page'), ENT_QUOTES, 'UTF-8') ?>
+                    </label>
+                    <input type="text" id="placementPage" name="page" class="form-control" maxlength="100">
+                </div>
+
+                <!-- Width / Height -->
+                <div class="form-group" style="display:flex;gap:1rem;">
+                    <div style="flex:1;">
+                        <label for="placementWidth" data-i18n="placement_form.width">
+                            <?= htmlspecialchars(_adst('placement_form.width', 'Width (px)'), ENT_QUOTES, 'UTF-8') ?>
+                        </label>
+                        <input type="number" id="placementWidth" name="width" class="form-control" min="1">
+                    </div>
+                    <div style="flex:1;">
+                        <label for="placementHeight" data-i18n="placement_form.height">
+                            <?= htmlspecialchars(_adst('placement_form.height', 'Height (px)'), ENT_QUOTES, 'UTF-8') ?>
+                        </label>
+                        <input type="number" id="placementHeight" name="height" class="form-control" min="1">
+                    </div>
+                </div>
+
+                <!-- Max Ads -->
+                <div class="form-group">
+                    <label for="placementMaxAds" data-i18n="placement_form.max_ads">
+                        <?= htmlspecialchars(_adst('placement_form.max_ads', 'Max Ads'), ENT_QUOTES, 'UTF-8') ?>
+                    </label>
+                    <input type="number" id="placementMaxAds" name="max_ads" class="form-control" min="1" value="1">
+                </div>
+
                 <!-- Status -->
                 <div class="form-group">
                     <label for="placementStatus" data-i18n="placement_form.status">
@@ -741,6 +782,7 @@ $apiBase = '/api';
                     <select id="placementStatus" name="status" class="form-control">
                         <option value="active"><?= htmlspecialchars(_adst('status.active', 'Active'), ENT_QUOTES, 'UTF-8') ?></option>
                         <option value="inactive"><?= htmlspecialchars(_adst('status.inactive', 'Inactive'), ENT_QUOTES, 'UTF-8') ?></option>
+                        <option value="draft"><?= htmlspecialchars(_adst('status.draft', 'Draft'), ENT_QUOTES, 'UTF-8') ?></option>
                     </select>
                 </div>
 
