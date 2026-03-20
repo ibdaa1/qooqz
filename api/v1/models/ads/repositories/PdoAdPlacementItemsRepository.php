@@ -7,6 +7,7 @@ final class PdoAdPlacementItemsRepository implements AdPlacementItemsRepositoryI
     private const TABLE = 'ad_placement_items';
     private const ALLOWED_ORDER_BY = ['id', 'placement_id', 'ad_id', 'priority', 'weight', 'start_date', 'end_date', 'created_at'];
     private const FILTERABLE_COLUMNS = ['placement_id', 'ad_id'];
+    private const DEFAULT_LANG = 'en';
 
     public function __construct(PDO $pdo)
     {
@@ -22,12 +23,13 @@ final class PdoAdPlacementItemsRepository implements AdPlacementItemsRepositoryI
         string $orderDir = 'DESC'
     ): array {
         $sql = "SELECT api.*,
-                    a.title AS ad_title
+                    COALESCE(atr.title, '') AS ad_title
                 FROM " . self::TABLE . " api
                 INNER JOIN ad_placements ap ON api.placement_id = ap.id
                 LEFT JOIN ads a ON api.ad_id = a.id
+                LEFT JOIN ad_translations atr ON a.id = atr.ad_id AND atr.language_code = :lang
                 WHERE ap.tenant_id = :tenant_id";
-        $params = [':tenant_id' => $tenantId];
+        $params = [':tenant_id' => $tenantId, ':lang' => self::DEFAULT_LANG];
 
         foreach (self::FILTERABLE_COLUMNS as $col) {
             if (isset($filters[$col]) && $filters[$col] !== '') {
@@ -82,14 +84,15 @@ final class PdoAdPlacementItemsRepository implements AdPlacementItemsRepositoryI
     {
         $stmt = $this->pdo->prepare(
             "SELECT api.*,
-                    a.title AS ad_title
+                    COALESCE(atr.title, '') AS ad_title
              FROM " . self::TABLE . " api
              INNER JOIN ad_placements ap ON api.placement_id = ap.id
              LEFT JOIN ads a ON api.ad_id = a.id
+             LEFT JOIN ad_translations atr ON a.id = atr.ad_id AND atr.language_code = :lang
              WHERE ap.tenant_id = :tenant_id AND api.id = :id
              LIMIT 1"
         );
-        $stmt->execute([':tenant_id' => $tenantId, ':id' => $id]);
+        $stmt->execute([':tenant_id' => $tenantId, ':id' => $id, ':lang' => self::DEFAULT_LANG]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
     }
