@@ -889,3 +889,26 @@
         height: 50px;
     }
 }
+/* ═══════════════════════════════════════════════
+   Image-type badge (icon + color from database)
+   ═══════════════════════════════════════════════ */
+.image-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 0.4rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+
+.image-type-badge i {
+    font-size: 0.75rem;
+}
+
+.image-type-badge--unknown {
+    background: var(--border-color, #334155);
+    color: var(--text-secondary, #94a3b8);
+}

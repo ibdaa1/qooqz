@@ -329,7 +329,7 @@
         state.items.forEach(item => {
             const isMain = item.is_main == 1;
             const createdDate = new Date(item.created_at).toLocaleDateString();
-            const imageTypeName = getImageTypeName(item.image_type_id);
+            const imageTypeBadge = getImageTypeBadge(item.image_type_id);
 
             html += `
                 <tr data-id="${item.id}">
@@ -340,7 +340,7 @@
                     <td>${item.id}</td>
                     <td>${escapeHtml(item.filename || '')}</td>
                     <td>${item.owner_id}</td>
-                    <td>${escapeHtml(imageTypeName)}</td>
+                    <td>${imageTypeBadge}</td>
                     <td><span class="badge badge-${item.visibility === 'public' ? 'success' : 'secondary'}">${item.visibility}</span></td>
                     <td>
                         <label class="toggle-switch">
@@ -948,6 +948,22 @@
     function getImageTypeName(id) {
         const type = state.imageTypes.find(t => t.id == id);
         return type ? type.name : 'Unknown';
+    }
+
+    /**
+     * Returns an HTML badge for the image type using icon + color stored in the DB.
+     * Falls back to a plain text badge if no icon/color is available.
+     */
+    function getImageTypeBadge(imageTypeId) {
+        const type = state.imageTypes.find(t => t.id == imageTypeId);
+        if (!type) {
+            return `<span class="image-type-badge image-type-badge--unknown">Unknown</span>`;
+        }
+        const icon  = type.icon  || 'fa-image';
+        const color = type.color || '#6b7280';
+        const name  = escapeHtml(type.name);
+        return `<span class="image-type-badge" style="background:${escapeHtml(color)};color:#fff;" title="${name}">` +
+               `<i class="fas ${escapeHtml(icon)}"></i> ${name}</span>`;
     }
 
     // Initialize
