@@ -303,7 +303,7 @@
 
 .add-tab-btn:hover {
     color: var(--primary-color, #3b82f6);
-    background: rgba(59, 130, 246, 0.06);
+    background: color-mix(in srgb, var(--primary-color, #3b82f6) 6%, transparent);
 }
 
 .add-tab-btn.active {
@@ -340,7 +340,7 @@
 .upload-drop-zone:hover,
 .upload-drop-zone.drag-over {
     border-color: var(--primary-color, #3b82f6);
-    background: rgba(59, 130, 246, 0.06);
+    background: color-mix(in srgb, var(--primary-color, #3b82f6) 6%, transparent);
 }
 
 .upload-drop-icon {
@@ -397,8 +397,8 @@
     align-items: flex-start;
     gap: 0.75rem;
     padding: 1rem;
-    background: rgba(59, 130, 246, 0.08);
-    border: 1px solid rgba(59, 130, 246, 0.25);
+    background: color-mix(in srgb, var(--primary-color, #3b82f6) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary-color, #3b82f6) 25%, transparent);
     border-radius: 8px;
     color: var(--text-secondary, #94a3b8);
     font-size: 0.9375rem;
@@ -447,7 +447,7 @@
 
 /* ── Studio Copy Row highlight ── */
 .data-table tbody tr.studio-copy-selected {
-    background: rgba(59, 130, 246, 0.18);
+    background: color-mix(in srgb, var(--primary-color, #3b82f6) 18%, transparent);
     outline: 2px solid var(--primary-color, #3b82f6);
     outline-offset: -2px;
 }
@@ -492,7 +492,7 @@
 .form-control:focus {
     outline: none;
     border-color: var(--primary-color, #3b82f6);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color, #3b82f6) 10%, transparent);
 }
 
 .form-control::placeholder {
@@ -642,39 +642,39 @@
 }
 
 .badge-success {
-    background: rgba(16, 185, 129, 0.2);
+    background: color-mix(in srgb, var(--success-color, #10b981) 20%, transparent);
     color: var(--success-color, #10b981);
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    border: 1px solid color-mix(in srgb, var(--success-color, #10b981) 30%, transparent);
 }
 
 .badge-danger {
-    background: rgba(239, 68, 68, 0.2);
+    background: color-mix(in srgb, var(--error-color, #ef4444) 20%, transparent);
     color: var(--error-color, #ef4444);
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    border: 1px solid color-mix(in srgb, var(--error-color, #ef4444) 30%, transparent);
 }
 
 .badge-warning {
-    background: rgba(245, 158, 11, 0.2);
+    background: color-mix(in srgb, var(--warning-color, #f59e0b) 20%, transparent);
     color: var(--warning-color, #f59e0b);
-    border: 1px solid rgba(245, 158, 11, 0.3);
+    border: 1px solid color-mix(in srgb, var(--warning-color, #f59e0b) 30%, transparent);
 }
 
 .badge-info {
-    background: rgba(34, 197, 94, 0.2);
+    background: color-mix(in srgb, var(--info-color, #22c55e) 20%, transparent);
     color: var(--info-color, #22c55e);
-    border: 1px solid rgba(34, 197, 94, 0.3);
+    border: 1px solid color-mix(in srgb, var(--info-color, #22c55e) 30%, transparent);
 }
 
 .badge-primary {
-    background: rgba(59, 130, 246, 0.2);
+    background: color-mix(in srgb, var(--primary-color, #3b82f6) 20%, transparent);
     color: var(--primary-color, #3b82f6);
-    border: 1px solid rgba(59, 130, 246, 0.3);
+    border: 1px solid color-mix(in srgb, var(--primary-color, #3b82f6) 30%, transparent);
 }
 
 .badge-secondary {
-    background: rgba(100, 116, 139, 0.2);
+    background: color-mix(in srgb, var(--secondary-color, #64748b) 20%, transparent);
     color: var(--secondary-color, #64748b);
-    border: 1px solid rgba(100, 116, 139, 0.3);
+    border: 1px solid color-mix(in srgb, var(--secondary-color, #64748b) 30%, transparent);
 }
 
 /* ════════════════════════════════════════════════════════════

@@ -331,18 +331,20 @@ The fragment emits `<style id="db-theme-vars-media-studio">` with a `:root { …
 ### 5.3 CSS `admin/assets/css/pages/media_studio.css`
 
 Uses CSS custom properties from the DB-driven theme (`--primary-color`, `--background-primary`, etc.).
+All interactive state colors (hover, focus ring, selected rows, hint boxes) use `color-mix()` so they
+are always derived from the DB-supplied CSS variable, not hardcoded values.
 
 Key selectors:
 
 | Selector | Purpose |
 |---|---|
 | `.notifications-container` | Fixed-position toast stack |
-| `.notification-success/error/warning/info` | Toast variants |
+| `.notification-success/error/warning/info` | Toast variants; background set via `var(--success-color)` etc. |
 | `.selection-bar` | Fixed top bar in select mode |
 | `.studio-copy-bar` | Fixed top bar in studio copy mode |
 | `.page-header` / `.page-header-actions` | Page title + action buttons |
 | `.card` / `.form-card` | Card container for forms |
-| `.upload-drop-zone` | Drag-and-drop upload area |
+| `.upload-drop-zone` | Drag-and-drop upload area; hover bg via `color-mix(var(--primary-color))` |
 | `.image-table` / `tbody tr` | Gallery table |
 | `.toggle-switch` / `.toggle-slider` | Is-Main toggle switch |
 | `.table-actions` | Edit/Delete button group |
@@ -350,8 +352,17 @@ Key selectors:
 | **`.image-type-badge`** | **Icon + color badge for image types (from DB)** |
 | `.image-type-badge--unknown` | Fallback for unknown type IDs |
 
-**Image type badge styles:**
+**Badge system (all colors from CSS variables):**
 ```css
+/* State badges (visibility: public/private, etc.) */
+.badge-success {
+    background: color-mix(in srgb, var(--success-color, #10b981) 20%, transparent);
+    color: var(--success-color, #10b981);
+    border: 1px solid color-mix(in srgb, var(--success-color, #10b981) 30%, transparent);
+}
+/* (same pattern for badge-danger, badge-warning, badge-info, badge-primary, badge-secondary) */
+
+/* Image type badge — background set INLINE by JS from image_types.color */
 .image-type-badge {
     display: inline-flex;
     align-items: center;
@@ -386,7 +397,29 @@ Alias defaults are emitted if not already defined by any theme record:
 - `--danger-color` → `#ef4444`
 - `--success-color` → `#22c55e`
 
-**CSS variables are NEVER hardcoded** in the media_studio page outside of these fallback values.
+All interactive state colors in the CSS (hover effects, focus rings, selected rows, hint boxes, and all `.badge-*` variants) are computed from these CSS variables using `color-mix()` — for example:
+
+```css
+/* Hover on tab button — color comes from --primary-color in DB */
+.add-tab-btn:hover {
+    background: color-mix(in srgb, var(--primary-color, #3b82f6) 6%, transparent);
+}
+
+/* Success badge — color comes from --success-color in DB */
+.badge-success {
+    background: color-mix(in srgb, var(--success-color, #10b981) 20%, transparent);
+    color: var(--success-color, #10b981);
+    border: 1px solid color-mix(in srgb, var(--success-color, #10b981) 30%, transparent);
+}
+```
+
+**No colors are hardcoded** in the media_studio page outside of these fallback values in `var()` and `color-mix()` expressions (which only activate when the DB has not supplied the variable).
+
+### Image Type Badge Colors (separate from theme)
+
+The `.image-type-badge` does **not** use the theme CSS variables. Instead, each image type stores its own
+`color` and `icon` directly in the `image_types` table. These are applied as **inline styles** by the JavaScript
+function `getImageTypeBadge()`. This means changing an image type's badge color requires only a `UPDATE image_types SET color = '...' WHERE code = '...'` — no code change.
 
 ---
 
