@@ -22,13 +22,11 @@ final class PdoAdPlacementItemsRepository implements AdPlacementItemsRepositoryI
         string $orderDir = 'DESC'
     ): array {
         $sql = "SELECT api.*,
-                    a.title      AS ad_title,
-                    ac.name      AS campaign_name,
-                    ac.tenant_id AS campaign_tenant_id
+                    a.title AS ad_title
                 FROM " . self::TABLE . " api
-                INNER JOIN ads a ON api.ad_id = a.id
-                INNER JOIN ad_campaigns ac ON a.campaign_id = ac.id
-                WHERE ac.tenant_id = :tenant_id";
+                INNER JOIN ad_placements ap ON api.placement_id = ap.id
+                LEFT JOIN ads a ON api.ad_id = a.id
+                WHERE ap.tenant_id = :tenant_id";
         $params = [':tenant_id' => $tenantId];
 
         foreach (self::FILTERABLE_COLUMNS as $col) {
@@ -61,9 +59,8 @@ final class PdoAdPlacementItemsRepository implements AdPlacementItemsRepositoryI
     public function count(int $tenantId, array $filters = []): int
     {
         $sql = "SELECT COUNT(*) FROM " . self::TABLE . " api
-                INNER JOIN ads a ON api.ad_id = a.id
-                INNER JOIN ad_campaigns ac ON a.campaign_id = ac.id
-                WHERE ac.tenant_id = :tenant_id";
+                INNER JOIN ad_placements ap ON api.placement_id = ap.id
+                WHERE ap.tenant_id = :tenant_id";
         $params = [':tenant_id' => $tenantId];
 
         foreach (self::FILTERABLE_COLUMNS as $col) {
@@ -85,13 +82,11 @@ final class PdoAdPlacementItemsRepository implements AdPlacementItemsRepositoryI
     {
         $stmt = $this->pdo->prepare(
             "SELECT api.*,
-                    a.title      AS ad_title,
-                    ac.name      AS campaign_name,
-                    ac.tenant_id AS campaign_tenant_id
+                    a.title AS ad_title
              FROM " . self::TABLE . " api
-             INNER JOIN ads a ON api.ad_id = a.id
-             INNER JOIN ad_campaigns ac ON a.campaign_id = ac.id
-             WHERE ac.tenant_id = :tenant_id AND api.id = :id
+             INNER JOIN ad_placements ap ON api.placement_id = ap.id
+             LEFT JOIN ads a ON api.ad_id = a.id
+             WHERE ap.tenant_id = :tenant_id AND api.id = :id
              LIMIT 1"
         );
         $stmt->execute([':tenant_id' => $tenantId, ':id' => $id]);
@@ -143,9 +138,8 @@ final class PdoAdPlacementItemsRepository implements AdPlacementItemsRepositoryI
     {
         $stmt = $this->pdo->prepare(
             "DELETE api FROM " . self::TABLE . " api
-             INNER JOIN ads a ON api.ad_id = a.id
-             INNER JOIN ad_campaigns ac ON a.campaign_id = ac.id
-             WHERE api.id = :id AND ac.tenant_id = :tenant_id"
+             INNER JOIN ad_placements ap ON api.placement_id = ap.id
+             WHERE api.id = :id AND ap.tenant_id = :tenant_id"
         );
         return $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
     }
