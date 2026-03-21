@@ -487,10 +487,14 @@ $results = [];
 
     $isolationResults = [];
 
-    // جداول يجب أن تحتوي على tenant_id
+    // جداول يجب أن تحتوي على tenant_id مباشرةً
+    // ملاحظة:
+    //   - ads       : مُقيَّدة عبر INNER JOIN ad_campaigns (campaign_id → tenant_id) — لا تحتاج عمود مباشر
+    //   - users     : جدول نظام عام — العزل عبر جدول tenant_users الوسيط
+    //   - tenants   : هو جدول المستأجرين بحد ذاته — لا يحتاج self-reference
     $tenantTables = [
-        'images', 'themes', 'products', 'orders', 'ads', 'ad_campaigns',
-        'ad_placements', 'categories', 'users', 'tenants', 'escrow_transactions',
+        'images', 'themes', 'products', 'orders', 'ad_campaigns',
+        'ad_placements', 'categories', 'escrow_transactions',
     ];
 
     foreach ($tenantTables as $table) {
@@ -504,6 +508,16 @@ $results = [];
         $exists = ($rows !== false && ($rows[0]['c'] ?? 0) > 0);
         $isolationResults["table_{$table}_has_tenant_id"] = $exists ? 'موجود ✔' : 'غير موجود ✗';
     }
+
+    // تحقق خاص: جدول ads مُقيَّد عبر FK → ad_campaigns.tenant_id
+    $adsHasCampaignId = safeQuery($pdo,
+        "SELECT COUNT(*) AS c FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ads' AND COLUMN_NAME = 'campaign_id'"
+    );
+    $adsScoped = ($adsHasCampaignId !== false && ($adsHasCampaignId[0]['c'] ?? 0) > 0);
+    $isolationResults['table_ads_scoped_via_campaign_id'] = $adsScoped
+        ? 'مُقيَّد عبر campaign_id → ad_campaigns.tenant_id ✔'
+        : 'غير مُقيَّد ✗';
 
     // تحقق: هل يمكن استرداد بيانات tenant=1 و tenant=2 منفصلَين؟
     $t1 = safeQuery($pdo, 'SELECT COUNT(*) AS c FROM images WHERE tenant_id = :tid', [':tid' => 1]);
@@ -529,7 +543,7 @@ $results = [];
     }
     $isolationResults['tenant_id_indexed'] = $indexedTables;
 
-    // نتيجة: كل جداول الجوهر تحتوي tenant_id
+    // نتيجة: كل جداول الجوهر تحتوي tenant_id أو عزل عبر FK
     $missingTenantId = array_filter($isolationResults,
         fn($v) => $v === 'غير موجود ✗' && is_string($v));
 
@@ -560,7 +574,7 @@ $results = [];
         'images'             => ['tenant_id', 'owner_id'],
         'themes'             => ['tenant_id'],
         'orders'             => ['tenant_id'],
-        'ads'                => ['tenant_id'],
+        'ads'                => ['campaign_id'],   // ads عزلها عبر campaign_id → ad_campaigns.tenant_id
         'ad_campaigns'       => ['tenant_id'],
         'products'           => ['tenant_id'],
         'escrow_transactions'=> ['tenant_id'],
@@ -907,11 +921,14 @@ $results = [];
         '1 OR 1=1',
     ];
 
+    // نستخدم عمود VARCHAR (url) بدلاً من عمود INT (tenant_id) لتجنّب
+    // type coercion في MySQL التي تحوّل '1 OR 1=1' → int 1 وتُعيد نتائج
+    // حقيقية — هذا ليس حقن SQL بل سلوك MySQL العادي مع الأعمدة الرقمية.
+    // Prepared statements تمنع تنفيذ أي SQL إضافي في القيمة الممررة.
     foreach ($injectionPayloads as $payload) {
-        // Prepared statement يجب أن يُعامل الـ payload كقيمة حرفية
         $rows = safeQuery($pdo,
-            'SELECT COUNT(*) AS c FROM images WHERE tenant_id = :tid',
-            [':tid' => $payload]  // يجب أن يُعيد 0 (لأن payload ليس integer)
+            'SELECT COUNT(*) AS c FROM images WHERE url = :url',
+            [':url' => $payload]  // يجب أن يُعيد 0 دائماً (لا يوجد url بهذه القيمة)
         );
         $sqlResults['payload_' . substr(md5($payload), 0, 8)] = [
             'payload' => $payload,
