@@ -347,8 +347,8 @@ if (!empty($_SESSION['user']['id'])) {
             </svg>
             QOOQZ
         </div>
-        <h1><?= $isRtl ? 'إنشاء حساب عبر واتساب' : 'Register with WhatsApp Verification' ?></h1>
-        <p><?= $isRtl ? 'سجّل بياناتك وتحقق من رقمك عبر واتساب في نفس الجلسة' : 'Register and verify your WhatsApp number in one session' ?></p>
+        <h1><?= $isRtl ? 'إنشاء حساب جديد' : 'Create New Account' ?></h1>
+        <p><?= $isRtl ? 'سجّل بياناتك وستصلك رسالة SMS لتفعيل حسابك' : 'Register and receive an SMS to activate your account' ?></p>
     </div>
 
     <!-- Step indicators -->
@@ -359,15 +359,7 @@ if (!empty($_SESSION['user']['id'])) {
         </div>
         <div class="rw-step" id="sInd2">
             <div class="rw-step-num">2</div>
-            <span><?= $isRtl ? 'إرسال الرمز' : 'Send OTP' ?></span>
-        </div>
-        <div class="rw-step" id="sInd3">
-            <div class="rw-step-num">3</div>
-            <span><?= $isRtl ? 'التحقق' : 'Verify' ?></span>
-        </div>
-        <div class="rw-step" id="sInd4">
-            <div class="rw-step-num">4</div>
-            <span><?= $isRtl ? 'التفعيل' : 'Done' ?></span>
+            <span><?= $isRtl ? 'التفعيل' : 'Activation' ?></span>
         </div>
     </div>
 
@@ -392,12 +384,12 @@ if (!empty($_SESSION['user']['id'])) {
             </div>
 
             <div class="rw-field">
-                <label for="rw_phone"><?= $isRtl ? 'رقم واتساب *' : 'WhatsApp Number *' ?></label>
+                <label for="rw_phone"><?= $isRtl ? 'رقم الجوال *' : 'Phone Number *' ?></label>
                 <input id="rw_phone" type="tel" autocomplete="tel" required
                        placeholder="+971 50 000 0000"
                        style="font-size:1.05rem;font-weight:600;letter-spacing:.5px;">
                 <small style="color:#888;font-size:.75rem;display:block;margin-top:4px;">
-                    <?= $isRtl ? 'سيُرسَل رابط التفعيل إلى هذا الرقم عبر واتساب' : 'A verification link will be sent to this number via WhatsApp' ?>
+                    <?= $isRtl ? 'سيُرسَل رابط التفعيل إلى هذا الرقم عبر SMS' : 'An activation link will be sent to this number via SMS' ?>
                 </small>
             </div>
 
@@ -429,99 +421,40 @@ if (!empty($_SESSION['user']['id'])) {
         </div>
 
         <!-- ══════════════════════════════════════
-             STEP 2 — Generate & send WhatsApp link
+             STEP 2 — Waiting for SMS activation
         ══════════════════════════════════════ -->
-        <div id="step2" style="display:none">
-
-            <div class="rw-meta" id="metaInfo">
-                <?= $isRtl ? 'المستخدم:' : 'User:' ?> <span id="metaUser">—</span> &nbsp;|&nbsp;
-                <?= $isRtl ? 'رقم واتساب:' : 'WhatsApp:' ?> <span id="metaPhone">—</span>
-            </div>
-
-            <p style="font-size:.88rem;color:#555;margin-bottom:14px;">
+        <div id="step2" style="display:none;text-align:center;">
+            <div style="font-size:4rem;margin-bottom:16px;">📱</div>
+            <h2 style="font-size:1.2rem;margin-bottom:8px;">
+                <?= $isRtl ? 'تحقق من رسائل SMS' : 'Check Your SMS' ?>
+            </h2>
+            <p style="color:#555;font-size:.88rem;margin-bottom:12px;">
                 <?= $isRtl
-                    ? 'تم إنشاء حسابك! اضغط الزر أدناه لمشاهدة رمز التحقق OTP وإرساله لنفسك عبر واتساب.'
-                    : 'Account created! Click below to get your OTP code and send it to yourself via WhatsApp.' ?>
+                    ? 'تم إنشاء حسابك! أرسلنا رابط التفعيل إلى رقم:'
+                    : 'Your account has been created! We sent an activation link to:' ?>
             </p>
-
-            <button id="btnGenLink" class="rw-btn rw-btn-wa">
-                <span>💬</span>
-                <?= $isRtl ? 'إنشاء رسالة واتساب' : 'Prepare WhatsApp Message' ?>
-            </button>
-
-            <div id="genAlert" class="rw-alert"></div>
-
-            <!-- Link display (shown after generation) -->
-            <div id="linkSection" style="display:none">
-
-                <!-- Quick action buttons -->
-                <div class="rw-actions">
-                    <button id="btnOpenWA" class="rw-action-btn rw-action-wa">
-                        <span class="icon">📱</span>
-                        <?= $isRtl ? 'فتح واتساب' : 'Open WhatsApp' ?>
-                    </button>
-                    <button id="btnCopyLink" class="rw-action-btn rw-action-cp">
-                        <span class="icon">📋</span>
-                        <?= $isRtl ? 'نسخ الرمز' : 'Copy OTP' ?>
-                    </button>
-                    <button id="btnCopyMsg" class="rw-action-btn rw-action-msg">
-                        <span class="icon">📝</span>
-                        <?= $isRtl ? 'نسخ الرسالة' : 'Copy Message' ?>
-                    </button>
-                </div>
-
-                <p id="copyStatus" style="font-size:.78rem;color:#555;margin-top:6px;min-height:1em;text-align:center;"></p>
-
-                <!-- Verification link -->
-                <div class="rw-link-box">
-                    <strong><?= $isRtl ? 'رمز التحقق (OTP):' : 'Verification Code (OTP):' ?></strong>
-                    <p id="verLink" style="margin-top:6px;font-size:1.8rem;letter-spacing:.2em;font-weight:700;color:var(--pri);"></p>
-                </div>
-
-                <!-- WhatsApp message preview -->
-                <details style="margin-top:12px;">
-                    <summary style="cursor:pointer;font-size:.82rem;color:#555;font-weight:600;">
-                        <?= $isRtl ? 'عرض رسالة واتساب الجاهزة' : 'Preview WhatsApp Message' ?>
-                    </summary>
-                    <textarea id="waMsgPreview" class="rw-msg-preview" rows="4" readonly></textarea>
-                </details>
-
-                <!-- Countdown -->
-                <div class="rw-timer" id="timerBox" style="display:none">
-                    <div id="rwClock" class="rw-clock">15:00</div>
-                    <p><?= $isRtl ? 'ينتهي رابط التفعيل خلال هذه المدة' : 'Verification link expires in' ?></p>
-                </div>
-
-                <!-- Instructions -->
-                <div class="rw-instructions">
-                    <h5><?= $isRtl ? '🚀 خطوات التحقق السريع:' : '🚀 Quick Steps:' ?></h5>
-                    <ol>
-                        <?php if ($isRtl): ?>
-                        <li>اضغط على زر <strong>"فتح واتساب"</strong></li>
-                        <li>سيفتح واتساب مع رسالة تحتوي على رمز التحقق OTP</li>
-                        <li>أرسل الرسالة إلى <strong>نفسك</strong></li>
-                        <li>ارجع هنا واضغط <strong>"المتابعة للتحقق"</strong> ثم أدخل الرمز لتفعيل حسابك</li>
-                        <?php else: ?>
-                        <li>Tap <strong>"Open WhatsApp"</strong></li>
-                        <li>WhatsApp will open with a message containing your OTP code</li>
-                        <li>Send it to <strong>yourself</strong></li>
-                        <li>Come back here, tap <strong>"Proceed to Verify"</strong> and enter the code to activate your account</li>
-                        <?php endif; ?>
-                    </ol>
-                </div>
-
-                <!-- Extra actions -->
-                <div class="rw-btn-row">
-                    <button id="btnRegenLink" class="rw-btn rw-btn-pri rw-btn-sm">
-                        🔄 <?= $isRtl ? 'إعادة إنشاء الرسالة' : 'Regenerate Message' ?>
-                    </button>
-                    <button id="btnCheckStatus" class="rw-btn rw-btn-out rw-btn-sm">
-                        ✔ <?= $isRtl ? 'المتابعة للتحقق' : 'Proceed to Verify' ?>
-                    </button>
-                </div>
+            <div style="font-size:1.1rem;font-weight:700;color:var(--pri);margin-bottom:20px;">
+                <span id="metaPhone">—</span>
             </div>
-
-            <div class="rw-btn-row" style="margin-top:16px;">
+            <div style="background:#f0faf3;border:1px solid #c3e6cb;border-radius:10px;padding:16px;margin-bottom:20px;font-size:.87rem;color:#155724;text-align:<?= $isRtl ? 'right' : 'left' ?>;">
+                <?php if ($isRtl): ?>
+                <strong>📌 خطوات التفعيل:</strong>
+                <ol style="margin:8px 0 0;padding-right:18px;">
+                    <li>افتح الرسالة النصية الواردة على رقمك</li>
+                    <li>اضغط رابط التفعيل <strong>على نفس الجهاز</strong></li>
+                    <li>سيتم تفعيل حسابك تلقائياً</li>
+                </ol>
+                <?php else: ?>
+                <strong>📌 Activation Steps:</strong>
+                <ol style="margin:8px 0 0;padding-left:18px;">
+                    <li>Open the SMS sent to your phone</li>
+                    <li>Tap the activation link <strong>on this same device</strong></li>
+                    <li>Your account will be activated automatically</li>
+                </ol>
+                <?php endif; ?>
+            </div>
+            <div id="smsAlert" class="rw-alert"></div>
+            <div class="rw-btn-row" style="margin-top:16px;justify-content:center;">
                 <button id="btnBackToStep1" class="rw-btn rw-btn-out rw-btn-sm">
                     ← <?= $isRtl ? 'تعديل البيانات' : 'Edit Details' ?>
                 </button>
@@ -529,48 +462,6 @@ if (!empty($_SESSION['user']['id'])) {
                     ↺ <?= $isRtl ? 'بدء من جديد' : 'Start Over' ?>
                 </button>
             </div>
-        </div>
-
-        <!-- ══════════════════════════════════════
-             STEP 3 — OTP Verification
-        ══════════════════════════════════════ -->
-        <div id="step3" style="display:none;text-align:center;">
-            <div style="font-size:3rem;margin-bottom:12px;">🔐</div>
-            <h2 style="font-size:1.2rem;margin-bottom:8px;">
-                <?= $isRtl ? 'أدخل رمز التحقق' : 'Enter Verification Code' ?>
-            </h2>
-            <p style="color:#555;font-size:.88rem;margin-bottom:16px;">
-                <?= $isRtl
-                    ? 'أدخل الرمز الذي أرسلته إلى نفسك عبر واتساب.'
-                    : 'Enter the OTP code you sent to yourself via WhatsApp.' ?>
-            </p>
-            <input id="otpInput" type="text" inputmode="numeric" maxlength="6"
-                   aria-label="<?= $isRtl ? 'رمز التحقق المكوّن من 6 أرقام' : '6-digit verification code' ?>"
-                   placeholder="<?= $isRtl ? 'الرمز المكوّن من 6 أرقام' : '6-digit code' ?>"
-                   style="width:180px;font-size:1.5rem;letter-spacing:.3em;text-align:center;padding:10px;border:2px solid #ccc;border-radius:8px;margin-bottom:12px;">
-            <div id="otpAlert" class="rw-alert" style="margin-bottom:10px;"></div>
-            <button id="btnVerifyOtp" class="rw-btn rw-btn-wa" style="width:auto;padding:12px 32px;">
-                ✔ <?= $isRtl ? 'تحقق وتفعيل الحساب' : 'Verify & Activate' ?>
-            </button>
-            <div class="rw-btn-row" style="margin-top:14px;justify-content:center;">
-                <button id="btnBackToStep2" class="rw-btn rw-btn-out rw-btn-sm">
-                    ← <?= $isRtl ? 'العودة' : 'Back' ?>
-                </button>
-            </div>
-        </div>
-
-        <!-- ══════════════════════════════════════
-             STEP 4 — Account activated
-        ══════════════════════════════════════ -->
-        <div id="step4" style="display:none;text-align:center;">
-            <div style="font-size:4rem;margin-bottom:12px;">🎉</div>
-            <h2 style="color:var(--ok);font-size:1.3rem;"><?= $isRtl ? 'تم تفعيل حسابك بنجاح!' : 'Account Activated Successfully!' ?></h2>
-            <p style="color:#555;margin-top:8px;font-size:.9rem;">
-                <?= $isRtl ? 'يمكنك الآن تسجيل الدخول باستخدام بريدك وكلمة المرور.' : 'You can now sign in with your email and password.' ?>
-            </p>
-            <a href="/frontend/login.php" class="rw-btn rw-btn-wa" style="display:inline-flex;margin-top:20px;width:auto;padding:12px 28px;text-decoration:none;">
-                <?= $isRtl ? 'تسجيل الدخول الآن' : 'Sign In Now' ?>
-            </a>
         </div>
 
     </div><!-- /.rw-body -->
@@ -581,45 +472,22 @@ if (!empty($_SESSION['user']['id'])) {
     'use strict';
 
     // ── DOM refs ──────────────────────────────────────────────────────
-    const step1       = document.getElementById('step1');
-    const step2       = document.getElementById('step2');
-    const step3       = document.getElementById('step3');
-    const step4       = document.getElementById('step4');
-    const sInd1       = document.getElementById('sInd1');
-    const sInd2       = document.getElementById('sInd2');
-    const sInd3       = document.getElementById('sInd3');
-    const sInd4       = document.getElementById('sInd4');
-    const regAlert    = document.getElementById('regAlert');
-    const genAlert    = document.getElementById('genAlert');
-    const linkSection = document.getElementById('linkSection');
-    const metaUser    = document.getElementById('metaUser');
-    const metaPhone   = document.getElementById('metaPhone');
-    const verLink     = document.getElementById('verLink');
-    const waMsgPreview= document.getElementById('waMsgPreview');
-    const rwClock     = document.getElementById('rwClock');
-    const timerBox    = document.getElementById('timerBox');
-    const copyStatus  = document.getElementById('copyStatus');
-    const csrfToken   = <?= json_encode($csrf) ?>;
+    const step1    = document.getElementById('step1');
+    const step2    = document.getElementById('step2');
+    const sInd1    = document.getElementById('sInd1');
+    const sInd2    = document.getElementById('sInd2');
+    const regAlert = document.getElementById('regAlert');
+    const metaPhone= document.getElementById('metaPhone');
+    const csrfToken= <?= json_encode($csrf) ?>;
 
     // ── State ─────────────────────────────────────────────────────────
-    let state = {
-        user_id:       null,
-        username:      null,
-        phone:         null,
-        session_token: null,
-        otp:           null,
-        link:          null,
-        waMessage:     null,
-        expiresAt:     null,
-    };
+    let state = { user_id: null, username: null, phone: null };
 
     // Restore partial session from sessionStorage (same tab only)
     try {
         const saved = JSON.parse(sessionStorage.getItem('rw_state') || 'null');
         if (saved && saved.user_id) { Object.assign(state, saved); }
     } catch (_) {}
-
-    let countdownInterval = null;
 
     // ── Helpers ───────────────────────────────────────────────────────
     function showAlert(el, type, msg) {
@@ -631,11 +499,8 @@ if (!empty($_SESSION['user']['id'])) {
     function setStep(n) {
         step1.style.display = n === 1 ? '' : 'none';
         step2.style.display = n === 2 ? '' : 'none';
-        step3.style.display = n === 3 ? '' : 'none';
-        step4.style.display = n === 4 ? '' : 'none';
-        [sInd1, sInd2, sInd3, sInd4].forEach((s, i) => {
-            s.className = 'rw-step' + (i + 1 < n ? ' done' : i + 1 === n ? ' active' : '');
-        });
+        sInd1.className = 'rw-step' + (n > 1 ? ' done' : ' active');
+        sInd2.className = 'rw-step' + (n === 2 ? ' active' : '');
     }
 
     async function postJSON(url, body) {
@@ -647,13 +512,6 @@ if (!empty($_SESSION['user']['id'])) {
         const txt = await r.text();
         try { return { ok: true, status: r.status, data: JSON.parse(txt) }; }
         catch (_) { return { ok: false, status: r.status, text: txt }; }
-    }
-
-    async function getJSON(url) {
-        try {
-            const r = await fetch(url, { cache: 'no-store' });
-            return await r.json();
-        } catch (_) { return []; }
     }
 
     // ── Language select ───────────────────────────────────────────────
@@ -673,7 +531,7 @@ if (!empty($_SESSION['user']['id'])) {
             return;
         }
         if (!phone) {
-            showAlert(regAlert, 'err', '<?= $isRtl ? 'رقم واتساب مطلوب.' : 'WhatsApp number is required.' ?>');
+            showAlert(regAlert, 'err', '<?= $isRtl ? 'رقم الجوال مطلوب.' : 'Phone number is required.' ?>');
             return;
         }
 
@@ -682,13 +540,13 @@ if (!empty($_SESSION['user']['id'])) {
         btn.innerHTML = '<span class="rw-spinner"></span> <?= $isRtl ? 'جارٍ التسجيل...' : 'Registering...' ?>';
 
         const body = {
-            action:               'register',
+            action:             'register',
             username,
             email,
             password,
-            phone:                phone || null,
-            preferred_language:   langSelect ? langSelect.value : <?= json_encode($lang) ?>,
-            csrf_token:           csrfToken,
+            phone:              phone || null,
+            preferred_language: langSelect ? langSelect.value : <?= json_encode($lang) ?>,
+            csrf_token:         csrfToken,
         };
 
         const res = await postJSON('/api/auth', body);
@@ -707,166 +565,28 @@ if (!empty($_SESSION['user']['id'])) {
             return;
         }
 
-        state.user_id       = j.user?.id       ?? j.user_id       ?? null;
-        state.username      = j.user?.username  ?? username;
-        state.phone         = j.user?.phone      ?? phone;
-        state.session_token = j.session_token    ?? null;
-        state.otp           = j.otp              ?? null;
+        state.user_id  = j.user?.id      ?? j.user_id ?? null;
+        state.username = j.user?.username ?? username;
+        state.phone    = j.user?.phone    ?? phone;
 
-        // Persist state for this tab so page refresh or verify redirect works
         try { sessionStorage.setItem('rw_state', JSON.stringify(state)); } catch (_) {}
 
-        metaUser.textContent  = state.username;
-        metaPhone.textContent = state.phone;
-
+        metaPhone.textContent = state.phone || '—';
         setStep(2);
-    });
-
-    // ── Step 2: Generate WhatsApp message with OTP ───────────────────
-    async function generateLink() {
-        if (!state.user_id) {
-            showAlert(genAlert, 'err', '<?= $isRtl ? 'لا يوجد مستخدم مسجّل.' : 'No registered user found.' ?>');
-            return;
-        }
-
-        linkSection.style.display = 'none';
-        hideAlert(genAlert);
-        timerBox.style.display = 'none';
-
-        // Build ready-to-send WhatsApp message with OTP
-        <?php if ($isRtl): ?>
-        state.waMessage = 'تم إنشاء حسابك في منصة QOOQZ بنجاح!\n'
-            + 'اسم المستخدم: ' + (state.username || '—') + '\n'
-            + 'رمز التحقق OTP: ' + (state.otp || '—') + '\n'
-            + 'أدخل الرمز في صفحة التحقق لتفعيل حسابك.';
-        <?php else: ?>
-        state.waMessage = 'Your QOOQZ account has been created!\n'
-            + 'Username: ' + (state.username || '—') + '\n'
-            + 'Verification Code (OTP): ' + (state.otp || '—') + '\n'
-            + 'Enter this code on the verification page to activate your account.';
-        <?php endif; ?>
-
-        try { sessionStorage.setItem('rw_state', JSON.stringify(state)); } catch (_) {}
-
-        showAlert(genAlert, 'ok', '✅ <?= $isRtl ? 'رسالة واتساب جاهزة للإرسال.' : 'WhatsApp message is ready to send.' ?>');
-
-        verLink.textContent   = state.otp || '—';
-        waMsgPreview.value    = state.waMessage;
-        linkSection.style.display = '';
-    }
-
-    document.getElementById('btnGenLink').addEventListener('click', generateLink);
-    document.getElementById('btnRegenLink').addEventListener('click', generateLink);
-
-    // ── Open WhatsApp ─────────────────────────────────────────────────
-    document.getElementById('btnOpenWA').addEventListener('click', () => {
-        if (!state.phone || !state.waMessage) {
-            alert('<?= $isRtl ? 'الرسالة أو الرقم غير متاحين.' : 'Message or phone not available.' ?>');
-            return;
-        }
-        let clean = state.phone.replace(/[^\d]/g, '');
-        if (clean.startsWith('0')) clean = clean.substring(1);
-        window.open('https://wa.me/' + clean + '?text=' + encodeURIComponent(state.waMessage), '_blank');
-    });
-
-    // ── Copy OTP code ─────────────────────────────────────────────────
-    document.getElementById('btnCopyLink').addEventListener('click', async () => {
-        if (!state.otp) return;
-        try {
-            await navigator.clipboard.writeText(state.otp);
-            copyStatus.textContent = '✅ <?= $isRtl ? 'تم نسخ الرمز' : 'OTP copied' ?>';
-        } catch (_) {
-            copyStatus.textContent = '<?= $isRtl ? 'انسخ الرمز يدوياً' : 'Copy the OTP manually' ?>';
-        }
-        setTimeout(() => { copyStatus.textContent = ''; }, 3000);
-    });
-
-    // ── Copy message ──────────────────────────────────────────────────
-    document.getElementById('btnCopyMsg').addEventListener('click', async () => {
-        if (!state.waMessage) return;
-        try {
-            await navigator.clipboard.writeText(state.waMessage);
-            copyStatus.textContent = '✅ <?= $isRtl ? 'تم نسخ الرسالة' : 'Message copied' ?>';
-        } catch (_) {
-            copyStatus.textContent = '<?= $isRtl ? 'انسخ الرسالة يدوياً' : 'Copy the message manually' ?>';
-        }
-        setTimeout(() => { copyStatus.textContent = ''; }, 3000);
-    });
-
-    // ── Proceed to OTP verification ───────────────────────────────────
-    document.getElementById('btnCheckStatus').addEventListener('click', () => {
-        if (!state.user_id) return;
-        setStep(3);
-    });
-
-    // ── OTP Verification ──────────────────────────────────────────────
-    document.getElementById('btnVerifyOtp').addEventListener('click', async () => {
-        const otpAlert = document.getElementById('otpAlert');
-        const otp = document.getElementById('otpInput').value.trim();
-        if (!otp || !/^\d{6}$/.test(otp)) {
-            showAlert(otpAlert, 'err', '<?= $isRtl ? 'يرجى إدخال رمز التحقق المكوّن من 6 أرقام.' : 'Please enter the 6-digit verification code.' ?>');
-            return;
-        }
-        const btn = document.getElementById('btnVerifyOtp');
-        btn.disabled = true;
-        btn.textContent = '<?= $isRtl ? 'جارٍ التحقق...' : 'Verifying...' ?>';
-        hideAlert(otpAlert);
-
-        const res = await postJSON('/api/auth', { action: 'verify_otp', otp });
-
-        btn.disabled = false;
-        btn.innerHTML = '✔ <?= $isRtl ? 'تحقق وتفعيل الحساب' : 'Verify & Activate' ?>';
-
-        if (!res.ok) {
-            showAlert(otpAlert, 'err', '<?= $isRtl ? 'خطأ من السيرفر.' : 'Server error.' ?>' + ' (' + res.status + ')');
-            return;
-        }
-        const j = res.data;
-        if (!j.ok) {
-            showAlert(otpAlert, 'err', j.error || j.message || '<?= $isRtl ? 'رمز التحقق غير صحيح.' : 'Invalid verification code.' ?>');
-            return;
-        }
-
-        try { sessionStorage.removeItem('rw_state'); } catch (_) {}
-        setStep(4);
     });
 
     // ── Navigation ────────────────────────────────────────────────────
     document.getElementById('btnBackToStep1').addEventListener('click', () => setStep(1));
-    document.getElementById('btnBackToStep2').addEventListener('click', () => setStep(2));
     document.getElementById('btnStartOver').addEventListener('click', () => {
         state = {};
         try { sessionStorage.removeItem('rw_state'); } catch (_) {}
-        if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
         location.reload();
     });
 
-    // ── Countdown ─────────────────────────────────────────────────────
-    function startCountdown(expiresAt) {
-        const expiry = new Date(expiresAt);
-        if (isNaN(expiry.getTime())) { return; } // invalid timestamp — skip countdown
-        function tick() {
-            const diff = expiry - Date.now();
-            if (diff <= 0) {
-                rwClock.textContent = '00:00';
-                clearInterval(countdownInterval);
-                showAlert(genAlert, 'err', '⏰ <?= $isRtl ? 'انتهت صلاحية الرابط. اضغط "إنشاء رابط جديد".' : 'Link expired. Click "Generate New Link".' ?>');
-                return;
-            }
-            const m = Math.floor(diff / 60000).toString().padStart(2, '0');
-            const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-            rwClock.textContent = m + ':' + s;
-        }
-        tick();
-        countdownInterval = setInterval(tick, 1000);
-    }
-
     // ── Init ──────────────────────────────────────────────────────────
     (function init() {
-        // If state was restored from sessionStorage, jump to step 2
         if (state.user_id) {
-            metaUser.textContent  = state.username  ?? '—';
-            metaPhone.textContent = state.phone      ?? '—';
+            metaPhone.textContent = state.phone ?? '—';
             setStep(2);
         }
     })();
