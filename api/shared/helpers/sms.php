@@ -359,6 +359,32 @@ class SMS {
     }
     
     // ===========================================
+    // 5.2 إرسال رابط تفعيل الحساب (بدون كشف الرمز)
+    // ===========================================
+
+    /**
+     * إرسال رابط تفعيل الحساب عبر SMS.
+     * الرابط يحتوي على الرمز المشفر فقط — لا يُعرض للمستخدم أبداً.
+     *
+     * @param string $phone  رقم الجوال مع كود الدولة
+     * @param string $link   رابط التفعيل الكامل
+     * @param string $lang   ar | en
+     * @return array
+     */
+    public static function sendVerificationLink(string $phone, string $link, string $lang = 'ar'): array {
+        if ($lang === 'ar') {
+            $message  = "مرحباً! لتفعيل حسابك في " . APP_NAME . " افتح الرابط التالي من نفس الجهاز الذي سجّلت منه:";
+            $message .= "\n" . $link;
+            $message .= "\nصالح لمدة 15 دقيقة. لا تشارك هذا الرابط.";
+        } else {
+            $message  = "Welcome to " . APP_NAME . "! Open the link below on the same device you registered from to activate your account:";
+            $message .= "\n" . $link;
+            $message .= "\nValid for 15 minutes. Do not share this link.";
+        }
+        return self::send($phone, $message, $lang);
+    }
+
+    // ===========================================
     // 6️⃣ إرسال إشعار طلب جديد
     // ===========================================
     

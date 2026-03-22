@@ -212,15 +212,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ins->execute([$regUsername, $regEmail, $hash, $regPhone ?: null, $regLang ?: 'en']);
             $newId = (int)$pdo->lastInsertId();
 
-            // Generate 6-digit OTP and store in session for verification
-            $otp = str_pad((string)random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+            // ---- Device-bound verification link (token never shown to user) ----
+            // Raw token: 32 random bytes as hex (64 chars). Only the hash is stored.
+            $rawToken    = bin2hex(random_bytes(32));
+            $tokenHash   = hash('sha256', $rawToken);
+
+            // Device token: stored in an httpOnly cookie so we can verify the same
+            // browser/device opens the activation link.
+            $rawDevice   = bin2hex(random_bytes(16));
+            $deviceHash  = hash('sha256', $rawDevice);
+
+            $expiresAt   = date('Y-m-d H:i:s', time() + 900); // 15 minutes
+            $userAgent   = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 512);
+            $clientIp    = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+
+            // Store verification record (no OTP is persisted in plain text anywhere)
+            $insV = $pdo->prepare(
+                'INSERT INTO user_phone_verifications
+                    (user_id, token_hash, device_hash, user_agent, ip, expires_at)
+                 VALUES (?, ?, ?, ?, ?, ?)'
+            );
+            $insV->execute([$newId, $tokenHash, $deviceHash, $userAgent, $clientIp, $expiresAt]);
+
+            // Set device cookie (httpOnly, SameSite=Lax, expires with verification window)
+            $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+            if (!headers_sent()) {
+                if (PHP_VERSION_ID >= 70300) {
+                    setcookie('qz_dvt', $rawDevice,
+                        ['expires' => time() + 900, 'path' => '/', 'httponly' => true,
+                         'samesite' => 'Lax', 'secure' => $secure]);
+                } else {
+                    setcookie('qz_dvt', $rawDevice, time() + 900, '/', '', $secure, true);
+                }
+            }
+
+            // Build activation link and send via SMS (link contains raw token, never the code itself)
+            $appUrl  = defined('APP_URL') ? APP_URL
+                     : (($secure ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+            $activationLink = $appUrl . '/verify_phone?t=' . urlencode($rawToken);
+
+            // Send SMS with the activation link
+            if ($regPhone) {
+                try {
+                    if (file_exists(__DIR__ . '/../../../shared/helpers/sms.php')) {
+                        require_once __DIR__ . '/../../../shared/helpers/sms.php';
+                    }
+                    if (class_exists('SMS')) {
+                        SMS::setPDO($pdo);
+                        SMS::sendVerificationLink($regPhone, $activationLink, $regLang ?: 'ar');
+                    }
+                } catch (Throwable $smsErr) {
+                    if (class_exists('Logger')) Logger::error('SMS send error: ' . $smsErr->getMessage());
+                }
+            }
+
+            // Store pending user_id in session (no OTP in session anymore)
             session_regenerate_id(true);
-            $_SESSION['pending_otp']         = $otp;
-            $_SESSION['pending_user_id']     = $newId;
-            $_SESSION['pending_otp_expires'] = time() + 900; // 15 minutes
-            $_SESSION['pending_otp_attempts'] = 0;
-            // Clear any previous active session until OTP is verified
-            unset($_SESSION['user_id'], $_SESSION['user']);
+            $_SESSION['pending_user_id'] = $newId;
+            unset($_SESSION['user_id'], $_SESSION['user'], $_SESSION['pending_otp']);
 
             $user = [
                 'id'                 => $newId,
@@ -237,13 +286,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'roles_count'        => 0,
             ];
 
-            // Return flat JSON so the frontend can access j.ok and j.user directly
-            // (ResponseFormatter::success() wraps data in a 'data' key which breaks j.ok checks)
             if (!headers_sent()) {
                 header('Content-Type: application/json; charset=utf-8');
                 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
             }
-            echo json_encode(['ok' => true, 'message' => 'Registration successful', 'user' => $user, 'otp' => $otp]);
+            // Never return the token or any secret — only tell the user to check their SMS
+            echo json_encode([
+                'ok'      => true,
+                'message' => ($regLang === 'ar')
+                    ? 'تم إنشاء الحساب. تحقق من رسائل SMS لتفعيل حسابك.'
+                    : 'Account created. Check your SMS to activate your account.',
+                'user'    => $user,
+            ]);
             exit;
         } catch (Throwable $e) {
             if (class_exists('Logger')) Logger::error('Register error: ' . $e->getMessage());
