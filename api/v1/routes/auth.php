@@ -170,7 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ? $routeAction
         : ($postAction ?: ($routeAction ?: 'login'));
 
-    if (!in_array($effectiveAction, ['login', 'register', 'verify_otp'], true)) {
+    if (!in_array($effectiveAction, ['login', 'register', 'verify_otp', 'resend_verification'], true)) {
         ResponseFormatter::notFound('Auth POST route not found');
         exit;
     }
@@ -302,6 +302,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Throwable $e) {
             if (class_exists('Logger')) Logger::error('Register error: ' . $e->getMessage());
             ResponseFormatter::serverError(app_env('debug') ? $e->getMessage() : 'Registration failed');
+        }
+        exit;
+    }
+
+    // ---------------- RESEND VERIFICATION SMS ----------------
+    if ($effectiveAction === 'resend_verification') {
+        $pendingId = $_SESSION['pending_user_id'] ?? null;
+        if (!$pendingId) {
+            ResponseFormatter::error('No pending registration found. Please register first.', 400);
+            exit;
+        }
+
+        try {
+            // Fetch user phone
+            $uRow = $pdo->prepare('SELECT phone, preferred_language FROM users WHERE id = ? AND is_active = 0 LIMIT 1');
+            $uRow->execute([(int)$pendingId]);
+            $uData = $uRow->fetch(PDO::FETCH_ASSOC);
+
+            if (!$uData || empty($uData['phone'])) {
+                ResponseFormatter::error('User not found or already activated.', 400);
+                exit;
+            }
+
+            // Rate-limit: max 1 resend per 60 seconds
+            $recent = $pdo->prepare(
+                'SELECT COUNT(*) FROM user_phone_verifications
+                  WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 60 SECOND)'
+            );
+            $recent->execute([(int)$pendingId]);
+            if ((int)$recent->fetchColumn() > 0) {
+                ResponseFormatter::error('Please wait 60 seconds before requesting another SMS.', 429);
+                exit;
+            }
+
+            $rawToken  = bin2hex(random_bytes(32));
+            $tokenHash = hash('sha256', $rawToken);
+            $rawDevice = bin2hex(random_bytes(16));
+            $deviceHash = hash('sha256', $rawDevice);
+            $expiresAt = date('Y-m-d H:i:s', time() + 900);
+            $userAgent = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 512);
+            $clientIp  = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+
+            $insV = $pdo->prepare(
+                'INSERT INTO user_phone_verifications
+                    (user_id, token_hash, device_hash, user_agent, ip, expires_at)
+                 VALUES (?, ?, ?, ?, ?, ?)'
+            );
+            $insV->execute([(int)$pendingId, $tokenHash, $deviceHash, $userAgent, $clientIp, $expiresAt]);
+
+            $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+            if (!headers_sent()) {
+                if (PHP_VERSION_ID >= 70300) {
+                    setcookie('qz_dvt', $rawDevice,
+                        ['expires' => time() + 900, 'path' => '/', 'httponly' => true,
+                         'samesite' => 'Lax', 'secure' => $secure]);
+                } else {
+                    setcookie('qz_dvt', $rawDevice, time() + 900, '/', '', $secure, true);
+                }
+            }
+
+            $appUrl = defined('APP_URL') ? APP_URL
+                    : (($secure ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+            $activationLink = $appUrl . '/verify_phone?t=' . urlencode($rawToken);
+
+            $resendLang = preg_replace('/[^a-z\-]/', '', strtolower($uData['preferred_language'] ?: 'ar'));
+            if (file_exists(__DIR__ . '/../../../shared/helpers/sms.php')) {
+                require_once __DIR__ . '/../../../shared/helpers/sms.php';
+            }
+            if (class_exists('SMS')) {
+                SMS::setPDO($pdo);
+                SMS::sendVerificationLink($uData['phone'], $activationLink, $resendLang);
+            }
+
+            if (!headers_sent()) {
+                header('Content-Type: application/json; charset=utf-8');
+            }
+            echo json_encode(['ok' => true, 'message' => 'Verification SMS sent.']);
+        } catch (Throwable $e) {
+            if (class_exists('Logger')) Logger::error('Resend verification error: ' . $e->getMessage());
+            ResponseFormatter::serverError('Failed to resend verification SMS.');
         }
         exit;
     }

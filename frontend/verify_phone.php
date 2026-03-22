@@ -25,9 +25,14 @@ if (session_status() === PHP_SESSION_NONE) {
 
 ini_set('display_errors', '0');
 
-$status  = trim($_GET['status'] ?? '');
-$rawMsg  = trim($_GET['msg']    ?? '');
-$rawToken = trim($_GET['t']     ?? '');
+$status   = trim($_GET['status']  ?? '');
+$rawMsg   = trim($_GET['msg']     ?? '');
+$rawToken = trim($_GET['t']       ?? '');
+$waiting  = !empty($_GET['waiting']);
+$rawPhone = trim($_GET['phone']   ?? '');
+// Sanitise phone for display only (never trusted for auth)
+$displayPhone = preg_replace('/[^\d+]/', '', $rawPhone);
+$displayPhone = htmlspecialchars(substr($displayPhone, 0, 20), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
 // If we already have a status, just render the result page
 $autoVerify = ($rawToken !== '' && $status === '');
@@ -82,7 +87,17 @@ $autoVerify = ($rawToken !== '' && $status === '');
         }
         .btn:hover { background: #2563eb; }
         .err { color: #dc2626; }
-        #statusMsg { display:none; }
+        .btn-resend {
+            background: none;
+            border: 2px solid #3b82f6;
+            color: #3b82f6;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .btn-resend:hover { background: #eff6ff; }
+        .btn-resend:disabled { opacity: .5; cursor: not-allowed; }
+        #resendMsg { font-size: 13px; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -104,6 +119,27 @@ $autoVerify = ($rawToken !== '' && $status === '');
     <div class="spinner" id="spinner"></div>
     <h1 id="titleMsg">جاري التحقق…</h1>
     <p id="bodyMsg">يرجى الانتظار بينما نتحقق من هويتك.</p>
+
+<?php elseif ($waiting): ?>
+    <div class="icon">📱</div>
+    <h1>تحقق من رسائل SMS</h1>
+    <?php if ($displayPhone !== ''): ?>
+    <p style="font-size:1rem;font-weight:700;color:#1a1a2e;margin:8px 0 4px;"><?= $displayPhone ?></p>
+    <?php endif; ?>
+    <p>تم إنشاء حسابك! أرسلنا رابط التفعيل إلى رقمك. افتح الرابط على نفس الجهاز لتفعيل حسابك.</p>
+    <div style="background:#f0faf3;border:1px solid #c3e6cb;border-radius:10px;padding:14px;margin:18px 0;font-size:.87rem;color:#155724;text-align:right;">
+        <strong>📌 خطوات التفعيل:</strong>
+        <ol style="margin:8px 0 0;padding-right:18px;">
+            <li>افتح الرسالة النصية الواردة على رقمك</li>
+            <li>اضغط رابط التفعيل <strong>على نفس الجهاز</strong></li>
+            <li>سيتم تفعيل حسابك تلقائياً</li>
+        </ol>
+    </div>
+    <button id="btnResend" class="btn btn-resend" style="display:inline-block;margin-top:8px;padding:10px 24px;border-radius:8px;">
+        🔁 إعادة إرسال رسالة التفعيل
+    </button>
+    <div id="resendMsg"></div>
+    <a href="/register" class="btn" style="background:#6b7280;margin-top:12px;display:inline-block;">العودة للتسجيل</a>
 
 <?php else: ?>
     <div class="icon">🔗</div>
@@ -178,6 +214,71 @@ $autoVerify = ($rawToken !== '' && $status === '');
     }
 
     activate();
+})();
+</script>
+<?php endif; ?>
+
+<?php if ($waiting): ?>
+<script>
+(function () {
+    'use strict';
+    const btn = document.getElementById('btnResend');
+    const msg = document.getElementById('resendMsg');
+    if (!btn) return;
+
+    let cooldown = 0;
+    let timer = null;
+
+    function setCooldown(secs) {
+        cooldown = secs;
+        btn.disabled = true;
+        clearInterval(timer);
+        timer = setInterval(function () {
+            cooldown--;
+            if (cooldown <= 0) {
+                clearInterval(timer);
+                btn.disabled = false;
+                btn.textContent = '🔁 إعادة إرسال رسالة التفعيل';
+            } else {
+                btn.textContent = '⏳ إعادة الإرسال بعد ' + cooldown + 'ث';
+            }
+        }, 1000);
+    }
+
+    btn.addEventListener('click', async function () {
+        msg.textContent = '';
+        msg.style.color = '';
+        btn.disabled = true;
+        btn.textContent = '⏳ جارٍ الإرسال…';
+
+        let data;
+        try {
+            const res = await fetch('/api/auth', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'resend_verification' })
+            });
+            data = await res.json();
+        } catch (e) {
+            msg.textContent = 'تعذّر الاتصال بالخادم. يرجى المحاولة مجدداً.';
+            msg.style.color = '#dc2626';
+            btn.disabled = false;
+            btn.textContent = '🔁 إعادة إرسال رسالة التفعيل';
+            return;
+        }
+
+        if (data && data.ok) {
+            msg.textContent = '✅ تم إرسال رسالة التفعيل بنجاح!';
+            msg.style.color = '#155724';
+            setCooldown(60);
+        } else {
+            msg.textContent = '❌ ' + (data.error || 'فشل إرسال الرسالة. يرجى المحاولة مجدداً.');
+            msg.style.color = '#dc2626';
+            btn.disabled = false;
+            btn.textContent = '🔁 إعادة إرسال رسالة التفعيل';
+        }
+    });
 })();
 </script>
 <?php endif; ?>

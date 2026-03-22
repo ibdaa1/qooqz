@@ -571,8 +571,9 @@ if (!empty($_SESSION['user']['id'])) {
 
         try { sessionStorage.setItem('rw_state', JSON.stringify(state)); } catch (_) {}
 
-        metaPhone.textContent = state.phone || '—';
-        setStep(2);
+        // Redirect to phone verification page
+        const verifyUrl = '/verify_phone?waiting=1&phone=' + encodeURIComponent(state.phone || '');
+        window.location.href = verifyUrl;
     });
 
     // ── Navigation ────────────────────────────────────────────────────
