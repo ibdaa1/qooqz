@@ -403,19 +403,12 @@ if (!empty($_SESSION['user']['id'])) {
                        minlength="6" placeholder="••••••••">
             </div>
 
-            <div class="rw-row">
-                <div class="rw-field">
-                    <label for="rw_country"><?= $isRtl ? 'البلد' : 'Country' ?></label>
-                    <select id="rw_country">
-                        <option value=""><?= $isRtl ? '-- اختر البلد --' : '-- Select Country --' ?></option>
-                    </select>
-                </div>
-                <div class="rw-field">
-                    <label for="rw_city"><?= $isRtl ? 'المدينة' : 'City' ?></label>
-                    <select id="rw_city" disabled>
-                        <option value=""><?= $isRtl ? '-- اختر المدينة --' : '-- Select City --' ?></option>
-                    </select>
-                </div>
+            <div class="rw-field">
+                <label for="rw_lang"><?= $isRtl ? 'اللغة المفضلة' : 'Preferred Language' ?></label>
+                <select id="rw_lang">
+                    <option value="ar" <?= $lang === 'ar' ? 'selected' : '' ?>>العربية</option>
+                    <option value="en" <?= $lang === 'en' ? 'selected' : '' ?>>English</option>
+                </select>
             </div>
 
             <div id="regAlert" class="rw-alert"></div>
@@ -443,13 +436,13 @@ if (!empty($_SESSION['user']['id'])) {
 
             <p style="font-size:.88rem;color:#555;margin-bottom:14px;">
                 <?= $isRtl
-                    ? 'اضغط الزر أدناه لإنشاء رابط التفعيل المرتبط بجلستك الحالية وإرساله إلى واتساب.'
-                    : 'Click the button below to generate a session-bound verification link and send it to WhatsApp.' ?>
+                    ? 'تم إنشاء حسابك بنجاح! اضغط الزر أدناه لإنشاء رسالة واتساب مع رابط تسجيل الدخول.'
+                    : 'Your account is ready! Click below to prepare a WhatsApp message with your login link.' ?>
             </p>
 
             <button id="btnGenLink" class="rw-btn rw-btn-wa">
-                <span>🔗</span>
-                <?= $isRtl ? 'إنشاء رابط التفعيل' : 'Generate Verification Link' ?>
+                <span>💬</span>
+                <?= $isRtl ? 'إنشاء رسالة واتساب' : 'Prepare WhatsApp Message' ?>
             </button>
 
             <div id="genAlert" class="rw-alert"></div>
@@ -497,37 +490,29 @@ if (!empty($_SESSION['user']['id'])) {
 
                 <!-- Instructions -->
                 <div class="rw-instructions">
-                    <h5><?= $isRtl ? '🚀 خطوات التفعيل السريع:' : '🚀 Quick Activation Steps:' ?></h5>
+                    <h5><?= $isRtl ? '🚀 خطوات الإرسال السريع:' : '🚀 Quick Steps:' ?></h5>
                     <ol>
                         <?php if ($isRtl): ?>
                         <li>اضغط على زر <strong>"فتح واتساب"</strong></li>
                         <li>سيفتح واتساب مع رسالة جاهزة للإرسال</li>
-                        <li>أرسل الرسالة إلى <strong>نفس رقم هاتفك</strong></li>
-                        <li>افتح الرابط المرسَل <strong>في هذا المتصفح</strong></li>
-                        <li>سيتم تفعيل حسابك تلقائياً</li>
+                        <li>أرسل الرسالة إلى <strong>نفسك أو من تريد</strong></li>
+                        <li>حسابك مفعّل بالفعل — يمكنك تسجيل الدخول الآن</li>
                         <?php else: ?>
                         <li>Tap <strong>"Open WhatsApp"</strong></li>
                         <li>WhatsApp will open with a ready-to-send message</li>
-                        <li>Send it to <strong>your own number</strong></li>
-                        <li>Open the link <strong>in this same browser</strong></li>
-                        <li>Your account will be activated automatically</li>
+                        <li>Send it to <strong>yourself or anyone</strong></li>
+                        <li>Your account is already active — you can sign in now</li>
                         <?php endif; ?>
                     </ol>
-                    <p style="margin-top:8px;font-size:.78rem;color:#666;">
-                        <strong>⚠️ <?= $isRtl ? 'ملاحظة:' : 'Note:' ?></strong>
-                        <?= $isRtl
-                            ? 'الرابط مرتبط بجلستك الحالية ولن يعمل في متصفح آخر.'
-                            : 'The link is bound to your current session and will not work in another browser.' ?>
-                    </p>
                 </div>
 
                 <!-- Extra actions -->
                 <div class="rw-btn-row">
                     <button id="btnRegenLink" class="rw-btn rw-btn-pri rw-btn-sm">
-                        🔄 <?= $isRtl ? 'إنشاء رابط جديد' : 'Generate New Link' ?>
+                        🔄 <?= $isRtl ? 'إعادة إنشاء الرسالة' : 'Regenerate Message' ?>
                     </button>
                     <button id="btnCheckStatus" class="rw-btn rw-btn-out rw-btn-sm">
-                        ✔ <?= $isRtl ? 'تحقق من حالة التفعيل' : 'Check Activation Status' ?>
+                        ✔ <?= $isRtl ? 'المتابعة لتسجيل الدخول' : 'Proceed to Login' ?>
                     </button>
                 </div>
             </div>
@@ -547,7 +532,7 @@ if (!empty($_SESSION['user']['id'])) {
         ══════════════════════════════════════ -->
         <div id="step3" style="display:none;text-align:center;">
             <div style="font-size:4rem;margin-bottom:12px;">🎉</div>
-            <h2 style="color:var(--ok);font-size:1.3rem;"><?= $isRtl ? 'تم تفعيل حسابك بنجاح!' : 'Account Activated!' ?></h2>
+            <h2 style="color:var(--ok);font-size:1.3rem;"><?= $isRtl ? 'تم إنشاء حسابك بنجاح!' : 'Account Created Successfully!' ?></h2>
             <p style="color:#555;margin-top:8px;font-size:.9rem;">
                 <?= $isRtl ? 'يمكنك الآن تسجيل الدخول باستخدام بريدك وكلمة المرور.' : 'You can now sign in with your email and password.' ?>
             </p>
@@ -635,42 +620,8 @@ if (!empty($_SESSION['user']['id'])) {
         } catch (_) { return []; }
     }
 
-    // ── Countries / Cities ────────────────────────────────────────────
-    const countrySelect = document.getElementById('rw_country');
-    const citySelect    = document.getElementById('rw_city');
-
-    async function loadCountries() {
-        const data = await getJSON('/api/locations/countries.php');
-        countrySelect.innerHTML = '<option value=""><?= $isRtl ? '-- اختر البلد --' : '-- Select Country --' ?></option>';
-        for (const c of data) {
-            const o = document.createElement('option');
-            o.value = c.id;
-            o.textContent = c.name;
-            countrySelect.appendChild(o);
-        }
-    }
-
-    async function loadCities(cid) {
-        citySelect.innerHTML = '<option value=""><?= $isRtl ? '-- اختر المدينة --' : '-- Select City --' ?></option>';
-        citySelect.disabled = true;
-        if (!cid) return;
-        const data = await getJSON('/api/locations/cities.php?country_id=' + encodeURIComponent(cid));
-        for (const ct of data) {
-            const o = document.createElement('option');
-            o.value = ct.id;
-            o.textContent = ct.name;
-            citySelect.appendChild(o);
-        }
-        citySelect.disabled = false;
-    }
-
-    countrySelect.addEventListener('change', () => {
-        if (countrySelect.value) loadCities(countrySelect.value);
-        else {
-            citySelect.innerHTML = '<option value=""><?= $isRtl ? '-- اختر المدينة --' : '-- Select City --' ?></option>';
-            citySelect.disabled = true;
-        }
-    });
+    // ── Language select ───────────────────────────────────────────────
+    const langSelect = document.getElementById('rw_lang');
 
     // ── Step 1: Register ──────────────────────────────────────────────
     document.getElementById('btnRegister').addEventListener('click', async () => {
@@ -680,8 +631,6 @@ if (!empty($_SESSION['user']['id'])) {
         const email    = document.getElementById('rw_email').value.trim();
         const phone    = document.getElementById('rw_phone').value.trim();
         const password = document.getElementById('rw_password').value;
-        const country  = countrySelect.value;
-        const city     = citySelect.value;
 
         if (!username || !email || !password) {
             showAlert(regAlert, 'err', '<?= $isRtl ? 'يرجى تعبئة جميع الحقول المطلوبة (*).' : 'Please fill all required fields (*).' ?>');
@@ -697,18 +646,16 @@ if (!empty($_SESSION['user']['id'])) {
         btn.innerHTML = '<span class="rw-spinner"></span> <?= $isRtl ? 'جارٍ التسجيل...' : 'Registering...' ?>';
 
         const body = {
+            action:               'register',
             username,
             email,
             password,
-            phone,
-            is_active: 0,
-            channel: 'whatsapp',
-            csrf_token: csrfToken,
+            phone:                phone || null,
+            preferred_language:   langSelect ? langSelect.value : <?= json_encode($lang) ?>,
+            csrf_token:           csrfToken,
         };
-        if (country) body.country_id = parseInt(country, 10);
-        if (city)    body.city_id    = parseInt(city, 10);
 
-        const res = await postJSON('/api/users/register_user.php', body);
+        const res = await postJSON('/api/auth', body);
 
         btn.disabled = false;
         btn.innerHTML = '📋 <?= $isRtl ? 'إنشاء الحساب والمتابعة' : 'Create Account & Continue' ?>';
@@ -724,7 +671,7 @@ if (!empty($_SESSION['user']['id'])) {
             return;
         }
 
-        state.user_id       = j.user_id;
+        state.user_id       = j.user?.id       ?? j.user_id       ?? null;
         state.username      = j.user?.username  ?? username;
         state.phone         = j.user?.phone      ?? phone;
         state.session_token = j.session_token    ?? null;
@@ -738,7 +685,7 @@ if (!empty($_SESSION['user']['id'])) {
         setStep(2);
     });
 
-    // ── Step 2: Generate link ─────────────────────────────────────────
+    // ── Step 2: Generate WhatsApp link (client-side) ─────────────────
     async function generateLink() {
         if (!state.user_id) {
             showAlert(genAlert, 'err', '<?= $isRtl ? 'لا يوجد مستخدم مسجّل.' : 'No registered user found.' ?>');
@@ -747,47 +694,30 @@ if (!empty($_SESSION['user']['id'])) {
 
         linkSection.style.display = 'none';
         hideAlert(genAlert);
-        showAlert(genAlert, 'info', '<?= $isRtl ? 'جارٍ إنشاء رابط التفعيل...' : 'Generating verification link...' ?>');
-
-        if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
         timerBox.style.display = 'none';
 
-        const body = {
-            user_id:       state.user_id,
-            channel:       'whatsapp',
-            ttl:           900,
-        };
-        if (state.session_token) body.session_token = state.session_token;
+        // Build login link as the "confirmation" link
+        const loginUrl = window.location.origin + '/frontend/login.php';
+        state.link = loginUrl;
 
-        const res = await postJSON('/api/users/send_verification_code.php', body);
-        hideAlert(genAlert);
+        // Build ready-to-send WhatsApp message
+        <?php if ($isRtl): ?>
+        state.waMessage = 'تم إنشاء حسابك في منصة QOOQZ بنجاح!\n'
+            + 'اسم المستخدم: ' + (state.username || '—') + '\n'
+            + 'رابط تسجيل الدخول: ' + loginUrl;
+        <?php else: ?>
+        state.waMessage = 'Your QOOQZ account has been created!\n'
+            + 'Username: ' + (state.username || '—') + '\n'
+            + 'Login here: ' + loginUrl;
+        <?php endif; ?>
 
-        if (!res.ok) {
-            showAlert(genAlert, 'err', '<?= $isRtl ? 'خطأ من السيرفر: ' : 'Server error: ' ?>' + (res.text || res.status));
-            return;
-        }
-
-        const j = res.data;
-        if (!j.ok) {
-            showAlert(genAlert, 'err', (j.error || j.message || JSON.stringify(j)));
-            return;
-        }
-
-        state.link      = j.link;
-        state.waMessage = j.whatsapp_message ?? '';
-        state.expiresAt = j.expires_at ?? null;
         try { sessionStorage.setItem('rw_state', JSON.stringify(state)); } catch (_) {}
 
-        showAlert(genAlert, 'ok', '✅ ' + (j.message || '<?= $isRtl ? 'تم إنشاء رابط التفعيل.' : 'Verification link generated.' ?>'));
+        showAlert(genAlert, 'ok', '✅ <?= $isRtl ? 'رسالة واتساب جاهزة للإرسال.' : 'WhatsApp message is ready to send.' ?>');
 
         verLink.textContent   = state.link;
         waMsgPreview.value    = state.waMessage;
         linkSection.style.display = '';
-
-        if (state.expiresAt) {
-            timerBox.style.display = '';
-            startCountdown(state.expiresAt);
-        }
     }
 
     document.getElementById('btnGenLink').addEventListener('click', generateLink);
@@ -829,22 +759,11 @@ if (!empty($_SESSION['user']['id'])) {
     });
 
     // ── Check activation ──────────────────────────────────────────────
-    document.getElementById('btnCheckStatus').addEventListener('click', async () => {
+    document.getElementById('btnCheckStatus').addEventListener('click', () => {
         if (!state.user_id) return;
-        showAlert(genAlert, 'info', '<?= $isRtl ? 'جارٍ التحقق من حالة التفعيل...' : 'Checking activation status...' ?>');
-
-        const res = await postJSON('/api/users/check_activation.php', { user_id: state.user_id, csrf_token: csrfToken });
-        hideAlert(genAlert);
-
-        if (res.ok && res.data && res.data.is_active) {
-            // Move to success step
-            setStep(3);
-            sInd2.className = 'rw-step done';
-            sInd3.className = 'rw-step active';
-            try { sessionStorage.removeItem('rw_state'); } catch (_) {}
-        } else {
-            showAlert(genAlert, 'warn', '⏳ <?= $isRtl ? 'لم يتم التفعيل بعد. تأكد من فتح الرابط في هذا المتصفح.' : 'Not activated yet. Make sure you opened the link in this browser.' ?>');
-        }
+        // User is active immediately after registration (is_active=1 in auth.php)
+        setStep(3);
+        try { sessionStorage.removeItem('rw_state'); } catch (_) {}
     });
 
     // ── Navigation ────────────────────────────────────────────────────
@@ -878,8 +797,6 @@ if (!empty($_SESSION['user']['id'])) {
 
     // ── Init ──────────────────────────────────────────────────────────
     (function init() {
-        loadCountries().catch(() => {});
-
         // If state was restored from sessionStorage, jump to step 2
         if (state.user_id) {
             metaUser.textContent  = state.username  ?? '—';
