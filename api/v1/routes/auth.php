@@ -218,6 +218,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'name'               => $regUsername,
                 'username'           => $regUsername,
                 'email'              => $regEmail,
+                'phone'              => $regPhone ?: null,
                 'role_id'            => null,
                 'preferred_language' => $regLang ?: 'en',
                 'is_active'          => true,
@@ -230,7 +231,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user']    = $user;
             $GLOBALS['ADMIN_USER'] = $user;
 
-            ResponseFormatter::success(['ok' => true, 'message' => 'Registration successful', 'user' => $user]);
+            // Return flat JSON so the frontend can access j.ok and j.user directly
+            // (ResponseFormatter::success() wraps data in a 'data' key which breaks j.ok checks)
+            if (!headers_sent()) {
+                header('Content-Type: application/json; charset=utf-8');
+                header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+            }
+            echo json_encode(['ok' => true, 'message' => 'Registration successful', 'user' => $user]);
+            exit;
         } catch (Throwable $e) {
             if (class_exists('Logger')) Logger::error('Register error: ' . $e->getMessage());
             ResponseFormatter::serverError(app_env('debug') ? $e->getMessage() : 'Registration failed');
