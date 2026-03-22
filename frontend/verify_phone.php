@@ -122,13 +122,13 @@ $autoVerify = ($rawToken !== '' && $status === '');
     <div class="icon">✅</div>
     <h1>تم تفعيل حسابك بنجاح!</h1>
     <p>مرحباً بك. يمكنك الآن تسجيل الدخول والاستمتاع بخدماتنا.</p>
-    <a href="/login" class="btn">تسجيل الدخول</a>
+    <a href="/frontend/login.php" class="btn">تسجيل الدخول</a>
 
 <?php elseif ($status === 'error'): ?>
     <div class="icon">❌</div>
     <h1 class="err">فشل التفعيل</h1>
     <p class="err"><?= htmlspecialchars($rawMsg ?: 'حدث خطأ غير متوقع.') ?></p>
-    <a href="/register" class="btn" style="background:#6b7280">العودة للتسجيل</a>
+    <a href="/frontend/register.php" class="btn" style="background:#6b7280">العودة للتسجيل</a>
 
 <?php elseif ($autoVerify): ?>
     <div class="spinner" id="spinner"></div>
@@ -159,13 +159,13 @@ $autoVerify = ($rawToken !== '' && $status === '');
         إرسال الرابط عبر واتساب
     </button>
     <div id="resendMsg"></div>
-    <a href="/register" class="btn" style="background:#6b7280;margin-top:12px;display:inline-block;">العودة للتسجيل</a>
+    <a href="/frontend/register.php" class="btn" style="background:#6b7280;margin-top:12px;display:inline-block;">العودة للتسجيل</a>
 
 <?php else: ?>
     <div class="icon">🔗</div>
     <h1>رابط التفعيل</h1>
     <p>لم يتم التعرف على رابط التفعيل. يرجى فتح الرابط المرسل عبر SMS مرة أخرى.</p>
-    <a href="/register" class="btn" style="background:#6b7280">إعادة التسجيل</a>
+    <a href="/frontend/register.php" class="btn" style="background:#6b7280">إعادة التسجيل</a>
 
 <?php endif; ?>
 
@@ -194,7 +194,7 @@ $autoVerify = ($rawToken !== '' && $status === '');
 
         if (data && data.ok) {
             showResult(true);
-            setTimeout(() => { window.location.href = '/'; }, 1800);
+            setTimeout(() => { window.location.href = '/frontend/'; }, 1800);
         } else {
             showResult(false, data.error || 'فشل التفعيل');
         }
@@ -221,7 +221,7 @@ $autoVerify = ($rawToken !== '' && $status === '');
             errSpan.className = 'err';
             errSpan.textContent = errMsg;
             const backLink = document.createElement('a');
-            backLink.href = '/register';
+            backLink.href = '/frontend/register.php';
             backLink.className = 'btn';
             backLink.style.background = '#6b7280';
             backLink.style.marginTop  = '16px';
