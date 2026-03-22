@@ -572,7 +572,7 @@ if (!empty($_SESSION['user']['id'])) {
         try { sessionStorage.setItem('rw_state', JSON.stringify(state)); } catch (_) {}
 
         // Redirect to phone verification page
-        const verifyUrl = '/verify_phone?waiting=1&phone=' + encodeURIComponent(state.phone || '');
+        const verifyUrl = '/frontend/verify_phone.php?waiting=1&phone=' + encodeURIComponent(state.phone || '');
         window.location.href = verifyUrl;
     });
 
