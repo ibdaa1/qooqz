@@ -249,7 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Build activation link and send via SMS (link contains raw token, never the code itself)
             $appUrl  = defined('APP_URL') ? APP_URL
                      : (($secure ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
-            $activationLink = $appUrl . '/verify_phone?t=' . urlencode($rawToken);
+            $activationLink = $appUrl . '/frontend/verify_phone.php?t=' . urlencode($rawToken);
 
             // Send SMS with the activation link
             if ($regPhone) {
@@ -364,9 +364,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $appUrl = defined('APP_URL') ? APP_URL
                     : (($secure ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
-            $activationLink = $appUrl . '/verify_phone?t=' . urlencode($rawToken);
+            $activationLink = $appUrl . '/frontend/verify_phone.php?t=' . urlencode($rawToken);
 
-            $resendLang = preg_replace('/[^a-z\-]/', '', strtolower($uData['preferred_language'] ?: 'ar'));
+            $resendLang= preg_replace('/[^a-z\-]/', '', strtolower($uData['preferred_language'] ?: 'ar'));
             if (file_exists(__DIR__ . '/../../../shared/helpers/sms.php')) {
                 require_once __DIR__ . '/../../../shared/helpers/sms.php';
             }

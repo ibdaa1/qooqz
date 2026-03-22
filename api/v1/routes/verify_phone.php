@@ -74,7 +74,7 @@ function _vpError(string $msg, int $code = 400, bool $json = false): void {
     } else {
         // Redirect to frontend page with error
         $appUrl = _vp_app_url();
-        $dest = $appUrl . '/verify_phone?status=error&msg=' . urlencode($msg);
+        $dest = $appUrl . '/frontend/verify_phone.php?status=error&msg=' . urlencode($msg);
         if (!headers_sent()) header('Location: ' . $dest, true, 302);
     }
 }
@@ -202,7 +202,7 @@ try {
         echo json_encode(['ok' => true, 'message' => 'Account activated successfully.', 'user' => $user]);
     } else {
         // Redirect to frontend success page
-        $dest = _vp_app_url() . '/verify_phone?status=success';
+        $dest = _vp_app_url() . '/frontend/verify_phone.php?status=success';
         if (!headers_sent()) header('Location: ' . $dest, true, 302);
     }
 
