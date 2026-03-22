@@ -128,7 +128,7 @@ $autoVerify = ($rawToken !== '' && $status === '');
     <div class="icon">❌</div>
     <h1 class="err">فشل التفعيل</h1>
     <p class="err"><?= htmlspecialchars($rawMsg ?: 'حدث خطأ غير متوقع.') ?></p>
-    <a href="/frontend/register.php" class="btn" style="background:#6b7280">العودة للتسجيل</a>
+    <a href="/frontend/" class="btn" style="background:#6b7280">العودة للرئيسية</a>
 
 <?php elseif ($autoVerify): ?>
     <div class="spinner" id="spinner"></div>
@@ -159,13 +159,14 @@ $autoVerify = ($rawToken !== '' && $status === '');
         إرسال الرابط عبر واتساب
     </button>
     <div id="resendMsg"></div>
+    <a href="/frontend/" class="btn" style="background:#6b7280">العودة للرئيسية</a>
     <a href="/frontend/register.php" class="btn" style="background:#6b7280;margin-top:12px;display:inline-block;">العودة للتسجيل</a>
 
 <?php else: ?>
     <div class="icon">🔗</div>
     <h1>رابط التفعيل</h1>
     <p>لم يتم التعرف على رابط التفعيل. يرجى فتح الرابط المرسل عبر SMS مرة أخرى.</p>
-    <a href="/frontend/register.php" class="btn" style="background:#6b7280">إعادة التسجيل</a>
+    <a href="/frontend/" class="btn" style="background:#6b7280">العودة للرئيسية</a>
 
 <?php endif; ?>
 
@@ -221,11 +222,11 @@ $autoVerify = ($rawToken !== '' && $status === '');
             errSpan.className = 'err';
             errSpan.textContent = errMsg;
             const backLink = document.createElement('a');
-            backLink.href = '/frontend/register.php';
+            backLink.href = '/frontend/';
             backLink.className = 'btn';
             backLink.style.background = '#6b7280';
             backLink.style.marginTop  = '16px';
-            backLink.textContent = 'إعادة التسجيل';
+            backLink.textContent = 'العودة للرئيسية';
             body.textContent = '';
             body.appendChild(errSpan);
             body.appendChild(document.createElement('br'));

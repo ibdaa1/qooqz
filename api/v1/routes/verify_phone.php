@@ -115,31 +115,6 @@ try {
         exit;
     }
 
-    // ---- Device verification ----
-    // Primary: compare device_hash (cookie set during registration)
-    $deviceMatch = ($deviceHash !== '' && hash_equals($row['device_hash'], $deviceHash));
-
-    // Secondary fallback: check user_agent similarity
-    $currentUA   = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 512);
-    $storedUA    = (string)($row['user_agent'] ?? '');
-    $uaMatch     = ($currentUA !== '' && $storedUA !== '' && $currentUA === $storedUA);
-
-    if (!$deviceMatch && !$uaMatch) {
-        // Log the suspicious access attempt
-        if (class_exists('Logger')) {
-            Logger::warning('Phone verification device mismatch', [
-                'user_id'       => $row['user_id'],
-                'stored_ip'     => $row['ip'],
-                'current_ip'    => $_SERVER['REMOTE_ADDR'] ?? '',
-                'stored_ua'     => substr($storedUA, 0, 120),
-                'current_ua'    => substr($currentUA, 0, 120),
-                'device_cookie' => $deviceHash !== '' ? 'present' : 'missing',
-            ]);
-        }
-        _vpError('تعذّر التحقق: يجب فتح الرابط على نفس الجهاز الذي تم التسجيل منه.', 403, $isJsonReq);
-        exit;
-    }
-
     // ---- Activate the user ----
     $userId = (int)$row['user_id'];
     $upd = $pdo->prepare('UPDATE users SET is_active = 1, updated_at = NOW() WHERE id = ? AND is_active = 0');
