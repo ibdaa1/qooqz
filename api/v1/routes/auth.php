@@ -170,7 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ? $routeAction
         : ($postAction ?: ($routeAction ?: 'login'));
 
-    if ($effectiveAction !== 'login' && $effectiveAction !== 'register') {
+    if (!in_array($effectiveAction, ['login', 'register', 'verify_otp'], true)) {
         ResponseFormatter::notFound('Auth POST route not found');
         exit;
     }
@@ -207,12 +207,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hash = password_hash($regPassword, PASSWORD_DEFAULT);
             $ins  = $pdo->prepare(
                 'INSERT INTO users (username, email, password_hash, phone, preferred_language, is_active, created_at)
-                 VALUES (?, ?, ?, ?, ?, 1, NOW())'
+                 VALUES (?, ?, ?, ?, ?, 0, NOW())'
             );
             $ins->execute([$regUsername, $regEmail, $hash, $regPhone ?: null, $regLang ?: 'en']);
             $newId = (int)$pdo->lastInsertId();
 
+            // Generate 6-digit OTP and store in session for verification
+            $otp = str_pad((string)random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
             session_regenerate_id(true);
+            $_SESSION['pending_otp']         = $otp;
+            $_SESSION['pending_user_id']     = $newId;
+            $_SESSION['pending_otp_expires'] = time() + 900; // 15 minutes
+            $_SESSION['pending_otp_attempts'] = 0;
+            // Clear any previous active session until OTP is verified
+            unset($_SESSION['user_id'], $_SESSION['user']);
+
             $user = [
                 'id'                 => $newId,
                 'name'               => $regUsername,
@@ -221,15 +230,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'phone'              => $regPhone ?: null,
                 'role_id'            => null,
                 'preferred_language' => $regLang ?: 'en',
-                'is_active'          => true,
+                'is_active'          => false,
                 'permissions'        => [],
                 'roles'              => [],
                 'permissions_count'  => 0,
                 'roles_count'        => 0,
             ];
-            $_SESSION['user_id'] = $newId;
-            $_SESSION['user']    = $user;
-            $GLOBALS['ADMIN_USER'] = $user;
 
             // Return flat JSON so the frontend can access j.ok and j.user directly
             // (ResponseFormatter::success() wraps data in a 'data' key which breaks j.ok checks)
@@ -237,11 +243,104 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Content-Type: application/json; charset=utf-8');
                 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
             }
-            echo json_encode(['ok' => true, 'message' => 'Registration successful', 'user' => $user]);
+            echo json_encode(['ok' => true, 'message' => 'Registration successful', 'user' => $user, 'otp' => $otp]);
             exit;
         } catch (Throwable $e) {
             if (class_exists('Logger')) Logger::error('Register error: ' . $e->getMessage());
             ResponseFormatter::serverError(app_env('debug') ? $e->getMessage() : 'Registration failed');
+        }
+        exit;
+    }
+
+    // ---------------- VERIFY OTP ----------------
+    if ($effectiveAction === 'verify_otp') {
+        $submittedOtp = trim((string)($payload['otp'] ?? ''));
+
+        if ($submittedOtp === '' || !preg_match('/^\d{6}$/', $submittedOtp)) {
+            ResponseFormatter::error('OTP must be a 6-digit number', 422);
+            exit;
+        }
+
+        $sessionOtp     = $_SESSION['pending_otp']          ?? null;
+        $sessionUserId  = $_SESSION['pending_user_id']       ?? null;
+        $otpExpires     = $_SESSION['pending_otp_expires']   ?? 0;
+        $attempts       = (int)($_SESSION['pending_otp_attempts'] ?? 0);
+
+        if (!$sessionOtp || !$sessionUserId) {
+            ResponseFormatter::error('No pending verification found. Please register again.', 400);
+            exit;
+        }
+
+        // Check expiry (15 minutes)
+        if (time() > $otpExpires) {
+            unset($_SESSION['pending_otp'], $_SESSION['pending_user_id'],
+                  $_SESSION['pending_otp_expires'], $_SESSION['pending_otp_attempts']);
+            ResponseFormatter::error('OTP has expired. Please register again.', 400);
+            exit;
+        }
+
+        // Brute-force protection: max 5 attempts
+        if ($attempts >= 5) {
+            unset($_SESSION['pending_otp'], $_SESSION['pending_user_id'],
+                  $_SESSION['pending_otp_expires'], $_SESSION['pending_otp_attempts']);
+            ResponseFormatter::error('Too many incorrect attempts. Please register again.', 429);
+            exit;
+        }
+
+        if ($submittedOtp !== $sessionOtp) {
+            $_SESSION['pending_otp_attempts'] = $attempts + 1;
+            $remaining = 5 - ($attempts + 1);
+            ResponseFormatter::error('Invalid OTP. ' . $remaining . ' attempt(s) remaining.', 401);
+            exit;
+        }
+
+        try {
+            // Activate the user account
+            $upd = $pdo->prepare('UPDATE users SET is_active = 1, updated_at = NOW() WHERE id = ? AND is_active = 0');
+            $upd->execute([$sessionUserId]);
+
+            if ($upd->rowCount() === 0) {
+                // User might already be active or not found
+                ResponseFormatter::error('Account could not be activated. It may already be active.', 409);
+                exit;
+            }
+
+            // Fetch the now-active user
+            $rowStmt = $pdo->prepare('SELECT id, username, email, phone, preferred_language, role_id, is_active FROM users WHERE id = ?');
+            $rowStmt->execute([$sessionUserId]);
+            $userData = $rowStmt->fetch(PDO::FETCH_ASSOC);
+
+            // Clear pending OTP from session and log the user in
+            unset($_SESSION['pending_otp'], $_SESSION['pending_user_id'],
+                  $_SESSION['pending_otp_expires'], $_SESSION['pending_otp_attempts']);
+            session_regenerate_id(true);
+
+            $user = [
+                'id'                 => (int)$userData['id'],
+                'name'               => $userData['username'],
+                'username'           => $userData['username'],
+                'email'              => $userData['email'],
+                'phone'              => $userData['phone'],
+                'role_id'            => $userData['role_id'],
+                'preferred_language' => $userData['preferred_language'],
+                'is_active'          => true,
+                'permissions'        => [],
+                'roles'              => [],
+                'permissions_count'  => 0,
+                'roles_count'        => 0,
+            ];
+            $_SESSION['user_id']       = $user['id'];
+            $_SESSION['user']          = $user;
+            $GLOBALS['ADMIN_USER']     = $user;
+
+            if (!headers_sent()) {
+                header('Content-Type: application/json; charset=utf-8');
+                header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+            }
+            echo json_encode(['ok' => true, 'message' => 'Account verified and activated', 'user' => $user]);
+        } catch (Throwable $e) {
+            if (class_exists('Logger')) Logger::error('Verify OTP error: ' . $e->getMessage());
+            ResponseFormatter::serverError(app_env('debug') ? $e->getMessage() : 'Verification failed');
         }
         exit;
     }
