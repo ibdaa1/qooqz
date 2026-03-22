@@ -378,7 +378,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!headers_sent()) {
                 header('Content-Type: application/json; charset=utf-8');
             }
-            echo json_encode(['ok' => true, 'message' => 'Verification SMS sent.']);
+            echo json_encode(['ok' => true, 'message' => 'Verification SMS sent.', 'activation_link' => $activationLink, 'phone' => $uData['phone'] ?? '']);
         } catch (Throwable $e) {
             if (class_exists('Logger')) Logger::error('Resend verification error: ' . $e->getMessage());
             ResponseFormatter::serverError('Failed to resend verification SMS.');

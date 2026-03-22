@@ -98,6 +98,21 @@ $autoVerify = ($rawToken !== '' && $status === '');
         .btn-resend:hover { background: #eff6ff; }
         .btn-resend:disabled { opacity: .5; cursor: not-allowed; }
         #resendMsg { font-size: 13px; margin-top: 10px; }
+        .btn-whatsapp {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 10px 24px;
+            background: #25d366;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-whatsapp:hover { background: #1ebe5d; }
+        .btn-whatsapp:disabled { opacity: .5; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -137,6 +152,11 @@ $autoVerify = ($rawToken !== '' && $status === '');
     </div>
     <button id="btnResend" class="btn btn-resend" style="display:inline-block;margin-top:8px;padding:10px 24px;border-radius:8px;">
         🔁 إعادة إرسال رسالة التفعيل
+    </button>
+    <br>
+    <button id="btnWhatsapp" class="btn-whatsapp" style="margin-top:10px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="vertical-align:middle;margin-left:6px;"><path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z"/></svg>
+        إرسال الرابط عبر واتساب
     </button>
     <div id="resendMsg"></div>
     <a href="/register" class="btn" style="background:#6b7280;margin-top:12px;display:inline-block;">العودة للتسجيل</a>
@@ -222,8 +242,10 @@ $autoVerify = ($rawToken !== '' && $status === '');
 <script>
 (function () {
     'use strict';
-    const btn = document.getElementById('btnResend');
-    const msg = document.getElementById('resendMsg');
+    const btn        = document.getElementById('btnResend');
+    const btnWa      = document.getElementById('btnWhatsapp');
+    const msg        = document.getElementById('resendMsg');
+
     if (!btn) return;
 
     let cooldown = 0;
@@ -232,12 +254,14 @@ $autoVerify = ($rawToken !== '' && $status === '');
     function setCooldown(secs) {
         cooldown = secs;
         btn.disabled = true;
+        if (btnWa) btnWa.disabled = true;
         clearInterval(timer);
         timer = setInterval(function () {
             cooldown--;
             if (cooldown <= 0) {
                 clearInterval(timer);
                 btn.disabled = false;
+                if (btnWa) btnWa.disabled = false;
                 btn.textContent = '🔁 إعادة إرسال رسالة التفعيل';
             } else {
                 btn.textContent = '⏳ إعادة الإرسال بعد ' + cooldown + 'ث';
@@ -245,10 +269,11 @@ $autoVerify = ($rawToken !== '' && $status === '');
         }, 1000);
     }
 
-    btn.addEventListener('click', async function () {
+    async function resendAndGetLink() {
         msg.textContent = '';
         msg.style.color = '';
         btn.disabled = true;
+        if (btnWa) btnWa.disabled = true;
         btn.textContent = '⏳ جارٍ الإرسال…';
 
         let data;
@@ -264,21 +289,56 @@ $autoVerify = ($rawToken !== '' && $status === '');
             msg.textContent = 'تعذّر الاتصال بالخادم. يرجى المحاولة مجدداً.';
             msg.style.color = '#dc2626';
             btn.disabled = false;
+            if (btnWa) btnWa.disabled = false;
             btn.textContent = '🔁 إعادة إرسال رسالة التفعيل';
-            return;
+            return null;
         }
 
         if (data && data.ok) {
-            msg.textContent = '✅ تم إرسال رسالة التفعيل بنجاح!';
-            msg.style.color = '#155724';
             setCooldown(60);
+            return { link: data.activation_link || null, phone: data.phone || '' };
         } else {
             msg.textContent = '❌ ' + (data.error || 'فشل إرسال الرسالة. يرجى المحاولة مجدداً.');
             msg.style.color = '#dc2626';
             btn.disabled = false;
+            if (btnWa) btnWa.disabled = false;
             btn.textContent = '🔁 إعادة إرسال رسالة التفعيل';
+            return null;
+        }
+    }
+
+    btn.addEventListener('click', async function () {
+        const result = await resendAndGetLink();
+        if (result) {
+            msg.textContent = '✅ تم إرسال رسالة التفعيل بنجاح!';
+            msg.style.color = '#155724';
         }
     });
+
+    if (btnWa) {
+        btnWa.addEventListener('click', async function () {
+            const result = await resendAndGetLink();
+            if (!result || !result.link) return;
+
+            // Phone comes from the server response (trusted), not URL params
+            // Strip non-digit/+ chars, then remove leading + for wa.me
+            const serverPhone = (result.phone || '').replace(/[^\d+]/g, '').replace(/^\+/, '');
+            // Validate: must be 7–15 digits
+            if (serverPhone && !/^\d{7,15}$/.test(serverPhone)) {
+                msg.textContent = '❌ رقم الهاتف غير صالح.';
+                msg.style.color = '#dc2626';
+                return;
+            }
+
+            msg.textContent = '✅ تم إنشاء الرابط. جاري فتح واتساب…';
+            msg.style.color = '#155724';
+            const waText = encodeURIComponent('رابط تفعيل حسابك: ' + result.link);
+            const waUrl  = serverPhone
+                ? 'https://wa.me/' + serverPhone + '?text=' + waText
+                : 'https://wa.me/?text=' + waText;
+            window.open(waUrl, '_blank');
+        });
+    }
 })();
 </script>
 <?php endif; ?>
