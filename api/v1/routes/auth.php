@@ -182,7 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $csrfPayload   = trim((string)($payload['csrf_token'] ?? ''));
         $csrfSubmitted = $csrfHeader !== '' ? $csrfHeader : $csrfPayload;
         $csrfSession   = (string)($_SESSION['csrf_token'] ?? '');
-        if ($csrfSession === '' || !hash_equals($csrfSession, $csrfSubmitted)) {
+        if ($csrfSession === '' || $csrfSubmitted === '' || !hash_equals($csrfSession, $csrfSubmitted)) {
             ResponseFormatter::error('Invalid request. Please reload the page.', 403);
             exit;
         }
@@ -344,7 +344,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $csrfPayload   = trim((string)($payload['csrf_token'] ?? ''));
         $csrfSubmitted = $csrfHeader !== '' ? $csrfHeader : $csrfPayload;
         $csrfSession   = (string)($_SESSION['csrf_token'] ?? '');
-        if ($csrfSession === '' || !hash_equals($csrfSession, $csrfSubmitted)) {
+        if ($csrfSession === '' || $csrfSubmitted === '' || !hash_equals($csrfSession, $csrfSubmitted)) {
             ResponseFormatter::error('Invalid request. Please reload the page.', 403);
             exit;
         }

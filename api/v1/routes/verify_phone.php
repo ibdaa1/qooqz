@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $csrfPayload = trim((string)($payload['csrf_token'] ?? ''));
     $csrfSubmitted = $csrfHeader !== '' ? $csrfHeader : $csrfPayload;
     $csrfSession = (string)($_SESSION['csrf_token'] ?? '');
-    if ($csrfSession === '' || !hash_equals($csrfSession, $csrfSubmitted)) {
+    if ($csrfSession === '' || $csrfSubmitted === '' || !hash_equals($csrfSession, $csrfSubmitted)) {
         _vpError('طلب غير صالح. يرجى إعادة تحميل الصفحة.', 403, true);
         exit;
     }
