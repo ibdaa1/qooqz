@@ -105,6 +105,29 @@ try {
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$row) {
+        // Token not found or already used — check if the user is already active
+        // (handles the case where the link was opened twice: first open activated
+        // the account, second open should not show an error)
+        $usedStmt = $pdo->prepare(
+            'SELECT u.is_active
+               FROM user_phone_verifications v
+               JOIN users u ON u.id = v.user_id
+              WHERE v.token_hash = ?
+              LIMIT 1'
+        );
+        $usedStmt->execute([$tokenHash]);
+        $usedRow = $usedStmt->fetch(PDO::FETCH_ASSOC);
+        if ($usedRow && (int)$usedRow['is_active'] === 1) {
+            // Account is already active — treat as success
+            if ($isJsonReq) {
+                if (!headers_sent()) header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => true, 'message' => 'تم تفعيل الحساب بنجاح.']);
+            } else {
+                $dest = _vp_app_url() . '/frontend/verify_phone.php?status=success';
+                if (!headers_sent()) header('Location: ' . $dest, true, 302);
+            }
+            exit;
+        }
         _vpError('رابط التفعيل غير صالح أو تم استخدامه مسبقاً.', 404, $isJsonReq);
         exit;
     }
@@ -140,8 +163,7 @@ try {
         exit;
     }
 
-    // Create authenticated session
-    session_regenerate_id(true);
+    // Build user object for session and response
     $user = [
         'id'                 => (int)$userData['id'],
         'name'               => $userData['username'],
@@ -156,25 +178,38 @@ try {
         'permissions_count'  => 0,
         'roles_count'        => 0,
     ];
-    $_SESSION['user_id']            = $user['id'];
-    $_SESSION['user']               = $user;
-    $GLOBALS['ADMIN_USER']          = $user;
-    unset($_SESSION['pending_user_id']);
 
-    // Expire the device cookie (no longer needed)
-    $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
-    if (!headers_sent()) {
-        if (PHP_VERSION_ID >= 70300) {
-            setcookie('qz_dvt', '', ['expires' => time() - 3600, 'path' => '/',
-                                     'httponly' => true, 'samesite' => 'Lax', 'secure' => $secure]);
-        } else {
-            setcookie('qz_dvt', '', time() - 3600, '/', '', $secure, true);
+    // Create authenticated session — wrapped separately so that any session/cookie
+    // warning (converted to ErrorException by ExceptionHandler) does NOT hide the
+    // successful activation that already happened in the DB above.
+    try {
+        session_regenerate_id(true);
+        $_SESSION['user_id']   = $user['id'];
+        $_SESSION['user']      = $user;
+        $GLOBALS['ADMIN_USER'] = $user;
+        unset($_SESSION['pending_user_id']);
+    } catch (Throwable $sessionErr) {
+        if (class_exists('Logger')) Logger::warning('verify_phone: session setup failed after activation: ' . $sessionErr->getMessage());
+    }
+
+    // Expire the device cookie — also non-fatal
+    try {
+        $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+        if (!headers_sent()) {
+            if (PHP_VERSION_ID >= 70300) {
+                setcookie('qz_dvt', '', ['expires' => time() - 3600, 'path' => '/',
+                                         'httponly' => true, 'samesite' => 'Lax', 'secure' => $secure]);
+            } else {
+                setcookie('qz_dvt', '', time() - 3600, '/', '', $secure, true);
+            }
         }
+    } catch (Throwable $cookieErr) {
+        if (class_exists('Logger')) Logger::warning('verify_phone: cookie cleanup failed: ' . $cookieErr->getMessage());
     }
 
     if ($isJsonReq) {
         if (!headers_sent()) header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['ok' => true, 'message' => 'Account activated successfully.', 'user' => $user]);
+        echo json_encode(['ok' => true, 'message' => 'تم تفعيل الحساب بنجاح.', 'user' => $user]);
     } else {
         // Redirect to frontend success page
         $dest = _vp_app_url() . '/frontend/verify_phone.php?status=success';
