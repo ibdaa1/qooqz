@@ -340,7 +340,7 @@ $autoVerify = ($rawToken !== '' && $status === '');
     function updateLinkDisplay(link, phone) {
         if (!link) return;
         currentLink = link;
-        if (phone) userPhone = (phone || '').replace(/[^\d]/g, '');
+        if (phone) userPhone = phone.replace(/[^\d]/g, '');
         if (linkText) linkText.textContent = link;
         if (btnWaDirect) btnWaDirect.href = buildWaUrl(currentLink, userPhone);
     }
