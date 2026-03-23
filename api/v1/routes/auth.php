@@ -266,9 +266,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            // Store pending user_id in session (no OTP in session anymore)
+            // Store pending user_id and activation link in session (no OTP in session anymore)
             session_regenerate_id(true);
-            $_SESSION['pending_user_id'] = $newId;
+            $_SESSION['pending_user_id']      = $newId;
+            // Only store the link if it passes URL validation (defense-in-depth)
+            $_SESSION['pending_verify_link']  = filter_var($activationLink, FILTER_VALIDATE_URL) !== false
+                ? $activationLink : '';
             unset($_SESSION['user_id'], $_SESSION['user'], $_SESSION['pending_otp']);
 
             $user = [
@@ -378,6 +381,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!headers_sent()) {
                 header('Content-Type: application/json; charset=utf-8');
             }
+            // Update session link with the newly generated one
+            $_SESSION['pending_verify_link'] = filter_var($activationLink, FILTER_VALIDATE_URL) !== false
+                ? $activationLink : '';
             echo json_encode(['ok' => true, 'message' => 'Verification SMS sent.', 'activation_link' => $activationLink, 'phone' => $uData['phone'] ?? '']);
         } catch (Throwable $e) {
             if (class_exists('Logger')) Logger::error('Resend verification error: ' . $e->getMessage());

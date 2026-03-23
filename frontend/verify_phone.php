@@ -10,6 +10,7 @@ declare(strict_types=1);
  *   ?t=RAW_TOKEN          — Fresh activation attempt (from SMS link)
  *   ?status=success       — Already activated; show success message
  *   ?status=error&msg=…   — Activation failed; show error message
+ *   ?waiting              — Show waiting/resend UI
  */
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -33,6 +34,9 @@ $rawPhone = trim($_GET['phone']   ?? '');
 // Sanitise phone for display only (never trusted for auth)
 $displayPhone = preg_replace('/[^\d+]/', '', $rawPhone);
 $displayPhone = htmlspecialchars(substr($displayPhone, 0, 20), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+// Retrieve the stored verification link from session for manual sharing
+$sessionVerifyLink = (string)($_SESSION['pending_verify_link'] ?? '');
 
 // If we already have a status, just render the result page
 $autoVerify = ($rawToken !== '' && $status === '');
@@ -113,6 +117,57 @@ $autoVerify = ($rawToken !== '' && $status === '');
         }
         .btn-whatsapp:hover { background: #1ebe5d; }
         .btn-whatsapp:disabled { opacity: .5; cursor: not-allowed; }
+        .link-box {
+            display: none;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-top: 16px;
+            text-align: right;
+        }
+        .link-box label {
+            font-size: 12px;
+            color: #64748b;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .link-box .link-text {
+            font-size: 12px;
+            color: #1e40af;
+            word-break: break-all;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px;
+            display: block;
+            margin-bottom: 8px;
+            direction: ltr;
+            text-align: left;
+        }
+        .link-box .btn-copy {
+            background: #3b82f6;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .link-box .btn-copy:hover { background: #2563eb; }
+        .btn-show-link {
+            background: none;
+            border: 2px solid #64748b;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 8px 20px;
+            border-radius: 8px;
+            margin-top: 8px;
+        }
+        .btn-show-link:hover { background: #f1f5f9; }
     </style>
 </head>
 <body>
@@ -158,6 +213,22 @@ $autoVerify = ($rawToken !== '' && $status === '');
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="vertical-align:middle;margin-left:6px;"><path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z"/></svg>
         إرسال الرابط عبر واتساب
     </button>
+    <br>
+    <button id="btnShowLink" class="btn-show-link" style="margin-top:8px;">
+        🔗 عرض الرابط يدوياً
+    </button>
+    <div id="linkBox" class="link-box">
+        <label>📋 رابط التفعيل (انسخه وأرسله عبر واتساب على نفس الجهاز):</label>
+        <span id="linkText" class="link-text"><?= htmlspecialchars($sessionVerifyLink, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></span>
+        <button type="button" class="btn-copy" id="btnCopy">نسخ الرابط</button>
+        <?php if ($sessionVerifyLink !== ''): ?>
+        <br>
+        <a id="btnWaDirect" href="#" target="_blank" class="btn-whatsapp" style="margin-top:8px;display:inline-block;text-decoration:none;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="vertical-align:middle;margin-left:4px;"><path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z"/></svg>
+            فتح واتساب مع الرابط
+        </a>
+        <?php endif; ?>
+    </div>
     <div id="resendMsg"></div>
     <a href="/frontend/" class="btn" style="background:#6b7280">العودة للرئيسية</a>
     <a href="/frontend/register.php" class="btn" style="background:#6b7280;margin-top:12px;display:inline-block;">العودة للتسجيل</a>
@@ -245,7 +316,34 @@ $autoVerify = ($rawToken !== '' && $status === '');
     'use strict';
     const btn        = document.getElementById('btnResend');
     const btnWa      = document.getElementById('btnWhatsapp');
+    const btnShowLink= document.getElementById('btnShowLink');
+    const linkBox    = document.getElementById('linkBox');
+    const linkText   = document.getElementById('linkText');
+    const btnCopy    = document.getElementById('btnCopy');
+    const btnWaDirect= document.getElementById('btnWaDirect');
     const msg        = document.getElementById('resendMsg');
+
+    // Link stored in session from registration (may be empty if session expired)
+    let currentLink = <?= json_encode($sessionVerifyLink, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+    // Build direct WhatsApp URL with a given link
+    function buildWaUrl(link) {
+        const waText = encodeURIComponent('رابط تفعيل حسابك: ' + link);
+        return 'https://wa.me/?text=' + waText;
+    }
+
+    // Update the displayed link and the direct WA button
+    function updateLinkDisplay(link) {
+        if (!link) return;
+        currentLink = link;
+        if (linkText) linkText.textContent = link;
+        if (btnWaDirect) btnWaDirect.href = buildWaUrl(link);
+    }
+
+    // Initialise direct WA button if link already available
+    if (currentLink && btnWaDirect) {
+        btnWaDirect.href = buildWaUrl(currentLink);
+    }
 
     if (!btn) return;
 
@@ -297,7 +395,9 @@ $autoVerify = ($rawToken !== '' && $status === '');
 
         if (data && data.ok) {
             setCooldown(60);
-            return { link: data.activation_link || null, phone: data.phone || '' };
+            const newLink = data.activation_link || null;
+            if (newLink) updateLinkDisplay(newLink);
+            return { link: newLink, phone: data.phone || '' };
         } else {
             msg.textContent = '❌ ' + (data.error || 'فشل إرسال الرسالة. يرجى المحاولة مجدداً.');
             msg.style.color = '#dc2626';
@@ -316,6 +416,60 @@ $autoVerify = ($rawToken !== '' && $status === '');
         }
     });
 
+    // Show/hide the manual link box
+    if (btnShowLink) {
+        btnShowLink.addEventListener('click', async function () {
+            if (linkBox.style.display === 'block') {
+                linkBox.style.display = 'none';
+                btnShowLink.textContent = '🔗 عرض الرابط يدوياً';
+                return;
+            }
+            // If no link yet, fetch one via resend
+            if (!currentLink) {
+                btnShowLink.textContent = '⏳ جارٍ تحضير الرابط…';
+                btnShowLink.disabled = true;
+                const result = await resendAndGetLink();
+                btnShowLink.disabled = false;
+                if (!result || !result.link) {
+                    btnShowLink.textContent = '🔗 عرض الرابط يدوياً';
+                    return;
+                }
+            }
+            linkBox.style.display = 'block';
+            btnShowLink.textContent = '🙈 إخفاء الرابط';
+        });
+    }
+
+    // Copy link to clipboard
+    if (btnCopy) {
+        btnCopy.addEventListener('click', function () {
+            if (!currentLink) return;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(currentLink).then(function () {
+                    btnCopy.textContent = '✅ تم النسخ!';
+                    setTimeout(function () { btnCopy.textContent = 'نسخ الرابط'; }, 2000);
+                });
+            } else {
+                // Fallback for older browsers
+                const tmp = document.createElement('textarea');
+                tmp.value = currentLink;
+                tmp.style.position = 'fixed';
+                tmp.style.opacity = '0';
+                document.body.appendChild(tmp);
+                tmp.select();
+                try {
+                    const ok = document.execCommand('copy');
+                    btnCopy.textContent = ok ? '✅ تم النسخ!' : '⚠️ انسخ الرابط يدوياً';
+                } catch (ex) {
+                    btnCopy.textContent = '⚠️ انسخ الرابط يدوياً';
+                }
+                document.body.removeChild(tmp);
+                setTimeout(function () { btnCopy.textContent = 'نسخ الرابط'; }, 2500);
+            }
+        });
+    }
+
+    // WhatsApp button (via resend API to get fresh link + phone)
     if (btnWa) {
         btnWa.addEventListener('click', async function () {
             const result = await resendAndGetLink();
