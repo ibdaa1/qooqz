@@ -138,30 +138,33 @@ try {
         exit;
     }
 
-    // ---- Activate the user ----
     $userId = (int)$row['user_id'];
-    $upd = $pdo->prepare('UPDATE users SET is_active = 1, updated_at = NOW() WHERE id = ? AND is_active = 0');
-    $upd->execute([$userId]);
 
-    if ($upd->rowCount() === 0) {
-        // Might already be active — still mark token as used and proceed
-    }
-
-    // Mark token as used (one-time)
-    $pdo->prepare('UPDATE user_phone_verifications SET used_at = NOW() WHERE id = ?')
-        ->execute([$row['id']]);
-
-    // Fetch user record for session
+    // ---- Fetch user record BEFORE making any DB changes ----
+    // Doing this first ensures that if the SELECT fails (e.g. unexpected schema
+    // difference) the activation UPDATE has not yet run, so the account stays
+    // inactive and the token stays unused — no partial state is left behind.
     $uStmt = $pdo->prepare(
-        'SELECT id, username, email, phone, preferred_language, role_id, is_active FROM users WHERE id = ?'
+        'SELECT id, username, email, phone, preferred_language, is_active FROM users WHERE id = ?'
     );
     $uStmt->execute([$userId]);
     $userData = $uStmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$userData) {
-        _vpError('User not found after activation.', 500, $isJsonReq);
+        _vpError('لم يُعثر على الحساب المرتبط بهذا الرابط.', 404, $isJsonReq);
         exit;
     }
+
+    // ---- Activate the user ----
+    // Omit updated_at from the SET clause — it may be absent on some installs;
+    // if the column has ON UPDATE CURRENT_TIMESTAMP MySQL will update it anyway.
+    $upd = $pdo->prepare('UPDATE users SET is_active = 1 WHERE id = ? AND is_active = 0');
+    $upd->execute([$userId]);
+    // rowCount() == 0 means account was already active; token is still marked used below.
+
+    // Mark token as used (one-time)
+    $pdo->prepare('UPDATE user_phone_verifications SET used_at = NOW() WHERE id = ?')
+        ->execute([$row['id']]);
 
     // Build user object for session and response
     $user = [
@@ -170,7 +173,7 @@ try {
         'username'           => $userData['username'],
         'email'              => $userData['email'],
         'phone'              => $userData['phone'],
-        'role_id'            => $userData['role_id'],
+        'role_id'            => $userData['role_id'] ?? null,
         'preferred_language' => $userData['preferred_language'],
         'is_active'          => true,
         'permissions'        => [],
