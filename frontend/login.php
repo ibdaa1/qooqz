@@ -41,6 +41,12 @@ $loginDir  = in_array($loginLang, ['ar','fa','ur','he'], true) ? 'rtl' : 'ltr';
 $isRtl     = $loginDir === 'rtl';
 
 // Load available languages from DB for the preferred_language dropdown
+// Load .env so getenv() works for GOOGLE_CLIENT_ID and DB credentials
+$__cfgFile = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/shared/config/config.php';
+if (!is_readable($__cfgFile)) $__cfgFile = dirname(__DIR__) . '/api/shared/config/config.php';
+if (is_readable($__cfgFile)) { require_once $__cfgFile; }
+unset($__cfgFile);
+
 $availLangs = [];
 try {
     $__dbFile = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/shared/config/db.php';
