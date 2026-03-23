@@ -162,18 +162,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $googleClientSecret = getenv('GOOGLE_CLIENT_SECRET') ?: (defined('GOOGLE_CLIENT_SECRET') ? GOOGLE_CLIENT_SECRET : '');
         $appUrl             = getenv('APP_URL')               ?: (defined('APP_URL')               ? APP_URL               : '');
         if ($appUrl === '') {
-            $secure  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+            $secure  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                       || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
             $appUrl  = ($secure ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
         }
-        $loginUrl    = $appUrl . '/frontend/login.php';
-        $redirectUri = $appUrl . '/api/auth?__action=google_callback';
+        $loginUrl = $appUrl . '/frontend/login.php';
+
+        // Use GOOGLE_REDIRECT_URI from env if set (same value used in login.php),
+        // otherwise construct it to keep auth-URL and token-exchange in sync.
+        $redirectUri = getenv('GOOGLE_REDIRECT_URI') ?: (defined('GOOGLE_REDIRECT_URI') ? GOOGLE_REDIRECT_URI : '');
+        if ($redirectUri === '') {
+            $redirectUri = $appUrl . '/api/auth?__action=google_callback';
+        }
 
         if ($error !== '' || $code === '') {
             header('Location: ' . $loginUrl . '?google_error=' . urlencode($error ?: 'access_denied'));
             exit;
         }
 
-        if ($googleClientId === '' || $googleClientSecret === '') {
+        // Detect placeholder / unconfigured credentials
+        $secretOk = ($googleClientSecret !== ''
+                     && stripos($googleClientSecret, 'PUT_YOUR') === false
+                     && stripos($googleClientSecret, 'YOUR_')    === false
+                     && strlen($googleClientSecret) > 10);
+        if ($googleClientId === '' || !$secretOk) {
             header('Location: ' . $loginUrl . '?google_error=server_config');
             exit;
         }
@@ -198,13 +210,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         curl_close($ch);
 
         if ($curlErr || !$tokenRaw) {
+            if (class_exists('Logger')) Logger::error('Google token exchange cURL error: ' . $curlErr);
             header('Location: ' . $loginUrl . '?google_error=token_exchange_failed');
             exit;
         }
 
         $tokenData = json_decode($tokenRaw, true);
         if (empty($tokenData['access_token'])) {
-            header('Location: ' . $loginUrl . '?google_error=no_access_token');
+            // Log the actual Google error to help with diagnosis
+            $googleErrCode = $tokenData['error']             ?? 'unknown';
+            $googleErrDesc = $tokenData['error_description'] ?? '';
+            if (class_exists('Logger')) {
+                Logger::error(sprintf(
+                    'Google token exchange failed: %s — %s (redirect_uri=%s)',
+                    $googleErrCode, $googleErrDesc, $redirectUri
+                ));
+            }
+            // Map known Google error codes to friendlier app-level codes
+            $appError = match($googleErrCode) {
+                'redirect_uri_mismatch' => 'server_config',
+                'invalid_client'        => 'server_config',
+                default                 => 'no_access_token',
+            };
+            header('Location: ' . $loginUrl . '?google_error=' . urlencode($appError));
             exit;
         }
 

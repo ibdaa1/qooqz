@@ -48,15 +48,25 @@ if (is_readable($__cfgFile)) { require_once $__cfgFile; }
 unset($__cfgFile);
 
 // Build Google OAuth2 URL for redirect-based Sign-In
-$_googleClientId = getenv('GOOGLE_CLIENT_ID') ?: (defined('GOOGLE_CLIENT_ID') ? GOOGLE_CLIENT_ID : '');
-$_appUrl         = getenv('APP_URL')           ?: (defined('APP_URL')           ? APP_URL           : '');
-if ($_appUrl === '') {
-    $_secure  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
-    $_appUrl  = ($_secure ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+$_googleClientId     = getenv('GOOGLE_CLIENT_ID')     ?: (defined('GOOGLE_CLIENT_ID')     ? GOOGLE_CLIENT_ID     : '');
+$_googleClientSecret = getenv('GOOGLE_CLIENT_SECRET') ?: (defined('GOOGLE_CLIENT_SECRET') ? GOOGLE_CLIENT_SECRET : '');
+// Use explicit GOOGLE_REDIRECT_URI if configured, otherwise derive from APP_URL / HTTP_HOST
+$_googleRedirectUri  = getenv('GOOGLE_REDIRECT_URI')  ?: (defined('GOOGLE_REDIRECT_URI')  ? GOOGLE_REDIRECT_URI  : '');
+if ($_googleRedirectUri === '') {
+    $_appUrl = getenv('APP_URL') ?: (defined('APP_URL') ? APP_URL : '');
+    if ($_appUrl === '') {
+        $_secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                   || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+        $_appUrl = ($_secure ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    }
+    $_googleRedirectUri = $_appUrl . '/api/auth?__action=google_callback';
+    unset($_appUrl, $_secure);
 }
-$_googleRedirectUri = $_appUrl . '/api/auth?__action=google_callback';
+// Detect obviously wrong placeholder secret so we don't show the button at all
+$_secretOk = ($_googleClientSecret !== '' && stripos($_googleClientSecret, 'PUT_YOUR') === false
+              && stripos($_googleClientSecret, 'YOUR_') === false && strlen($_googleClientSecret) > 10);
 $googleAuthUrl = '';
-if ($_googleClientId !== '') {
+if ($_googleClientId !== '' && $_secretOk) {
     $googleAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query([
         'client_id'     => $_googleClientId,
         'redirect_uri'  => $_googleRedirectUri,
@@ -66,7 +76,7 @@ if ($_googleClientId !== '') {
         'prompt'        => 'consent',
     ]);
 }
-unset($_googleClientId, $_appUrl, $_secure, $_googleRedirectUri);
+unset($_googleClientId, $_googleClientSecret, $_googleRedirectUri, $_secretOk);
 
 $availLangs = [];
 try {
