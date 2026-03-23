@@ -233,6 +233,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  VALUES (?, ?, ?, ?, ?, ?, ?)'
             );
             $insV->execute([$newId, $tokenHash, $deviceHash, session_id(), $userAgent, $clientIp, $expiresAt]);
+            $verificationRowId = (int)$pdo->lastInsertId();
 
             // Set device cookie (httpOnly, SameSite=Lax, expires with verification window)
             $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
@@ -268,6 +269,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Store pending user_id and activation link in session (no OTP in session anymore)
             session_regenerate_id(true);
+            // Update the verification record to use the post-regeneration session ID
+            if ($verificationRowId > 0) {
+                $pdo->prepare('UPDATE user_phone_verifications SET session_id = ? WHERE id = ?')
+                    ->execute([session_id(), $verificationRowId]);
+            }
             $_SESSION['pending_user_id']      = $newId;
             // Only store the link if it passes URL validation (defense-in-depth)
             $_SESSION['pending_verify_link']  = filter_var($activationLink, FILTER_VALIDATE_URL) !== false
