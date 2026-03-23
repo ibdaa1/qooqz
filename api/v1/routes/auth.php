@@ -196,7 +196,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         try {
-            // Rate-limit: max 5 registrations per IP per hour
+            // Rate-limit: max 5 registrations per IP per hour (exact match is intentional
+            // — stricter for abuse prevention; prefix relaxation is only for verification)
             $regIp = (string)($_SERVER['REMOTE_ADDR'] ?? '');
             if ($regIp !== '') {
                 $ipRate = $pdo->prepare(

@@ -95,7 +95,7 @@ function _ip_prefix(string $ip): string {
         return implode('.', array_slice($parts, 0, 3));
     }
     // IPv6 — compare /64 prefix (first 8 bytes)
-    $bin = @inet_pton($ip);
+    $bin = inet_pton($ip);
     if ($bin === false) return $ip;
     return bin2hex(substr($bin, 0, 8));
 }
