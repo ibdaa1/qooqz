@@ -35,8 +35,9 @@ $rawPhone = trim($_GET['phone']   ?? '');
 $displayPhone = preg_replace('/[^\d+]/', '', $rawPhone);
 $displayPhone = htmlspecialchars(substr($displayPhone, 0, 20), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
-// Retrieve the stored verification link from session for manual sharing
-$sessionVerifyLink = (string)($_SESSION['pending_verify_link'] ?? '');
+// Activation link is never stored in session (security hardening);
+// it is fetched fresh via the resend API when the user requests it.
+$sessionVerifyLink = '';
 
 // If we already have a status, just render the result page
 $autoVerify = ($rawToken !== '' && $status === '');

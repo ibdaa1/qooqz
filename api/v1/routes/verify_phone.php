@@ -85,6 +85,21 @@ function _vp_app_url(): string {
     return ($secure ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
 }
 
+// Compare IP prefixes (/24 for IPv4, /64 for IPv6) — full match is too strict
+// for mobile/CGNAT users whose IP may change between registration and verification.
+function _ip_prefix(string $ip): string {
+    if ($ip === '') return '';
+    if (strpos($ip, ':') === false) {
+        // IPv4 — compare first three octets (e.g. 1.2.3.*)
+        $parts = explode('.', $ip, 4);
+        return implode('.', array_slice($parts, 0, 3));
+    }
+    // IPv6 — compare /64 prefix (first 8 bytes)
+    $bin = @inet_pton($ip);
+    if ($bin === false) return $ip;
+    return bin2hex(substr($bin, 0, 8));
+}
+
 if ($rawToken === '') {
     _vpError('Missing verification token', 400, $isJsonReq);
     exit;
@@ -161,9 +176,11 @@ try {
         exit;
     }
 
-    // ---- Enforce IP binding ----
+    // ---- Enforce IP binding (prefix only — ISPs and mobile networks change IP) ----
     $currentIp = (string)($_SERVER['REMOTE_ADDR'] ?? '');
-    if ($row['ip'] !== '' && $currentIp !== $row['ip']) {
+    $storedIp  = (string)($row['ip'] ?? '');
+    if ($storedIp !== '' && $currentIp !== ''
+        && _ip_prefix($currentIp) !== _ip_prefix($storedIp)) {
         _vpError('رابط التفعيل غير صالح من هذا العنوان. يجب التفعيل من نفس الشبكة.', 403, $isJsonReq);
         exit;
     }

@@ -196,6 +196,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         try {
+            // Rate-limit: max 5 registrations per IP per hour
+            $regIp = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+            if ($regIp !== '') {
+                $ipRate = $pdo->prepare(
+                    'SELECT COUNT(DISTINCT user_id) FROM user_phone_verifications
+                      WHERE ip = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)'
+                );
+                $ipRate->execute([$regIp]);
+                if ((int)$ipRate->fetchColumn() >= 5) {
+                    ResponseFormatter::error('Too many registration attempts from this network. Please try again later.', 429);
+                    exit;
+                }
+            }
+
             // Check duplicates
             $chk = $pdo->prepare('SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1');
             $chk->execute([$regUsername, $regEmail]);
@@ -224,7 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $expiresAt   = date('Y-m-d H:i:s', time() + 86400); // 24 hours (for manual link sharing)
             $userAgent   = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 512);
-            $clientIp    = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+            $clientIp    = $regIp;
 
             // Store verification record (no OTP is persisted in plain text anywhere)
             $insV = $pdo->prepare(
@@ -274,11 +288,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->prepare('UPDATE user_phone_verifications SET session_id = ? WHERE id = ?')
                     ->execute([session_id(), $verificationRowId]);
             }
-            $_SESSION['pending_user_id']      = $newId;
-            // Only store the link if it passes URL validation (defense-in-depth)
-            $_SESSION['pending_verify_link']  = filter_var($activationLink, FILTER_VALIDATE_URL) !== false
-                ? $activationLink : '';
-            unset($_SESSION['user_id'], $_SESSION['user'], $_SESSION['pending_otp']);
+            $_SESSION['pending_user_id'] = $newId;
+            unset($_SESSION['user_id'], $_SESSION['user'], $_SESSION['pending_otp'], $_SESSION['pending_verify_link']);
 
             $user = [
                 'id'                 => $newId,
@@ -387,9 +398,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!headers_sent()) {
                 header('Content-Type: application/json; charset=utf-8');
             }
-            // Update session link with the newly generated one
-            $_SESSION['pending_verify_link'] = filter_var($activationLink, FILTER_VALIDATE_URL) !== false
-                ? $activationLink : '';
+            unset($_SESSION['pending_verify_link']);
             echo json_encode(['ok' => true, 'message' => 'Verification SMS sent.', 'activation_link' => $activationLink, 'phone' => $uData['phone'] ?? '']);
         } catch (Throwable $e) {
             if (class_exists('Logger')) Logger::error('Resend verification error: ' . $e->getMessage());
@@ -519,7 +528,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $verified = false;
         if ($hash !== null) {
             if (function_exists('password_verify')) $verified = @password_verify($password, $hash);
-            if (!$verified && $hash === $password) $verified = true; // dev fallback
         } else {
             ResponseFormatter::serverError('Password not found for user');
             exit;
