@@ -96,7 +96,7 @@ $deviceHash = ($rawDevice !== '') ? hash('sha256', $rawDevice) : '';
 try {
     // Look up pending verification record
     $stmt = $pdo->prepare(
-        'SELECT v.id, v.user_id, v.device_hash, v.user_agent, v.ip, v.expires_at
+        'SELECT v.id, v.user_id, v.device_hash, v.session_id, v.user_agent, v.ip, v.expires_at
          FROM user_phone_verifications v
          WHERE v.token_hash = ? AND v.used_at IS NULL
          LIMIT 1'
@@ -135,6 +135,36 @@ try {
     // Check expiry
     if (strtotime($row['expires_at']) < time()) {
         _vpError('انتهت صلاحية رابط التفعيل. يرجى التسجيل مجدداً.', 410, $isJsonReq);
+        exit;
+    }
+
+    // ---- Enforce device binding (cookie) ----
+    // The qz_dvt cookie is set during registration and binds the token to that browser/device.
+    // If the link is opened on a different device (e.g. shared via WhatsApp), the cookie
+    // will be absent and activation must be refused.
+    if ($row['device_hash'] !== '' && ($deviceHash === '' || $deviceHash !== $row['device_hash'])) {
+        _vpError('يجب فتح رابط التفعيل من نفس الجهاز والمتصفح الذي أجريت منه التسجيل.', 403, $isJsonReq);
+        exit;
+    }
+
+    // ---- Enforce session binding ----
+    // Check 1: session_id stored at registration must match the current session.
+    $storedSessionId = (string)($row['session_id'] ?? '');
+    if ($storedSessionId !== '' && session_id() !== $storedSessionId) {
+        _vpError('يجب فتح رابط التفعيل من نفس جلسة المتصفح الذي أجريت منه التسجيل.', 403, $isJsonReq);
+        exit;
+    }
+    // Check 2: pending_user_id in session must match the user in the token.
+    $sessionPendingId = isset($_SESSION['pending_user_id']) ? (int)$_SESSION['pending_user_id'] : 0;
+    if ($sessionPendingId !== (int)$row['user_id']) {
+        _vpError('يجب فتح رابط التفعيل من نفس المتصفح الذي أجريت منه التسجيل.', 403, $isJsonReq);
+        exit;
+    }
+
+    // ---- Enforce IP binding ----
+    $currentIp = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    if ($row['ip'] !== '' && $currentIp !== $row['ip']) {
+        _vpError('رابط التفعيل غير صالح من هذا العنوان. يجب التفعيل من نفس الشبكة.', 403, $isJsonReq);
         exit;
     }
 

@@ -229,10 +229,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Store verification record (no OTP is persisted in plain text anywhere)
             $insV = $pdo->prepare(
                 'INSERT INTO user_phone_verifications
-                    (user_id, token_hash, device_hash, user_agent, ip, expires_at)
-                 VALUES (?, ?, ?, ?, ?, ?)'
+                    (user_id, token_hash, device_hash, session_id, user_agent, ip, expires_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)'
             );
-            $insV->execute([$newId, $tokenHash, $deviceHash, $userAgent, $clientIp, $expiresAt]);
+            $insV->execute([$newId, $tokenHash, $deviceHash, session_id(), $userAgent, $clientIp, $expiresAt]);
 
             // Set device cookie (httpOnly, SameSite=Lax, expires with verification window)
             $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
@@ -349,10 +349,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $insV = $pdo->prepare(
                 'INSERT INTO user_phone_verifications
-                    (user_id, token_hash, device_hash, user_agent, ip, expires_at)
-                 VALUES (?, ?, ?, ?, ?, ?)'
+                    (user_id, token_hash, device_hash, session_id, user_agent, ip, expires_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)'
             );
-            $insV->execute([(int)$pendingId, $tokenHash, $deviceHash, $userAgent, $clientIp, $expiresAt]);
+            $insV->execute([(int)$pendingId, $tokenHash, $deviceHash, session_id(), $userAgent, $clientIp, $expiresAt]);
 
             $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
             if (!headers_sent()) {
