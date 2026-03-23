@@ -177,7 +177,7 @@ $autoVerify = ($rawToken !== '' && $status === '');
     <div class="icon">✅</div>
     <h1>تم تفعيل حسابك بنجاح!</h1>
     <p>مرحباً بك. يمكنك الآن تسجيل الدخول والاستمتاع بخدماتنا.</p>
-    <a href="/frontend/login.php" class="btn">تسجيل الدخول</a>
+    <a href="/frontend/public/index.php" class="btn">الذهاب للرئيسية</a>
 
 <?php elseif ($status === 'error'): ?>
     <div class="icon">❌</div>
@@ -266,7 +266,7 @@ $autoVerify = ($rawToken !== '' && $status === '');
 
         if (data && data.ok) {
             showResult(true);
-            setTimeout(() => { window.location.href = '/frontend/'; }, 1800);
+            setTimeout(() => { window.location.href = '/frontend/public/index.php'; }, 1800);
         } else {
             showResult(false, data.error || 'فشل التفعيل');
         }
@@ -326,23 +326,28 @@ $autoVerify = ($rawToken !== '' && $status === '');
     // Link stored in session from registration (may be empty if session expired)
     let currentLink = <?= json_encode($sessionVerifyLink, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
-    // Build direct WhatsApp URL with a given link
-    function buildWaUrl(link) {
+    // User's registered phone number (digits only, from registration URL param)
+    let userPhone = <?= json_encode(preg_replace('/[^\d]/', '', $displayPhone), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+    // Build direct WhatsApp URL — sends to user's own number if available
+    function buildWaUrl(link, phone) {
         const waText = encodeURIComponent('رابط تفعيل حسابك: ' + link);
-        return 'https://wa.me/?text=' + waText;
+        const ph = (phone || '').replace(/[^\d]/g, '');
+        return ph ? 'https://wa.me/' + ph + '?text=' + waText : 'https://wa.me/?text=' + waText;
     }
 
     // Update the displayed link and the direct WA button
-    function updateLinkDisplay(link) {
+    function updateLinkDisplay(link, phone) {
         if (!link) return;
         currentLink = link;
+        if (phone) userPhone = (phone || '').replace(/[^\d]/g, '');
         if (linkText) linkText.textContent = link;
-        if (btnWaDirect) btnWaDirect.href = buildWaUrl(link);
+        if (btnWaDirect) btnWaDirect.href = buildWaUrl(currentLink, userPhone);
     }
 
     // Initialise direct WA button if link already available
     if (currentLink && btnWaDirect) {
-        btnWaDirect.href = buildWaUrl(currentLink);
+        btnWaDirect.href = buildWaUrl(currentLink, userPhone);
     }
 
     if (!btn) return;
@@ -396,8 +401,9 @@ $autoVerify = ($rawToken !== '' && $status === '');
         if (data && data.ok) {
             setCooldown(60);
             const newLink = data.activation_link || null;
-            if (newLink) updateLinkDisplay(newLink);
-            return { link: newLink, phone: data.phone || '' };
+            const newPhone = data.phone || '';
+            if (newLink) updateLinkDisplay(newLink, newPhone);
+            return { link: newLink, phone: newPhone };
         } else {
             msg.textContent = '❌ ' + (data.error || 'فشل إرسال الرسالة. يرجى المحاولة مجدداً.');
             msg.style.color = '#dc2626';
@@ -475,9 +481,9 @@ $autoVerify = ($rawToken !== '' && $status === '');
             const result = await resendAndGetLink();
             if (!result || !result.link) return;
 
-            // Phone comes from the server response (trusted), not URL params
-            // Strip non-digit/+ chars, then remove leading + for wa.me
-            const serverPhone = (result.phone || '').replace(/[^\d+]/g, '').replace(/^\+/, '');
+            // Phone comes from the server response (trusted)
+            // Strip non-digit chars for wa.me (no leading +)
+            const serverPhone = (result.phone || '').replace(/[^\d]/g, '');
             // Validate: must be 7–15 digits
             if (serverPhone && !/^\d{7,15}$/.test(serverPhone)) {
                 msg.textContent = '❌ رقم الهاتف غير صالح.';
@@ -487,11 +493,7 @@ $autoVerify = ($rawToken !== '' && $status === '');
 
             msg.textContent = '✅ تم إنشاء الرابط. جاري فتح واتساب…';
             msg.style.color = '#155724';
-            const waText = encodeURIComponent('رابط تفعيل حسابك: ' + result.link);
-            const waUrl  = serverPhone
-                ? 'https://wa.me/' + serverPhone + '?text=' + waText
-                : 'https://wa.me/?text=' + waText;
-            window.open(waUrl, '_blank');
+            window.open(buildWaUrl(result.link, serverPhone || userPhone), '_blank');
         });
     }
 })();
