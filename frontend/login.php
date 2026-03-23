@@ -108,6 +108,7 @@ $tr = $isRtl ? [
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <?php endif; ?>
     <link rel="stylesheet" href="assets/css/login.css">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="<?= $loginDir ?>">
 
@@ -177,6 +178,9 @@ $tr = $isRtl ? [
 
                 <button type="submit" class="lq-btn"><?= htmlspecialchars($tr['login_btn']) ?></button>
 
+                <div class="lq-or"><span><?= $isRtl ? 'أو' : 'or' ?></span></div>
+                <div id="google-btn-login" class="lq-google-btn"></div>
+
                 <p class="lq-switch">
                     <?= htmlspecialchars($tr['no_account']) ?>
                     <a href="#" onclick="showForm('register');return false;"><?= htmlspecialchars($tr['register_title']) ?></a>
@@ -239,6 +243,9 @@ $tr = $isRtl ? [
 
                 <button type="submit" class="lq-btn"><?= htmlspecialchars($tr['register_btn']) ?></button>
 
+                <div class="lq-or"><span><?= $isRtl ? 'أو' : 'or' ?></span></div>
+                <div id="google-btn-register" class="lq-google-btn"></div>
+
                 <p class="lq-switch">
                     <?= htmlspecialchars($tr['already']) ?>
                     <a href="#" onclick="showForm('login');return false;"><?= htmlspecialchars($tr['login_title']) ?></a>
@@ -253,6 +260,7 @@ $tr = $isRtl ? [
 
 <script src="assets/js/login.js"></script>
 <script>
+var GOOGLE_CLIENT_ID = <?= json_encode(getenv('GOOGLE_CLIENT_ID') ?: '') ?>;
 function togglePw(id, btn) {
     var inp = document.getElementById(id);
     if (!inp) return;

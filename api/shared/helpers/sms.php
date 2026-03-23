@@ -137,7 +137,7 @@ class SMS {
             CURLOPT_POSTFIELDS => http_build_query($data),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_TIMEOUT => 30,
+            CURLOPT_TIMEOUT => 8,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/x-www-form-urlencoded'
             ]
@@ -275,7 +275,7 @@ class SMS {
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => http_build_query($data),
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 30
+            CURLOPT_TIMEOUT => 8
         ]);
         
         $response = curl_exec($ch);

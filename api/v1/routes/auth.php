@@ -170,7 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ? $routeAction
         : ($postAction ?: ($routeAction ?: 'login'));
 
-    if (!in_array($effectiveAction, ['login', 'register', 'verify_otp', 'resend_verification'], true)) {
+    if (!in_array($effectiveAction, ['login', 'register', 'verify_otp', 'resend_verification', 'google_login'], true)) {
         ResponseFormatter::notFound('Auth POST route not found');
         exit;
     }
@@ -277,21 +277,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                      : (($secure ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
             $activationLink = $appUrl . '/frontend/verify_phone.php?t=' . urlencode($rawToken);
 
-            // Send SMS with the activation link
-            if ($regPhone) {
-                try {
-                    if (file_exists(__DIR__ . '/../../../shared/helpers/sms.php')) {
-                        require_once __DIR__ . '/../../../shared/helpers/sms.php';
-                    }
-                    if (class_exists('SMS')) {
-                        SMS::setPDO($pdo);
-                        SMS::sendVerificationLink($regPhone, $activationLink, $regLang ?: 'ar');
-                    }
-                } catch (Throwable $smsErr) {
-                    if (class_exists('Logger')) Logger::error('SMS send error: ' . $smsErr->getMessage());
-                }
-            }
-
             // Store pending user_id and activation link in session (no OTP in session anymore)
             session_regenerate_id(true);
             // Update the verification record to use the post-regeneration session ID
@@ -329,6 +314,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'activation_link' => $activationLink,
                 'user'            => $user,
             ]);
+
+            // Flush response to client immediately so the user doesn't wait for SMS
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            } else {
+                while (ob_get_level() > 0) { ob_end_flush(); }
+                flush();
+            }
+
+            // Send SMS after the response has been delivered to the browser
+            if ($regPhone) {
+                try {
+                    if (file_exists(__DIR__ . '/../../../shared/helpers/sms.php')) {
+                        require_once __DIR__ . '/../../../shared/helpers/sms.php';
+                    }
+                    if (class_exists('SMS')) {
+                        SMS::setPDO($pdo);
+                        SMS::sendVerificationLink($regPhone, $activationLink, $regLang ?: 'ar');
+                    }
+                } catch (Throwable $smsErr) {
+                    if (class_exists('Logger')) Logger::error('SMS send error: ' . $smsErr->getMessage());
+                }
+            }
             exit;
         } catch (Throwable $e) {
             if (class_exists('Logger')) Logger::error('Register error: ' . $e->getMessage());
@@ -408,6 +416,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $activationLink = $appUrl . '/frontend/verify_phone.php?t=' . urlencode($rawToken);
 
             $resendLang= preg_replace('/[^a-z\-]/', '', strtolower($uData['preferred_language'] ?: 'ar'));
+
+            if (!headers_sent()) {
+                header('Content-Type: application/json; charset=utf-8');
+            }
+            unset($_SESSION['pending_verify_link']);
+            echo json_encode(['ok' => true, 'message' => 'Verification SMS sent.', 'activation_link' => $activationLink, 'phone' => $uData['phone'] ?? '']);
+
+            // Flush response before sending SMS so the client doesn't wait
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            } else {
+                while (ob_get_level() > 0) { ob_end_flush(); }
+                flush();
+            }
+
             if (file_exists(__DIR__ . '/../../../shared/helpers/sms.php')) {
                 require_once __DIR__ . '/../../../shared/helpers/sms.php';
             }
@@ -415,12 +438,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 SMS::setPDO($pdo);
                 SMS::sendVerificationLink($uData['phone'], $activationLink, $resendLang);
             }
-
-            if (!headers_sent()) {
-                header('Content-Type: application/json; charset=utf-8');
-            }
-            unset($_SESSION['pending_verify_link']);
-            echo json_encode(['ok' => true, 'message' => 'Verification SMS sent.', 'activation_link' => $activationLink, 'phone' => $uData['phone'] ?? '']);
         } catch (Throwable $e) {
             if (class_exists('Logger')) Logger::error('Resend verification error: ' . $e->getMessage());
             ResponseFormatter::serverError('Failed to resend verification SMS.');
@@ -522,6 +539,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // ---------------- LOGIN ----------------
+    if ($effectiveAction !== 'google_login') {
     $username = trim((string)($payload['username'] ?? $payload['email'] ?? ''));
     $password = (string)($payload['password'] ?? '');
 
@@ -597,6 +615,160 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (class_exists('Logger')) Logger::error('Auth error: ' . $e->getMessage());
         ResponseFormatter::serverError(app_env('debug') ? $e->getMessage() : 'Authentication failed');
         exit;
+    }
+    } // end if ($effectiveAction !== 'google_login')
+    // ---------------- GOOGLE LOGIN ----------------
+    if ($effectiveAction === 'google_login') {
+        $idToken = trim((string)($payload['id_token'] ?? ''));
+        if ($idToken === '') {
+            ResponseFormatter::error('Missing Google ID token', 400);
+            exit;
+        }
+
+        // Verify the ID token with Google's tokeninfo endpoint
+        $ch = curl_init('https://oauth2.googleapis.com/tokeninfo?id_token=' . urlencode($idToken));
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ]);
+        $tokenInfoRaw = curl_exec($ch);
+        $curlErr      = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlErr || !$tokenInfoRaw) {
+            ResponseFormatter::serverError('Could not reach Google authentication servers. Please try again.');
+            exit;
+        }
+
+        $tokenInfo = json_decode($tokenInfoRaw, true);
+        if (empty($tokenInfo['sub']) || empty($tokenInfo['email'])) {
+            ResponseFormatter::error('Invalid Google token', 401);
+            exit;
+        }
+
+        // Verify the token was issued for our app
+        $googleClientId = getenv('GOOGLE_CLIENT_ID') ?: (defined('GOOGLE_CLIENT_ID') ? GOOGLE_CLIENT_ID : '');
+        $tokenAud = $tokenInfo['aud'] ?? '';
+        if ($googleClientId !== '' && $tokenAud !== $googleClientId) {
+            ResponseFormatter::error('Token audience mismatch', 401);
+            exit;
+        }
+
+        $googleSub   = (string)$tokenInfo['sub'];
+        $googleEmail = filter_var($tokenInfo['email'], FILTER_VALIDATE_EMAIL) ? $tokenInfo['email'] : '';
+        $googleName  = trim((string)($tokenInfo['name'] ?? ''));
+
+        if ($googleEmail === '') {
+            ResponseFormatter::error('Google account email is missing or invalid', 422);
+            exit;
+        }
+
+        try {
+            // Check if this Google account is already linked
+            $authStmt = $pdo->prepare(
+                'SELECT user_id FROM user_auth_providers WHERE provider = ? AND provider_user_id = ? LIMIT 1'
+            );
+            $authStmt->execute(['google', $googleSub]);
+            $authRow = $authStmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($authRow) {
+                $userId = (int)$authRow['user_id'];
+            } else {
+                // Check if a user with this email already exists
+                $emailStmt = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+                $emailStmt->execute([$googleEmail]);
+                $existingUser = $emailStmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($existingUser) {
+                    $userId = (int)$existingUser['id'];
+                } else {
+                    // Create a new user from the Google profile
+                    $baseUsername = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', $googleName) ?: 'user');
+                    if (strlen($baseUsername) < 3) $baseUsername = 'user';
+                    $username = substr($baseUsername, 0, 45);
+                    $counter  = 1;
+                    while (true) {
+                        $chkStmt = $pdo->prepare('SELECT id FROM users WHERE username = ? LIMIT 1');
+                        $chkStmt->execute([$username]);
+                        if (!$chkStmt->fetch()) break;
+                        $username = substr($baseUsername, 0, 40) . $counter++;
+                    }
+
+                    $insStmt = $pdo->prepare(
+                        'INSERT INTO users (username, email, is_active, preferred_language, created_at)
+                         VALUES (?, ?, 1, ?, NOW())'
+                    );
+                    $insStmt->execute([$username, $googleEmail, 'en']);
+                    $userId = (int)$pdo->lastInsertId();
+                }
+
+                // Link this Google account to the user
+                $extra   = json_encode([
+                    'email_verified' => (bool)($tokenInfo['email_verified'] ?? false),
+                    'name'           => $googleName,
+                    'picture'        => $tokenInfo['picture'] ?? null,
+                ]);
+                $insAuth = $pdo->prepare(
+                    'INSERT INTO user_auth_providers (user_id, provider, provider_user_id, provider_extra)
+                     VALUES (?, ?, ?, ?)'
+                );
+                $insAuth->execute([$userId, 'google', $googleSub, $extra]);
+            }
+
+            // Load full user record
+            $uLoad = $pdo->prepare(
+                'SELECT u.id, u.username, u.email, u.phone, u.preferred_language, u.is_active,
+                        tu.role_id, tu.tenant_id
+                 FROM users u
+                 LEFT JOIN tenant_users tu ON tu.user_id = u.id AND tu.is_active = 1
+                 WHERE u.id = ?
+                 ORDER BY tu.joined_at DESC
+                 LIMIT 1'
+            );
+            $uLoad->execute([$userId]);
+            $uRow = $uLoad->fetch(PDO::FETCH_ASSOC);
+
+            if (!$uRow) {
+                ResponseFormatter::serverError('User not found after Google authentication');
+                exit;
+            }
+
+            $rbac = _load_user_rbac($pdo, $userId, isset($uRow['role_id']) ? (int)$uRow['role_id'] : null);
+
+            session_regenerate_id(true);
+
+            $user = [
+                'id'                 => (int)$uRow['id'],
+                'name'               => $uRow['username'],
+                'username'           => $uRow['username'],
+                'email'              => $uRow['email'],
+                'phone'              => $uRow['phone'] ?? null,
+                'role_id'            => isset($uRow['role_id']) ? (int)$uRow['role_id'] : null,
+                'tenant_id'          => isset($uRow['tenant_id']) ? (int)$uRow['tenant_id'] : 1,
+                'preferred_language' => $uRow['preferred_language'] ?? 'en',
+                'is_active'          => (bool)$uRow['is_active'],
+                'permissions'        => $rbac['permissions'] ?? [],
+                'roles'              => $rbac['roles'] ?? [],
+                'permissions_count'  => count($rbac['permissions'] ?? []),
+                'roles_count'        => count($rbac['roles'] ?? []),
+            ];
+
+            $_SESSION['user_id']     = $user['id'];
+            $_SESSION['user']        = $user;
+            $_SESSION['permissions'] = $user['permissions'];
+            $_SESSION['roles']       = $user['roles'];
+            unset($_SESSION['pending_user_id']);
+            $GLOBALS['ADMIN_USER']   = $user;
+
+            ResponseFormatter::success(['ok' => true, 'message' => 'Authenticated', 'user' => $user]);
+            exit;
+
+        } catch (Throwable $e) {
+            if (class_exists('Logger')) Logger::error('Google login error: ' . $e->getMessage());
+            ResponseFormatter::serverError('Google sign-in failed. Please try again.');
+            exit;
+        }
     }
 }
 

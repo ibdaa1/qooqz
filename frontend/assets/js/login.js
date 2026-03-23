@@ -170,3 +170,64 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     } catch (e) {}
 });
+// ---- Google Sign-In ----
+async function handleGoogleCredential(response) {
+    clearResult();
+    const idToken = response.credential;
+    if (!idToken) { setResult('Google sign-in failed: no credential', false); return; }
+
+    try {
+        const resp = await fetch('/api/auth', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'google_login', id_token: idToken })
+        });
+        const data = await resp.json().catch(() => null);
+
+        if (resp.ok && data && (data.ok || data.success)) {
+            setResult(data.message || 'Signed in with Google', true);
+            try {
+                const u = (data.data && data.data.user) ? data.data.user : (data.user || null);
+                if (u && u.id) {
+                    localStorage.setItem('pubUser', JSON.stringify({
+                        id: u.id, name: u.name || u.username || u.email || 'User', username: u.username || ''
+                    }));
+                }
+            } catch (e) {}
+            const redirect = new URLSearchParams(window.location.search).get('redirect');
+            const safeRedirect = (redirect && redirect.startsWith('/') && !redirect.startsWith('//'))
+                ? redirect : '/frontend/public/index.php';
+            setTimeout(() => { window.location.href = safeRedirect; }, 600);
+        } else {
+            setResult((data && data.message) ? data.message : 'Google sign-in failed', false);
+        }
+    } catch (err) {
+        console.error(err);
+        setResult('Network or server error during Google sign-in', false);
+    }
+}
+
+function initGoogleSignIn() {
+    if (typeof google === 'undefined' || !google.accounts || !window.GOOGLE_CLIENT_ID) return;
+    google.accounts.id.initialize({
+        client_id: window.GOOGLE_CLIENT_ID,
+        callback: handleGoogleCredential,
+        auto_select: false,
+    });
+    const btnLogin    = document.getElementById('google-btn-login');
+    const btnRegister = document.getElementById('google-btn-register');
+    if (btnLogin)    google.accounts.id.renderButton(btnLogin,    { theme: 'outline', size: 'large', width: 280 });
+    if (btnRegister) google.accounts.id.renderButton(btnRegister, { theme: 'outline', size: 'large', width: 280 });
+}
+
+// Try to init when GSI library is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof google !== 'undefined') { initGoogleSignIn(); }
+        else { window.addEventListener('load', initGoogleSignIn); }
+    });
+} else {
+    if (typeof google !== 'undefined') { initGoogleSignIn(); }
+    else { window.addEventListener('load', initGoogleSignIn); }
+}
