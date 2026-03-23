@@ -222,7 +222,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $rawDevice   = bin2hex(random_bytes(16));
             $deviceHash  = hash('sha256', $rawDevice);
 
-            $expiresAt   = date('Y-m-d H:i:s', time() + 900); // 15 minutes
+            $expiresAt   = date('Y-m-d H:i:s', time() + 86400); // 24 hours (for manual link sharing)
             $userAgent   = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 512);
             $clientIp    = (string)($_SERVER['REMOTE_ADDR'] ?? '');
 
@@ -239,10 +239,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!headers_sent()) {
                 if (PHP_VERSION_ID >= 70300) {
                     setcookie('qz_dvt', $rawDevice,
-                        ['expires' => time() + 900, 'path' => '/', 'httponly' => true,
+                        ['expires' => time() + 86400, 'path' => '/', 'httponly' => true,
                          'samesite' => 'Lax', 'secure' => $secure]);
                 } else {
-                    setcookie('qz_dvt', $rawDevice, time() + 900, '/', '', $secure, true);
+                    setcookie('qz_dvt', $rawDevice, time() + 86400, '/', '', $secure, true);
                 }
             }
 
@@ -293,13 +293,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Content-Type: application/json; charset=utf-8');
                 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
             }
-            // Never return the token or any secret — only tell the user to check their SMS
             echo json_encode([
-                'ok'      => true,
-                'message' => ($regLang === 'ar')
-                    ? 'تم إنشاء الحساب. تحقق من رسائل SMS لتفعيل حسابك.'
-                    : 'Account created. Check your SMS to activate your account.',
-                'user'    => $user,
+                'ok'              => true,
+                'message'         => ($regLang === 'ar')
+                    ? 'تم إنشاء الحساب. يمكنك إرسال رابط التفعيل يدوياً.'
+                    : 'Account created. You can share the activation link manually.',
+                'activation_link' => $activationLink,
+                'user'            => $user,
             ]);
             exit;
         } catch (Throwable $e) {
@@ -343,7 +343,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $tokenHash = hash('sha256', $rawToken);
             $rawDevice = bin2hex(random_bytes(16));
             $deviceHash = hash('sha256', $rawDevice);
-            $expiresAt = date('Y-m-d H:i:s', time() + 900);
+            $expiresAt = date('Y-m-d H:i:s', time() + 86400); // 24 hours (for manual link sharing)
             $userAgent = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 512);
             $clientIp  = (string)($_SERVER['REMOTE_ADDR'] ?? '');
 
@@ -358,10 +358,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!headers_sent()) {
                 if (PHP_VERSION_ID >= 70300) {
                     setcookie('qz_dvt', $rawDevice,
-                        ['expires' => time() + 900, 'path' => '/', 'httponly' => true,
+                        ['expires' => time() + 86400, 'path' => '/', 'httponly' => true,
                          'samesite' => 'Lax', 'secure' => $secure]);
                 } else {
-                    setcookie('qz_dvt', $rawDevice, time() + 900, '/', '', $secure, true);
+                    setcookie('qz_dvt', $rawDevice, time() + 86400, '/', '', $secure, true);
                 }
             }
 
