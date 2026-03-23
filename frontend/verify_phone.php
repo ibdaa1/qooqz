@@ -226,7 +226,7 @@ $autoVerify = ($rawToken !== '' && $status === '');
     </button>
     <div id="linkBox" class="link-box">
         <label>📋 رابط التفعيل (انسخه وأرسله عبر واتساب على نفس الجهاز):</label>
-        <span id="linkText" class="link-text"><?= htmlspecialchars($sessionVerifyLink, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></span>
+        <a id="linkText" class="link-text" href="<?= htmlspecialchars($sessionVerifyLink, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>" target="_blank" style="word-break:break-all;color:#1d4ed8;"><?= htmlspecialchars($sessionVerifyLink, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></a>
         <button type="button" class="btn-copy" id="btnCopy">نسخ الرابط</button>
         <?php if ($sessionVerifyLink !== ''): ?>
         <br>
@@ -352,7 +352,7 @@ $autoVerify = ($rawToken !== '' && $status === '');
         if (!link) return;
         currentLink = link;
         if (phone) userPhone = phone.replace(/[^\d]/g, '');
-        if (linkText) linkText.textContent = link;
+        if (linkText) { linkText.textContent = link; linkText.href = link; }
         if (btnWaDirect) btnWaDirect.href = buildWaUrl(currentLink, userPhone);
     }
 
@@ -486,9 +486,17 @@ $autoVerify = ($rawToken !== '' && $status === '');
         });
     }
 
-    // WhatsApp button (via resend API to get fresh link + phone)
+    // WhatsApp button — use existing link if available, only resend if needed
     if (btnWa) {
         btnWa.addEventListener('click', async function () {
+            // If we already have a link, open WhatsApp immediately (no resend needed)
+            if (currentLink) {
+                msg.textContent = '✅ جاري فتح واتساب…';
+                msg.style.color = '#155724';
+                window.open(buildWaUrl(currentLink, userPhone), '_blank');
+                return;
+            }
+
             const result = await resendAndGetLink();
             if (!result || !result.link) return;
 
