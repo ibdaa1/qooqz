@@ -157,7 +157,23 @@ document.addEventListener('DOMContentLoaded', function () {
         showForm('register');
     }
 
-    // If user is already logged in (PHP session user injected by header.php or window.pubSessionUser),
+    // Show Google error message if redirected back with error
+    const googleError = params.get('google_error');
+    if (googleError) {
+        const msgs = {
+            access_denied:         'Google sign-in was cancelled.',
+            token_exchange_failed: 'Could not connect to Google. Please try again.',
+            no_access_token:       'Google authentication failed. Please try again.',
+            no_user_info:          'Could not retrieve Google account info.',
+            invalid_email:         'Google account has no valid email.',
+            server_config:         'Google sign-in is not configured on the server.',
+            server_error:          'A server error occurred during Google sign-in.',
+            user_load_failed:      'Failed to load user after Google sign-in.',
+        };
+        setResult(msgs[googleError] || 'Google sign-in failed: ' + googleError, false);
+    }
+
+    // If user is already logged in(PHP session user injected by header.php or window.pubSessionUser),
     // sync to localStorage and redirect away from login page.
     try {
         const existing = localStorage.getItem('pubUser');
@@ -170,64 +186,4 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     } catch (e) {}
 });
-// ---- Google Sign-In ----
-async function handleGoogleCredential(response) {
-    clearResult();
-    const idToken = response.credential;
-    if (!idToken) { setResult('Google sign-in failed: no credential', false); return; }
-
-    try {
-        const resp = await fetch('/api/auth', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'google_login', id_token: idToken })
-        });
-        const data = await resp.json().catch(() => null);
-
-        if (resp.ok && data && (data.ok || data.success)) {
-            setResult(data.message || 'Signed in with Google', true);
-            try {
-                const u = (data.data && data.data.user) ? data.data.user : (data.user || null);
-                if (u && u.id) {
-                    localStorage.setItem('pubUser', JSON.stringify({
-                        id: u.id, name: u.name || u.username || u.email || 'User', username: u.username || ''
-                    }));
-                }
-            } catch (e) {}
-            const redirect = new URLSearchParams(window.location.search).get('redirect');
-            const safeRedirect = (redirect && redirect.startsWith('/') && !redirect.startsWith('//'))
-                ? redirect : '/frontend/public/index.php';
-            setTimeout(() => { window.location.href = safeRedirect; }, 600);
-        } else {
-            setResult((data && data.message) ? data.message : 'Google sign-in failed', false);
-        }
-    } catch (err) {
-        console.error(err);
-        setResult('Network or server error during Google sign-in', false);
-    }
-}
-
-function initGoogleSignIn() {
-    if (typeof google === 'undefined' || !google.accounts || !window.GOOGLE_CLIENT_ID) return;
-    google.accounts.id.initialize({
-        client_id: window.GOOGLE_CLIENT_ID,
-        callback: handleGoogleCredential,
-        auto_select: false,
-    });
-    const btnLogin    = document.getElementById('google-btn-login');
-    const btnRegister = document.getElementById('google-btn-register');
-    if (btnLogin)    google.accounts.id.renderButton(btnLogin,    { theme: 'outline', size: 'large', width: 280 });
-    if (btnRegister) google.accounts.id.renderButton(btnRegister, { theme: 'outline', size: 'large', width: 280 });
-}
-
-// Try to init when GSI library is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-        if (typeof google !== 'undefined') { initGoogleSignIn(); }
-        else { window.addEventListener('load', initGoogleSignIn); }
-    });
-} else {
-    if (typeof google !== 'undefined') { initGoogleSignIn(); }
-    else { window.addEventListener('load', initGoogleSignIn); }
-}
+// ---- Google error display is handled in DOMContentLoaded above ----

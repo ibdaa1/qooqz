@@ -153,6 +153,194 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         exit;
     }
 
+    // ---------------- GOOGLE OAUTH2 CALLBACK ----------------
+    if ($action === 'google_callback') {
+        $code  = trim((string)($_GET['code']  ?? ''));
+        $error = trim((string)($_GET['error'] ?? ''));
+
+        $googleClientId     = getenv('GOOGLE_CLIENT_ID')     ?: (defined('GOOGLE_CLIENT_ID')     ? GOOGLE_CLIENT_ID     : '');
+        $googleClientSecret = getenv('GOOGLE_CLIENT_SECRET') ?: (defined('GOOGLE_CLIENT_SECRET') ? GOOGLE_CLIENT_SECRET : '');
+        $appUrl             = getenv('APP_URL')               ?: (defined('APP_URL')               ? APP_URL               : '');
+        if ($appUrl === '') {
+            $secure  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+            $appUrl  = ($secure ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        }
+        $loginUrl    = $appUrl . '/frontend/login.php';
+        $redirectUri = $appUrl . '/api/auth?__action=google_callback';
+
+        if ($error !== '' || $code === '') {
+            header('Location: ' . $loginUrl . '?google_error=' . urlencode($error ?: 'access_denied'));
+            exit;
+        }
+
+        if ($googleClientId === '' || $googleClientSecret === '') {
+            header('Location: ' . $loginUrl . '?google_error=server_config');
+            exit;
+        }
+
+        // Exchange authorization code for access token
+        $ch = curl_init('https://oauth2.googleapis.com/token');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => http_build_query([
+                'code'          => $code,
+                'client_id'     => $googleClientId,
+                'client_secret' => $googleClientSecret,
+                'redirect_uri'  => $redirectUri,
+                'grant_type'    => 'authorization_code',
+            ]),
+        ]);
+        $tokenRaw = curl_exec($ch);
+        $curlErr  = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlErr || !$tokenRaw) {
+            header('Location: ' . $loginUrl . '?google_error=token_exchange_failed');
+            exit;
+        }
+
+        $tokenData = json_decode($tokenRaw, true);
+        if (empty($tokenData['access_token'])) {
+            header('Location: ' . $loginUrl . '?google_error=no_access_token');
+            exit;
+        }
+
+        // Retrieve user profile from Google
+        $ch2 = curl_init('https://www.googleapis.com/oauth2/v2/userinfo');
+        curl_setopt_array($ch2, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $tokenData['access_token']],
+        ]);
+        $userInfoRaw = curl_exec($ch2);
+        curl_close($ch2);
+
+        $userInfo = json_decode($userInfoRaw, true);
+        if (empty($userInfo['id']) || empty($userInfo['email'])) {
+            header('Location: ' . $loginUrl . '?google_error=no_user_info');
+            exit;
+        }
+
+        $googleSub   = (string)$userInfo['id'];
+        $googleEmail = filter_var($userInfo['email'], FILTER_VALIDATE_EMAIL) ? $userInfo['email'] : '';
+        $googleName  = trim((string)($userInfo['name'] ?? ''));
+
+        if ($googleEmail === '') {
+            header('Location: ' . $loginUrl . '?google_error=invalid_email');
+            exit;
+        }
+
+        try {
+            // Check if this Google account is already linked
+            $authStmt = $pdo->prepare(
+                'SELECT user_id FROM user_auth_providers WHERE provider = ? AND provider_user_id = ? LIMIT 1'
+            );
+            $authStmt->execute(['google', $googleSub]);
+            $authRow = $authStmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($authRow) {
+                $userId = (int)$authRow['user_id'];
+            } else {
+                // Check if a user with this email already exists
+                $emailStmt = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+                $emailStmt->execute([$googleEmail]);
+                $existingUser = $emailStmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($existingUser) {
+                    $userId = (int)$existingUser['id'];
+                } else {
+                    // Create a new user from the Google profile
+                    $baseUsername = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', $googleName) ?: 'user');
+                    if (strlen($baseUsername) < 3) $baseUsername = 'user';
+                    $username = substr($baseUsername, 0, 45);
+                    $counter  = 1;
+                    while (true) {
+                        $chkStmt = $pdo->prepare('SELECT id FROM users WHERE username = ? LIMIT 1');
+                        $chkStmt->execute([$username]);
+                        if (!$chkStmt->fetch()) break;
+                        $username = substr($baseUsername, 0, 40) . $counter++;
+                    }
+                    $insStmt = $pdo->prepare(
+                        'INSERT INTO users (username, email, is_active, preferred_language, created_at)
+                         VALUES (?, ?, 1, ?, NOW())'
+                    );
+                    $insStmt->execute([$username, $googleEmail, 'en']);
+                    $userId = (int)$pdo->lastInsertId();
+                }
+
+                // Link this Google account to the user
+                $extra   = json_encode([
+                    'email_verified' => (bool)($userInfo['verified_email'] ?? false),
+                    'name'           => $googleName,
+                    'picture'        => $userInfo['picture'] ?? null,
+                ]);
+                $insAuth = $pdo->prepare(
+                    'INSERT INTO user_auth_providers (user_id, provider, provider_user_id, provider_extra)
+                     VALUES (?, ?, ?, ?)'
+                );
+                $insAuth->execute([$userId, 'google', $googleSub, $extra]);
+            }
+
+            // Load full user record
+            $uLoad = $pdo->prepare(
+                'SELECT u.id, u.username, u.email, u.phone, u.preferred_language, u.is_active,
+                        tu.role_id, tu.tenant_id
+                 FROM users u
+                 LEFT JOIN tenant_users tu ON tu.user_id = u.id AND tu.is_active = 1
+                 WHERE u.id = ?
+                 ORDER BY tu.joined_at DESC
+                 LIMIT 1'
+            );
+            $uLoad->execute([$userId]);
+            $uRow = $uLoad->fetch(PDO::FETCH_ASSOC);
+
+            if (!$uRow) {
+                header('Location: ' . $loginUrl . '?google_error=user_load_failed');
+                exit;
+            }
+
+            $rbac = _load_user_rbac($pdo, $userId, isset($uRow['role_id']) ? (int)$uRow['role_id'] : null);
+
+            session_regenerate_id(true);
+
+            $user = [
+                'id'                 => (int)$uRow['id'],
+                'name'               => $uRow['username'],
+                'username'           => $uRow['username'],
+                'email'              => $uRow['email'],
+                'phone'              => $uRow['phone'] ?? null,
+                'role_id'            => isset($uRow['role_id']) ? (int)$uRow['role_id'] : null,
+                'tenant_id'          => isset($uRow['tenant_id']) ? (int)$uRow['tenant_id'] : 1,
+                'preferred_language' => $uRow['preferred_language'] ?? 'en',
+                'is_active'          => (bool)$uRow['is_active'],
+                'permissions'        => $rbac['permissions'] ?? [],
+                'roles'              => $rbac['roles'] ?? [],
+                'permissions_count'  => count($rbac['permissions'] ?? []),
+                'roles_count'        => count($rbac['roles'] ?? []),
+            ];
+
+            $_SESSION['user_id']     = $user['id'];
+            $_SESSION['user']        = $user;
+            $_SESSION['permissions'] = $user['permissions'];
+            $_SESSION['roles']       = $user['roles'];
+            unset($_SESSION['pending_user_id']);
+            $GLOBALS['ADMIN_USER']   = $user;
+
+            // Redirect to frontend after successful Google login
+            header('Location: ' . $appUrl . '/frontend/public/index.php');
+            exit;
+
+        } catch (Throwable $e) {
+            if (class_exists('Logger')) Logger::error('Google callback error: ' . $e->getMessage());
+            header('Location: ' . $loginUrl . '?google_error=server_error');
+            exit;
+        }
+    }
+
     // default: accept check for GET /api/auth
     ResponseFormatter::error('Invalid GET action. Use: me, csrf, check or logout', 400);
     exit;
