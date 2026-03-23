@@ -115,9 +115,16 @@ class SMS {
     private static function sendWithUnifonicCURL($phone, $message) {
         $url = SMS_API_URL;
         
+        $appSid = defined('UNIFONIC_APP_SID') ? UNIFONIC_APP_SID : getenv('UNIFONIC_APP_SID');
+        if (empty($appSid)) {
+            self::logError('Unifonic AppSid not configured');
+            return ['success' => false, 'message' => 'SMS provider not configured', 'message_id' => null];
+        }
+        $senderID = defined('SMS_SENDER_ID') ? SMS_SENDER_ID : (getenv('SMS_SENDER_ID') ?: '');
+
         $data = [
-            'AppSid' => UNIFONIC_APP_SID,
-            'SenderID' => SMS_SENDER_ID,
+            'AppSid' => $appSid,
+            'SenderID' => $senderID,
             'Recipient' => $phone,
             'Body' => $message
         ];
@@ -249,7 +256,7 @@ class SMS {
     private static function sendWithNexmo($phone, $message) {
         $apiKey = getenv('NEXMO_API_KEY');
         $apiSecret = getenv('NEXMO_API_SECRET');
-        $from = SMS_SENDER_ID;
+        $from = defined('SMS_SENDER_ID') ? SMS_SENDER_ID : (getenv('SMS_SENDER_ID') ?: '');
         
         $url = 'https://rest.nexmo.com/sms/json';
         

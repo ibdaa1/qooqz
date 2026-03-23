@@ -68,19 +68,9 @@ class AuthService
                 return null;
             }
 
-            // Password verify
+            // Password verify — only bcrypt/argon2 hashes accepted; no plaintext fallback
             if (!password_verify($password, $user['password_hash'])) {
-
-                // Legacy MD5 migration (optional)
-                if (
-                    preg_match('/^[a-f0-9]{32}$/i', $user['password_hash']) &&
-                    md5($password) === $user['password_hash']
-                ) {
-                    $newHash = password_hash($password, PASSWORD_DEFAULT);
-                    $this->upgradePasswordHash((int)$user['id'], $newHash);
-                } else {
-                    return null;
-                }
+                return null;
             }
 
             // Sanitize output

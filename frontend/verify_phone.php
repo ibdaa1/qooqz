@@ -39,6 +39,12 @@ $displayPhone = htmlspecialchars(substr($displayPhone, 0, 20), ENT_QUOTES | ENT_
 // it is fetched fresh via the resend API when the user requests it.
 $sessionVerifyLink = '';
 
+// Ensure a CSRF token is available for JS-driven POST requests (activate, resend, WhatsApp)
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(24));
+}
+$pageCsrfToken = $_SESSION['csrf_token'];
+
 // If we already have a status, just render the result page
 $autoVerify = ($rawToken !== '' && $status === '');
 ?>
@@ -248,7 +254,8 @@ $autoVerify = ($rawToken !== '' && $status === '');
 <script>
 (function () {
     'use strict';
-    const token = <?= json_encode($rawToken, JSON_UNESCAPED_UNICODE) ?>;
+    const token    = <?= json_encode($rawToken, JSON_UNESCAPED_UNICODE) ?>;
+    const csrfToken = <?= json_encode($pageCsrfToken, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
     async function activate() {
         let data;
@@ -256,7 +263,7 @@ $autoVerify = ($rawToken !== '' && $status === '');
             const res = await fetch('/api/verify_phone', {
                 method: 'POST',
                 credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ token: token })
             });
             data = await res.json();
@@ -324,6 +331,9 @@ $autoVerify = ($rawToken !== '' && $status === '');
     const btnWaDirect= document.getElementById('btnWaDirect');
     const msg        = document.getElementById('resendMsg');
 
+    // CSRF token for all POST requests
+    const csrfToken = <?= json_encode($pageCsrfToken, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
     // Link stored in session from registration (may be empty if session expired)
     let currentLink = <?= json_encode($sessionVerifyLink, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
@@ -386,7 +396,7 @@ $autoVerify = ($rawToken !== '' && $status === '');
             const res = await fetch('/api/auth', {
                 method: 'POST',
                 credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ action: 'resend_verification' })
             });
             data = await res.json();

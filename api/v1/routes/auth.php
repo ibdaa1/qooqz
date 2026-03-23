@@ -177,6 +177,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ---------------- REGISTER ----------------
     if ($effectiveAction === 'register') {
+        // CSRF check
+        $csrfHeader    = trim((string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+        $csrfPayload   = trim((string)($payload['csrf_token'] ?? ''));
+        $csrfSubmitted = $csrfHeader !== '' ? $csrfHeader : $csrfPayload;
+        $csrfSession   = (string)($_SESSION['csrf_token'] ?? '');
+        if ($csrfSession === '' || !hash_equals($csrfSession, $csrfSubmitted)) {
+            ResponseFormatter::error('Invalid request. Please reload the page.', 403);
+            exit;
+        }
+
         $regUsername = trim((string)($payload['username'] ?? ''));
         $regEmail    = trim((string)($payload['email'] ?? ''));
         $regPassword = (string)($payload['password'] ?? '');
@@ -329,6 +339,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ---------------- RESEND VERIFICATION SMS ----------------
     if ($effectiveAction === 'resend_verification') {
+        // CSRF check
+        $csrfHeader    = trim((string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+        $csrfPayload   = trim((string)($payload['csrf_token'] ?? ''));
+        $csrfSubmitted = $csrfHeader !== '' ? $csrfHeader : $csrfPayload;
+        $csrfSession   = (string)($_SESSION['csrf_token'] ?? '');
+        if ($csrfSession === '' || !hash_equals($csrfSession, $csrfSubmitted)) {
+            ResponseFormatter::error('Invalid request. Please reload the page.', 403);
+            exit;
+        }
+
         $pendingId = $_SESSION['pending_user_id'] ?? null;
         if (!$pendingId) {
             ResponseFormatter::error('No pending registration found. Please register first.', 400);

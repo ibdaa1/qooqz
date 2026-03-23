@@ -59,6 +59,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $rawToken  = trim((string)($payload['token']        ?? ''));
     $rawDevice = trim((string)($payload['device_token'] ?? $_COOKIE['qz_dvt'] ?? ''));
     $isJsonReq = true;
+
+    // ---- CSRF check for POST requests ----
+    $csrfHeader = trim((string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+    $csrfPayload = trim((string)($payload['csrf_token'] ?? ''));
+    $csrfSubmitted = $csrfHeader !== '' ? $csrfHeader : $csrfPayload;
+    $csrfSession = (string)($_SESSION['csrf_token'] ?? '');
+    if ($csrfSession === '' || !hash_equals($csrfSession, $csrfSubmitted)) {
+        _vpError('طلب غير صالح. يرجى إعادة تحميل الصفحة.', 403, true);
+        exit;
+    }
 } else {
     // GET — token from URL, device from cookie
     $rawToken  = trim((string)($_GET['t'] ?? ''));
