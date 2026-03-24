@@ -83,7 +83,19 @@ function getSectionData(string $dataSource, string $apiBase, string $lang, int $
             return $data;
         })(),
         'deals'      => pub_fetch($apiBase . 'public/discounts?tenant_id=' . $tenantId . '&lang=' . urlencode($lang))['data']['data'] ?? [],
-        'entities'   => pub_fetch($apiBase . 'public/entities?' . $qs . ($filter === 'featured' ? '&is_featured=1' : ''))['data']['data'] ?? [],
+        'entities'   => (function () use ($apiBase, $qs, $filter) {
+            $extra = match ($filter) {
+                'featured' => '&is_featured=1',
+                'verified' => '&is_verified=1',
+                default    => '',
+            };
+            $data = pub_fetch($apiBase . 'public/entities?' . $qs . $extra)['data']['data'] ?? [];
+            // Fallback: if filtered result is empty, return all entities
+            if (empty($data) && $extra !== '') {
+                $data = pub_fetch($apiBase . 'public/entities?' . $qs)['data']['data'] ?? [];
+            }
+            return $data;
+        })(),
         'brands'     => pub_fetch($apiBase . 'public/brands?' . $qs . ($filter === 'featured' ? '&is_featured=1' : ''))['data']['data'] ?? [],
         'tenants'    => pub_fetch($apiBase . 'public/tenants?lang=' . urlencode($lang) . '&per=12&page=1' . ($filter === 'active' ? '&status=active' : ''))['data']['data'] ?? [],
         'jobs'       => pub_fetch($apiBase . 'public/jobs?lang=' . urlencode($lang) . '&per=12&page=1' . ($filter === 'featured' ? '&is_featured=1' : ''))['data']['data'] ?? [],
@@ -92,7 +104,9 @@ function getSectionData(string $dataSource, string $apiBase, string $lang, int $
             if ($filter !== '') {
                 $url .= '&placement_key=' . urlencode($filter);
             }
-            return pub_fetch($url)['data'] ?? [];
+            $result = pub_fetch($url);
+            $data   = $result['data']['data'] ?? $result['data'] ?? [];
+            return is_array($data) ? $data : [];
         })(),
         'stats'      => [], // ad_stats component fetches its own data
         default      => [],

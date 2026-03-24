@@ -168,7 +168,7 @@ SET `component` = CASE `section_type`
     WHEN 'stats'      THEN 'ad_stats'
     WHEN 'custom'     THEN 'ad_custom'
     WHEN 'native'     THEN 'ad_native'
-    WHEN 'ads'        THEN 'ad_banner'
+    WHEN 'ads'        THEN 'ad_ads'
     ELSE 'default'
 END
 WHERE `component` IS NULL;
@@ -248,7 +248,7 @@ FROM (
     UNION ALL
     SELECT 'entities', 'ad_entities',
            'بائعون مميزون', 'أفضل البائعين الموثوقين',
-           4, '#f5f3ff', '#1f2937', 'entities:featured', 60
+           4, '#f5f3ff', '#1f2937', 'entities:verified', 60
 ) AS v
 WHERE NOT EXISTS (
     SELECT 1 FROM `homepage_sections` WHERE `tenant_id` = 1 LIMIT 1

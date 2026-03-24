@@ -46,7 +46,7 @@ INSERT INTO `homepage_sections`
      `layout_type`, `items_per_row`, `background_color`, `text_color`,
      `data_source`, `is_active`, `sort_order`, `created_at`)
 SELECT
-    1, 'ads', 'ad_banner', 'إعلانات', '',
+    1, 'ads', 'ad_ads', 'إعلانات', '',
     'full', 1, 'var(--pub-surface)', 'var(--pub-text)',
     'ads:homepage', 1, 25, NOW()
 WHERE NOT EXISTS (

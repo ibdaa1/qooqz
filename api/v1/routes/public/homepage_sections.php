@@ -27,7 +27,7 @@ if ($first === 'homepage_sections') {
                     WHEN 'stats'      THEN 'ad_stats'
                     WHEN 'custom'     THEN 'ad_custom'
                     WHEN 'native'     THEN 'ad_native'
-                    WHEN 'ads'        THEN 'ad_banner'
+                    WHEN 'ads'        THEN 'ad_ads'
                     ELSE 'default'
                 END AS component,
                 COALESCE(hst.title, hs.title)       AS title,
