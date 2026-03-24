@@ -33,7 +33,7 @@ if ($first === 'entities') {
     $total = $pdoCount("SELECT COUNT(*) FROM entities e $where", $params);
     $rows  = $pdoList(
         "SELECT e.id, e.store_name, e.slug, e.vendor_type, e.is_verified, e.tenant_id,
-                (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url,
+                (SELECT i.url FROM images i WHERE i.owner_id = e.id ORDER BY (i.image_type_id = 4) DESC, i.id ASC LIMIT 1) AS logo_url,
                 NULL AS logo_thumb_url,
                 es.additional_settings,
                 es.card_style_id,

@@ -75,7 +75,7 @@ if ($first === 'products') {
                        WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
                     NULL AS brand_name,
                     (SELECT i.url FROM images i WHERE i.owner_id = p.id
-                       ORDER BY i.id ASC LIMIT 1) AS image_url,
+                       ORDER BY (i.image_type_id = 2) DESC, i.id ASC LIMIT 1) AS image_url,
                     NULL AS image_thumb_url
                FROM products p
           LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
@@ -168,7 +168,7 @@ if ($first === 'products') {
                 p.stock_quantity, p.stock_status, p.rating_average, p.rating_count,
                 (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
                 (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
-                (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url,
+                (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY (i.image_type_id = 2) DESC, i.id ASC LIMIT 1) AS image_url,
                 NULL AS image_thumb_url
            FROM products p
       LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?

@@ -13,7 +13,7 @@ if ($first === 'categories') {
     if ($id) {
         $row = $pdoOne(
             "SELECT c.id, COALESCE(ct.name, c.slug) AS name, c.slug, c.description,
-                    (SELECT i.url FROM images i WHERE i.owner_id = c.id ORDER BY i.id ASC LIMIT 1) AS image_url,
+                    (SELECT i.url FROM images i WHERE i.owner_id = c.id ORDER BY (i.image_type_id = 1) DESC, i.id ASC LIMIT 1) AS image_url,
                     c.is_featured, c.is_active, c.parent_id, c.sort_order, c.tenant_id
                FROM categories c
           LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
@@ -41,7 +41,7 @@ if ($first === 'categories') {
     $total = $pdoCount("SELECT COUNT(*) FROM categories c $where", $whereParams);
     $rows  = $pdoList(
         "SELECT c.id, COALESCE(ct.name, c.slug) AS name, c.slug,
-                (SELECT i.url FROM images i WHERE i.owner_id = c.id ORDER BY i.id ASC LIMIT 1) AS image_url,
+                (SELECT i.url FROM images i WHERE i.owner_id = c.id ORDER BY (i.image_type_id = 1) DESC, i.id ASC LIMIT 1) AS image_url,
                 c.is_featured, c.is_active, c.parent_id, c.sort_order, c.tenant_id,
                 (SELECT COUNT(*) FROM products p
                   INNER JOIN product_categories pc ON pc.product_id = p.id AND pc.category_id = c.id
