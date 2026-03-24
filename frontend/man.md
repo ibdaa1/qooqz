@@ -749,3 +749,67 @@ varchar(30)
 NO
 #6b7280
 
+---
+
+## Public API — Ads Endpoint
+
+### GET /api/public/ads
+
+Fetch active ads assigned to placement(s) for the given tenant.
+
+Query parameters:
+| Parameter       | Type    | Required | Description                                  |
+|----------------|---------|----------|----------------------------------------------|
+| tenant_id       | int     | Yes      | Tenant identifier                            |
+| placement_key   | string  | No       | Filter by placement key (e.g. `homepage_top`) |
+| lang            | string  | No       | Language code (default: `ar`)                |
+| limit           | int     | No       | Max ads to return (1–50, default: 25)        |
+
+Response (200 OK):
+```json
+{
+  "ok": true,
+  "data": [
+    {
+      "id": 1,
+      "target_type": "url",
+      "target_value": "https://example.com",
+      "title": "Ad Title",
+      "description": "Ad description",
+      "image_url": "https://cdn.example.com/ads/ad1.webp",
+      "thumb_url": "https://cdn.example.com/ads/ad1_thumb.webp",
+      "priority": 1,
+      "weight": 10
+    }
+  ]
+}
+```
+
+### GET /api/public/ads/{id}
+
+Fetch a single active ad by ID (for click-through and detail pages).
+
+Tracking endpoints:
+- `GET /api/track_view.php?id={ad_id}` — record an ad view (daily deduplication per session)
+- `GET /api/track_click.php?id={ad_id}` — record an ad click (no deduplication)
+
+Views and clicks are stored in the `ad_stats` table (upsert by `ad_id + date`).
+
+### homepage_sections — section data_source for ads
+
+To display ads in a homepage section, set the section's `data_source` to:
+
+```
+ads:{placement_key}
+```
+
+Example: `data_source = ads:homepage_top` will fetch all active ads
+assigned to the placement with `placement_key = homepage_top`.
+
+Compatible components: `ad_banner`, `ad_slider`, `ad_native`
+
+### Notes on banners table images
+
+The `banners` table does **not** have `image_url` or `mobile_image_url` columns.
+Banner images are stored in the unified `images` table with `image_type_id = 9`
+and are returned via a LEFT JOIN in the public banners API endpoint.

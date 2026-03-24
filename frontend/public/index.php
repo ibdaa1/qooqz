@@ -87,6 +87,13 @@ function getSectionData(string $dataSource, string $apiBase, string $lang, int $
         'brands'     => pub_fetch($apiBase . 'public/brands?' . $qs . ($filter === 'featured' ? '&is_featured=1' : ''))['data']['data'] ?? [],
         'tenants'    => pub_fetch($apiBase . 'public/tenants?lang=' . urlencode($lang) . '&per=12&page=1' . ($filter === 'active' ? '&status=active' : ''))['data']['data'] ?? [],
         'jobs'       => pub_fetch($apiBase . 'public/jobs?lang=' . urlencode($lang) . '&per=12&page=1' . ($filter === 'featured' ? '&is_featured=1' : ''))['data']['data'] ?? [],
+        'ads'        => (function () use ($apiBase, $tenantId, $lang, $filter) {
+            $url  = $apiBase . 'public/ads?tenant_id=' . $tenantId . '&lang=' . urlencode($lang);
+            if ($filter !== '') {
+                $url .= '&placement_key=' . urlencode($filter);
+            }
+            return pub_fetch($url)['data'] ?? [];
+        })(),
         'stats'      => [], // ad_stats component fetches its own data
         default      => [],
     };

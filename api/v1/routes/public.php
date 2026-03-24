@@ -152,6 +152,7 @@ $_pubRoutes = [
     'entity_types'       => 'entity_types',
     'homepage_sections'  => 'homepage_sections',
     'banners'            => 'banners',
+    'ads'                => 'ads',
     'discounts'          => 'discounts',
     'brands'             => 'brands',
     'notifications'      => 'notifications',
