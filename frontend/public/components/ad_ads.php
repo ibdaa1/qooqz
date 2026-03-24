@@ -10,6 +10,11 @@ declare(strict_types=1);
  *
  * Available variables: $section, $sectionData, $lang, $tenantId, $apiBase,
  *   $_cardStyles
+ *
+ * Tracking:
+ *   Views  — recorded via Intersection Observer when the ad enters the viewport.
+ *   Clicks — recorded on anchor click via fetch POST to /api/public/ads/{id}/click.
+ *   Both call POST /api/public/ads/{id}/view|click which upserts into ad_stats.
  */
 
 if (empty($sectionData)) {
@@ -21,20 +26,22 @@ if (empty($sectionData)) {
  * target_type: 'url', 'product', 'category', 'entity', 'page', or empty
  * Only http/https URLs are allowed for target_type='url' to prevent XSS.
  */
-function _ad_link(string $type, string $value): string {
-    if ($value === '') return '#';
-    return match ($type) {
-        'url' => (function (string $v): string {
-            $parsed = parse_url($v, PHP_URL_SCHEME);
-            return ($parsed !== null && in_array(strtolower($parsed), ['http', 'https'], true))
-                ? $v
-                : '#';
-        })($value),
-        'product'  => '/frontend/public/product.php?id='    . urlencode($value),
-        'category' => '/frontend/public/categories.php?id=' . urlencode($value),
-        'entity'   => '/frontend/public/entity.php?id='     . urlencode($value),
-        default    => '#',
-    };
+if (!function_exists('_ad_link')) {
+    function _ad_link(string $type, string $value): string {
+        if ($value === '') return '#';
+        return match ($type) {
+            'url' => (function (string $v): string {
+                $parsed = parse_url($v, PHP_URL_SCHEME);
+                return ($parsed !== null && in_array(strtolower($parsed), ['http', 'https'], true))
+                    ? $v
+                    : '#';
+            })($value),
+            'product'  => '/frontend/public/product.php?id='    . urlencode($value),
+            'category' => '/frontend/public/categories.php?id=' . urlencode($value),
+            'entity'   => '/frontend/public/entity.php?id='     . urlencode($value),
+            default    => '#',
+        };
+    }
 }
 ?>
 <div class="pub-ads-grid">
@@ -70,3 +77,47 @@ function _ad_link(string $type, string $value): string {
 </a>
 <?php endforeach; ?>
 </div>
+<script>
+(function () {
+    'use strict';
+    // Track ad views using IntersectionObserver.
+    // A view is counted once per page load when at least 50% of the ad card
+    // is visible for at least one second (prevents instant scroll-past counts).
+    if (!('IntersectionObserver' in window)) return;
+
+    var viewed = new Set();
+    var timers  = {};
+
+    var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            var el   = entry.target;
+            var adId = el.dataset.adId;
+            if (!adId || viewed.has(adId)) return;
+
+            if (entry.isIntersecting) {
+                // Start a 1-second dwell timer
+                timers[adId] = timers[adId] || setTimeout(function () {
+                    if (!viewed.has(adId)) {
+                        viewed.add(adId);
+                        fetch('/api/public/ads/' + adId + '/view', {
+                            method: 'POST',
+                            keepalive: true
+                        }).catch(function () {});
+                    }
+                    delete timers[adId];
+                }, 1000);
+            } else {
+                // Card left viewport before 1 s — cancel pending timer
+                if (timers[adId]) {
+                    clearTimeout(timers[adId]);
+                    delete timers[adId];
+                }
+            }
+        });
+    }, { threshold: 0.5 });
+
+    document.querySelectorAll('.pub-ad-card[data-ad-id]').forEach(function (el) {
+        observer.observe(el);
+    });
+})();
+</script>
