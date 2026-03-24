@@ -95,8 +95,9 @@ if (!function_exists('_ad_link')) {
             if (!adId || viewed.has(adId)) return;
 
             if (entry.isIntersecting) {
-                // Start a 1-second dwell timer
-                timers[adId] = timers[adId] || setTimeout(function () {
+                // Start a 1-second dwell timer (guard prevents duplicate timers
+                // when the card briefly leaves and re-enters the viewport)
+                if (!timers[adId]) timers[adId] = setTimeout(function () {
                     if (!viewed.has(adId)) {
                         viewed.add(adId);
                         fetch('/api/public/ads/' + adId + '/view', {

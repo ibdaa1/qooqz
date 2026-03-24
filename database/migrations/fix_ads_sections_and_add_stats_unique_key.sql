@@ -37,7 +37,7 @@ UPDATE `homepage_sections`
 SET `component`   = 'ad_ads',
     `data_source` = 'ads'
 WHERE `section_type` = 'ads'
-  AND (`component` IS NULL OR `component` != 'ad_ads' OR `data_source` LIKE 'ads:%');
+  AND (`component` != 'ad_ads' OR `component` IS NULL OR `data_source` LIKE 'ads:%');
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3.  Fix entities section: change data_source to 'entities:verified' so
