@@ -19,15 +19,21 @@ if (empty($sectionData)) {
 /**
  * Build the click-through URL from target_type / target_value.
  * target_type: 'url', 'product', 'category', 'entity', 'page', or empty
+ * Only http/https URLs are allowed for target_type='url' to prevent XSS.
  */
 function _ad_link(string $type, string $value): string {
     if ($value === '') return '#';
     return match ($type) {
-        'url'      => $value,
-        'product'  => '/frontend/public/product.php?id='   . urlencode($value),
+        'url' => (function (string $v): string {
+            $parsed = parse_url($v, PHP_URL_SCHEME);
+            return ($parsed !== null && in_array(strtolower($parsed), ['http', 'https'], true))
+                ? $v
+                : '#';
+        })($value),
+        'product'  => '/frontend/public/product.php?id='    . urlencode($value),
         'category' => '/frontend/public/categories.php?id=' . urlencode($value),
-        'entity'   => '/frontend/public/entity.php?id='    . urlencode($value),
-        default    => $value,
+        'entity'   => '/frontend/public/entity.php?id='     . urlencode($value),
+        default    => '#',
     };
 }
 ?>
@@ -41,9 +47,9 @@ function _ad_link(string $type, string $value): string {
     $_adVal   = $_ad['target_value'] ?? '';
     $_adHref  = _ad_link($_adType, $_adVal);
 ?>
-<a href="<?= e($_adHref) ?>" class="pub-ad-card" target="_blank" rel="noopener"
-   data-ad-id="<?= $_adId ?>"
-   onclick="fetch('/api/public/ads/<?= $_adId ?>/click',{method:'POST',keepalive:true}).catch(()=>{})">
+<a href="<?= e($_adHref) ?>" class="pub-ad-card" target="_blank" rel="noopener noreferrer"
+   data-ad-id="<?= (int)$_adId ?>"
+   onclick="fetch('/api/public/ads/<?= (int)$_adId ?>/click',{method:'POST',keepalive:true}).catch(()=>{})">
     <?php if ($_adImg !== ''): ?>
     <div class="pub-ad-img-wrap">
         <img src="<?= e(pub_img($_adImg)) ?>" alt="<?= e($_adTitle) ?>"
