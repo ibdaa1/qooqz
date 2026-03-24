@@ -1613,6 +1613,33 @@
     }
 
     /* ──────────────────────────────────────────────
+     * Languages — populate translation language select from API
+     * ──────────────────────────────────────────── */
+    function loadLanguages() {
+        var langApi = (CFG.languagesApi || (CFG.apiBase || '/api') + '/languages') + '?format=json&is_active=1&per=1000';
+        fetch(langApi, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                var items = (json.data && json.data.items) ? json.data.items
+                          : (Array.isArray(json.data) ? json.data : []);
+                if (!Array.isArray(items) || items.length === 0) return;
+                var langEl = document.getElementById('adTransLang');
+                if (!langEl) return;
+                var placeholder = t('translations.select_language', '-- Select Language --');
+                langEl.innerHTML = '<option value="">' + esc(placeholder) + '</option>';
+                items.forEach(function (lang) {
+                    var opt = document.createElement('option');
+                    opt.value = lang.code || '';
+                    opt.textContent = (lang.native_name || lang.name || lang.code || '') + ' (' + (lang.code || '') + ')';
+                    langEl.appendChild(opt);
+                });
+            })
+            .catch(function (err) {
+                console.warn('[Ads] Failed to load languages:', err);
+            });
+    }
+
+    /* ──────────────────────────────────────────────
      * Initialise
      * ──────────────────────────────────────────── */
     function init() {
@@ -1624,6 +1651,9 @@
 
         // Populate campaign filter on ads tab
         refreshCampaignFilter();
+
+        // Load languages for translation selector
+        loadLanguages();
 
         // Load data
         loadCampaigns({ page: 1, filters: {} });

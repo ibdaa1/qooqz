@@ -617,23 +617,6 @@ $apiBase = '/api';
                     <div class="ad-translation-add-row">
                         <select id="adTransLang" class="form-control">
                             <option value=""><?= htmlspecialchars(_adst('translations.select_language', '-- Select Language --'), ENT_QUOTES, 'UTF-8') ?></option>
-                            <option value="en">English (en)</option>
-                            <option value="ar">العربية (ar)</option>
-                            <option value="fr">Français (fr)</option>
-                            <option value="tr">Türkçe (tr)</option>
-                            <option value="ur">اردو (ur)</option>
-                            <option value="de">Deutsch (de)</option>
-                            <option value="es">Español (es)</option>
-                            <option value="fa">فارسی (fa)</option>
-                            <option value="he">עברית (he)</option>
-                            <option value="hi">हिन्दी (hi)</option>
-                            <option value="zh">中文 (zh)</option>
-                            <option value="ja">日本語 (ja)</option>
-                            <option value="ko">한국어 (ko)</option>
-                            <option value="pt">Português (pt)</option>
-                            <option value="ru">Русский (ru)</option>
-                            <option value="it">Italiano (it)</option>
-                            <option value="nl">Nederlands (nl)</option>
                         </select>
                         <input type="text" id="adTransTitle" class="form-control"
                                placeholder="<?= htmlspecialchars(_adst('translations.ad_title_placeholder', 'Ad title...'), ENT_QUOTES, 'UTF-8') ?>">
@@ -906,6 +889,7 @@ window.ADS_CONFIG = {
     translationsApi:   <?= json_encode($apiBase . '/ad_translations') ?>,
     placementsApi:     <?= json_encode($apiBase . '/ad_placements') ?>,
     placementItemsApi: <?= json_encode($apiBase . '/ad_placement_items') ?>,
+    languagesApi:      <?= json_encode($apiBase . '/languages') ?>,
     adImageTypeId:     20
 };
 </script>
