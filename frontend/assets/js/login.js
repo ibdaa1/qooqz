@@ -170,7 +170,7 @@ document.addEventListener('DOMContentLoaded', function () {
             server_error:          'A server error occurred during Google sign-in.',
             user_load_failed:      'Failed to load user after Google sign-in.',
         };
-        setResult(msgs[googleError] || 'Google sign-in failed: ' + googleError, false);
+        setResult(msgs[googleError] || 'Google sign-in failed.', false);
     }
 
     // If user is already logged in(PHP session user injected by header.php or window.pubSessionUser),
