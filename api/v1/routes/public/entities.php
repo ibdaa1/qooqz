@@ -22,6 +22,7 @@ if ($first === 'entities') {
     if ($tenantId)                          { $where .= ' AND e.tenant_id = ?';    $params[] = $tenantId; }
     if (!empty($_GET['vendor_type']))        { $where .= ' AND e.vendor_type = ?'; $params[] = $_GET['vendor_type']; }
     if (!empty($_GET['is_verified']))        { $where .= ' AND e.is_verified = ?'; $params[] = 1; }
+    if (!empty($_GET['is_featured']))        { $where .= ' AND e.is_featured = ?'; $params[] = (int)$_GET['is_featured']; }
     if (!empty($_GET['q'])) {
         $like = '%' . str_replace(['%','_','\\'], ['\\%','\\_','\\\\'], $_GET['q']) . '%';
         $where .= ' AND (e.store_name LIKE ? OR e.email LIKE ?)';

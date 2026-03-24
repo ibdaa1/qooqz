@@ -10,9 +10,26 @@ declare(strict_types=1);
 if ($first === 'homepage_sections') {
     if (!$tenantId) { ResponseFormatter::success(['ok' => true, 'data' => []]); exit; }
     $rows = $pdoList(
-        "SELECT hs.id, hs.section_type, hs.component, hs.layout_type, hs.layout_config,
+        "SELECT hs.id, hs.section_type, hs.layout_type,
                 hs.items_per_row, hs.background_color, hs.text_color, hs.padding,
                 hs.custom_css, hs.data_source, hs.sort_order, hs.is_active,
+                CASE hs.section_type
+                    WHEN 'categories' THEN 'ad_categories'
+                    WHEN 'products'   THEN 'ad_products'
+                    WHEN 'deals'      THEN 'ad_deals'
+                    WHEN 'entities'   THEN 'ad_entities'
+                    WHEN 'jobs'       THEN 'ad_jobs'
+                    WHEN 'tenants'    THEN 'ad_tenants'
+                    WHEN 'slider'     THEN 'ad_slider'
+                    WHEN 'banners'    THEN 'ad_slider'
+                    WHEN 'banner'     THEN 'ad_banner'
+                    WHEN 'search'     THEN 'ad_search'
+                    WHEN 'stats'      THEN 'ad_stats'
+                    WHEN 'custom'     THEN 'ad_custom'
+                    WHEN 'native'     THEN 'ad_native'
+                    WHEN 'ads'        THEN 'ad_banner'
+                    ELSE 'default'
+                END AS component,
                 COALESCE(hst.title, hs.title)       AS title,
                 COALESCE(hst.subtitle, hs.subtitle) AS subtitle
            FROM homepage_sections hs

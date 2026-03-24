@@ -143,6 +143,12 @@ if ($first === 'products') {
     if (!empty($_GET['is_featured'])) {
         $where .= ' AND p.is_featured = ?'; $whereParams[] = (int)$_GET['is_featured'];
     }
+    if (!empty($_GET['is_new'])) {
+        $where .= ' AND p.is_new = ?'; $whereParams[] = (int)$_GET['is_new'];
+    }
+    if (!empty($_GET['is_bestseller'])) {
+        $where .= ' AND p.is_bestseller = ?'; $whereParams[] = (int)$_GET['is_bestseller'];
+    }
     if (!empty($_GET['category_id']) && is_numeric($_GET['category_id'])) {
         $where .= ' AND p.id IN (SELECT product_id FROM product_categories WHERE category_id = ?)';
         $whereParams[] = (int)$_GET['category_id'];
