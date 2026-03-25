@@ -18,9 +18,11 @@ if ($first === 'brands') {
 
     $bCount = $pdoCount("SELECT COUNT(*) FROM brands b $bWhere", $bParams);
     $rows   = $pdoList(
-        "SELECT b.id, b.slug, b.logo_url, b.website_url, b.is_featured,
+        "SELECT b.id, b.slug, b.website_url, b.is_featured,
                 COALESCE(bt.name, b.slug) AS name,
-                COALESCE(bt.description, '') AS description
+                COALESCE(bt.description, '') AS description,
+                (SELECT i.url FROM images i
+                  WHERE i.owner_id = b.id ORDER BY i.id ASC LIMIT 1) AS logo_url
            FROM brands b
       LEFT JOIN brand_translations bt ON bt.brand_id = b.id AND bt.language_code = ?
          $bWhere
