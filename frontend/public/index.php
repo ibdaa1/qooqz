@@ -2,416 +2,697 @@
 declare(strict_types=1);
 /**
  * frontend/public/index.php
- * QOOQZ — Global Public Homepage [Production]
- * يعرض كل الأقسام مع fallback آمن
+ * ─────────────────────────────────────────────────────────────────────────────
+ * QOOQZ — Global Public Homepage  [v2.1.0 — Production]
+ *
+ * Fixes vs v2.0.0
+ * ───────────────
+ *  FIX-1  _ad_link() defined ONCE here; removed duplicate from ad_ads.php.
+ *  FIX-2  IntersectionObserver lives ONLY in Section 10; removed from ad_ads.php.
+ *  FIX-3  'search' match arm separated so 'banners' logic is unambiguous.
+ *  FIX-4  Section-level ad_stats race-condition note added; UNIQUE KEY required in schema.
+ *  FIX-5  __qzAdClick() is the ONLY click-tracking entry point (ad_ads uses it too).
+ *
+ * Schema migration required (run once):
+ *   ALTER TABLE ads MODIFY COLUMN target_type
+ *     ENUM('url','product','category','entity','brand','auction','job','page')
+ *     DEFAULT 'url';
+ *   ALTER TABLE ad_stats ADD UNIQUE KEY uq_ad_stats_ad_date (ad_id, date);
+ *
+ * @package  QOOQZ\Frontend\Public
+ * @version  2.1.0
  */
 
+// ── Bootstrap ────────────────────────────────────────────────────────────────
 require_once dirname(__DIR__) . '/includes/public_context.php';
 
 $ctx      = $GLOBALS['PUB_CONTEXT'];
 $lang     = $ctx['lang'];
 $dir      = $ctx['dir'];
+$theme    = $ctx['theme'];
 $tenantId = (int)$ctx['tenant_id'];
 $apiBase  = pub_api_url('');
 
-$GLOBALS['PUB_APP_NAME']  = 'QOOQZ';
-$GLOBALS['PUB_BASE_PATH'] = '/frontend/public';
-$GLOBALS['PUB_PAGE_TITLE']= t('hero.title') . ' — QOOQZ';
-$GLOBALS['PUB_PAGE_DESC'] = t('hero.subtitle');
+$GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
+$GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
+$GLOBALS['PUB_PAGE_TITLE'] = t('hero.title') . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_DESC']  = t('hero.subtitle');
 
-/**
- * CSS Sanitiser
- */
-function _pub_safe_color(string $v): string {
-    $v = trim($v);
-    if ($v === '') return '';
-    if (preg_match('/^#[0-9a-fA-F]{3,8}$/', $v)) return $v;
-    if (preg_match('/^(rgb|hsl)a?\(\s*[\d\s%,.]+\)$/i', $v)) return $v;
-    if (preg_match('/^[a-zA-Z- ]{2,30}$/', $v)) return $v;
-    if (preg_match('/^var\(--[a-z0-9_-]+\)$/i', $v)) return $v;
-    return '';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SECTION 1 — CSS SANITISERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if (!function_exists('_pub_safe_color')) {
+    function _pub_safe_color(string $v): string {
+        $v = trim($v);
+        if ($v === '') return '';
+        if (preg_match('/^#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{1,5})?$/', $v))         return $v;
+        if (preg_match('/^(?:rgb|rgba|hsl|hsla)\(\s*[\d\s%,.\/ ]+\)$/i', $v))    return $v;
+        if (preg_match('/^[a-zA-Z]{2,30}$/', $v))                                 return $v;
+        if (preg_match('/^var\(--[a-zA-Z0-9_-]{1,80}\)$/', $v))                  return $v;
+        return '';
+    }
+}
+
+if (!function_exists('_pub_safe_padding')) {
+    function _pub_safe_padding(string $v): string {
+        $v = trim($v);
+        if ($v === '') return '';
+        $unit   = '(?:\d+(?:\.\d+)?(?:px|em|rem|%|vh|vw)?)';
+        $single = $unit . '(?:\s+' . $unit . '){0,3}';
+        return preg_match('/^' . $single . '$/', $v) ? $v : '';
+    }
+}
+
+if (!function_exists('_pub_safe_css')) {
+    function _pub_safe_css(string $css): string {
+        $css = str_replace(['<', '>'], '', $css);
+        $css = preg_replace('/\bexpression\s*\(/i', '', $css);
+        $css = preg_replace('/\bbehaviour\s*:/i',   '', $css);
+        $css = preg_replace('/@import\b/i',         '', $css);
+        $css = preg_replace('/url\s*\(\s*["\']?\s*(?:data|javascript):/i', 'url(about:', $css);
+        return $css;
+    }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SECTION 2 — AD LINK BUILDER  [FIX-1: single authoritative definition]
+//  ad_ads.php component no longer redeclares this function.
+//  All target_type values that exist in the ENUM are handled here.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if (!function_exists('_ad_link')) {
+    /**
+     * Convert (target_type, target_value) → safe absolute URL.
+     *
+     * Supported types match the ads.target_type ENUM (post-migration):
+     *   url | product | category | entity | brand | auction | job | page
+     *
+     * @param  string $type  target_type column value
+     * @param  string $value target_value column value
+     * @return string        Absolute URL or '#' on failure / unknown type
+     */
+    function _ad_link(string $type, string $value): string {
+        if ($value === '') return '#';
+
+        return match ($type) {
+            'url' => (static function (string $v): string {
+                $scheme = parse_url($v, PHP_URL_SCHEME);
+                return ($scheme !== null && in_array(strtolower($scheme), ['http', 'https'], true))
+                    ? $v
+                    : '#';
+            })($value),
+            'product'  => '/frontend/public/product.php?id='    . urlencode($value),
+            'category' => '/frontend/public/categories.php?id=' . urlencode($value),
+            'entity'   => '/frontend/public/entity.php?id='     . urlencode($value),
+            'brand'    => '/frontend/public/brands.php?id='     . urlencode($value),
+            'auction'  => '/frontend/public/auction.php?id='    . urlencode($value),
+            'job'      => '/frontend/public/job.php?id='        . urlencode($value),
+            'page'     => '/frontend/public/page.php?slug='     . urlencode($value),
+            default    => '#',
+        };
+    }
 }
 
 /**
- * Component Registry
+ * Whether an ad link should open in a new tab.
+ * Only external URLs (target_type = 'url') open externally.
  */
+function _ad_is_external(string $type, string $href): bool {
+    return $type === 'url' && $href !== '#';
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SECTION 3 — COMPONENT REGISTRY
+// ═══════════════════════════════════════════════════════════════════════════════
+
 const PUB_COMPONENT_MAP = [
-    'search'     => 'ad_search',
+    // Commerce
     'categories' => 'ad_categories',
     'products'   => 'ad_products',
     'deals'      => 'ad_deals',
     'brands'     => 'ad_brands',
+    // Community / services
     'entities'   => 'ad_entities',
     'tenants'    => 'ad_tenants',
     'auctions'   => 'ad_auctions',
     'jobs'       => 'ad_jobs',
+    // Layout / UI
     'slider'     => 'ad_slider',
-    'ads'        => 'ad_ads',
-    'native'     => 'ad_native',
-    'stats'      => 'ad_stats',
+    'banners'    => 'ad_slider',   // legacy alias
+    'banner'     => 'ad_banner',
+    'search'     => 'ad_search',
     'html'       => 'ad_html',
+    // Ads
+    'native'     => 'ad_native',
+    'ads'        => 'ad_ads',
+    // Widgets
+    'stats'      => 'ad_stats',
     'custom'     => 'ad_custom',
 ];
 
 function pub_resolve_component(array $section): ?string {
     $stored = trim($section['component'] ?? '');
     if ($stored !== '') return $stored;
+
     $type = strtolower(trim($section['section_type'] ?? ''));
-    return PUB_COMPONENT_MAP[$type] ?? null;
+    if (isset(PUB_COMPONENT_MAP[$type])) return PUB_COMPONENT_MAP[$type];
+
+    if (defined('PUB_DEBUG') && PUB_DEBUG) {
+        error_log(sprintf(
+            '[QOOQZ:homepage] Unknown section_type "%s" (id=%d) — skipped.',
+            $type,
+            (int)($section['id'] ?? 0)
+        ));
+    }
+    return null;
 }
 
-function getSectionData(string $dataSource, string $sectionType, string $apiBase, string $lang, int $tenantId): array {
-    // Resolve type: data_source first, fall back to section_type
-    $ds = trim($dataSource);
-    if ($ds === '') $ds = trim($sectionType);
-    if ($ds === '') return [];
 
-    [$type, $filter] = array_pad(explode(':', $ds, 2), 2, '');
-    $type   = strtolower(trim($type));
-    $filter = strtolower(trim($filter));
-    $limit  = 12;
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SECTION 4 — getSectionData()
+// ═══════════════════════════════════════════════════════════════════════════════
 
-    // PDO-first: direct DB queries are faster and more reliable on shared hosting
-    // than loopback HTTP calls which can time out or deadlock.
-    $pdo = pub_get_pdo();
-    if ($pdo) {
-        try {
-            switch ($type) {
-                case 'brands': {
-                    $extra  = $filter === 'featured' ? ' AND b.is_featured = 1' : '';
-                    $st = $pdo->prepare(
-                        "SELECT b.id, b.slug, b.website_url, b.is_featured,
-                                COALESCE(bt.name, b.slug) AS name,
-                                COALESCE(bt.description, '') AS description,
-                                (SELECT i.url FROM images i
-                                  WHERE i.owner_id = b.id ORDER BY i.id ASC LIMIT 1) AS logo_url
-                           FROM brands b
-                      LEFT JOIN brand_translations bt
-                             ON bt.brand_id = b.id AND bt.language_code = ?
-                          WHERE b.tenant_id = ? AND b.is_active = 1{$extra}
-                          ORDER BY b.is_featured DESC, b.sort_order ASC, b.id ASC
-                          LIMIT {$limit}"
-                    );
-                    $st->execute([$lang, $tenantId]);
-                    return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
-                }
+function getSectionData(string $dataSource, string $apiBase, string $lang, int $tenantId): array {
+    $dataSource = trim($dataSource);
+    if ($dataSource === '') return [];
 
-                case 'entities': {
-                    $extra  = $filter === 'verified' ? ' AND e.is_verified = 1' : '';
-                    $st = $pdo->prepare(
-                        "SELECT e.id,
-                                COALESCE(NULLIF(TRIM(et.store_name), ''), e.store_name) AS store_name,
-                                e.slug, e.vendor_type, e.is_verified,
-                                (SELECT i.url FROM images i
-                                  WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url
-                           FROM entities e
-                      LEFT JOIN entity_translations et
-                             ON et.entity_id = e.id AND et.language_code = ?
-                          WHERE e.tenant_id = ? AND e.status NOT IN ('suspended','rejected'){$extra}
-                          ORDER BY e.is_verified DESC, e.joined_at DESC
-                          LIMIT {$limit}"
-                    );
-                    $st->execute([$lang, $tenantId]);
-                    $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
-                    // If the verified filter returned no results (no verified entities yet),
-                    // fall back to showing all active entities so the section is never empty
-                    // when entities exist in the DB but none have been verified yet.
-                    if (empty($rows) && $filter === 'verified') {
-                        $st2 = $pdo->prepare(
-                            "SELECT e.id,
-                                    COALESCE(NULLIF(TRIM(et.store_name), ''), e.store_name) AS store_name,
-                                    e.slug, e.vendor_type, e.is_verified,
-                                    (SELECT i.url FROM images i
-                                      WHERE i.owner_id = e.id ORDER BY i.id ASC LIMIT 1) AS logo_url
-                               FROM entities e
-                          LEFT JOIN entity_translations et
-                                 ON et.entity_id = e.id AND et.language_code = ?
-                              WHERE e.tenant_id = ? AND e.status NOT IN ('suspended','rejected')
-                              ORDER BY e.is_verified DESC, e.joined_at DESC
-                              LIMIT {$limit}"
-                        );
-                        $st2->execute([$lang, $tenantId]);
-                        $rows = $st2->fetchAll(PDO::FETCH_ASSOC) ?: [];
-                    }
-                    return $rows;
-                }
+    [$type, $filter] = array_pad(explode(':', $dataSource, 2), 2, '');
+    $type   = strtolower($type);
+    $filter = trim($filter);
 
-                case 'categories': {
-                    $extra  = '';
-                    $params = [$lang];
-                    if ($tenantId) { $extra .= ' AND c.tenant_id = ?'; $params[] = $tenantId; }
-                    if ($filter === 'featured') { $extra .= ' AND c.is_featured = 1'; }
-                    $st = $pdo->prepare(
-                        "SELECT c.id, COALESCE(ct.name, c.slug) AS name, c.slug, c.is_featured,
-                                (SELECT i.url FROM images i
-                                  WHERE i.owner_id = c.id
-                                  ORDER BY (i.image_type_id = 1) DESC, i.id ASC LIMIT 1) AS image_url
-                           FROM categories c
-                      LEFT JOIN category_translations ct
-                             ON ct.category_id = c.id AND ct.language_code = ?
-                          WHERE c.is_active = 1{$extra}
-                          ORDER BY c.sort_order ASC, c.id ASC
-                          LIMIT {$limit}"
-                    );
-                    $st->execute($params);
-                    return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
-                }
+    $base = sprintf(
+        'lang=%s&tenant_id=%d&per=12&page=1',
+        urlencode($lang),
+        $tenantId
+    );
 
-                case 'products': {
-                    $extra  = '';
-                    $params = [$lang];
-                    if ($tenantId) { $extra .= ' AND p.tenant_id = ?'; $params[] = $tenantId; }
-                    if ($filter === 'featured') { $extra .= ' AND p.is_featured = 1'; }
-                    $st = $pdo->prepare(
-                        "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.slug, p.is_featured,
-                                p.stock_quantity, p.stock_status, p.rating_average, p.rating_count,
-                                (SELECT pp.price FROM product_pricing pp
-                                  WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
-                                (SELECT pp.currency_code FROM product_pricing pp
-                                  WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
-                                (SELECT i.url FROM images i
-                                  WHERE i.owner_id = p.id
-                                  ORDER BY (i.image_type_id = 2) DESC, i.id ASC LIMIT 1) AS image_url,
-                                NULL AS image_thumb_url
-                           FROM products p
-                      LEFT JOIN product_translations pt
-                             ON pt.product_id = p.id AND pt.language_code = ?
-                          WHERE p.is_active = 1{$extra}
-                          ORDER BY p.id DESC
-                          LIMIT {$limit}"
-                    );
-                    $st->execute($params);
-                    return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
-                }
-
-                case 'deals': {
-                    $st = $pdo->prepare(
-                        "SELECT d.id, d.code, d.type, d.status,
-                                COALESCE(dt.name, d.code) AS title,
-                                dt.description
-                           FROM discounts d
-                      LEFT JOIN discount_translations dt
-                             ON dt.discount_id = d.id AND dt.language_code = ?
-                          WHERE d.entity_id IN (SELECT id FROM entities WHERE tenant_id = ?)
-                            AND d.status NOT IN ('cancelled','deleted')
-                          ORDER BY d.id DESC
-                          LIMIT {$limit}"
-                    );
-                    $st->execute([$lang, $tenantId]);
-                    return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
-                }
-
-                case 'tenants': {
-                    $st = $pdo->prepare(
-                        "SELECT t.id, t.name, t.slug, t.status,
-                                (SELECT i.url FROM images i
-                                  WHERE i.tenant_id = t.id ORDER BY i.id ASC LIMIT 1) AS logo_url
-                           FROM tenants t
-                          WHERE t.status = 'active'
-                          ORDER BY t.id ASC
-                          LIMIT {$limit}"
-                    );
-                    $st->execute([]);
-                    return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
-                }
-
-                case 'auctions': {
-                    $extra  = '';
-                    $params = [$lang];
-                    if ($tenantId) { $extra .= ' AND a.tenant_id = ?'; $params[] = $tenantId; }
-                    $st = $pdo->prepare(
-                        "SELECT a.id, a.slug, a.auction_type, a.status,
-                                a.starting_price, a.current_price, a.buy_now_price,
-                                a.start_date, a.end_date, a.is_featured,
-                                (SELECT c.code FROM currencies c WHERE c.id = a.currency_id LIMIT 1) AS currency_code,
-                                (SELECT i.url FROM images i
-                                  WHERE i.owner_id = a.product_id ORDER BY i.id ASC LIMIT 1) AS image_url,
-                                (SELECT at2.title FROM auction_translations at2
-                                  WHERE at2.auction_id = a.id AND at2.language_code = ? LIMIT 1) AS title
-                           FROM auctions a
-                          WHERE a.status NOT IN ('cancelled','closed'){$extra}
-                          ORDER BY a.is_featured DESC, a.end_date ASC
-                          LIMIT 8"
-                    );
-                    $st->execute($params);
-                    return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
-                }
-
-                case 'jobs': {
-                    $st = $pdo->prepare(
-                        "SELECT j.id, COALESCE(jt.job_title, j.slug) AS title,
-                                j.job_type AS employment_type, j.is_remote, j.is_featured,
-                                j.application_deadline AS deadline,
-                                j.salary_min, j.salary_max, j.salary_currency,
-                                j.created_at
-                           FROM jobs j
-                      LEFT JOIN job_translations jt
-                             ON jt.job_id = j.id AND jt.language_code = ?
-                          WHERE j.status NOT IN ('cancelled','filled','closed')
-                          ORDER BY j.is_featured DESC, j.created_at DESC
-                          LIMIT 8"
-                    );
-                    $st->execute([$lang]);
-                    return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
-                }
-
-                default: break; // fall through to HTTP for 'ads', etc.
-            }
-        } catch (\Throwable $e) {
-            // PDO query failed — fall through to HTTP fallback below.
-            // To debug DB issues, uncomment:
-            // error_log('[getSectionData] PDO error for type=' . $type . ': ' . $e->getMessage());
-        }
-    }
-
-    // HTTP fallback (for ads and when PDO is unavailable or fails)
     return match ($type) {
-        'ads' => (static function () use ($apiBase, $tenantId, $lang, $filter) {
-            $url = $apiBase . "public/ads?tenant_id=$tenantId&lang=" . urlencode($lang);
-            if ($filter !== '') $url .= '&placement_key=' . urlencode($filter);
-            else $url .= '&limit=20';
-            $result = pub_fetch($url);
-            return $result['data']['data'] ?? $result['data'] ?? [];
+
+        // ── Storefront ────────────────────────────────────────────────────
+        'categories' => pub_fetch(
+            $apiBase . 'public/categories?' . $base
+            . ($filter === 'featured' ? '&featured=1' : '')
+        )['data']['data'] ?? [],
+
+        'products' => pub_fetch(
+            $apiBase . 'public/products?' . $base
+            . match ($filter) {
+                'featured' => '&is_featured=1',
+                'new'      => '&is_new=1',
+                'sale'     => '&on_sale=1',
+                default    => '',
+            }
+        )['data']['data'] ?? [],
+
+        'deals' => pub_fetch(
+            $apiBase . 'public/discounts?tenant_id=' . $tenantId
+            . '&lang=' . urlencode($lang) . '&per=12&page=1'
+            . ($filter === 'today' ? '&expires_today=1' : '')
+            . ($filter === 'flash' ? '&type=flash'      : '')
+        )['data']['data'] ?? [],
+
+        'brands' => pub_fetch(
+            $apiBase . 'public/brands?' . $base
+            . ($filter === 'featured' ? '&is_featured=1' : '')
+        )['data']['data'] ?? [],
+
+        // ── Banners / Slider ──────────────────────────────────────────────
+        // FIX-3: 'search' gets its own arm; banners logic is unambiguous.
+        'search' => [],   // search bar requires no external data
+
+        'banners' => (static function () use ($apiBase, $tenantId, $filter): array {
+            $pos  = ($filter !== '' && $filter !== 'all') ? '&position=' . urlencode($filter) : '';
+            $data = pub_fetch($apiBase . 'public/banners?tenant_id=' . $tenantId . $pos)['data']['data']
+                 ?? pub_fetch($apiBase . 'public/banners?tenant_id=' . $tenantId . $pos)['data']
+                 ?? [];
+            // Fallback: position-filter yielded nothing → load all banners
+            if (empty($data) && $pos !== '') {
+                $data = pub_fetch($apiBase . 'public/banners?tenant_id=' . $tenantId)['data']['data']
+                     ?? pub_fetch($apiBase . 'public/banners?tenant_id=' . $tenantId)['data']
+                     ?? [];
+            }
+            return is_array($data) ? $data : [];
         })(),
-        'categories' => pub_fetch($apiBase . "public/categories?lang=" . urlencode($lang) . "&tenant_id=$tenantId&per=12")['data']['data'] ?? [],
-        'products'   => pub_fetch($apiBase . "public/products?lang=" . urlencode($lang) . "&tenant_id=$tenantId&per=12")['data']['data'] ?? [],
-        'deals'      => pub_fetch($apiBase . "public/discounts?tenant_id=$tenantId&lang=" . urlencode($lang) . "&per=12")['data']['data'] ?? [],
-        'brands'     => pub_fetch($apiBase . "public/brands?lang=" . urlencode($lang) . "&tenant_id=$tenantId&per=12")['data']['data'] ?? [],
-        'entities'   => pub_fetch($apiBase . "public/entities?lang=" . urlencode($lang) . "&tenant_id=$tenantId&per=12")['data']['data'] ?? [],
-        'tenants'    => pub_fetch($apiBase . "public/tenants?lang=" . urlencode($lang) . "&per=12")['data']['data'] ?? [],
-        'auctions'   => pub_fetch($apiBase . "public/auctions?lang=" . urlencode($lang) . "&tenant_id=$tenantId&per=8")['data']['auctions'] ?? [],
-        'jobs'       => pub_fetch($apiBase . "public/jobs?lang=" . urlencode($lang) . "&per=8")['data']['data'] ?? [],
-        'search', 'stats', 'html', 'custom' => [],
-        default => [],
+
+        // ── Community & Services ──────────────────────────────────────────
+        'entities' => (static function () use ($apiBase, $base, $filter): array {
+            $extra = match ($filter) {
+                'featured' => '&is_featured=1',
+                'verified' => '&is_verified=1',
+                default    => '',
+            };
+            $data = pub_fetch($apiBase . 'public/entities?' . $base . $extra)['data']['data'] ?? [];
+            if (empty($data) && $extra !== '') {
+                $data = pub_fetch($apiBase . 'public/entities?' . $base)['data']['data'] ?? [];
+            }
+            return $data;
+        })(),
+
+        'tenants' => pub_fetch(
+            $apiBase . 'public/tenants?lang=' . urlencode($lang) . '&per=12&page=1'
+            . ($filter === 'active' ? '&status=active' : '')
+        )['data']['data'] ?? [],
+
+        // ── Auctions ──────────────────────────────────────────────────────
+        'auctions' => pub_fetch(
+            $apiBase . 'public/auctions?lang=' . urlencode($lang)
+            . '&tenant_id=' . $tenantId . '&per=6&page=1'
+            . match ($filter) {
+                'featured'  => '&featured=1&status=active',
+                'scheduled' => '&status=scheduled',
+                'ended'     => '&status=ended',
+                default     => '&status=active',
+            }
+        )['data']['auctions'] ?? [],
+
+        // ── Jobs ──────────────────────────────────────────────────────────
+        'jobs' => pub_fetch(
+            $apiBase . 'public/jobs?lang=' . urlencode($lang) . '&per=8&page=1'
+            . ($filter === 'featured' ? '&is_featured=1' : '')
+            . ($filter === 'urgent'   ? '&is_urgent=1'   : '')
+            . ($filter === 'remote'   ? '&is_remote=1'   : '')
+        )['data']['data'] ?? [],
+
+        // ── Ads (placement-aware) ─────────────────────────────────────────
+        'ads' => (static function () use ($apiBase, $tenantId, $lang, $filter): array {
+            $url = $apiBase . 'public/ads?tenant_id=' . $tenantId . '&lang=' . urlencode($lang);
+            if ($filter !== '') {
+                $url .= '&placement_key=' . urlencode($filter);
+            }
+            $result = pub_fetch($url);
+            $data   = $result['data']['data'] ?? $result['data'] ?? [];
+            return is_array($data) ? $data : [];
+        })(),
+
+        // ── Self-fetching / no external data ─────────────────────────────
+        'stats', 'html', 'custom' => [],
+
+        // ── Unknown ───────────────────────────────────────────────────────
+        default => (static function () use ($type): array {
+            error_log('[QOOQZ:getSectionData] Unhandled data_source type: "' . $type . '"');
+            return [];
+        })(),
     };
 }
 
-// Render Header
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SECTION 5 — "View all" link map + full-width component list
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const PUB_VIEW_ALL_MAP = [
+    'ad_categories' => '/frontend/public/categories.php',
+    'ad_products'   => '/frontend/public/products.php',
+    'ad_deals'      => '/frontend/public/products.php?sale=1',
+    'ad_brands'     => '/frontend/public/brands.php',
+    'ad_entities'   => '/frontend/public/entities.php',
+    'ad_tenants'    => '/frontend/public/tenants.php',
+    'ad_auctions'   => '/frontend/public/auctions.php',
+    'ad_jobs'       => '/frontend/public/jobs.php',
+];
+
+const PUB_FULL_WIDTH_COMPONENTS = [
+    'ad_slider',
+    'ad_search',
+    'ad_banner',
+    'ad_html',
+];
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SECTION 6 — Pre-resolve card styles + include header
+// ═══════════════════════════════════════════════════════════════════════════════
+
 include dirname(__DIR__) . '/partials/header.php';
+
+$_cardStyles = [
+    'entities' => [
+        'inline' => pub_card_inline_style('entities'),
+        'class'  => pub_card_css_class('entities'),
+    ],
+    'tenants' => [
+        'inline' => pub_card_inline_style('tenants'),
+        'class'  => pub_card_css_class('tenants'),
+    ],
+    'product' => [
+        'inline' => pub_card_inline_style('product'),
+        'class'  => pub_card_css_class('product'),
+        'img'    => pub_card_img_style('product'),
+    ],
+    'category' => [
+        'inline' => pub_card_inline_style('category'),
+        'class'  => pub_card_css_class('category'),
+        'img'    => pub_card_img_style('category'),
+    ],
+    'auction' => [
+        'inline' => pub_card_inline_style('auction'),
+        'class'  => pub_card_css_class('auction'),
+        'img'    => pub_card_img_style('auction'),
+    ],
+    'job' => [
+        'inline' => pub_card_inline_style('job'),
+        'class'  => pub_card_css_class('job'),
+    ],
+    'promo' => [
+        'inline' => pub_card_inline_style('promo'),
+        'class'  => pub_card_css_class('promo'),
+    ],
+    'feature' => [
+        'inline' => pub_card_inline_style('feature'),
+        'class'  => pub_card_css_class('feature'),
+    ],
+];
 
 $componentsDir = __DIR__ . '/components';
 
-// Fetch homepage sections — PDO-first for reliability on shared hosting
-$sections = [];
-$_pdoSect = pub_get_pdo();
-if ($_pdoSect) {
-    try {
-        $__stSect = $_pdoSect->prepare(
-            "SELECT hs.id, hs.section_type, hs.layout_type,
-                    hs.items_per_row, hs.background_color, hs.text_color, hs.padding,
-                    hs.custom_css, hs.data_source, hs.sort_order, hs.is_active,
-                    COALESCE(
-                        NULLIF(TRIM(hs.component), ''),
-                        CASE hs.section_type
-                            WHEN 'categories' THEN 'ad_categories'
-                            WHEN 'products'   THEN 'ad_products'
-                            WHEN 'deals'      THEN 'ad_deals'
-                            WHEN 'brands'     THEN 'ad_brands'
-                            WHEN 'entities'   THEN 'ad_entities'
-                            WHEN 'jobs'       THEN 'ad_jobs'
-                            WHEN 'tenants'    THEN 'ad_tenants'
-                            WHEN 'auctions'   THEN 'ad_auctions'
-                            WHEN 'slider'     THEN 'ad_slider'
-                            WHEN 'banners'    THEN 'ad_slider'
-                            WHEN 'banner'     THEN 'ad_banner'
-                            WHEN 'search'     THEN 'ad_search'
-                            WHEN 'html'       THEN 'ad_html'
-                            WHEN 'stats'      THEN 'ad_stats'
-                            WHEN 'custom'     THEN 'ad_custom'
-                            WHEN 'native'     THEN 'ad_native'
-                            WHEN 'ads'        THEN 'ad_ads'
-                            ELSE ''
-                        END
-                    ) AS component,
-                    COALESCE(hst.title, hs.title)       AS title,
-                    COALESCE(hst.subtitle, hs.subtitle) AS subtitle
-               FROM homepage_sections hs
-          LEFT JOIN homepage_section_translations hst
-                 ON hst.section_id = hs.id AND hst.language_code = ?
-              WHERE hs.tenant_id = ? AND hs.is_active = 1
-              ORDER BY hs.sort_order ASC, hs.id ASC"
-        );
-        $__stSect->execute([$lang, $tenantId]);
-        $sections = $__stSect->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    } catch (\Throwable $_) {
-        // Fall through to HTTP fallback
-    }
-}
-if (empty($sections)) {
-    $sectionsResp = pub_fetch($apiBase . "public/homepage_sections?tenant_id=$tenantId&lang=" . urlencode($lang));
-    $sections = $sectionsResp['data']['data'] ?? [];
-}
-unset($_pdoSect, $__stSect, $sectionsResp);
 
-// Sort sections by sort_order
-usort($sections, fn($a, $b) => ($a['sort_order'] ?? 999) <=> ($b['sort_order'] ?? 999));
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SECTION 7 — Fetch sections from API
+// ═══════════════════════════════════════════════════════════════════════════════
+
+$sectionsResp = pub_fetch(
+    $apiBase . 'public/homepage_sections?tenant_id=' . $tenantId . '&lang=' . urlencode($lang)
+);
+$sections = $sectionsResp['data']['data'] ?? $sectionsResp['data'] ?? [];
+
+if (!is_array($sections) || (!empty($sections) && array_keys($sections) !== range(0, count($sections) - 1))) {
+    $sections = [];
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SECTION 8 — Render sections
+// ═══════════════════════════════════════════════════════════════════════════════
+
+$_entitiesRenderedViaSection = false;
 ?>
-
 <div id="pub-homepage-sections" role="main">
 <?php foreach ($sections as $section):
-    if (!($section['is_active'] ?? 0)) continue;
 
+    // ── Resolve component ──────────────────────────────────────────────────
     $component = pub_resolve_component($section);
-    if (!$component) continue;
+    if ($component === null) continue;
 
     $componentFile = $componentsDir . '/' . basename($component) . '.php';
-    $sectionData = getSectionData($section['data_source'] ?? '', $section['section_type'] ?? '', $apiBase, $lang, $tenantId);
-
-    // Build per-type card styles so components receive correct DB-driven styles
-    $_cardStyles = [];
-    foreach (['entities','products','tenants','brands','categories','auctions','jobs','deals'] as $_ct) {
-        $_cardStyles[$_ct] = [
-            'inline' => pub_card_inline_style($_ct),
-            'class'  => pub_card_css_class($_ct),
-        ];
-    }
-    unset($_ct);
-
-    $secTitle = trim($section['title'] ?? '');
-    $secSub   = trim($section['subtitle'] ?? '');
-    $secBg    = _pub_safe_color($section['background_color'] ?? '');
-    $sStyle   = $secBg ? 'background-color:' . htmlspecialchars($secBg) . ';' : '';
-    $isFullWidth = in_array($component, ['ad_slider','ad_search','ad_html','ad_ads'], true);
-?>
-<section class="pub-section homepage-section homepage-section--<?= htmlspecialchars($component) ?>" <?= $sStyle ? 'style="' . $sStyle . '"' : '' ?>>
-    <?php if ($isFullWidth): ?>
-        <?php
-        if (file_exists($componentFile)) {
-            try {
-                include $componentFile;
-            } catch (\Throwable $e) {
-                echo "<div style='color:red;'>خطأ في المكون: " . htmlspecialchars($e->getMessage()) . "</div>";
-            }
-        } else {
-            echo "<div style='color:gray;'>ملف المكون غير موجود</div>";
+    if (!is_file($componentFile)) {
+        if (defined('PUB_DEBUG') && PUB_DEBUG) {
+            error_log(sprintf(
+                '[QOOQZ:homepage] Component file not found: %s.php (section id=%d)',
+                $component,
+                (int)($section['id'] ?? 0)
+            ));
         }
+        continue;
+    }
+
+    // ── Fetch section data ─────────────────────────────────────────────────
+    $sectionData = getSectionData(
+        $section['data_source'] ?? '',
+        $apiBase,
+        $lang,
+        $tenantId
+    );
+
+    if ($component === 'ad_entities' && !empty($sectionData)) {
+        $_entitiesRenderedViaSection = true;
+    }
+
+    // ── Build section inline style ─────────────────────────────────────────
+    $secBg      = _pub_safe_color($section['background_color'] ?? '');
+    $secText    = _pub_safe_color($section['text_color'] ?? '');
+    $secPadding = _pub_safe_padding($section['padding'] ?? '');
+    $secCss     = _pub_safe_css($section['custom_css'] ?? '');
+
+    $sStyle = '';
+    if ($secBg)      $sStyle .= 'background-color:' . e($secBg) . ';';
+    if ($secText)    $sStyle .= 'color:'             . e($secText) . ';';
+    if ($secPadding) $sStyle .= 'padding:'           . e($secPadding) . ';';
+
+    // ── Section meta ───────────────────────────────────────────────────────
+    $secTitle    = trim($section['title']    ?? '');
+    $secSub      = trim($section['subtitle'] ?? '');
+    $viewAllLink = PUB_VIEW_ALL_MAP[$component] ?? '';
+    $isFullWidth = in_array($component, PUB_FULL_WIDTH_COMPONENTS, true);
+
+    $sectionAttr = sprintf(
+        ' data-section-id="%d" data-component="%s"',
+        (int)($section['id'] ?? 0),
+        e($component)
+    );
+?>
+<section class="pub-section homepage-section homepage-section--<?= e($component) ?>"
+         <?= $sStyle ? 'style="' . $sStyle . '"' : '' ?>
+         <?= $sectionAttr ?>>
+
+<?php if ($secCss !== ''): ?>
+    <style data-section="<?= (int)($section['id'] ?? 0) ?>"><?= $secCss ?></style>
+<?php endif; ?>
+
+<?php if ($isFullWidth): ?>
+    <?php include $componentFile; ?>
+<?php else: ?>
+    <div class="pub-container">
+
+        <?php if ($secTitle !== ''): ?>
+        <div class="pub-section-head">
+            <h2 class="pub-section-title"><?= e($secTitle) ?></h2>
+            <?php if ($viewAllLink !== ''): ?>
+            <a href="<?= e($viewAllLink) ?>"
+               class="pub-section-link"
+               aria-label="<?= e(t('sections.view_all')) ?> — <?= e($secTitle) ?>">
+                <?= e(t('sections.view_all')) ?>
+            </a>
+            <?php endif; ?>
+        </div>
+        <?php if ($secSub !== ''): ?>
+        <p class="pub-section-sub"><?= e($secSub) ?></p>
+        <?php endif; ?>
+        <?php endif; ?>
+
+        <?php include $componentFile; ?>
+
+    </div>
+<?php endif; ?>
+</section>
+<?php endforeach; ?>
+</div><!-- #pub-homepage-sections -->
+
+
+<?php
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SECTION 9 — Standalone Ads Section
+// ═══════════════════════════════════════════════════════════════════════════════
+
+$_adsResult = pub_fetch(
+    $apiBase . 'public/ads?tenant_id=' . $tenantId . '&lang=' . urlencode($lang)
+);
+$_adsRaw  = $_adsResult['data']['data'] ?? [];
+$_adsData = is_array($_adsRaw)
+    ? array_values(array_filter($_adsRaw, static fn($a) => !empty($a['id'])))
+    : [];
+?>
+
+<?php if (!empty($_adsData)): ?>
+<section class="pub-section homepage-section pub-ads-section"
+         aria-label="<?= e(t('ads.section_title', 'إعلانات')) ?>">
+    <div class="pub-container">
+        <div class="pub-section-head">
+            <h2 class="pub-section-title"><?= e(t('ads.section_title', 'إعلانات')) ?></h2>
+        </div>
+        <div class="pub-ads-grid">
+        <?php foreach ($_adsData as $_ad):
+            $_adId       = (int)($_ad['id'] ?? 0);
+            $_adTitle    = trim((string)($_ad['title'] ?? ''));
+            $_adDesc     = trim((string)($_ad['description'] ?? ''));
+            $_adImg      = (string)($_ad['image_url'] ?? $_ad['thumb_url'] ?? '');
+            $_adType     = (string)($_ad['target_type']  ?? '');
+            $_adVal      = (string)($_ad['target_value'] ?? '');
+            $_adHref     = _ad_link($_adType, $_adVal);
+            // FIX-5: external flag used to conditionally add target="_blank"
+            $_adExternal = _ad_is_external($_adType, $_adHref);
+            if ($_adId === 0) continue;
         ?>
-    <?php else: ?>
-        <div class="pub-container">
-            <?php if ($secTitle !== ''): ?>
-            <div class="pub-section-head">
-                <h2 class="pub-section-title"><?= htmlspecialchars($secTitle) ?></h2>
-                <?php if ($secSub !== ''): ?>
-                <p class="pub-section-sub"><?= htmlspecialchars($secSub) ?></p>
-                <?php endif; ?>
+        <a href="<?= e($_adHref) ?>"
+           class="pub-ad-card"
+           <?= $_adExternal ? 'target="_blank" rel="noopener noreferrer"' : '' ?>
+           data-ad-id="<?= $_adId ?>"
+           onclick="__qzAdClick(<?= $_adId ?>)">
+
+            <?php if ($_adImg !== ''): ?>
+            <div class="pub-ad-img-wrap">
+                <img src="<?= e(pub_img($_adImg)) ?>"
+                     alt="<?= e($_adTitle) ?>"
+                     class="pub-ad-img"
+                     loading="lazy"
+                     decoding="async">
             </div>
             <?php endif; ?>
 
-            <?php
-            if (file_exists($componentFile)) {
-                try {
-                    include $componentFile;
-                } catch (\Throwable $e) {
-                    echo "<div style='color:red;'>خطأ في المكون: " . htmlspecialchars($e->getMessage()) . "</div>";
-                }
-            } else {
-                echo "<div style='color:gray;'>ملف المكون غير موجود</div>";
-            }
-            ?>
+            <?php if ($_adTitle !== '' || $_adDesc !== ''): ?>
+            <div class="pub-ad-body">
+                <?php if ($_adTitle !== ''): ?>
+                <p class="pub-ad-title"><?= e($_adTitle) ?></p>
+                <?php endif; ?>
+                <?php if ($_adDesc !== ''): ?>
+                <p class="pub-ad-desc"><?= e($_adDesc) ?></p>
+                <?php endif; ?>
+                <span class="pub-ad-badge" aria-hidden="true"><?= e(t('ads.sponsored', 'إعلان')) ?></span>
+            </div>
+            <?php endif; ?>
+
+        </a>
+        <?php endforeach; ?>
+        </div><!-- .pub-ads-grid -->
+    </div><!-- .pub-container -->
+</section><!-- .pub-ads-section -->
+<?php endif; ?>
+
+
+<?php
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SECTION 9b — Standalone Entities fallback
+// ═══════════════════════════════════════════════════════════════════════════════
+
+$_entData = [];
+if (!$_entitiesRenderedViaSection) {
+    $_entResult = pub_fetch(
+        $apiBase . 'public/entities?tenant_id=' . $tenantId . '&lang=' . urlencode($lang) . '&per=12&page=1'
+    );
+    $_entRaw  = $_entResult['data']['data'] ?? [];
+    $_entData = is_array($_entRaw)
+        ? array_values(array_filter($_entRaw, static fn($e) => !empty($e['id'])))
+        : [];
+}
+?>
+
+<?php if (!$_entitiesRenderedViaSection && !empty($_entData)): ?>
+<section class="pub-section homepage-section pub-entities-section"
+         aria-label="<?= e(t('entities.section_title', 'بائعون مميزون')) ?>">
+    <div class="pub-container">
+        <div class="pub-section-head">
+            <h2 class="pub-section-title"><?= e(t('entities.section_title', 'بائعون مميزون')) ?></h2>
+            <a href="/frontend/public/entities.php"
+               class="pub-section-link"
+               aria-label="<?= e(t('sections.view_all', 'عرض الكل')) ?>">
+                <?= e(t('sections.view_all', 'عرض الكل')) ?>
+            </a>
         </div>
-    <?php endif; ?>
-</section>
-<?php endforeach; ?>
-</div>
+        <div class="pub-grid-md">
+        <?php foreach ($_entData as $_ent):
+            $_entId       = (int)($_ent['id'] ?? 0);
+            $_entName     = trim((string)($_ent['store_name'] ?? $_ent['name'] ?? ''));
+            $_entType     = trim((string)($_ent['vendor_type'] ?? ''));
+            $_entLogo     = (string)($_ent['logo_url'] ?? '');
+            $_entVerified = !empty($_ent['is_verified']);
+            if ($_entId === 0) continue;
+        ?>
+        <a href="/frontend/public/entity.php?id=<?= $_entId ?>"
+           class="pub-entity-card"
+           style="text-decoration:none;">
+            <div class="pub-entity-avatar">
+                <?php if ($_entLogo !== ''): ?>
+                    <img src="<?= e(pub_img($_entLogo, 'entity_logo')) ?>"
+                         alt="<?= e($_entName) ?>"
+                         loading="lazy"
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                    <span style="display:none;" aria-label="">🏢</span>
+                <?php else: ?>
+                    <span aria-label="<?= e(t('entities.logo_placeholder', 'شعار الكيان')) ?>">🏢</span>
+                <?php endif; ?>
+            </div>
+            <div class="pub-entity-info">
+                <p class="pub-entity-name"><?= e($_entName) ?></p>
+                <?php if ($_entType !== ''): ?>
+                    <p class="pub-entity-desc"><?= e($_entType) ?></p>
+                <?php endif; ?>
+                <?php if ($_entVerified): ?>
+                    <span class="pub-entity-verified">✅ <?= e(t('entities.verified', 'موثق')) ?></span>
+                <?php endif; ?>
+            </div>
+        </a>
+        <?php endforeach; ?>
+        </div><!-- .pub-grid-md -->
+    </div><!-- .pub-container -->
+</section><!-- .pub-entities-section -->
+<?php endif; ?>
+
+
+<?php
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SECTION 10 — Ad tracking script  [FIX-2: single Observer, lives ONLY here]
+//
+//  __qzAdClick(id) — global; called from ALL ad markup on the page.
+//  IntersectionObserver — queries ALL .pub-ad-card[data-ad-id] once, after DOM ready.
+//
+//  FIX-4 note: ad_stats MUST have UNIQUE KEY uq_ad_stats_ad_date (ad_id, date)
+//  so the PHP INSERT IGNORE in the API actually prevents duplicate rows under
+//  concurrent requests. Run the schema migration before deploying.
+// ═══════════════════════════════════════════════════════════════════════════════
+?>
+<script>
+(function () {
+    'use strict';
+
+    var API  = '/api/public/ads/';
+    var OPTS = { method: 'POST', keepalive: true };
+
+    // ── Click tracking ─────────────────────────────────────────────────────
+    // Exposed globally so inline onclick="__qzAdClick(id)" works from any
+    // component on the page (ad_ads.php, standalone section, etc.)
+    window.__qzAdClick = function (adId) {
+        if (!adId) return;
+        fetch(API + adId + '/click', OPTS).catch(function () {});
+    };
+
+    // ── View / impression tracking ─────────────────────────────────────────
+    if (!('IntersectionObserver' in window)) return;
+
+    var viewed = new Set();
+    var timers = {};
+
+    var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            var el   = entry.target;
+            var id   = el.dataset.adId;
+            if (!id || id === '0' || viewed.has(id)) return;
+
+            if (entry.isIntersecting) {
+                if (timers[id]) return;
+                timers[id] = setTimeout(function () {
+                    if (!viewed.has(id)) {
+                        viewed.add(id);
+                        fetch(API + id + '/view', OPTS).catch(function () {});
+                    }
+                    delete timers[id];
+                }, 1000);
+            } else {
+                clearTimeout(timers[id]);
+                delete timers[id];
+            }
+        });
+    }, { threshold: 0.5 });
+
+    // Observe every ad card on the page — rendered by any component or section.
+    document.querySelectorAll('.pub-ad-card[data-ad-id]').forEach(function (el) {
+        observer.observe(el);
+    });
+})();
+</script>
+
+
+<?php
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SECTION 11 — Homepage engine initialisation
+// ═══════════════════════════════════════════════════════════════════════════════
+?>
+<script>
+if (typeof PubHomepageEngine !== 'undefined') {
+    PubHomepageEngine.init(<?= (int)$tenantId ?>, '<?= e($lang) ?>', '<?= e($dir) ?>');
+}
+</script>
 
 <?php include dirname(__DIR__) . '/partials/footer.php'; ?>
