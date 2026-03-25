@@ -405,8 +405,8 @@ $sectionsResp = pub_fetch(
 );
 $sections = $sectionsResp['data']['data'] ?? $sectionsResp['data'] ?? [];
 
-// Defensive: must be an indexed array
-if (!is_array($sections) || array_is_list($sections) === false) {
+// Defensive: must be an indexed array (array_is_list requires PHP 8.1+; use array_keys check instead)
+if (!is_array($sections) || (!empty($sections) && array_keys($sections) !== range(0, count($sections) - 1))) {
     $sections = [];
 }
 
@@ -515,8 +515,11 @@ if (!is_array($sections) || array_is_list($sections) === false) {
 $_adsResult = pub_fetch(
     $apiBase . 'public/ads?tenant_id=' . $tenantId . '&lang=' . urlencode($lang)
 );
-$_adsData = $_adsResult['data']['data'] ?? ($_adsResult['data'] ?? []);
-$_adsData = is_array($_adsData) ? array_values(array_filter($_adsData, static fn($a) => !empty($a['id']))) : [];
+// Extract the ads list: response is {"data":{"ok":true,"data":[...]}}
+// Guard against ['data'] being the associative envelope instead of the list
+$_adsRaw  = $_adsResult['data']['data'] ?? null;
+$_adsData = (is_array($_adsRaw) && array_values($_adsRaw) === $_adsRaw) ? $_adsRaw : [];
+$_adsData = array_values(array_filter($_adsData, static fn($a) => !empty($a['id'])));
 ?>
 
 <?php if (!empty($_adsData)): ?>
@@ -528,11 +531,11 @@ $_adsData = is_array($_adsData) ? array_values(array_filter($_adsData, static fn
         <div class="pub-ads-grid">
         <?php foreach ($_adsData as $_ad):
             $_adId       = (int)($_ad['id'] ?? 0);
-            $_adTitle    = trim($_ad['title'] ?? '');
-            $_adDesc     = trim($_ad['description'] ?? '');
-            $_adImg      = $_ad['image_url'] ?? ($_ad['thumb_url'] ?? '');
-            $_adType     = $_ad['target_type']  ?? '';
-            $_adVal      = $_ad['target_value'] ?? '';
+            $_adTitle    = trim((string)($_ad['title'] ?? ''));
+            $_adDesc     = trim((string)($_ad['description'] ?? ''));
+            $_adImg      = (string)($_ad['image_url'] ?? $_ad['thumb_url'] ?? '');
+            $_adType     = (string)($_ad['target_type']  ?? '');
+            $_adVal      = (string)($_ad['target_value'] ?? '');
             $_adHref     = _ad_link($_adType, $_adVal);
             $_adExternal = ($_adType === 'url' && $_adHref !== '#');
             if ($_adId === 0) continue;
@@ -570,6 +573,84 @@ $_adsData = is_array($_adsData) ? array_values(array_filter($_adsData, static fn
         </div><!-- .pub-ads-grid -->
     </div><!-- .pub-container -->
 </section><!-- .pub-ads-section -->
+<?php endif; ?>
+
+
+<?php
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SECTION 9b — Standalone Entities Section
+//  Always rendered when there are entities for the tenant, regardless of whether
+//  an 'entities' row exists in the homepage_sections DB table.
+//  This ensures entities are always visible on the homepage.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Skip if an entities section was already rendered via homepage_sections
+$_entitiesAlreadyRendered = false;
+foreach ($sections as $_sec) {
+    if (in_array($_sec['section_type'] ?? '', ['entities'], true) || in_array($_sec['component'] ?? '', ['ad_entities'], true)) {
+        $_entitiesAlreadyRendered = true;
+        break;
+    }
+}
+
+if (!$_entitiesAlreadyRendered) {
+    $_entResult = pub_fetch(
+        $apiBase . 'public/entities?tenant_id=' . $tenantId . '&lang=' . urlencode($lang) . '&per=12&page=1'
+    );
+    $_entRaw  = $_entResult['data']['data'] ?? null;
+    $_entData = (is_array($_entRaw) && array_values($_entRaw) === $_entRaw) ? $_entRaw : [];
+    $_entData = array_values(array_filter($_entData, static fn($e) => !empty($e['id'])));
+}
+?>
+
+<?php if (!$_entitiesAlreadyRendered && !empty($_entData)): ?>
+<section class="homepage-section pub-entities-section" aria-label="<?= e(t('entities.section_title', 'بائعون مميزون')) ?>">
+    <div class="pub-container">
+        <div class="pub-section-head">
+            <h2 class="pub-section-title"><?= e(t('entities.section_title', 'بائعون مميزون')) ?></h2>
+            <a href="/frontend/public/entities.php"
+               class="pub-section-link"
+               aria-label="<?= e(t('sections.view_all', 'عرض الكل')) ?>">
+                <?= e(t('sections.view_all', 'عرض الكل')) ?>
+            </a>
+        </div>
+        <div class="pub-grid-md">
+        <?php foreach ($_entData as $_ent):
+            $_entId   = (int)($_ent['id'] ?? 0);
+            $_entName = trim((string)($_ent['store_name'] ?? $_ent['name'] ?? ''));
+            $_entType = trim((string)($_ent['vendor_type'] ?? ''));
+            $_entLogo = (string)($_ent['logo_url'] ?? '');
+            $_entVerified = !empty($_ent['is_verified']);
+            if ($_entId === 0) continue;
+        ?>
+        <a href="/frontend/public/entity.php?id=<?= $_entId ?>"
+           class="pub-entity-card"
+           style="text-decoration:none;">
+            <div class="pub-entity-avatar">
+                <?php if ($_entLogo !== ''): ?>
+                    <img src="<?= e(pub_img($_entLogo, 'entity_logo')) ?>"
+                         alt="<?= e($_entName) ?>"
+                         loading="lazy"
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                    <span style="display:none;">🏢</span>
+                <?php else: ?>
+                    🏢
+                <?php endif; ?>
+            </div>
+            <div class="pub-entity-info">
+                <p class="pub-entity-name"><?= e($_entName) ?></p>
+                <?php if ($_entType !== ''): ?>
+                    <p class="pub-entity-desc"><?= e($_entType) ?></p>
+                <?php endif; ?>
+                <?php if ($_entVerified): ?>
+                    <span class="pub-entity-verified">✅ <?= e(t('entities.verified', 'موثق')) ?></span>
+                <?php endif; ?>
+            </div>
+        </a>
+        <?php endforeach; ?>
+        </div><!-- .pub-grid-md -->
+    </div><!-- .pub-container -->
+</section><!-- .pub-entities-section -->
 <?php endif; ?>
 
 
