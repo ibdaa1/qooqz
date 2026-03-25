@@ -1,5 +1,6 @@
 <?php
-/**///htdocs/frontend/partials/dashboard.php
+/**
+ * frontend/partials/dashboard.php
  * User Dashboard
  */
 $UI   = $GLOBALS['PUBLIC_UI'] ?? [];
