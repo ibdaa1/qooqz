@@ -59,9 +59,11 @@ $_imgAuction  = $_cardStyles['auction']['img'] ?? '';
                     🔨 <?= $aBids ?> <?= e(t('auctions.bids', 'مزايدة')) ?>
                 </p>
             <?php endif; ?>
-            <?php if ($aEndDate !== ''): ?>
+            <?php if ($aEndDate !== ''):
+                    $aEndTs = strtotime($aEndDate);
+            ?>
                 <p class="pub-entity-desc" style="font-size:.8rem;" data-auction-end="<?= e($aEndDate) ?>">
-                    ⏳ <?= e(t('auctions.ends', 'ينتهي')) ?>: <?= e(date('Y-m-d H:i', strtotime($aEndDate))) ?>
+                    ⏳ <?= e(t('auctions.ends', 'ينتهي')) ?>: <?= e($aEndTs !== false ? date('Y-m-d H:i', $aEndTs) : '') ?>
                 </p>
             <?php endif; ?>
         </div>
