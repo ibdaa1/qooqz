@@ -725,8 +725,8 @@ if (!$_entitiesRenderedViaSection) {
     }, { threshold: 0.5 });
 
     // Observe every ad card on the page — rendered by any component or section.
-    document.querySelectorAll('.pub-ad-card[data-ad-id]').forEach(function (el) {
-        observer.observe(el);
+    document.querySelectorAll('[data-ad-id]').forEach(function (el) {
+        if (el.dataset.adId && el.dataset.adId !== '0') observer.observe(el);
     });
 })();
 </script>

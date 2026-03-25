@@ -24,7 +24,7 @@ if (!function_exists('e')) {
     function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES|ENT_SUBSTITUTE, 'UTF-8'); }
 }
 if (!function_exists('t')) {
-    function t(string $key, array $r = []): string { return $key; }
+    function t(string $key, string|array $r = []): string { return is_string($r) ? $r : $key; }
 }
 ?>
 

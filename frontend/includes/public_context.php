@@ -173,25 +173,34 @@ if (!function_exists('pub_load_translations')) {
 if (!function_exists('t')) {
     /**
      * Translate a dot-separated key, e.g. t('nav.home') or t('hero.title').
-     * Falls back to the key itself.
+     *
+     * @param string            $key     Dot-separated translation key.
+     * @param string|array      $replace When a string, used as the fallback default if
+     *                                   the key is missing.  When an array, used for
+     *                                   {placeholder} substitution (existing behaviour).
      */
-    function t(string $key, array $replace = []): string {
+    function t(string $key, string|array $replace = []): string {
         $strings = $GLOBALS['PUB_STRINGS'] ?? [];
         $parts   = explode('.', $key, 2);
         $group   = $parts[0] ?? '';
         $sub     = $parts[1] ?? '';
 
+        // Determine the default fallback value.
+        $default = is_string($replace) ? $replace : $key;
+
         $val = $sub !== ''
-            ? ($strings[$group][$sub] ?? $key)
-            : ($strings[$group] ?? $key);
+            ? ($strings[$group][$sub] ?? $default)
+            : ($strings[$group] ?? $default);
 
         if (!is_string($val)) {
-            $val = $key;
+            $val = $default;
         }
 
-        // Simple placeholder replacement {key} => value
-        foreach ($replace as $k => $v) {
-            $val = str_replace('{' . $k . '}', (string)$v, $val);
+        // Simple placeholder replacement {key} => value (only when $replace is an array)
+        if (is_array($replace)) {
+            foreach ($replace as $k => $v) {
+                $val = str_replace('{' . $k . '}', (string)$v, $val);
+            }
         }
         return $val;
     }
