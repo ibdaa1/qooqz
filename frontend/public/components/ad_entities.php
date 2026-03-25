@@ -18,6 +18,8 @@ $_clsEntity = $_cardStyles['entities']['class'] ?? '';
     ?>
     <a href="/frontend/public/entity.php?id=<?= (int)($ent['id'] ?? 0) ?>"
        class="pub-entity-card<?= $_clsEntity ? ' ' . $_clsEntity : '' ?>" 
+       data-track-type="entity"
+       data-track-id="<?= (int)($ent['id'] ?? 0) ?>"
        style="text-decoration:none;<?= e($entCardStyle) ?>">
         <div class="pub-entity-avatar">
             <?php if (!empty($ent['logo_url'])): ?>

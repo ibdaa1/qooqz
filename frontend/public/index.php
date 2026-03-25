@@ -734,7 +734,136 @@ if (!$_entitiesRenderedViaSection) {
 
 <?php
 // ═══════════════════════════════════════════════════════════════════════════════
-//  SECTION 11 — Homepage engine initialisation
+//  SECTION 11 — Core-events tracking script
+//
+//  Tracks view / click for all entity cards rendered on this page:
+//    products, entities, brands, categories, auctions, jobs.
+//
+//  Cards must carry  data-track-type="<entity_type>"  and
+//                    data-track-id="<entity_id>"  attributes.
+//
+//  Events are de-duplicated in localStorage (daily key) to avoid
+//  flooding the DB with repeated view/click rows per session.
+//  All writes go to POST /api/public/events → core_events table.
+// ═══════════════════════════════════════════════════════════════════════════════
+?>
+<script>
+(function () {
+    'use strict';
+
+    var API_EVENTS = '/api/public/events';
+    var today      = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    var STORE_KEY  = 'qz_ce_' + today;
+    var _track     = null;
+
+    // ── localStorage helpers ───────────────────────────────────────────────
+    function _getTrack() {
+        if (_track !== null) return _track;
+        try {
+            var raw = localStorage.getItem(STORE_KEY);
+            _track = raw ? JSON.parse(raw) : {};
+            if (typeof _track !== 'object' || _track === null) _track = {};
+        } catch (e) {
+            _track = {};
+        }
+        // Remove previous-day keys (one-time cleanup)
+        try {
+            for (var i = localStorage.length - 1; i >= 0; i--) {
+                var k = localStorage.key(i);
+                if (k && k.slice(0, 6) === 'qz_ce_' && k !== STORE_KEY) {
+                    localStorage.removeItem(k);
+                }
+            }
+        } catch (e) {}
+        return _track;
+    }
+
+    function _recorded(key) {
+        try { return !!_getTrack()[key]; } catch (e) { return false; }
+    }
+
+    function _markRecorded(key) {
+        try {
+            var t = _getTrack();
+            t[key] = 1;
+            localStorage.setItem(STORE_KEY, JSON.stringify(t));
+        } catch (e) {}
+    }
+
+    // ── Core tracking function — exposed globally ──────────────────────────
+    // Used by pubAddToCart (add_to_cart), pubToggleWishlist (favorite),
+    // and any page that needs to fire a manual event.
+    window.pubTrackEvent = function (entityType, entityId, eventType, value) {
+        if (!entityType || !entityId || !eventType) return;
+        var body = { entity_type: entityType, entity_id: entityId, event_type: eventType };
+        if (value !== undefined && value !== null) body.value = value;
+        fetch(API_EVENTS, {
+            method:      'POST',
+            headers:     { 'Content-Type': 'application/json' },
+            body:        JSON.stringify(body),
+            keepalive:   true,
+            credentials: 'include'
+        }).catch(function () {});
+    };
+
+    // ── View tracking via IntersectionObserver ─────────────────────────────
+    if (!('IntersectionObserver' in window)) return;
+
+    var viewTimers = {};
+
+    var viewObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            var el   = entry.target;
+            var type = el.dataset.trackType;
+            var id   = el.dataset.trackId;
+            if (!type || !id || id === '0') return;
+
+            var key = 'v_' + type + '_' + id;
+
+            if (entry.isIntersecting) {
+                if (viewTimers[key]) return;
+                if (_recorded(key)) return;
+                viewTimers[key] = setTimeout(function () {
+                    if (!_recorded(key)) {
+                        _markRecorded(key);
+                        window.pubTrackEvent(type, parseInt(id, 10), 'view');
+                    }
+                    delete viewTimers[key];
+                }, 1000); // 1-second visibility threshold
+            } else {
+                clearTimeout(viewTimers[key]);
+                delete viewTimers[key];
+            }
+        });
+    }, { threshold: 0.5 });
+
+    document.querySelectorAll('[data-track-type][data-track-id]').forEach(function (el) {
+        if (el.dataset.trackId && el.dataset.trackId !== '0') {
+            viewObserver.observe(el);
+        }
+    });
+
+    // ── Click tracking via event delegation ───────────────────────────────
+    // Capture phase so the event fires even when the element is a link.
+    document.addEventListener('click', function (e) {
+        var el = e.target.closest('[data-track-type][data-track-id]');
+        if (!el) return;
+        var type = el.dataset.trackType;
+        var id   = el.dataset.trackId;
+        if (!type || !id || id === '0') return;
+
+        var key = 'c_' + type + '_' + id;
+        if (_recorded(key)) return;
+        _markRecorded(key);
+        window.pubTrackEvent(type, parseInt(id, 10), 'click');
+    }, true);
+})();
+</script>
+
+
+<?php
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SECTION 12 — Homepage engine initialisation
 // ═══════════════════════════════════════════════════════════════════════════════
 ?>
 <script>

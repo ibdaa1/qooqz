@@ -22,7 +22,9 @@ $_imgProduct = $_cardStyles['product']['img'] ?? '';
         $pImg = pub_img($p['image_url'] ?? $p['image_thumb_url'] ?? null, 'product');
     ?>
     <div class="pub-product-card<?= $_clsProduct ? ' ' . $_clsProduct : '' ?>" 
-         style="position:relative;<?= e($_cardProduct) ?>">
+         data-track-type="product"
+         data-track-id="<?= $pId ?>"
+         style="position:relative;<?= e($_cardProduct) ?>"><?php // view + click tracked by core_events JS in index.php ?>
         
         <button class="pub-wishlist-btn"
                 type="button"

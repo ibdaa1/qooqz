@@ -17,6 +17,8 @@ $_imgCategory = $_cardStyles['category']['img'] ?? '';
     <?php foreach ($sectionData as $cat): ?>
     <a href="/frontend/public/products.php?category_id=<?= (int)($cat['id'] ?? 0) ?>"
        class="pub-cat-card<?= !empty($cat['is_featured']) ? ' pub-cat-card--featured' : '' ?><?= $_clsCategory ? ' ' . $_clsCategory : '' ?>"
+       data-track-type="category"
+       data-track-id="<?= (int)($cat['id'] ?? 0) ?>"
        style="text-decoration:none;<?= e($_cardCategory) ?>">
         <div class="pub-cat-img-wrap" style="<?= e($_imgCategory) ?>">
             <?php if (!empty($cat['image_url'])): ?>

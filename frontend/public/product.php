@@ -955,3 +955,24 @@ function pubSubmitQuestion(productId) {
 </script>
 
 <?php include dirname(__DIR__) . '/partials/footer.php'; ?>
+<?php if ($productId > 0): ?>
+<script>
+// Track product page view in core_events
+(function () {
+    if (typeof window.pubTrackEvent !== 'function') {
+        window.pubTrackEvent = function (entityType, entityId, eventType, value) {
+            var body = { entity_type: entityType, entity_id: entityId, event_type: eventType };
+            if (value !== undefined && value !== null) body.value = value;
+            fetch('/api/public/events', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+                keepalive: true,
+                credentials: 'include'
+            }).catch(function () {});
+        };
+    }
+    window.pubTrackEvent('product', <?= (int)$productId ?>, 'view');
+}());
+</script>
+<?php endif; ?>

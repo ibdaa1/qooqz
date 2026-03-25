@@ -626,6 +626,11 @@ function pubAddToCart(btn) {
   }
   try { localStorage.setItem('pub_cart', JSON.stringify(cart)); } catch (e) {}
 
+  // ── Track add_to_cart event ───────────────────────────────────────────────
+  if (typeof window.pubTrackEvent === 'function') {
+    window.pubTrackEvent('product', id, 'add_to_cart', price || null);
+  }
+
   // ── 2. Sync to DB (fire-and-forget — user is logged in) ──────────────────
   var tenantId = (typeof window.PUB_TENANT_ID !== 'undefined') ? window.PUB_TENANT_ID : 1;
   if (typeof fetch !== 'undefined') {
@@ -697,6 +702,10 @@ function pubToggleWishlist(btn) {
         btn.classList.add('pub-wishlist-active');
         btn.title = 'In wishlist';
         btn.textContent = '♥';
+        // Track favorite event when item is added to wishlist
+        if (typeof window.pubTrackEvent === 'function') {
+          window.pubTrackEvent('product', parseInt(productId, 10), 'favorite');
+        }
       }
       // Update badge count
       pubRefreshWishlistBadge();

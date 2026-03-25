@@ -169,6 +169,7 @@ $_pubRoutes = [
     'support_tickets'    => 'support_tickets',
     'ticket_categories'  => 'ticket_categories',
     'returns'            => 'returns',
+    'events'             => 'events',
 ];
 
 $_pubFile = isset($_pubRoutes[$first])

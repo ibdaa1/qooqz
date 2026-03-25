@@ -16,7 +16,11 @@ if (empty($sectionData)) {
         $bLogo = $brand['logo_url'] ?? null;
         $bHref = '/frontend/public/brands.php?id=' . $bId;
     ?>
-    <a href="<?= e($bHref) ?>" class="pub-cat-card" style="text-decoration:none;">
+    <a href="<?= e($bHref) ?>"
+       class="pub-cat-card"
+       data-track-type="brand"
+       data-track-id="<?= $bId ?>"
+       style="text-decoration:none;">
         <div class="pub-cat-img-wrap">
             <?php if ($bLogo): ?>
                 <img src="<?= e(pub_img($bLogo, 'brand')) ?>"

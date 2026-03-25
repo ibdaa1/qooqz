@@ -27,6 +27,8 @@ $_imgAuction = $_cardStyles['auction']['img'] ?? '';
     ?>
     <a href="<?= e($aHref) ?>"
        class="pub-product-card<?= $_clsAuction ? ' ' . $_clsAuction : '' ?>"
+       data-track-type="auction"
+       data-track-id="<?= $aId ?>"
        style="text-decoration:none;<?= e($_cardAuction) ?>">
         <div class="pub-cat-img-wrap" style="<?= e($_imgAuction) ?>">
             <?php if ($aImg): ?>
