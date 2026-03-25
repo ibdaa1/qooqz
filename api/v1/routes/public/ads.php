@@ -44,36 +44,73 @@ $action = strtolower($segments[2] ?? '');
  *        Without the key INSERT IGNORE is a silent no-op and duplicates accumulate.
  * ═══════════════════════════════════════════════════════════════════════════ */
 if ($adId > 0 && $method === 'POST' && in_array($action, ['click', 'view'], true)) {
-    $col = $action === 'click' ? 'clicks' : 'views';
+    // ── Collect tracking data ────────────────────────────────────────────
+    if (session_status() === PHP_SESSION_NONE) {
+        @session_start([
+            'cookie_secure'   => isset($_SERVER['HTTPS']),
+            'cookie_httponly' => true,
+            'cookie_samesite' => 'Lax',
+        ]);
+    }
+
+    $trackSessionId = session_id() ?: null;
+    $trackUserId    = (int)(
+        $_SESSION['user']['id'] ??
+        ($_SESSION['current_user']['id'] ?? ($_SESSION['user_id'] ?? 0))
+    ) ?: null;
+
+    $trackIp = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
+    if (str_contains((string)$trackIp, ',')) {
+        $trackIp = trim(explode(',', (string)$trackIp)[0]);
+    }
+    $trackIp        = substr((string)$trackIp, 0, 45) ?: null;
+    $trackUserAgent = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255) ?: null;
+    $trackEventType = $action === 'click' ? 'click' : 'view';
+
     try {
-        // Attempt atomic increment first (fast path — row already exists for today)
-        $upd = $pdo->prepare(
-            "UPDATE ad_stats SET {$col} = {$col} + 1 WHERE ad_id = ? AND date = CURDATE()"
+        // Per-event insert: one row per view/click with full tracking data.
+        $ins = $pdo->prepare(
+            "INSERT INTO ad_stats
+                 (ad_id, user_id, session_id, ip_address, user_agent,
+                  date, created_at, views, clicks, event_type)
+             VALUES
+                 (?, ?, ?, ?, ?, CURDATE(), NOW(), ?, ?, ?)"
         );
-        $upd->execute([$adId]);
-
-        if ($upd->rowCount() === 0) {
-            // No row for today yet — create it.
-            // INSERT IGNORE + UNIQUE KEY prevents duplicate inserts under concurrency.
-            $ins = $pdo->prepare(
-                "INSERT IGNORE INTO ad_stats (ad_id, date, views, clicks)
-                 VALUES (?, CURDATE(), ?, ?)"
-            );
-            $ins->execute([
-                $adId,
-                $action === 'view'  ? 1 : 0,
-                $action === 'click' ? 1 : 0,
-            ]);
-
-            // Edge case: two concurrent requests both hit rowCount()===0 and try to
-            // INSERT IGNORE simultaneously. The loser's INSERT is silently discarded.
-            // Re-run the UPDATE to capture that increment.
-            if ($ins->rowCount() === 0) {
-                $upd->execute([$adId]);
-            }
-        }
+        $ins->execute([
+            $adId,
+            $trackUserId,
+            $trackSessionId,
+            $trackIp,
+            $trackUserAgent,
+            $action === 'view'  ? 1 : 0,
+            $action === 'click' ? 1 : 0,
+            $trackEventType,
+        ]);
     } catch (Throwable) {
-        // Tracking must never break the user experience.
+        // Fallback: legacy schema without the new columns.
+        try {
+            $legacyCol = $action === 'click' ? 'clicks' : 'views';
+            $upd = $pdo->prepare(
+                "UPDATE ad_stats SET {$legacyCol} = {$legacyCol} + 1 WHERE ad_id = ? AND date = CURDATE()"
+            );
+            $upd->execute([$adId]);
+            if ($upd->rowCount() === 0) {
+                $ins = $pdo->prepare(
+                    "INSERT IGNORE INTO ad_stats (ad_id, date, views, clicks)
+                     VALUES (?, CURDATE(), ?, ?)"
+                );
+                $ins->execute([
+                    $adId,
+                    $action === 'view'  ? 1 : 0,
+                    $action === 'click' ? 1 : 0,
+                ]);
+                if ($ins->rowCount() === 0) {
+                    $upd->execute([$adId]);
+                }
+            }
+        } catch (Throwable) {
+            // Tracking must never break the user experience.
+        }
     }
     ResponseFormatter::success(['ok' => true]);
     exit;
