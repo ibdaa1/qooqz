@@ -304,46 +304,83 @@ if (!function_exists('pub_load_theme')) {
                 $buttons = [];
                 $cards   = [];
 
-                // Look up active theme_id (mirrors AdminUiThemeLoader::getActiveThemeId)
-                $thSt = $pdo->prepare('SELECT id FROM themes WHERE tenant_id = ? AND is_active = 1 LIMIT 1');
-                $thSt->execute([$tenantId]);
-                $thRow = $thSt->fetch(PDO::FETCH_ASSOC);
-                if (!$thRow) {
-                    $thSt = $pdo->prepare('SELECT id FROM themes WHERE tenant_id = ? AND is_default = 1 LIMIT 1');
+                // Look up active theme_id in a separate try/catch so a missing
+                // `themes` table does not abort all subsequent setting queries.
+                $themeDbId = null;
+                try {
+                    $thSt = $pdo->prepare('SELECT id FROM themes WHERE tenant_id = ? AND is_active = 1 LIMIT 1');
                     $thSt->execute([$tenantId]);
                     $thRow = $thSt->fetch(PDO::FETCH_ASSOC);
+                    if (!$thRow) {
+                        $thSt = $pdo->prepare('SELECT id FROM themes WHERE tenant_id = ? AND is_default = 1 LIMIT 1');
+                        $thSt->execute([$tenantId]);
+                        $thRow = $thSt->fetch(PDO::FETCH_ASSOC);
+                    }
+                    $themeDbId = $thRow ? (int)$thRow['id'] : null;
+                } catch (Throwable $_) {
+                    // themes table missing or inaccessible — continue without theme_id filter.
+                    // To log: error_log('[pub_load_theme] themes table unavailable: ' . $_->getMessage());
+                    $themeDbId = null;
                 }
-                $themeDbId  = $thRow ? (int)$thRow['id'] : null;
-                $thIdCond   = $themeDbId ? ' AND (theme_id = ? OR theme_id IS NULL)' : '';
+
+                $thIdCond = $themeDbId ? ' AND (theme_id = ? OR theme_id IS NULL)' : '';
                 $thP = static function(array $base) use ($themeDbId): array {
                     return $themeDbId ? array_merge($base, [$themeDbId]) : $base;
                 };
 
+                // Helper: run a query with optional theme_id filter; if the column is
+                // absent in the target table, automatically retry without the filter.
+                $safeList = static function(string $sql, array $params) use ($pdo, $themeDbId, $thIdCond): array {
+                    try {
+                        $st = $pdo->prepare($sql);
+                        $st->execute($params);
+                        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                    } catch (Throwable $_) {
+                        if ($themeDbId !== null) {
+                            // theme_id column may not exist in the target table — retry without the filter.
+                            // $thP() always appends theme_id as the LAST param, so array_pop() removes it.
+                            try {
+                                $sqlFallback = str_replace($thIdCond, '', $sql);
+                                array_pop($params); // remove trailing theme_id param (appended last by $thP())
+                                $st2 = $pdo->prepare($sqlFallback);
+                                $st2->execute($params);
+                                return $st2->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                            } catch (Throwable $__) {}
+                        }
+                        return [];
+                    }
+                };
+
                 // color_settings: setting_key, color_value
-                $st = $pdo->prepare('SELECT setting_key, color_value FROM color_settings WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY sort_order, id');
-                $st->execute($thP([$tenantId]));
-                $colorRows = $st->fetchAll(PDO::FETCH_ASSOC);
+                $colorRows = $safeList(
+                    'SELECT setting_key, color_value FROM color_settings WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY sort_order, id',
+                    $thP([$tenantId])
+                );
 
                 // font_settings: setting_key, font_family, font_size, font_weight, line_height
-                $st = $pdo->prepare('SELECT setting_key, font_family, font_size, font_weight, line_height FROM font_settings WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY sort_order');
-                $st->execute($thP([$tenantId]));
-                $fonts = $st->fetchAll(PDO::FETCH_ASSOC);
+                $fonts = $safeList(
+                    'SELECT setting_key, font_family, font_size, font_weight, line_height FROM font_settings WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY sort_order',
+                    $thP([$tenantId])
+                );
 
                 // design_settings: setting_key, setting_value
-                $st = $pdo->prepare('SELECT setting_key, setting_value, setting_type FROM design_settings WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY sort_order');
-                $st->execute($thP([$tenantId]));
-                $designs = $st->fetchAll(PDO::FETCH_ASSOC);
+                $designs = $safeList(
+                    'SELECT setting_key, setting_value, setting_type FROM design_settings WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY sort_order',
+                    $thP([$tenantId])
+                );
 
                 // button_styles
-                $st = $pdo->prepare('SELECT slug, button_type, background_color, text_color, border_color, border_width, border_radius, padding, font_size, font_weight, hover_background_color, hover_text_color, hover_border_color FROM button_styles WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY button_type');
-                $st->execute($thP([$tenantId]));
-                $buttons = $st->fetchAll(PDO::FETCH_ASSOC);
+                $buttons = $safeList(
+                    'SELECT slug, button_type, background_color, text_color, border_color, border_width, border_radius, padding, font_size, font_weight, hover_background_color, hover_text_color, hover_border_color FROM button_styles WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY button_type',
+                    $thP([$tenantId])
+                );
 
                 // card_styles — use SELECT * to match AdminUiThemeLoader::getCardStyles() and remain
                 // safe even when optional columns (e.g. text_color) haven't been added via migration yet.
-                $st = $pdo->prepare('SELECT * FROM card_styles WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY card_type');
-                $st->execute($thP([$tenantId]));
-                $cards = $st->fetchAll(PDO::FETCH_ASSOC);
+                $cards = $safeList(
+                    'SELECT * FROM card_styles WHERE tenant_id = ? AND is_active = 1' . $thIdCond . ' ORDER BY card_type',
+                    $thP([$tenantId])
+                );
 
                 if ($colorRows || $fonts || $designs || $buttons || $cards) {
                     $theme = $defaults;
