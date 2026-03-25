@@ -414,6 +414,10 @@ if (!is_array($sections) || (!empty($sections) && array_keys($sections) !== rang
 // ═══════════════════════════════════════════════════════════════════════════════
 //  SECTION 8 — Render sections
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// Track whether an entities section actually rendered data (for the standalone
+// entities fallback below — we only skip the fallback if data was truly shown).
+$_entitiesRenderedViaSection = false;
 ?>
 <div id="pub-homepage-sections" role="main">
 <?php foreach ($sections as $section):
@@ -442,6 +446,11 @@ if (!is_array($sections) || (!empty($sections) && array_keys($sections) !== rang
         $tenantId
     );
 
+    // Track whether entities were shown via a DB-driven section
+    if ($component === 'ad_entities' && !empty($sectionData)) {
+        $_entitiesRenderedViaSection = true;
+    }
+
     // ── Build section inline style ─────────────────────────────────────────
     $secBg      = _pub_safe_color($section['background_color'] ?? '');
     $secText    = _pub_safe_color($section['text_color'] ?? '');
@@ -466,7 +475,7 @@ if (!is_array($sections) || (!empty($sections) && array_keys($sections) !== rang
         e($component)
     );
 ?>
-<section class="homepage-section homepage-section--<?= e($component) ?>"
+<section class="pub-section homepage-section homepage-section--<?= e($component) ?>"
          <?= $sStyle ? 'style="' . $sStyle . '"' : '' ?>
          <?= $sectionAttr ?>>
 
@@ -515,15 +524,15 @@ if (!is_array($sections) || (!empty($sections) && array_keys($sections) !== rang
 $_adsResult = pub_fetch(
     $apiBase . 'public/ads?tenant_id=' . $tenantId . '&lang=' . urlencode($lang)
 );
-// Extract the ads list: response is {"data":{"ok":true,"data":[...]}}
-// Guard against ['data'] being the associative envelope instead of the list
-$_adsRaw  = $_adsResult['data']['data'] ?? null;
-$_adsData = (is_array($_adsRaw) && array_values($_adsRaw) === $_adsRaw) ? $_adsRaw : [];
-$_adsData = array_values(array_filter($_adsData, static fn($a) => !empty($a['id'])));
+// Extract the ads list: {"success":true,"data":{"ok":true,"data":[...]}}
+$_adsRaw  = $_adsResult['data']['data'] ?? [];
+$_adsData = is_array($_adsRaw)
+    ? array_values(array_filter($_adsRaw, static fn($a) => !empty($a['id'])))
+    : [];
 ?>
 
 <?php if (!empty($_adsData)): ?>
-<section class="homepage-section pub-ads-section" aria-label="<?= e(t('ads.section_title', 'إعلانات')) ?>">
+<section class="pub-section homepage-section pub-ads-section" aria-label="<?= e(t('ads.section_title', 'إعلانات')) ?>">
     <div class="pub-container">
         <div class="pub-section-head">
             <h2 class="pub-section-title"><?= e(t('ads.section_title', 'إعلانات')) ?></h2>
@@ -579,32 +588,24 @@ $_adsData = array_values(array_filter($_adsData, static fn($a) => !empty($a['id'
 <?php
 // ═══════════════════════════════════════════════════════════════════════════════
 //  SECTION 9b — Standalone Entities Section
-//  Always rendered when there are entities for the tenant, regardless of whether
-//  an 'entities' row exists in the homepage_sections DB table.
-//  This ensures entities are always visible on the homepage.
+//  Rendered when no DB-driven entities section already showed entity data.
+//  Uses $_entitiesRenderedViaSection tracked in the section loop above.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Skip if an entities section was already rendered via homepage_sections
-$_entitiesAlreadyRendered = false;
-foreach ($sections as $_sec) {
-    if (($_sec['section_type'] ?? '') === 'entities' || ($_sec['component'] ?? '') === 'ad_entities') {
-        $_entitiesAlreadyRendered = true;
-        break;
-    }
-}
-
-if (!$_entitiesAlreadyRendered) {
+$_entData = [];  // default — populated below if fallback is needed
+if (!$_entitiesRenderedViaSection) {
     $_entResult = pub_fetch(
         $apiBase . 'public/entities?tenant_id=' . $tenantId . '&lang=' . urlencode($lang) . '&per=12&page=1'
     );
-    $_entRaw  = $_entResult['data']['data'] ?? null;
-    $_entData = (is_array($_entRaw) && array_values($_entRaw) === $_entRaw) ? $_entRaw : [];
-    $_entData = array_values(array_filter($_entData, static fn($e) => !empty($e['id'])));
+    $_entRaw  = $_entResult['data']['data'] ?? [];
+    $_entData = is_array($_entRaw)
+        ? array_values(array_filter($_entRaw, static fn($e) => !empty($e['id'])))
+        : [];
 }
 ?>
 
-<?php if (!$_entitiesAlreadyRendered && !empty($_entData)): ?>
-<section class="homepage-section pub-entities-section" aria-label="<?= e(t('entities.section_title', 'بائعون مميزون')) ?>">
+<?php if (!$_entitiesRenderedViaSection && !empty($_entData)): ?>
+<section class="pub-section homepage-section pub-entities-section" aria-label="<?= e(t('entities.section_title', 'بائعون مميزون')) ?>">
     <div class="pub-container">
         <div class="pub-section-head">
             <h2 class="pub-section-title"><?= e(t('entities.section_title', 'بائعون مميزون')) ?></h2>

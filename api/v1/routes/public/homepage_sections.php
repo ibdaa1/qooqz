@@ -17,18 +17,21 @@ if ($first === 'homepage_sections') {
                     WHEN 'categories' THEN 'ad_categories'
                     WHEN 'products'   THEN 'ad_products'
                     WHEN 'deals'      THEN 'ad_deals'
+                    WHEN 'brands'     THEN 'ad_brands'
                     WHEN 'entities'   THEN 'ad_entities'
                     WHEN 'jobs'       THEN 'ad_jobs'
                     WHEN 'tenants'    THEN 'ad_tenants'
+                    WHEN 'auctions'   THEN 'ad_auctions'
                     WHEN 'slider'     THEN 'ad_slider'
                     WHEN 'banners'    THEN 'ad_slider'
                     WHEN 'banner'     THEN 'ad_banner'
                     WHEN 'search'     THEN 'ad_search'
+                    WHEN 'html'       THEN 'ad_html'
                     WHEN 'stats'      THEN 'ad_stats'
                     WHEN 'custom'     THEN 'ad_custom'
                     WHEN 'native'     THEN 'ad_native'
                     WHEN 'ads'        THEN 'ad_ads'
-                    ELSE 'default'
+                    ELSE ''    -- empty → pub_resolve_component() falls back to PUB_COMPONENT_MAP
                 END AS component,
                 COALESCE(hst.title, hs.title)       AS title,
                 COALESCE(hst.subtitle, hs.subtitle) AS subtitle
