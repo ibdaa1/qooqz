@@ -587,7 +587,7 @@ $_adsData = array_values(array_filter($_adsData, static fn($a) => !empty($a['id'
 // Skip if an entities section was already rendered via homepage_sections
 $_entitiesAlreadyRendered = false;
 foreach ($sections as $_sec) {
-    if (in_array($_sec['section_type'] ?? '', ['entities'], true) || in_array($_sec['component'] ?? '', ['ad_entities'], true)) {
+    if (($_sec['section_type'] ?? '') === 'entities' || ($_sec['component'] ?? '') === 'ad_entities') {
         $_entitiesAlreadyRendered = true;
         break;
     }
@@ -632,9 +632,9 @@ if (!$_entitiesAlreadyRendered) {
                          alt="<?= e($_entName) ?>"
                          loading="lazy"
                          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-                    <span style="display:none;">🏢</span>
+                    <span style="display:none;" aria-label="">🏢</span>
                 <?php else: ?>
-                    🏢
+                    <span aria-label="<?= e(t('entities.logo_placeholder', 'شعار الكيان')) ?>">🏢</span>
                 <?php endif; ?>
             </div>
             <div class="pub-entity-info">
