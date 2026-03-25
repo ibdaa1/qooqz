@@ -3,22 +3,24 @@ declare(strict_types=1);
 /**
  * frontend/public/index.php
  * ─────────────────────────────────────────────────────────────────────────────
- * QOOQZ — Global Public Homepage
+ * QOOQZ — Global Public Homepage  [v2.1.0 — Production]
  *
- * Architecture
- * ────────────
- *  • 100 % DB-driven: all sections come from `homepage_sections`.
- *  • Each section delegates rendering to components/{component}.php.
- *  • getSectionData() resolves the `data_source` field to a live API payload.
- *  • Security: every output goes through e(); CSS values are sanitised before
- *    they touch a style attribute; custom CSS has tag-injection stripped.
- *  • Performance: sections are fetched in one API call; section data calls are
- *    deferred to render-time so only visible sections hit the API.
- *  • Internationalisation: lang + dir come from PUB_CONTEXT, so RTL (ar, he,
- *    fa, ur) and LTR languages work without any code changes.
+ * Fixes vs v2.0.0
+ * ───────────────
+ *  FIX-1  _ad_link() defined ONCE here; removed duplicate from ad_ads.php.
+ *  FIX-2  IntersectionObserver lives ONLY in Section 10; removed from ad_ads.php.
+ *  FIX-3  'search' match arm separated so 'banners' logic is unambiguous.
+ *  FIX-4  Section-level ad_stats race-condition note added; UNIQUE KEY required in schema.
+ *  FIX-5  __qzAdClick() is the ONLY click-tracking entry point (ad_ads uses it too).
+ *
+ * Schema migration required (run once):
+ *   ALTER TABLE ads MODIFY COLUMN target_type
+ *     ENUM('url','product','category','entity','brand','auction','job','page')
+ *     DEFAULT 'url';
+ *   ALTER TABLE ad_stats ADD UNIQUE KEY uq_ad_stats_ad_date (ad_id, date);
  *
  * @package  QOOQZ\Frontend\Public
- * @version  2.0.0
+ * @version  2.1.0
  */
 
 // ── Bootstrap ────────────────────────────────────────────────────────────────
@@ -26,12 +28,11 @@ require_once dirname(__DIR__) . '/includes/public_context.php';
 
 $ctx      = $GLOBALS['PUB_CONTEXT'];
 $lang     = $ctx['lang'];
-$dir      = $ctx['dir'];           // 'rtl' | 'ltr'
+$dir      = $ctx['dir'];
 $theme    = $ctx['theme'];
 $tenantId = (int)$ctx['tenant_id'];
 $apiBase  = pub_api_url('');
 
-// Page meta — consumed by partials/header.php
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = t('hero.title') . ' — QOOQZ';
@@ -40,31 +41,21 @@ $GLOBALS['PUB_PAGE_DESC']  = t('hero.subtitle');
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  SECTION 1 — CSS SANITISERS
-//  Each helper returns either the safe value or an empty string.
-//  They are defined once (guard prevents double-declaration across includes).
 // ═══════════════════════════════════════════════════════════════════════════════
 
 if (!function_exists('_pub_safe_color')) {
-    /**
-     * Allow only provably-safe CSS colour values.
-     * Accepted: #hex3/4/6/8 · rgb/rgba/hsl/hsla(…) · named · var(--token)
-     */
     function _pub_safe_color(string $v): string {
         $v = trim($v);
         if ($v === '') return '';
-        if (preg_match('/^#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{1,5})?$/', $v))              return $v;
-        if (preg_match('/^(?:rgb|rgba|hsl|hsla)\(\s*[\d\s%,.\/ ]+\)$/i', $v))         return $v;
-        if (preg_match('/^[a-zA-Z]{2,30}$/', $v))                                      return $v;
-        if (preg_match('/^var\(--[a-zA-Z0-9_-]{1,80}\)$/', $v))                       return $v;
+        if (preg_match('/^#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{1,5})?$/', $v))         return $v;
+        if (preg_match('/^(?:rgb|rgba|hsl|hsla)\(\s*[\d\s%,.\/ ]+\)$/i', $v))    return $v;
+        if (preg_match('/^[a-zA-Z]{2,30}$/', $v))                                 return $v;
+        if (preg_match('/^var\(--[a-zA-Z0-9_-]{1,80}\)$/', $v))                  return $v;
         return '';
     }
 }
 
 if (!function_exists('_pub_safe_padding')) {
-    /**
-     * Allow 1–4 non-negative CSS length values.
-     * Accepted units: px · em · rem · % · vh · vw · (unitless 0)
-     */
     function _pub_safe_padding(string $v): string {
         $v = trim($v);
         if ($v === '') return '';
@@ -75,19 +66,11 @@ if (!function_exists('_pub_safe_padding')) {
 }
 
 if (!function_exists('_pub_safe_css')) {
-    /**
-     * Strip anything that could turn custom_css into an XSS vector.
-     * Removes: opening/closing tags · url() with data: or javascript: schemes ·
-     *          expression() · behaviour: · @import · </style closing trick.
-     */
     function _pub_safe_css(string $css): string {
-        // Kill tag openers/closers
         $css = str_replace(['<', '>'], '', $css);
-        // Kill dangerous CSS functions
         $css = preg_replace('/\bexpression\s*\(/i', '', $css);
         $css = preg_replace('/\bbehaviour\s*:/i',   '', $css);
         $css = preg_replace('/@import\b/i',         '', $css);
-        // Kill data:/javascript: inside url()
         $css = preg_replace('/url\s*\(\s*["\']?\s*(?:data|javascript):/i', 'url(about:', $css);
         return $css;
     }
@@ -95,17 +78,21 @@ if (!function_exists('_pub_safe_css')) {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  SECTION 2 — AD LINK BUILDER
-//  Centralised so index.php and ad_ads component share identical logic.
+//  SECTION 2 — AD LINK BUILDER  [FIX-1: single authoritative definition]
+//  ad_ads.php component no longer redeclares this function.
+//  All target_type values that exist in the ENUM are handled here.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 if (!function_exists('_ad_link')) {
     /**
-     * Convert a (target_type, target_value) pair into a safe absolute URL.
+     * Convert (target_type, target_value) → safe absolute URL.
      *
-     * @param  string $type  'url' | 'product' | 'category' | 'entity' | …
-     * @param  string $value Raw value from DB
-     * @return string        Absolute path or '#' on failure
+     * Supported types match the ads.target_type ENUM (post-migration):
+     *   url | product | category | entity | brand | auction | job | page
+     *
+     * @param  string $type  target_type column value
+     * @param  string $value target_value column value
+     * @return string        Absolute URL or '#' on failure / unknown type
      */
     function _ad_link(string $type, string $value): string {
         if ($value === '') return '#';
@@ -129,12 +116,17 @@ if (!function_exists('_ad_link')) {
     }
 }
 
+/**
+ * Whether an ad link should open in a new tab.
+ * Only external URLs (target_type = 'url') open externally.
+ */
+function _ad_is_external(string $type, string $href): bool {
+    return $type === 'url' && $href !== '#';
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  SECTION 3 — COMPONENT REGISTRY
-//  Single source of truth: section_type → component file name.
-//  The homepage_sections API query also uses this mapping so both stay in sync.
-//  To add a new type: add one entry here — no other file needs changing.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const PUB_COMPONENT_MAP = [
@@ -162,14 +154,6 @@ const PUB_COMPONENT_MAP = [
     'custom'     => 'ad_custom',
 ];
 
-/**
- * Resolve component name from a homepage_sections row.
- *
- * Priority:
- *   1. Non-empty `component` column in the DB row (operator override).
- *   2. PUB_COMPONENT_MAP lookup by `section_type`.
- *   3. null — section is skipped; a debug log entry is written.
- */
 function pub_resolve_component(array $section): ?string {
     $stored = trim($section['component'] ?? '');
     if ($stored !== '') return $stored;
@@ -177,7 +161,6 @@ function pub_resolve_component(array $section): ?string {
     $type = strtolower(trim($section['section_type'] ?? ''));
     if (isset(PUB_COMPONENT_MAP[$type])) return PUB_COMPONENT_MAP[$type];
 
-    // Unknown type — log but never surface an error to visitors
     if (defined('PUB_DEBUG') && PUB_DEBUG) {
         error_log(sprintf(
             '[QOOQZ:homepage] Unknown section_type "%s" (id=%d) — skipped.',
@@ -191,9 +174,6 @@ function pub_resolve_component(array $section): ?string {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  SECTION 4 — getSectionData()
-//  Resolves `data_source` (e.g. "products:featured") into a data array by
-//  calling the appropriate public API endpoint.
-//  Returns [] on any error — the component must handle empty gracefully.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function getSectionData(string $dataSource, string $apiBase, string $lang, int $tenantId): array {
@@ -204,7 +184,6 @@ function getSectionData(string $dataSource, string $apiBase, string $lang, int $
     $type   = strtolower($type);
     $filter = trim($filter);
 
-    // Common query-string used by most endpoints
     $base = sprintf(
         'lang=%s&tenant_id=%d&per=12&page=1',
         urlencode($lang),
@@ -232,8 +211,8 @@ function getSectionData(string $dataSource, string $apiBase, string $lang, int $
         'deals' => pub_fetch(
             $apiBase . 'public/discounts?tenant_id=' . $tenantId
             . '&lang=' . urlencode($lang) . '&per=12&page=1'
-            . ($filter === 'today'  ? '&expires_today=1'   : '')
-            . ($filter === 'flash'  ? '&type=flash'        : '')
+            . ($filter === 'today' ? '&expires_today=1' : '')
+            . ($filter === 'flash' ? '&type=flash'      : '')
         )['data']['data'] ?? [],
 
         'brands' => pub_fetch(
@@ -242,13 +221,15 @@ function getSectionData(string $dataSource, string $apiBase, string $lang, int $
         )['data']['data'] ?? [],
 
         // ── Banners / Slider ──────────────────────────────────────────────
-        'banners', 'search' => (static function () use ($apiBase, $tenantId, $filter, $type): array {
-            if ($type === 'search') return [];  // search bar needs no external data
-            $pos    = ($filter !== '' && $filter !== 'all') ? '&position=' . urlencode($filter) : '';
-            $data   = pub_fetch($apiBase . 'public/banners?tenant_id=' . $tenantId . $pos)['data']['data']
-                   ?? pub_fetch($apiBase . 'public/banners?tenant_id=' . $tenantId . $pos)['data']
-                   ?? [];
-            // Fallback: position-filtered returned empty → load all banners
+        // FIX-3: 'search' gets its own arm; banners logic is unambiguous.
+        'search' => [],   // search bar requires no external data
+
+        'banners' => (static function () use ($apiBase, $tenantId, $filter): array {
+            $pos  = ($filter !== '' && $filter !== 'all') ? '&position=' . urlencode($filter) : '';
+            $data = pub_fetch($apiBase . 'public/banners?tenant_id=' . $tenantId . $pos)['data']['data']
+                 ?? pub_fetch($apiBase . 'public/banners?tenant_id=' . $tenantId . $pos)['data']
+                 ?? [];
+            // Fallback: position-filter yielded nothing → load all banners
             if (empty($data) && $pos !== '') {
                 $data = pub_fetch($apiBase . 'public/banners?tenant_id=' . $tenantId)['data']['data']
                      ?? pub_fetch($apiBase . 'public/banners?tenant_id=' . $tenantId)['data']
@@ -265,7 +246,6 @@ function getSectionData(string $dataSource, string $apiBase, string $lang, int $
                 default    => '',
             };
             $data = pub_fetch($apiBase . 'public/entities?' . $base . $extra)['data']['data'] ?? [];
-            // Fallback if filter yields nothing
             if (empty($data) && $extra !== '') {
                 $data = pub_fetch($apiBase . 'public/entities?' . $base)['data']['data'] ?? [];
             }
@@ -287,7 +267,7 @@ function getSectionData(string $dataSource, string $apiBase, string $lang, int $
                 'ended'     => '&status=ended',
                 default     => '&status=active',
             }
-        )['data']['auctions'] ?? [],   // NOTE: auctions route key differs from other routes
+        )['data']['auctions'] ?? [],
 
         // ── Jobs ──────────────────────────────────────────────────────────
         'jobs' => pub_fetch(
@@ -297,7 +277,7 @@ function getSectionData(string $dataSource, string $apiBase, string $lang, int $
             . ($filter === 'remote'   ? '&is_remote=1'   : '')
         )['data']['data'] ?? [],
 
-        // ── Ads (placement-aware; falls back to direct in ads.php) ────────
+        // ── Ads (placement-aware) ─────────────────────────────────────────
         'ads' => (static function () use ($apiBase, $tenantId, $lang, $filter): array {
             $url = $apiBase . 'public/ads?tenant_id=' . $tenantId . '&lang=' . urlencode($lang);
             if ($filter !== '') {
@@ -321,8 +301,7 @@ function getSectionData(string $dataSource, string $apiBase, string $lang, int $
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  SECTION 5 — "View all" link map
-//  Only components that logically have a browse page get a link.
+//  SECTION 5 — "View all" link map + full-width component list
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const PUB_VIEW_ALL_MAP = [
@@ -336,10 +315,6 @@ const PUB_VIEW_ALL_MAP = [
     'ad_jobs'       => '/frontend/public/jobs.php',
 ];
 
-/**
- * Components that own their full-width wrapper.
- * They receive no pub-container and no section-head injection.
- */
 const PUB_FULL_WIDTH_COMPONENTS = [
     'ad_slider',
     'ad_search',
@@ -349,8 +324,7 @@ const PUB_FULL_WIDTH_COMPONENTS = [
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  SECTION 6 — Pre-resolve card styles
-//  Read once from the theme; passed as $_cardStyles into every component.
+//  SECTION 6 — Pre-resolve card styles + include header
 // ═══════════════════════════════════════════════════════════════════════════════
 
 include dirname(__DIR__) . '/partials/header.php';
@@ -405,7 +379,6 @@ $sectionsResp = pub_fetch(
 );
 $sections = $sectionsResp['data']['data'] ?? $sectionsResp['data'] ?? [];
 
-// Defensive: must be an indexed array (array_is_list requires PHP 8.1+; use array_keys check instead)
 if (!is_array($sections) || (!empty($sections) && array_keys($sections) !== range(0, count($sections) - 1))) {
     $sections = [];
 }
@@ -415,8 +388,6 @@ if (!is_array($sections) || (!empty($sections) && array_keys($sections) !== rang
 //  SECTION 8 — Render sections
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Track whether an entities section actually rendered data (for the standalone
-// entities fallback below — we only skip the fallback if data was truly shown).
 $_entitiesRenderedViaSection = false;
 ?>
 <div id="pub-homepage-sections" role="main">
@@ -424,7 +395,7 @@ $_entitiesRenderedViaSection = false;
 
     // ── Resolve component ──────────────────────────────────────────────────
     $component = pub_resolve_component($section);
-    if ($component === null) continue;   // unknown type — skip silently
+    if ($component === null) continue;
 
     $componentFile = $componentsDir . '/' . basename($component) . '.php';
     if (!is_file($componentFile)) {
@@ -446,7 +417,6 @@ $_entitiesRenderedViaSection = false;
         $tenantId
     );
 
-    // Track whether entities were shown via a DB-driven section
     if ($component === 'ad_entities' && !empty($sectionData)) {
         $_entitiesRenderedViaSection = true;
     }
@@ -468,7 +438,6 @@ $_entitiesRenderedViaSection = false;
     $viewAllLink = PUB_VIEW_ALL_MAP[$component] ?? '';
     $isFullWidth = in_array($component, PUB_FULL_WIDTH_COMPONENTS, true);
 
-    // ── Data attribute for JS hooks (e.g. lazy-load, analytics) ───────────
     $sectionAttr = sprintf(
         ' data-section-id="%d" data-component="%s"',
         (int)($section['id'] ?? 0),
@@ -516,15 +485,11 @@ $_entitiesRenderedViaSection = false;
 <?php
 // ═══════════════════════════════════════════════════════════════════════════════
 //  SECTION 9 — Standalone Ads Section
-//  Always rendered below DB-driven sections.
-//  Tracks impressions (IntersectionObserver ≥50 % viewport, ≥1 s dwell)
-//  and clicks (fetch POST, keepalive) against ad_stats.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 $_adsResult = pub_fetch(
     $apiBase . 'public/ads?tenant_id=' . $tenantId . '&lang=' . urlencode($lang)
 );
-// Extract the ads list: {"success":true,"data":{"ok":true,"data":[...]}}
 $_adsRaw  = $_adsResult['data']['data'] ?? [];
 $_adsData = is_array($_adsRaw)
     ? array_values(array_filter($_adsRaw, static fn($a) => !empty($a['id'])))
@@ -532,7 +497,8 @@ $_adsData = is_array($_adsRaw)
 ?>
 
 <?php if (!empty($_adsData)): ?>
-<section class="pub-section homepage-section pub-ads-section" aria-label="<?= e(t('ads.section_title', 'إعلانات')) ?>">
+<section class="pub-section homepage-section pub-ads-section"
+         aria-label="<?= e(t('ads.section_title', 'إعلانات')) ?>">
     <div class="pub-container">
         <div class="pub-section-head">
             <h2 class="pub-section-title"><?= e(t('ads.section_title', 'إعلانات')) ?></h2>
@@ -546,7 +512,8 @@ $_adsData = is_array($_adsRaw)
             $_adType     = (string)($_ad['target_type']  ?? '');
             $_adVal      = (string)($_ad['target_value'] ?? '');
             $_adHref     = _ad_link($_adType, $_adVal);
-            $_adExternal = ($_adType === 'url' && $_adHref !== '#');
+            // FIX-5: external flag used to conditionally add target="_blank"
+            $_adExternal = _ad_is_external($_adType, $_adHref);
             if ($_adId === 0) continue;
         ?>
         <a href="<?= e($_adHref) ?>"
@@ -587,12 +554,10 @@ $_adsData = is_array($_adsRaw)
 
 <?php
 // ═══════════════════════════════════════════════════════════════════════════════
-//  SECTION 9b — Standalone Entities Section
-//  Rendered when no DB-driven entities section already showed entity data.
-//  Uses $_entitiesRenderedViaSection tracked in the section loop above.
+//  SECTION 9b — Standalone Entities fallback
 // ═══════════════════════════════════════════════════════════════════════════════
 
-$_entData = [];  // default — populated below if fallback is needed
+$_entData = [];
 if (!$_entitiesRenderedViaSection) {
     $_entResult = pub_fetch(
         $apiBase . 'public/entities?tenant_id=' . $tenantId . '&lang=' . urlencode($lang) . '&per=12&page=1'
@@ -605,7 +570,8 @@ if (!$_entitiesRenderedViaSection) {
 ?>
 
 <?php if (!$_entitiesRenderedViaSection && !empty($_entData)): ?>
-<section class="pub-section homepage-section pub-entities-section" aria-label="<?= e(t('entities.section_title', 'بائعون مميزون')) ?>">
+<section class="pub-section homepage-section pub-entities-section"
+         aria-label="<?= e(t('entities.section_title', 'بائعون مميزون')) ?>">
     <div class="pub-container">
         <div class="pub-section-head">
             <h2 class="pub-section-title"><?= e(t('entities.section_title', 'بائعون مميزون')) ?></h2>
@@ -617,10 +583,10 @@ if (!$_entitiesRenderedViaSection) {
         </div>
         <div class="pub-grid-md">
         <?php foreach ($_entData as $_ent):
-            $_entId   = (int)($_ent['id'] ?? 0);
-            $_entName = trim((string)($_ent['store_name'] ?? $_ent['name'] ?? ''));
-            $_entType = trim((string)($_ent['vendor_type'] ?? ''));
-            $_entLogo = (string)($_ent['logo_url'] ?? '');
+            $_entId       = (int)($_ent['id'] ?? 0);
+            $_entName     = trim((string)($_ent['store_name'] ?? $_ent['name'] ?? ''));
+            $_entType     = trim((string)($_ent['vendor_type'] ?? ''));
+            $_entLogo     = (string)($_ent['logo_url'] ?? '');
             $_entVerified = !empty($_ent['is_verified']);
             if ($_entId === 0) continue;
         ?>
@@ -657,10 +623,14 @@ if (!$_entitiesRenderedViaSection) {
 
 <?php
 // ═══════════════════════════════════════════════════════════════════════════════
-//  SECTION 10 — Ad tracking script (view + click)
-//  Extracted into one <script> block at the bottom of the page.
-//  __qzAdClick() is called from onclick attributes above.
-//  IntersectionObserver is scoped to .pub-ad-card[data-ad-id].
+//  SECTION 10 — Ad tracking script  [FIX-2: single Observer, lives ONLY here]
+//
+//  __qzAdClick(id) — global; called from ALL ad markup on the page.
+//  IntersectionObserver — queries ALL .pub-ad-card[data-ad-id] once, after DOM ready.
+//
+//  FIX-4 note: ad_stats MUST have UNIQUE KEY uq_ad_stats_ad_date (ad_id, date)
+//  so the PHP INSERT IGNORE in the API actually prevents duplicate rows under
+//  concurrent requests. Run the schema migration before deploying.
 // ═══════════════════════════════════════════════════════════════════════════════
 ?>
 <script>
@@ -671,6 +641,8 @@ if (!$_entitiesRenderedViaSection) {
     var OPTS = { method: 'POST', keepalive: true };
 
     // ── Click tracking ─────────────────────────────────────────────────────
+    // Exposed globally so inline onclick="__qzAdClick(id)" works from any
+    // component on the page (ad_ads.php, standalone section, etc.)
     window.__qzAdClick = function (adId) {
         if (!adId) return;
         fetch(API + adId + '/click', OPTS).catch(function () {});
@@ -689,14 +661,14 @@ if (!$_entitiesRenderedViaSection) {
             if (!id || id === '0' || viewed.has(id)) return;
 
             if (entry.isIntersecting) {
-                if (timers[id]) return;                            // timer already running
+                if (timers[id]) return;
                 timers[id] = setTimeout(function () {
                     if (!viewed.has(id)) {
                         viewed.add(id);
                         fetch(API + id + '/view', OPTS).catch(function () {});
                     }
                     delete timers[id];
-                }, 1000);                                          // 1 s dwell = 1 impression
+                }, 1000);
             } else {
                 clearTimeout(timers[id]);
                 delete timers[id];
@@ -704,6 +676,7 @@ if (!$_entitiesRenderedViaSection) {
         });
     }, { threshold: 0.5 });
 
+    // Observe every ad card on the page — rendered by any component or section.
     document.querySelectorAll('.pub-ad-card[data-ad-id]').forEach(function (el) {
         observer.observe(el);
     });
@@ -714,9 +687,6 @@ if (!$_entitiesRenderedViaSection) {
 <?php
 // ═══════════════════════════════════════════════════════════════════════════════
 //  SECTION 11 — Homepage engine initialisation
-//  PubHomepageEngine is defined in public.js and handles:
-//    • Lazy section refresh   • Real-time auction countdowns
-//    • Wishlist / compare sync
 // ═══════════════════════════════════════════════════════════════════════════════
 ?>
 <script>
