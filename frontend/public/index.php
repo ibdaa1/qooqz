@@ -640,31 +640,60 @@ if (!$_entitiesRenderedViaSection) {
     var API  = '/api/public/ads/';
     var OPTS = { method: 'POST', keepalive: true };
 
+    // ── Unique-per-user deduplication via localStorage ─────────────────────
+    // Keys: "qzac_{adId}_{date}" for clicks, "qzav_{adId}_{date}" for views.
+    // Each key expires automatically when the date changes (daily reset).
+    var today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+    function _alreadyRecorded(prefix, adId) {
+        try {
+            return !!localStorage.getItem(prefix + adId + '_' + today);
+        } catch (e) {
+            return false; // localStorage unavailable (private mode, etc.) — allow tracking
+        }
+    }
+
+    function _markRecorded(prefix, adId) {
+        try {
+            localStorage.setItem(prefix + adId + '_' + today, '1');
+            // Prune stale entries (yesterday and older) to avoid unbounded growth.
+            var keep = prefix + adId + '_' + today;
+            for (var i = localStorage.length - 1; i >= 0; i--) {
+                var k = localStorage.key(i);
+                if (k && k.slice(0, prefix.length) === prefix && k !== keep && k.indexOf(adId + '_') !== -1) {
+                    localStorage.removeItem(k);
+                }
+            }
+        } catch (e) {}
+    }
+
     // ── Click tracking ─────────────────────────────────────────────────────
     // Exposed globally so inline onclick="__qzAdClick(id)" works from any
     // component on the page (ad_ads.php, standalone section, etc.)
     window.__qzAdClick = function (adId) {
         if (!adId) return;
+        if (_alreadyRecorded('qzac_', adId)) return; // already clicked today
+        _markRecorded('qzac_', adId);
         fetch(API + adId + '/click', OPTS).catch(function () {});
     };
 
     // ── View / impression tracking ─────────────────────────────────────────
     if (!('IntersectionObserver' in window)) return;
 
-    var viewed = new Set();
     var timers = {};
 
     var observer = new IntersectionObserver(function (entries) {
         entries.forEach(function (entry) {
             var el   = entry.target;
             var id   = el.dataset.adId;
-            if (!id || id === '0' || viewed.has(id)) return;
+            if (!id || id === '0') return;
 
             if (entry.isIntersecting) {
                 if (timers[id]) return;
+                if (_alreadyRecorded('qzav_', id)) return; // already viewed today
                 timers[id] = setTimeout(function () {
-                    if (!viewed.has(id)) {
-                        viewed.add(id);
+                    if (!_alreadyRecorded('qzav_', id)) {
+                        _markRecorded('qzav_', id);
                         fetch(API + id + '/view', OPTS).catch(function () {});
                     }
                     delete timers[id];

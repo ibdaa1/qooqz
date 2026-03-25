@@ -2,13 +2,14 @@
 declare(strict_types=1);
 /**
  * Component: ad_search
- * Renders the search bar form.
+ * Renders the global search bar. Submits to search.php which searches across
+ * products, categories, entities, tenants, jobs and auctions.
  */
 
 ?>
 <div class="pub-search-bar">
     <div class="pub-container">
-        <form class="pub-search-form" method="get" action="/frontend/public/entities.php" id="pubSearchForm">
+        <form class="pub-search-form" method="get" action="/frontend/public/search.php" id="pubSearchForm">
             <input type="search" 
                    name="q" 
                    class="pub-search-input"

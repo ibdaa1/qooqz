@@ -18,6 +18,7 @@ $GLOBALS['PUB_SEO']        = ['schema_type' => 'ItemList', 'name' => t('auctions
 $page   = max(1, (int)($_GET['page'] ?? 1));
 $status = in_array($_GET['status'] ?? 'active', ['active','scheduled','ended','all'], true) ? ($_GET['status'] ?? 'active') : 'active';
 $type   = in_array($_GET['type'] ?? '', ['normal','reserve','buy_now','dutch','sealed_bid'], true) ? ($_GET['type'] ?? '') : '';
+$search = trim($_GET['q'] ?? '');
 
 $per    = 24;
 $offset = ($page - 1) * $per;
@@ -31,6 +32,12 @@ if ($pdo) {
         if ($status !== 'all')    { $aWhere .= ' AND a.status = ?';       $aParams[] = $status; }
         if ($type)                { $aWhere .= ' AND a.auction_type = ?'; $aParams[] = $type; }
         if ($tenantId)            { $aWhere .= ' AND a.tenant_id = ?';    $aParams[] = $tenantId; }
+        if ($search !== '') {
+            $aKw = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search) . '%';
+            $aWhere .= ' AND (a.slug LIKE ? OR EXISTS (SELECT 1 FROM auction_translations ats WHERE ats.auction_id = a.id AND ats.title LIKE ?))';
+            $aParams[] = $aKw;
+            $aParams[] = $aKw;
+        }
         // Use inline LIMIT/OFFSET (not bound params) — MySQL 5.x native prepares reject ? in LIMIT
         $limitSql = 'LIMIT ' . (int)$per . ' OFFSET ' . (int)$offset;
 

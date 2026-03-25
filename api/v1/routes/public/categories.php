@@ -37,6 +37,12 @@ if ($first === 'categories') {
         }
     }
     if (!empty($_GET['featured'])) { $where .= ' AND c.is_featured = ?'; $whereParams[] = 1; }
+    if (!empty($_GET['search'])) {
+        $kw = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], trim($_GET['search'])) . '%';
+        $where .= ' AND (c.slug LIKE ? OR EXISTS (SELECT 1 FROM category_translations ct2 WHERE ct2.category_id = c.id AND ct2.name LIKE ?))';
+        $whereParams[] = $kw;
+        $whereParams[] = $kw;
+    }
 
     $total = $pdoCount("SELECT COUNT(*) FROM categories c $where", $whereParams);
     $rows  = $pdoList(

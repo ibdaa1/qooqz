@@ -32,6 +32,12 @@ if ($first === 'auctions') {
         if ($aType)         { $aWhere .= ' AND a.auction_type = ?'; $aParams[] = $aType; }
         if ($aFeat !== null){ $aWhere .= ' AND a.is_featured = 1'; }
         if ($tenantId)      { $aWhere .= ' AND a.tenant_id = ?'; $aParams[] = $tenantId; }
+        if (!empty($_GET['search'])) {
+            $aKw = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], trim($_GET['search'])) . '%';
+            $aWhere .= ' AND (a.slug LIKE ? OR EXISTS (SELECT 1 FROM auction_translations ats WHERE ats.auction_id = a.id AND ats.title LIKE ?))';
+            $aParams[] = $aKw;
+            $aParams[] = $aKw;
+        }
         $aRows = $pdoList(
             "SELECT a.id, a.slug, a.auction_type, a.status, a.starting_price, a.current_price,
                     a.buy_now_price, a.bid_increment, a.total_bids, a.total_bidders,
