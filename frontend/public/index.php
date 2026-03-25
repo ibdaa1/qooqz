@@ -228,6 +228,110 @@ $componentsDir = __DIR__ . '/components';
 <?php endforeach; ?>
 </div><!-- #pub-homepage-sections -->
 
+<?php
+/* -------------------------------------------------------
+ * Ads Section — always rendered below the DB-driven sections.
+ * Fetches active ads for this tenant and displays them with
+ * view-impression tracking (IntersectionObserver) and click
+ * tracking (onclick fetch). Both call:
+ *   POST /api/public/ads/{id}/view   — increments ad_stats.views
+ *   POST /api/public/ads/{id}/click  — increments ad_stats.clicks
+ * ----------------------------------------------------- */
+$_adsResult   = pub_fetch($apiBase . 'public/ads?tenant_id=' . $tenantId . '&lang=' . urlencode($lang));
+$_adsData     = $_adsResult['data']['data'] ?? ($_adsResult['data'] ?? []);
+$_adsData     = is_array($_adsData) ? array_values($_adsData) : [];
+
+if (!function_exists('_ad_link')) {
+    function _ad_link(string $type, string $value): string {
+        if ($value === '') return '#';
+        return match ($type) {
+            'url' => (function (string $v): string {
+                $parsed = parse_url($v, PHP_URL_SCHEME);
+                return ($parsed !== null && in_array(strtolower($parsed), ['http', 'https'], true))
+                    ? $v
+                    : '#';
+            })($value),
+            'product'  => '/frontend/public/product.php?id='    . urlencode($value),
+            'category' => '/frontend/public/categories.php?id=' . urlencode($value),
+            'entity'   => '/frontend/public/entity.php?id='     . urlencode($value),
+            default    => '#',
+        };
+    }
+}
+?>
+<?php if (!empty($_adsData)): ?>
+<section class="homepage-section pub-ads-section">
+    <div class="pub-container">
+        <div class="pub-section-head">
+            <h2 class="pub-section-title"><?= e(t('ads.section_title', 'إعلانات')) ?></h2>
+        </div>
+        <div class="pub-ads-grid">
+        <?php foreach ($_adsData as $_ad):
+            $_adId      = (int)($_ad['id'] ?? 0);
+            $_adTitle   = $_ad['title'] ?? '';
+            $_adDesc    = $_ad['description'] ?? '';
+            $_adImg     = $_ad['image_url'] ?? ($_ad['thumb_url'] ?? '');
+            $_adType    = $_ad['target_type'] ?? '';
+            $_adVal     = $_ad['target_value'] ?? '';
+            $_adHref    = _ad_link($_adType, $_adVal);
+            $_adExternal = ($_adType === 'url' && $_adHref !== '#');
+            if ($_adId === 0) continue;
+        ?>
+        <a href="<?= e($_adHref) ?>" class="pub-ad-card"
+           <?= $_adExternal ? 'target="_blank" rel="noopener noreferrer"' : '' ?>
+           data-ad-id="<?= $_adId ?>"
+           onclick="fetch('/api/public/ads/<?= $_adId ?>/click',{method:'POST',keepalive:true}).catch(function(){})">
+            <?php if ($_adImg !== ''): ?>
+            <div class="pub-ad-img-wrap">
+                <img src="<?= e(pub_img($_adImg)) ?>" alt="<?= e($_adTitle) ?>"
+                     class="pub-ad-img" loading="lazy">
+            </div>
+            <?php endif; ?>
+            <?php if ($_adTitle !== '' || $_adDesc !== ''): ?>
+            <div class="pub-ad-body">
+                <?php if ($_adTitle !== ''): ?><p class="pub-ad-title"><?= e($_adTitle) ?></p><?php endif; ?>
+                <?php if ($_adDesc  !== ''): ?><p class="pub-ad-desc"><?= e($_adDesc) ?></p><?php endif; ?>
+                <span class="pub-ad-badge"><?= e(t('ads.sponsored', 'إعلان')) ?></span>
+            </div>
+            <?php endif; ?>
+        </a>
+        <?php endforeach; ?>
+        </div><!-- .pub-ads-grid -->
+    </div><!-- .pub-container -->
+</section><!-- .pub-ads-section -->
+<script>
+(function () {
+    'use strict';
+    if (!('IntersectionObserver' in window)) return;
+    var viewed = new Set();
+    var timers = {};
+    var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            var el   = entry.target;
+            var adId = el.dataset.adId;
+            if (!adId || adId === '0' || viewed.has(adId)) return;
+            if (entry.isIntersecting) {
+                if (!timers[adId]) timers[adId] = setTimeout(function () {
+                    if (!viewed.has(adId)) {
+                        viewed.add(adId);
+                        fetch('/api/public/ads/' + adId + '/view', {
+                            method: 'POST', keepalive: true
+                        }).catch(function () {});
+                    }
+                    delete timers[adId];
+                }, 1000);
+            } else {
+                if (timers[adId]) { clearTimeout(timers[adId]); delete timers[adId]; }
+            }
+        });
+    }, { threshold: 0.5 });
+    document.querySelectorAll('.pub-ads-section .pub-ad-card[data-ad-id]').forEach(function (el) {
+        observer.observe(el);
+    });
+})();
+</script>
+<?php endif; ?>
+
 <script>
 if (typeof PubHomepageEngine !== 'undefined') {
     PubHomepageEngine.init(<?= (int)$tenantId ?>, '<?= e($lang) ?>');
