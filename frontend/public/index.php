@@ -641,29 +641,48 @@ if (!$_entitiesRenderedViaSection) {
     var OPTS = { method: 'POST', keepalive: true };
 
     // ── Unique-per-user deduplication via localStorage ─────────────────────
-    // Keys: "qzac_{adId}_{date}" for clicks, "qzav_{adId}_{date}" for views.
-    // Each key expires automatically when the date changes (daily reset).
+    // All ad interactions for today are stored in a single JSON object under
+    // key "qz_ad_track_{YYYY-MM-DD}" to avoid per-event localStorage iteration.
+    // The key for the previous day is removed once on init (one-time cleanup).
     var today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    var STORE_KEY = 'qz_ad_track_' + today;
+    var _track = null; // in-memory cache, populated lazily
 
-    function _alreadyRecorded(prefix, adId) {
+    function _getTrack() {
+        if (_track !== null) return _track;
         try {
-            return !!localStorage.getItem(prefix + adId + '_' + today);
+            var raw = localStorage.getItem(STORE_KEY);
+            _track = raw ? JSON.parse(raw) : {};
+            if (typeof _track !== 'object' || _track === null) _track = {};
         } catch (e) {
-            return false; // localStorage unavailable (private mode, etc.) — allow tracking
+            _track = {};
         }
-    }
-
-    function _markRecorded(prefix, adId) {
+        // One-time cleanup: remove yesterday's tracking key (and older)
         try {
-            localStorage.setItem(prefix + adId + '_' + today, '1');
-            // Prune stale entries (yesterday and older) to avoid unbounded growth.
-            var keep = prefix + adId + '_' + today;
             for (var i = localStorage.length - 1; i >= 0; i--) {
                 var k = localStorage.key(i);
-                if (k && k.slice(0, prefix.length) === prefix && k !== keep && k.indexOf(adId + '_') !== -1) {
+                if (k && k.slice(0, 13) === 'qz_ad_track_' && k !== STORE_KEY) {
                     localStorage.removeItem(k);
                 }
             }
+        } catch (e) {}
+        return _track;
+    }
+
+    function _alreadyRecorded(field, adId) {
+        try {
+            var t = _getTrack();
+            return !!(t[field + adId]);
+        } catch (e) {
+            return false; // localStorage unavailable (private mode etc.) — allow tracking
+        }
+    }
+
+    function _markRecorded(field, adId) {
+        try {
+            var t = _getTrack();
+            t[field + adId] = 1;
+            localStorage.setItem(STORE_KEY, JSON.stringify(t));
         } catch (e) {}
     }
 
@@ -672,8 +691,8 @@ if (!$_entitiesRenderedViaSection) {
     // component on the page (ad_ads.php, standalone section, etc.)
     window.__qzAdClick = function (adId) {
         if (!adId) return;
-        if (_alreadyRecorded('qzac_', adId)) return; // already clicked today
-        _markRecorded('qzac_', adId);
+        if (_alreadyRecorded('c', adId)) return; // already clicked today
+        _markRecorded('c', adId);
         fetch(API + adId + '/click', OPTS).catch(function () {});
     };
 
@@ -690,10 +709,10 @@ if (!$_entitiesRenderedViaSection) {
 
             if (entry.isIntersecting) {
                 if (timers[id]) return;
-                if (_alreadyRecorded('qzav_', id)) return; // already viewed today
+                if (_alreadyRecorded('v', id)) return; // already viewed today
                 timers[id] = setTimeout(function () {
-                    if (!_alreadyRecorded('qzav_', id)) {
-                        _markRecorded('qzav_', id);
+                    if (!_alreadyRecorded('v', id)) {
+                        _markRecorded('v', id);
                         fetch(API + id + '/view', OPTS).catch(function () {});
                     }
                     delete timers[id];

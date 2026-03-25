@@ -37,12 +37,59 @@ if ($q !== '') {
     $enc    = urlencode($q);
     $base   = 'tenant_id=' . $tenantId . '&lang=' . urlencode($lang) . '&per=8&page=1';
 
-    $results['products']   = pub_fetch($apiBase . 'public/products?'   . $base . '&search=' . $enc)['data']['data'] ?? [];
-    $results['categories'] = pub_fetch($apiBase . 'public/categories?' . $base . '&search=' . $enc)['data']['data'] ?? [];
-    $results['entities']   = pub_fetch($apiBase . 'public/entities?'   . $base . '&search=' . $enc)['data']['data'] ?? [];
-    $results['tenants']    = pub_fetch($apiBase . 'public/tenants?lang=' . urlencode($lang) . '&per=8&page=1&search=' . $enc)['data']['data'] ?? [];
-    $results['jobs']       = pub_fetch($apiBase . 'public/jobs?lang='   . urlencode($lang) . '&per=8&page=1&search=' . $enc)['data']['data'] ?? [];
-    $results['auctions']   = pub_fetch($apiBase . 'public/auctions?lang=' . urlencode($lang) . '&tenant_id=' . $tenantId . '&per=8&page=1&status=all&search=' . $enc)['data']['auctions'] ?? [];
+    $urls = [
+        'products'   => $apiBase . 'public/products?'   . $base . '&search=' . $enc,
+        'categories' => $apiBase . 'public/categories?' . $base . '&search=' . $enc,
+        'entities'   => $apiBase . 'public/entities?'   . $base . '&search=' . $enc,
+        'tenants'    => $apiBase . 'public/tenants?lang=' . urlencode($lang) . '&per=8&page=1&search=' . $enc,
+        'jobs'       => $apiBase . 'public/jobs?lang='   . urlencode($lang) . '&per=8&page=1&search=' . $enc,
+        'auctions'   => $apiBase . 'public/auctions?lang=' . urlencode($lang) . '&tenant_id=' . $tenantId . '&per=8&page=1&status=all&search=' . $enc,
+    ];
+
+    // Fetch all sources in parallel using cURL multi, falling back to sequential pub_fetch()
+    if (function_exists('curl_multi_init')) {
+        $mh      = curl_multi_init();
+        $handles = [];
+        foreach ($urls as $key => $url) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 5,
+                CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_SSL_VERIFYPEER => false,
+            ]);
+            curl_multi_add_handle($mh, $ch);
+            $handles[$key] = $ch;
+        }
+        do {
+            $status = curl_multi_exec($mh, $active);
+            if ($active) curl_multi_select($mh);
+        } while ($active && $status === CURLM_OK);
+
+        $raw = [];
+        foreach ($handles as $key => $ch) {
+            $body      = curl_multi_getcontent($ch);
+            $decoded   = $body ? json_decode($body, true) : null;
+            $raw[$key] = is_array($decoded) ? $decoded : [];
+            curl_multi_remove_handle($mh, $ch);
+            curl_close($ch);
+        }
+        curl_multi_close($mh);
+    } else {
+        $raw = [];
+        foreach ($urls as $key => $url) {
+            $decoded   = pub_fetch($url);
+            $raw[$key] = is_array($decoded) ? $decoded : [];
+        }
+    }
+
+    $results['products']   = $raw['products']['data']['data']     ?? [];
+    $results['categories'] = $raw['categories']['data']['data']   ?? [];
+    $results['entities']   = $raw['entities']['data']['data']     ?? [];
+    $results['tenants']    = $raw['tenants']['data']['data']      ?? [];
+    $results['jobs']       = $raw['jobs']['data']['data']         ?? [];
+    $results['auctions']   = $raw['auctions']['data']['auctions'] ?? [];
 
     // Normalize to arrays
     foreach ($results as $k => $v) {
