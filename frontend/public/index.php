@@ -397,6 +397,9 @@ $_entitiesRenderedViaSection = false;
     $component = pub_resolve_component($section);
     if ($component === null) continue;
 
+    // Skip ad_search — the search form is now embedded in the global header
+    if ($component === 'ad_search') continue;
+
     $componentFile = $componentsDir . '/' . basename($component) . '.php';
     if (!is_file($componentFile)) {
         if (defined('PUB_DEBUG') && PUB_DEBUG) {

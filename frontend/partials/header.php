@@ -455,6 +455,21 @@ body {
                 <span class="pub-logo-name"><?= e($_appName) ?></span>
             <?php endif; ?>
         </a>
+
+        <!-- Global search — inline on desktop, second row on mobile -->
+        <form class="pub-header-search" method="get"
+              action="<?= e($_basePath . '/search.php') ?>"
+              role="search">
+            <input type="search"
+                   name="q"
+                   class="pub-header-search-input"
+                   placeholder="<?= e(t('search.placeholder', 'ابحث عن منتجات، متاجر...')) ?>"
+                   value="<?= e($_GET['q'] ?? '') ?>"
+                   aria-label="<?= e(t('search.placeholder', 'ابحث عن منتجات، متاجر...')) ?>">
+            <button type="submit" class="pub-header-search-btn">
+                <?= e(t('search.button', 'بحث')) ?>
+            </button>
+        </form>
     </div>
 </header>
 

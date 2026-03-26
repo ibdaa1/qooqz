@@ -80,12 +80,75 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
+/* Header search form — shown inline on desktop, second row on mobile */
+.pub-header-search {
+  flex: 1;
+  min-width: 0;
+  max-width: 420px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.pub-header-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 12px;
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: var(--pub-radius, 8px);
+  font-size: 0.9rem;
+  outline: none;
+  background: rgba(255,255,255,0.15);
+  color: var(--pub-header-text, #fff);
+  transition: border-color 0.2s, background 0.2s;
+}
+.pub-header-search-input::placeholder {
+  color: rgba(255,255,255,0.65);
+}
+.pub-header-search-input:focus {
+  background: rgba(255,255,255,0.25);
+  border-color: rgba(255,255,255,0.7);
+}
+.pub-header-search-btn {
+  padding: 7px 14px;
+  background: rgba(255,255,255,0.2);
+  color: var(--pub-header-text, #fff);
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: var(--pub-radius, 8px);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+.pub-header-search-btn:hover {
+  background: rgba(255,255,255,0.32);
+}
+
 .pub-header-inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 100%;
   gap: 12px;
+  /* flex-wrap allows the search form to wrap to a second row on mobile;
+     space-between and height:100% removed since the header height is now
+     auto on mobile to accommodate the wrapped search row */
+  flex-wrap: wrap;
+}
+
+/* Mobile: search becomes a full-width second row */
+@media (max-width: 640px) {
+  .pub-header {
+    height: auto;
+    min-height: var(--pub-header-h);
+  }
+  .pub-header-inner {
+    min-height: var(--pub-header-h);
+    padding-bottom: 8px;
+  }
+  .pub-header-search {
+    flex-basis: 100%;
+    max-width: 100%;
+    order: 3;
+  }
 }
 
 /* Logo */
