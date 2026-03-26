@@ -13,17 +13,16 @@ declare(strict_types=1);
  *   POST /api/public/ads/{id}/click
  *   POST /api/public/ads/{id}/view
  *
- * Schema migration required before deploying (run once):
+ * Schema migrations required (run once):
  *
- *   -- FIX-3: widen target_type ENUM to match all types handled in PHP
+ *   -- Widen target_type ENUM to match all types handled in PHP:
  *   ALTER TABLE ads MODIFY COLUMN target_type
  *     ENUM('url','product','category','entity','brand','auction','job','page')
  *     DEFAULT 'url';
  *
- *   -- FIX-4: unique constraint prevents duplicate rows under concurrent requests;
- *   --        INSERT IGNORE is only effective when this key exists.
- *   ALTER TABLE ad_stats
- *     ADD UNIQUE KEY uq_ad_stats_ad_date (ad_id, date);
+ *   -- Per-event tracking columns + per-session unique key (enables upsert):
+ *   Run: database/migrations/alter_ad_stats_add_tracking_columns.sql
+ *   Run: database/migrations/add_ad_stats_per_session_unique_key.sql
  *
  * Variables assumed to exist (injected by the API router):
  *   $pdo, $pdoList, $pdoOne, $first, $segments, $lang,
@@ -39,9 +38,15 @@ $action = strtolower($segments[2] ?? '');
 /* ═══════════════════════════════════════════════════════════════════════════
  * POST /ads/{id}/click  |  /ads/{id}/view — impression / click tracking
  *
- * FIX-4: relies on UNIQUE KEY uq_ad_stats_ad_date(ad_id, date) in ad_stats
- *        so INSERT IGNORE truly prevents duplicate rows under race conditions.
- *        Without the key INSERT IGNORE is a silent no-op and duplicates accumulate.
+ * Per-session upsert: one row per (ad_id, session_id, date).
+ * Relies on UNIQUE KEY uq_ad_stats_session (ad_id, session_id, date) added by
+ * migration add_ad_stats_per_session_unique_key.sql.
+ *
+ * When a view fires first it creates the row (views=1, clicks=0).
+ * When the click fires afterwards ON DUPLICATE KEY UPDATE increments clicks and
+ * upgrades event_type to 'click'.
+ * If a click fires first (user clicked before the 1-second IntersectionObserver
+ * timer) it sets views=1 and clicks=1 directly, so neither counter is lost.
  * ═══════════════════════════════════════════════════════════════════════════ */
 if ($adId > 0 && $method === 'POST' && in_array($action, ['click', 'view'], true)) {
     // ── Collect tracking data ────────────────────────────────────────────
@@ -70,13 +75,17 @@ if ($adId > 0 && $method === 'POST' && in_array($action, ['click', 'view'], true
     $trackUserAgent = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255) ?: null;
     $trackEventType = $action === 'click' ? 'click' : 'view';
 
-    $isView  = $action === 'view'  ? 1 : 0;
+    // A click always implies a view.  Setting views=1 on click events means the
+    // row correctly shows views=1 even when the click arrives before the separate
+    // view request (within the first second of visibility).
+    $isView  = 1; // every event records a view
     $isClick = $action === 'click' ? 1 : 0;
 
     try {
-        // Atomic upsert: inserts the first event of the day for this ad,
-        // then increments the appropriate counter on any subsequent event.
-        // Relies on UNIQUE KEY uq_ad_stats_ad_date (ad_id, date).
+        // Upsert: insert on first event, increment counters on subsequent events
+        // for the same session+ad+day.  Also upgrade event_type to 'click' when
+        // a click comes in after a view-only row was created.
+        // Relies on UNIQUE KEY uq_ad_stats_session (ad_id, session_id, date).
         $ins = $pdo->prepare(
             "INSERT INTO ad_stats
                  (ad_id, user_id, session_id, ip_address, user_agent,
@@ -84,8 +93,9 @@ if ($adId > 0 && $method === 'POST' && in_array($action, ['click', 'view'], true
              VALUES
                  (?, ?, ?, ?, ?, CURDATE(), NOW(), ?, ?, ?)
              ON DUPLICATE KEY UPDATE
-                 views  = views  + VALUES(views),
-                 clicks = clicks + VALUES(clicks)"
+                 views      = views + VALUES(views),
+                 clicks     = clicks + VALUES(clicks),
+                 event_type = IF(VALUES(clicks) > 0, 'click', event_type)"
         );
         $ins->execute([
             $adId,
