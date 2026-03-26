@@ -640,7 +640,8 @@ if (!$_entitiesRenderedViaSection) {
     'use strict';
 
     var API  = '/api/public/ads/';
-    var OPTS = { method: 'POST', keepalive: true };
+    // credentials:'include' sends the session cookie so PHP can resolve user_id.
+    var OPTS = { method: 'POST', keepalive: true, credentials: 'include' };
 
     // ── Unique-per-user deduplication via localStorage ─────────────────────
     // All ad interactions for today are stored in a single JSON object under
@@ -659,11 +660,11 @@ if (!$_entitiesRenderedViaSection) {
         } catch (e) {
             _track = {};
         }
-        // One-time cleanup: remove yesterday's tracking key (and older)
+        // One-time cleanup: remove previous-day tracking keys
         try {
             for (var i = localStorage.length - 1; i >= 0; i--) {
                 var k = localStorage.key(i);
-                if (k && k.slice(0, 13) === 'qz_ad_track_' && k !== STORE_KEY) {
+                if (k && k.slice(0, 12) === 'qz_ad_track_' && k !== STORE_KEY) {
                     localStorage.removeItem(k);
                 }
             }
@@ -688,6 +689,14 @@ if (!$_entitiesRenderedViaSection) {
         } catch (e) {}
     }
 
+    function _unmarkRecorded(field, adId) {
+        try {
+            var t = _getTrack();
+            delete t[field + adId];
+            localStorage.setItem(STORE_KEY, JSON.stringify(t));
+        } catch (e) {}
+    }
+
     // ── Click tracking ─────────────────────────────────────────────────────
     // Exposed globally so inline onclick="__qzAdClick(id)" works from any
     // component on the page (ad_ads.php, standalone section, etc.)
@@ -695,7 +704,9 @@ if (!$_entitiesRenderedViaSection) {
         if (!adId) return;
         if (_alreadyRecorded('c', adId)) return; // already clicked today
         _markRecorded('c', adId);
-        fetch(API + adId + '/click', OPTS).catch(function () {});
+        fetch(API + adId + '/click', OPTS).catch(function () {
+            _unmarkRecorded('c', adId); // allow retry on next click
+        });
     };
 
     // ── View / impression tracking ─────────────────────────────────────────
@@ -715,7 +726,9 @@ if (!$_entitiesRenderedViaSection) {
                 timers[id] = setTimeout(function () {
                     if (!_alreadyRecorded('v', id)) {
                         _markRecorded('v', id);
-                        fetch(API + id + '/view', OPTS).catch(function () {});
+                        fetch(API + id + '/view', OPTS).catch(function () {
+                            _unmarkRecorded('v', id); // allow retry on next view
+                        });
                     }
                     delete timers[id];
                 }, 1000);
@@ -726,10 +739,31 @@ if (!$_entitiesRenderedViaSection) {
         });
     }, { threshold: 0.5 });
 
-    // Observe every ad card on the page — rendered by any component or section.
-    document.querySelectorAll('[data-ad-id]').forEach(function (el) {
-        if (el.dataset.adId && el.dataset.adId !== '0') observer.observe(el);
-    });
+    function _observeAdEl(el) {
+        if (el.dataset && el.dataset.adId && el.dataset.adId !== '0') {
+            observer.observe(el);
+        }
+    }
+
+    // Observe every ad card already in the DOM at script execution time.
+    document.querySelectorAll('[data-ad-id]').forEach(_observeAdEl);
+
+    // Also observe ad cards added dynamically (e.g., rendered by PubHomepageEngine).
+    if ('MutationObserver' in window) {
+        new MutationObserver(function (mutations) {
+            mutations.forEach(function (mutation) {
+                mutation.addedNodes.forEach(function (node) {
+                    if (node.nodeType !== 1) return;
+                    if (node.dataset && node.dataset.adId) {
+                        _observeAdEl(node);
+                    }
+                    if (node.querySelectorAll) {
+                        node.querySelectorAll('[data-ad-id]').forEach(_observeAdEl);
+                    }
+                });
+            });
+        }).observe(document.body, { childList: true, subtree: true });
+    }
 })();
 </script>
 

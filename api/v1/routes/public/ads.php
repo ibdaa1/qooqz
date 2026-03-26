@@ -59,6 +59,9 @@ if ($adId > 0 && $method === 'POST' && in_array($action, ['click', 'view'], true
         ($_SESSION['current_user']['id'] ?? ($_SESSION['user_id'] ?? 0))
     ) ?: null;
 
+    // Release session lock immediately — we only read, never write.
+    session_write_close();
+
     $trackIp = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
     if (str_contains((string)$trackIp, ',')) {
         $trackIp = trim(explode(',', (string)$trackIp)[0]);
@@ -67,14 +70,22 @@ if ($adId > 0 && $method === 'POST' && in_array($action, ['click', 'view'], true
     $trackUserAgent = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255) ?: null;
     $trackEventType = $action === 'click' ? 'click' : 'view';
 
+    $isView  = $action === 'view'  ? 1 : 0;
+    $isClick = $action === 'click' ? 1 : 0;
+
     try {
-        // Per-event insert: one row per view/click with full tracking data.
+        // Atomic upsert: inserts the first event of the day for this ad,
+        // then increments the appropriate counter on any subsequent event.
+        // Relies on UNIQUE KEY uq_ad_stats_ad_date (ad_id, date).
         $ins = $pdo->prepare(
             "INSERT INTO ad_stats
                  (ad_id, user_id, session_id, ip_address, user_agent,
                   date, created_at, views, clicks, event_type)
              VALUES
-                 (?, ?, ?, ?, ?, CURDATE(), NOW(), ?, ?, ?)"
+                 (?, ?, ?, ?, ?, CURDATE(), NOW(), ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                 views  = views  + VALUES(views),
+                 clicks = clicks + VALUES(clicks)"
         );
         $ins->execute([
             $adId,
@@ -82,34 +93,23 @@ if ($adId > 0 && $method === 'POST' && in_array($action, ['click', 'view'], true
             $trackSessionId,
             $trackIp,
             $trackUserAgent,
-            $action === 'view'  ? 1 : 0,
-            $action === 'click' ? 1 : 0,
+            $isView,
+            $isClick,
             $trackEventType,
         ]);
-    } catch (Throwable) {
-        // Fallback: legacy schema without the new columns.
+    } catch (Throwable $e) {
+        error_log('[ads.php] ad_stats insert failed for ad_id=' . $adId . ': ' . $e->getMessage());
+        // Fallback: minimal upsert without the extended columns (legacy schema).
         try {
-            $legacyCol = $action === 'click' ? 'clicks' : 'views';
-            $upd = $pdo->prepare(
-                "UPDATE ad_stats SET {$legacyCol} = {$legacyCol} + 1 WHERE ad_id = ? AND date = CURDATE()"
-            );
-            $upd->execute([$adId]);
-            if ($upd->rowCount() === 0) {
-                $ins = $pdo->prepare(
-                    "INSERT IGNORE INTO ad_stats (ad_id, date, views, clicks)
-                     VALUES (?, CURDATE(), ?, ?)"
-                );
-                $ins->execute([
-                    $adId,
-                    $action === 'view'  ? 1 : 0,
-                    $action === 'click' ? 1 : 0,
-                ]);
-                if ($ins->rowCount() === 0) {
-                    $upd->execute([$adId]);
-                }
-            }
-        } catch (Throwable) {
-            // Tracking must never break the user experience.
+            $pdo->prepare(
+                "INSERT INTO ad_stats (ad_id, date, views, clicks)
+                 VALUES (?, CURDATE(), ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                     views  = views  + VALUES(views),
+                     clicks = clicks + VALUES(clicks)"
+            )->execute([$adId, $isView, $isClick]);
+        } catch (Throwable $e2) {
+            error_log('[ads.php] ad_stats fallback insert failed for ad_id=' . $adId . ': ' . $e2->getMessage());
         }
     }
     ResponseFormatter::success(['ok' => true]);
