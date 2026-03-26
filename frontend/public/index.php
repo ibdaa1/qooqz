@@ -702,6 +702,15 @@ if (!$_entitiesRenderedViaSection) {
     // component on the page (ad_ads.php, standalone section, etc.)
     window.__qzAdClick = function (adId) {
         if (!adId) return;
+        // A click always implies a view — fire view if not yet recorded.
+        // This covers the case where the user clicks before the 1-second
+        // IntersectionObserver timer has had a chance to fire.
+        if (!_alreadyRecorded('v', adId)) {
+            _markRecorded('v', adId);
+            fetch(API + adId + '/view', OPTS).catch(function () {
+                _unmarkRecorded('v', adId);
+            });
+        }
         if (_alreadyRecorded('c', adId)) return; // already clicked today
         _markRecorded('c', adId);
         fetch(API + adId + '/click', OPTS).catch(function () {
