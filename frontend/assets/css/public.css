@@ -36,7 +36,6 @@
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
-  overflow-x: hidden; /* prevent horizontal scroll on all screens */
 }
 
 body {
