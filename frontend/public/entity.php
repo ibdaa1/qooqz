@@ -282,6 +282,7 @@ if ($pdo) {
 
 $GLOBALS['PUB_PAGE_TITLE'] = e($entity['store_name'] ?? '') . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_DESC']  = e($entity['description'] ?? '');
+$GLOBALS['PUB_PAGE_TYPE']  = 'entities';
 
 // Entity ratings — last 5 + average (reuse $pdo already set above)
 $entityRatings    = [];
@@ -607,22 +608,7 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
         <?php endforeach; endif; ?>
         <?php endif; ?>
 
-        <!-- Product search within entity -->
-        <form method="get" style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <input type="hidden" name="id" value="<?= $entityId ?>">
-            <?php if ($selectedCat): ?><input type="hidden" name="cat" value="<?= $selectedCat ?>"><?php endif; ?>
-            <input type="search" name="q" class="pub-search-input"
-                   style="max-width:320px;"
-                   placeholder="🔍 <?= e(t('products.search_placeholder')) ?>"
-                   value="<?= e($productSearch) ?>">
-            <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm"><?= e(t('products.filter')) ?></button>
-            <?php if ($productSearch): ?>
-                <a href="?id=<?= $entityId ?><?= $selectedCat ? '&cat=' . $selectedCat : '' ?>"
-                   class="pub-btn pub-btn--ghost pub-btn--sm"><?= e(t('products.clear')) ?></a>
-            <?php endif; ?>
-        </form>
-
-        <?php if (!empty($products)): ?>
+                <?php if (!empty($products)): ?>
         <div class="pub-grid" style="margin-top:20px;">
             <?php foreach ($products as $p): ?>
             <?php

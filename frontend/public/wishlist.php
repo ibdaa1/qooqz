@@ -8,6 +8,7 @@ if (!$_isLoggedIn) {
 }
 
 $GLOBALS['PUB_PAGE_TITLE'] = e(t('wishlist.page_title')) . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_TYPE']  = 'products';
 include dirname(__DIR__) . '/partials/header.php';
 
 // Resolve product card style from DB card_styles (card_type='product')

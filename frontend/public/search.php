@@ -16,14 +16,32 @@ $dir      = $ctx['dir'];
 $tenantId = (int)$ctx['tenant_id'];
 $apiBase  = pub_api_url('');
 
-$q = trim($_GET['q'] ?? '');
+$q    = trim($_GET['q'] ?? '');
+$type = trim($_GET['context'] ?? 'all');
 
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = ($q !== '' ? e($q) . ' — ' : '') . t('search.results_title', 'نتائج البحث') . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_DESC']  = t('search.results_desc', 'نتائج البحث في المنتجات والتصنيفات والمتاجر والمزادات والوظائف');
+$GLOBALS['PUB_PAGE_TYPE']  = 'all';
 
-// ── Fetch results from all sources ──────────────────────────────────────────
+// ── Context → which sources to query ────────────────────────────────────────
+$_contextSources = [
+    'products'   => ['products'],
+    'categories' => ['categories'],
+    'entities'   => ['entities'],
+    'tenants'    => ['tenants'],
+    'jobs'       => ['jobs'],
+    'auctions'   => ['auctions'],
+    'cart'       => ['products'],
+    'orders'     => ['products'],
+    'brands'     => ['products'],
+    'bundles'    => ['products'],
+    'all'        => ['products', 'categories', 'entities', 'tenants', 'jobs', 'auctions'],
+];
+$_activeSources = $_contextSources[$type] ?? $_contextSources['all'];
+
+// ── Fetch results from active sources ───────────────────────────────────────
 $results = [
     'products'   => [],
     'categories' => [],
@@ -37,7 +55,7 @@ if ($q !== '') {
     $enc    = urlencode($q);
     $base   = 'tenant_id=' . $tenantId . '&lang=' . urlencode($lang) . '&per=8&page=1';
 
-    $urls = [
+    $allUrls = [
         'products'   => $apiBase . 'public/products?'   . $base . '&search=' . $enc,
         'categories' => $apiBase . 'public/categories?' . $base . '&search=' . $enc,
         'entities'   => $apiBase . 'public/entities?'   . $base . '&search=' . $enc,
@@ -45,6 +63,8 @@ if ($q !== '') {
         'jobs'       => $apiBase . 'public/jobs?lang='   . urlencode($lang) . '&per=8&page=1&search=' . $enc,
         'auctions'   => $apiBase . 'public/auctions?lang=' . urlencode($lang) . '&tenant_id=' . $tenantId . '&per=8&page=1&status=all&search=' . $enc,
     ];
+    // Narrow to context-relevant sources only
+    $urls = array_intersect_key($allUrls, array_flip($_activeSources));
 
     // Fetch all sources in parallel using cURL multi, falling back to sequential pub_fetch()
     if (function_exists('curl_multi_init')) {
@@ -103,19 +123,6 @@ include dirname(__DIR__) . '/partials/header.php';
 ?>
 
 <div class="pub-container pub-search-results-page" style="padding-top:32px;padding-bottom:48px;">
-
-    <!-- ── Search bar ── -->
-    <form class="pub-search-form pub-search-results-form" method="get" action="/frontend/public/search.php"
-          style="margin-bottom:32px;">
-        <input type="search"
-               name="q"
-               class="pub-search-input"
-               placeholder="<?= e(t('search.placeholder', 'ابحث عن منتجات، تصنيفات، متاجر...')) ?>"
-               value="<?= e($q) ?>"
-               autofocus
-               style="flex:1;">
-        <button type="submit" class="pub-search-btn"><?= e(t('search.button', 'بحث')) ?></button>
-    </form>
 
     <?php if ($q === ''): ?>
     <p class="pub-search-hint" style="text-align:center;color:var(--pub-muted,#888);font-size:1.1rem;">

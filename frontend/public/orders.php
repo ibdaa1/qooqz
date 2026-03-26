@@ -8,6 +8,7 @@ if (!$_isLoggedIn) {
 }
 
 $GLOBALS['PUB_PAGE_TITLE'] = e(t('orders.page_title')) . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_TYPE']  = 'orders';
 include dirname(__DIR__) . '/partials/header.php';
 
 $userId = (int)($_SESSION['user_id'] ?? $_SESSION['user']['id'] ?? 0);

@@ -17,6 +17,7 @@ $tenantId = $ctx['tenant_id'];
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = t('nav.brands', ['default' => 'Brands']) . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_TYPE']  = 'brands';
 
 /* -------------------------------------------------------
  * Filters

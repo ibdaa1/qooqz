@@ -9,6 +9,7 @@ $lang = $ctx['lang'];
 $dir  = $ctx['dir'];
 
 $GLOBALS['PUB_PAGE_TITLE'] = e(t('products.compare_title', ['default' => 'Compare Products'])) . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_TYPE']  = 'products';
 include dirname(__DIR__) . '/partials/header.php';
 ?>
 <main class="pub-container" style="padding:28px 0 48px;">

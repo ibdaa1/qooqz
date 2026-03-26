@@ -13,6 +13,7 @@ $tenantId = $ctx['tenant_id'];
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = t('entities.page_title') . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_TYPE']  = 'entities';
 
 /* Filters */
 $page   = max(1, (int)($_GET['page'] ?? 1));
@@ -123,9 +124,6 @@ $_entityCardClass = pub_card_css_class('entities');
 
     <!-- Filters -->
     <form method="get" class="pub-filter-bar">
-        <input type="search" name="q" class="pub-search-input"
-               placeholder="<?= e(t('entities.search_placeholder')) ?>"
-               value="<?= e($search) ?>">
         <select name="vendor_type" class="pub-filter-select" data-auto-submit>
             <?php foreach ($vendorTypes as $val => $label): ?>
                 <option value="<?= e($val) ?>" <?= $vType===$val?'selected':'' ?>><?= e($label) ?></option>

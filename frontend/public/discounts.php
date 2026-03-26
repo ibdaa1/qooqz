@@ -14,6 +14,7 @@ $tenantId = $ctx['tenant_id'];
 $qs       = 'lang=' . urlencode($lang) . '&tenant_id=' . $tenantId;
 
 $GLOBALS['PUB_PAGE_TITLE'] = t('discounts.page_title') . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_TYPE']  = 'products';
 
 // Resolve discount card style from DB card_styles (card_type='discount')
 $_discountCardStyle = pub_card_inline_style('discount');

@@ -18,6 +18,7 @@ $apiBase  = pub_api_url('');
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = t('catalog.page_title', 'Catalog') . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_TYPE']  = 'products';
 $GLOBALS['PUB_PAGE_DESC']  = t('catalog.page_description', 'Browse products and categories');
 
 /* ------------------------------------------------------------------
@@ -193,18 +194,15 @@ include dirname(__DIR__) . '/partials/header.php';
             </a>
         </div>
 
-        <!-- Search + filter bar -->
+        <!-- Filter bar -->
         <form method="get" class="pub-filter-bar" style="margin-bottom:20px;">
             <?php if ($catId): ?>
             <input type="hidden" name="category_id" value="<?= $catId ?>">
             <?php endif; ?>
-            <input type="search" name="q" class="pub-search-input"
-                   placeholder="<?= e(t('products.search_placeholder', 'Search products…')) ?>"
-                   value="<?= e($search) ?>">
             <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm">
-                🔍 <?= e(t('products.filter', 'Search')) ?>
+                🔍 <?= e(t('products.filter', 'Filter')) ?>
             </button>
-            <?php if ($search || $catId): ?>
+            <?php if ($catId): ?>
             <a href="/frontend/public/catalog.php" class="pub-btn pub-btn--ghost pub-btn--sm">
                 ✕ <?= e(t('products.clear', 'Clear')) ?>
             </a>

@@ -14,6 +14,7 @@ $lang = $ctx['lang'];
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = t('nav.tenants') . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_TYPE']  = 'tenants';
 
 /* Filters */
 $page   = max(1, (int)($_GET['page'] ?? 1));
@@ -112,9 +113,6 @@ $_tenantCardClass = pub_card_css_class('tenants');
 
     <!-- Search -->
     <form method="get" class="pub-filter-bar">
-        <input type="search" name="q" class="pub-search-input"
-               placeholder="<?= e(t('entities.search_placeholder')) ?>"
-               value="<?= e($search) ?>">
         <button type="submit" class="pub-btn pub-btn--primary pub-btn--sm"><?= e(t('entities.filter')) ?></button>
         <?php if ($search): ?>
             <a href="/frontend/public/tenants.php" class="pub-btn pub-btn--ghost pub-btn--sm"><?= e(t('entities.clear')) ?></a>

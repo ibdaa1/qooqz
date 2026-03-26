@@ -19,6 +19,7 @@ $bundles = $resp['data'] ?? [];
 $meta    = $resp['meta'] ?? [];
 
 $GLOBALS['PUB_PAGE_TITLE'] = e(t('bundles.page_title', ['default' => 'Bundle Deals'])) . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_TYPE']  = 'all';
 include dirname(__DIR__) . '/partials/header.php';
 
 // Resolve bundle card style from DB card_styles (card_type='bundle')

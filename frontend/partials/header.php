@@ -462,16 +462,26 @@ body {
         <form class="pub-header-search"
               method="get"
               action="<?= e($_basePath . '/search.php') ?>"
-              role="search">
+              role="search"
+              autocomplete="off">
+            <input type="hidden" name="context" value="<?= e($GLOBALS['PUB_PAGE_TYPE'] ?? 'all') ?>">
             <input type="search"
                    name="q"
+                   id="pubGlobalSearchInput"
                    class="pub-header-search-input"
                    placeholder="<?= e(t('search.placeholder', 'ابحث عن منتجات، متاجر...')) ?>"
                    value="<?= e($_GET['q'] ?? '') ?>"
-                   aria-label="<?= e(t('search.placeholder', 'ابحث عن منتجات، متاجر...')) ?>">
+                   aria-label="<?= e(t('search.placeholder', 'ابحث عن منتجات، متاجر...')) ?>"
+                   aria-autocomplete="list"
+                   aria-controls="pubSearchSuggest">
             <button type="submit" class="pub-header-search-btn">
                 <?= e(t('search.button', 'بحث')) ?>
             </button>
+            <ul id="pubSearchSuggest" role="listbox" hidden
+                style="position:absolute;top:100%;inset-inline-start:0;min-width:300px;max-width:480px;
+                       background:var(--pub-surface,#fff);border:1px solid var(--pub-border,#ddd);
+                       border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.12);
+                       list-style:none;margin:4px 0 0;padding:4px 0;z-index:9999;font-size:.9rem;"></ul>
         </form>
 
     </div>
@@ -525,6 +535,79 @@ body {
         });
         if (b) b.addEventListener('click', close);
         if (c) c.addEventListener('click', close);
+    })();
+    </script>
+
+    <!-- Live search autocomplete -->
+    <script>
+    (function () {
+        var inp  = document.getElementById('pubGlobalSearchInput');
+        var list = document.getElementById('pubSearchSuggest');
+        if (!inp || !list) return;
+
+        var timer    = null;
+        var lastQ    = '';
+        var basePath = '<?= e($_basePath) ?>';
+
+        function hide() {
+            list.hidden = true;
+            list.innerHTML = '';
+        }
+
+        function show(items) {
+            if (!items || !items.length) { hide(); return; }
+            list.innerHTML = '';
+            items.forEach(function (item) {
+                var li = document.createElement('li');
+                li.setAttribute('role', 'option');
+                li.style.cssText = 'padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;';
+                li.innerHTML =
+                    '<span style="font-size:1rem;">' + (item.icon || '🔍') + '</span>' +
+                    '<span style="flex:1;"><strong>' + _esc(item.name) + '</strong>' +
+                    (item.type ? ' <small style="color:var(--pub-muted,.#888);">· ' + _esc(item.type) + '</small>' : '') + '</span>';
+                li.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    inp.value = item.name;
+                    hide();
+                    inp.form.submit();
+                });
+                li.addEventListener('mouseover', function () { this.style.background = 'var(--pub-surface,#f5f5f5)'; });
+                li.addEventListener('mouseout',  function () { this.style.background = ''; });
+                list.appendChild(li);
+            });
+            list.hidden = false;
+        }
+
+        function _esc(s) {
+            return String(s).replace(/[&<>"']/g, function (c) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+            });
+        }
+
+        function fetchSuggestions(q) {
+            var ctx = (inp.form.querySelector('[name="context"]') || {}).value || 'all';
+            var url = '/api/public/search_suggest?q=' + encodeURIComponent(q) + '&context=' + encodeURIComponent(ctx) + '&lang=<?= urlencode($lang) ?>';
+            fetch(url, {credentials: 'include'})
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (j) {
+                    if (!j) return;
+                    var items = (j.data && j.data.suggestions) ? j.data.suggestions : (j.suggestions || []);
+                    show(items);
+                })
+                .catch(function () { hide(); });
+        }
+
+        inp.addEventListener('input', function () {
+            clearTimeout(timer);
+            var q = inp.value.trim();
+            if (q === lastQ) return;
+            lastQ = q;
+            if (q.length < 2) { hide(); return; }
+            timer = setTimeout(function () { fetchSuggestions(q); }, 300);
+        });
+
+        inp.addEventListener('blur', function () { setTimeout(hide, 200); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
     })();
     </script>
 

@@ -14,6 +14,7 @@ $tenantId = $ctx['tenant_id'];
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = t('categories.page_title') . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_TYPE']  = 'categories';
 
 /* -------------------------------------------------------
  * Filters
@@ -81,10 +82,6 @@ $_categoryImgStyle  = pub_card_img_style('category', '16/9');
 
     <!-- Filter bar -->
     <form method="get" class="pub-filter-bar">
-        <input type="search" name="q" class="pub-search-input" style="max-width:260px;"
-               placeholder="<?= e(t('categories.search_placeholder')) ?>"
-               value="<?= e($search) ?>">
-
         <!-- Parent categories filter (root only / all) -->
         <select name="parent_id" class="pub-filter-select" data-auto-submit>
             <option value=""><?= e(t('categories.all_categories')) ?></option>

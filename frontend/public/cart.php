@@ -18,6 +18,7 @@ $tenantId = $ctx['tenant_id'];
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = t('cart.title') . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_TYPE']  = 'cart';
 
 include dirname(__DIR__) . '/partials/header.php';
 ?>

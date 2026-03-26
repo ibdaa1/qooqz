@@ -719,19 +719,6 @@ foreach ($categories as $c) {
     <button class="topbar-menu-toggle" id="menuToggle" aria-label="Toggle menu">☰</button>
     <a class="topbar-brand" href="/frontend/public/display.php">QOOQZ</a>
 
-    <div class="topbar-search">
-        <form method="get" action="">
-            <?php if ($catId): ?><input type="hidden" name="category_id" value="<?= $catId ?>"> <?php endif; ?>
-            <input
-                type="search"
-                name="q"
-                value="<?= d_e($search) ?>"
-                placeholder="<?= $isRtl ? 'البحث عن منتج…' : 'Search products…' ?>"
-                aria-label="search">
-            <button type="submit">&#x1F50D;</button>
-        </form>
-    </div>
-
     <div class="topbar-spacer"></div>
 
     <nav style="display:flex;gap:16px;font-size:.85rem;font-weight:500">

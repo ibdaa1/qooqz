@@ -12,6 +12,7 @@ $tenantId = $ctx['tenant_id'];
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = t('auctions.page_title') . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_TYPE']  = 'auctions';
 $GLOBALS['PUB_PAGE_DESC']  = t('auctions.page_subtitle');
 $GLOBALS['PUB_SEO']        = ['schema_type' => 'ItemList', 'name' => t('auctions.page_title')];
 

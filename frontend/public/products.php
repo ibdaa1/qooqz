@@ -13,6 +13,7 @@ $tenantId = $ctx['tenant_id'];
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = t('products.page_title') . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_TYPE']  = 'products';
 
 /* Filters */
 $page    = max(1, (int)($_GET['page'] ?? 1));
@@ -129,10 +130,6 @@ $_productImgStyle  = pub_card_img_style('product');
 
     <!-- Filter bar -->
     <form method="get" class="pub-filter-bar">
-        <input type="search" name="q" class="pub-search-input"
-               placeholder="<?= e(t('products.search_placeholder')) ?>"
-               value="<?= e($search) ?>">
-
         <select name="sort" class="pub-filter-select" data-auto-submit>
             <option value="newest" <?= $sort==='newest'?'selected':'' ?>><?= e(t('products.sort_newest')) ?></option>
             <option value="price_asc" <?= $sort==='price_asc'?'selected':'' ?>><?= e(t('products.sort_price_asc')) ?></option>

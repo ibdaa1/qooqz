@@ -14,6 +14,7 @@ $tenantId = $ctx['tenant_id'];
 $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = t('jobs.page_title') . ' — QOOQZ';
+$GLOBALS['PUB_PAGE_TYPE']  = 'jobs';
 
 // Resolve job card style from DB card_styles (card_type='job')
 $_jobCardStyle = pub_card_inline_style('jobs');
@@ -73,10 +74,6 @@ include dirname(__DIR__) . '/partials/header.php';
 
     <!-- Filters -->
     <form method="get" class="pub-filter-bar">
-        <input type="search" name="q" class="pub-search-input" style="max-width:240px;"
-               placeholder="<?= e(t('jobs.search_placeholder')) ?>"
-               value="<?= e($search) ?>">
-
         <select name="employment_type" class="pub-filter-select" data-auto-submit>
             <?php foreach ($empTypes as $val => $label): ?>
                 <option value="<?= e($val) ?>" <?= $jobType===$val?'selected':'' ?>><?= e($label) ?></option>
