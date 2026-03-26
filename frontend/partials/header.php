@@ -374,35 +374,10 @@ body {
 }
 
 /* ── FIX-2: Mobile search bar — second row on ≤640px ── */
+/* (Handled in public.css — no override needed here) */
 @media (max-width: 640px) {
-    .pub-header {
-        height: auto;
-        min-height: var(--pub-header-h, 60px);
-        padding-block: 6px;
-    }
-    .pub-header-inner {
-        flex-wrap: wrap;
-        row-gap: 6px;
-        align-items: center;
-        padding-block: 4px 8px;
-    }
-    .pub-header-search {
-        display: flex !important;   /* override public.css display:none */
-        flex: 0 0 100%;
-        order: 3;
-        max-width: 100%;
-        margin-top: 2px;
-    }
-    .pub-header-search-input {
-        background: rgba(255,255,255,0.18);
-        color: var(--pub-header-text, #fff);
-        border-color: rgba(255,255,255,0.3);
-    }
-    .pub-header-search-input::placeholder {
-        color: rgba(255,255,255,0.6);
-    }
     .pub-layout {
-        min-height: calc(100vh - 106px);
+        min-height: calc(100vh - 116px);
     }
 }
     </style>
