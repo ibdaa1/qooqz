@@ -48,6 +48,7 @@ body {
   background: var(--pub-bg);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden; /* prevent content overflow on mobile */
+  padding-top: var(--pub-header-h, 60px);
 }
 
 img, video, svg { max-width: 100%; height: auto; display: block; }
@@ -74,9 +75,12 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   background: var(--pub-header-bg, var(--pub-primary));
   color: var(--pub-header-text, #fff);
   height: var(--pub-header-h);
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 100;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 200;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
@@ -140,6 +144,9 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
     height: auto;
     min-height: 110px;
     padding-block: 6px;
+  }
+  body {
+    padding-top: 110px;
   }
   .pub-header-inner {
     flex-wrap: wrap;
