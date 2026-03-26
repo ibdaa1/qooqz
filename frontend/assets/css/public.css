@@ -361,9 +361,10 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .pub-sidebar::-webkit-scrollbar { width: 4px; }
 .pub-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
 
-/* Sidebar header */
+/* Sidebar header (logo + close) — hidden on desktop; main header already shows the brand.
+   Shown on mobile inside the drawer via @media (max-width: 768px). */
 .pub-sidebar-header {
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: space-between;
   padding: 14px 14px 10px;
@@ -387,6 +388,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   text-overflow: ellipsis;
   transition: opacity 0.2s ease;
 }
+
 /* Close button: hidden on desktop (sidebar is persistent) */
 .pub-sidebar-close {
   display: none;
@@ -545,6 +547,8 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   [dir="rtl"] .pub-sidebar.open {
     transform: translateX(0);
   }
+  /* Show sidebar header (with brand + close button) inside mobile drawer */
+  .pub-sidebar-header { display: flex; }
   /* Show close button and backdrop on mobile */
   .pub-sidebar-close { display: block; }
   .pub-sidebar-backdrop.open { display: block; }
