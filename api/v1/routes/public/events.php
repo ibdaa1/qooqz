@@ -101,19 +101,45 @@ if (!$pdo instanceof PDO) {
 }
 
 // ── Session / user / request metadata ────────────────────────────────────────
+// The bootstrap normally starts the session via api/shared/config/session.php
+// (APP_SESSID + shared save path). This fallback only fires when the bootstrap
+// did not already open the session (e.g. the file is called outside normal flow).
 if (session_status() === PHP_SESSION_NONE) {
+    // Must match the shared session config: name = APP_SESSID, same save path.
+    if (session_name() !== 'APP_SESSID') {
+        session_name('APP_SESSID');
+    }
+    // Shared session directory (mirrors api/shared/config/session.php)
+    $__evtSp = defined('BASE_DIR')
+        ? BASE_DIR . '/storage/sessions'
+        : (__DIR__ . '/../../../../storage/sessions');
+    if (is_dir($__evtSp)) {
+        ini_set('session.save_path', $__evtSp);
+    }
+    unset($__evtSp);
     @session_start([
-        'cookie_secure'   => isset($_SERVER['HTTPS']),
+        'cookie_secure'   => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
         'cookie_httponly' => true,
         'cookie_samesite' => 'Lax',
     ]);
 }
 
-$sessId  = session_id() ?: null;
-$userId  = (int)(
+$sessId = session_id() ?: null;
+
+// Resolve user_id: session → GLOBALS container → GLOBALS ADMIN_USER
+$userId = (int)(
     $_SESSION['user']['id'] ??
     ($_SESSION['current_user']['id'] ?? ($_SESSION['user_id'] ?? 0))
 ) ?: null;
+
+if (!$userId) {
+    // Bootstrap may have resolved the user into $container or $GLOBALS
+    $__gu = $GLOBALS['container']['current_user'] ?? ($GLOBALS['ADMIN_USER'] ?? null);
+    if (is_array($__gu) && !empty($__gu['id'])) {
+        $userId = (int)$__gu['id'] ?: null;
+    }
+    unset($__gu);
+}
 
 $ip = (string)($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '');
 if (str_contains($ip, ',')) {
