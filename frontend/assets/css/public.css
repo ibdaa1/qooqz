@@ -134,20 +134,10 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   flex-wrap: wrap;
 }
 
-/* Mobile: search becomes a full-width second row */
+/* Mobile: hide search from header — keeps header single-row, no "two headers" appearance */
 @media (max-width: 640px) {
-  .pub-header {
-    height: auto;
-    min-height: var(--pub-header-h);
-  }
-  .pub-header-inner {
-    min-height: var(--pub-header-h);
-    padding-bottom: 8px;
-  }
   .pub-header-search {
-    flex-basis: 100%;
-    max-width: 100%;
-    order: 3;
+    display: none;
   }
 }
 
