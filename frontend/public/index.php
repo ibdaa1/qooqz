@@ -829,6 +829,24 @@ if (!$_entitiesRenderedViaSection) {
         });
     };
 
+    // ── Click tracking via event delegation ───────────────────────────────
+    // Registered first so it works even when IntersectionObserver is absent.
+    // Capture phase so the event fires even when the element is a link.
+    document.addEventListener('click', function (e) {
+        var el = e.target.closest('[data-track-type][data-track-id]');
+        if (!el) return;
+        var type = el.dataset.trackType;
+        var id   = el.dataset.trackId;
+        if (!type || !id || id === '0') return;
+
+        var key = 'c_' + type + '_' + id;
+        if (_recorded(key)) return;
+        _markRecorded(key);
+        window.pubTrackEvent(type, parseInt(id, 10), 'click', undefined, function () {
+            _unmarkRecorded(key); // allow retry later if API failed
+        });
+    }, true);
+
     // ── View tracking via IntersectionObserver ─────────────────────────────
     if (!('IntersectionObserver' in window)) return;
 
@@ -862,28 +880,31 @@ if (!$_entitiesRenderedViaSection) {
         });
     }, { threshold: 0.5 });
 
-    document.querySelectorAll('[data-track-type][data-track-id]').forEach(function (el) {
+    function _attachViewObserver(el) {
         if (el.dataset.trackId && el.dataset.trackId !== '0') {
             viewObserver.observe(el);
         }
-    });
+    }
 
-    // ── Click tracking via event delegation ───────────────────────────────
-    // Capture phase so the event fires even when the element is a link.
-    document.addEventListener('click', function (e) {
-        var el = e.target.closest('[data-track-type][data-track-id]');
-        if (!el) return;
-        var type = el.dataset.trackType;
-        var id   = el.dataset.trackId;
-        if (!type || !id || id === '0') return;
+    document.querySelectorAll('[data-track-type][data-track-id]').forEach(_attachViewObserver);
 
-        var key = 'c_' + type + '_' + id;
-        if (_recorded(key)) return;
-        _markRecorded(key);
-        window.pubTrackEvent(type, parseInt(id, 10), 'click', undefined, function () {
-            _unmarkRecorded(key); // allow retry later if API failed
+    // ── Auto-observe cards added dynamically (e.g., by PubHomepageEngine) ──
+    if ('MutationObserver' in window) {
+        var _mutObs = new MutationObserver(function (mutations) {
+            mutations.forEach(function (mutation) {
+                mutation.addedNodes.forEach(function (node) {
+                    if (node.nodeType !== 1) return;
+                    if (node.dataset && node.dataset.trackType && node.dataset.trackId) {
+                        _attachViewObserver(node);
+                    }
+                    if (node.querySelectorAll) {
+                        node.querySelectorAll('[data-track-type][data-track-id]').forEach(_attachViewObserver);
+                    }
+                });
+            });
         });
-    }, true);
+        _mutObs.observe(document.body, { childList: true, subtree: true });
+    }
 })();
 </script>
 

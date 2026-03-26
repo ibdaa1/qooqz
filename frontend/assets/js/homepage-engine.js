@@ -133,6 +133,8 @@
       a.href = '/frontend/public/products.php?category_id=' + (parseInt(cat.id) || 0);
       a.className = 'pub-cat-card' + (cat.is_featured ? ' pub-cat-card--featured' : '');
       a.style.textDecoration = 'none';
+      a.dataset.trackType = 'category';
+      a.dataset.trackId   = String(parseInt(cat.id) || 0);
 
       var imgHtml = cat.image_url
         ? '<img src="' + esc(imgUrl(cat.image_url)) + '" alt="' + esc(cat.name || '') + '" class="pub-cat-img" loading="lazy" onerror="this.style.display=\'none\'">'
@@ -160,6 +162,8 @@
       a.href = '/frontend/public/product.php?id=' + (parseInt(p.id) || 0);
       a.className = 'pub-product-card';
       a.style.textDecoration = 'none';
+      a.dataset.trackType = 'product';
+      a.dataset.trackId   = String(parseInt(p.id) || 0);
 
       var imgHtml = p.image_url
         ? '<img src="' + esc(imgUrl(p.image_url)) + '" alt="' + esc(p.name || '') + '" class="pub-cat-img" loading="lazy" onerror="this.style.display=\'none\'">'
@@ -217,6 +221,8 @@
       }
       a.className = 'pub-brand-card';
       a.style.textDecoration = 'none';
+      a.dataset.trackType = 'brand';
+      a.dataset.trackId   = String(parseInt(b.id) || 0);
 
       var imgHtml = b.logo_url
         ? '<img src="' + esc(imgUrl(b.logo_url)) + '" alt="' + esc(b.name || b.slug || '') + '" class="pub-brand-logo" loading="lazy" onerror="this.style.display=\'none\'">'
@@ -241,6 +247,8 @@
       a.href = '/frontend/public/entity.php?id=' + (parseInt(ent.id) || 0);
       a.className = 'pub-entity-card';
       a.style.textDecoration = 'none';
+      a.dataset.trackType = 'entity';
+      a.dataset.trackId   = String(parseInt(ent.id) || 0);
 
       var logoHtml = ent.logo_url
         ? '<img src="' + esc(imgUrl(ent.logo_url)) + '" alt="' + esc(ent.store_name || ent.name || '') + '" loading="lazy" onerror="this.style.display=\'none\'">'
