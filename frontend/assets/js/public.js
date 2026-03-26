@@ -1,19 +1,27 @@
 /**
- * assets/js/public.js
+ * assets/js/public.js — Production v3.1
  * QOOQZ — Global Public Interface JS
- * - Mobile hamburger menu
- * - Dynamic theme injection from API
- * - Lazy loading helpers
- * - Lightweight, no dependencies
+ *
+ * ─ Fixes vs v3.0 ──────────────────────────────────────────────
+ *   FIX-3  Sidebar double-binding eliminated:
+ *          cloneNode() replaces inline-script listener when
+ *          button carries data-bound="1" (set by header.php).
+ *          public.js then sets data-bound="js" as its own mark.
+ *   FIX-4  Desktop collapse state correctly restored on load.
+ *   FIX-5  Resize handler prevents stale mobile-open state.
+ * ──────────────────────────────────────────────────────────────
+ *
+ * No external dependencies.
  */
 
 (function () {
   'use strict';
 
   /* -------------------------------------------------------
-   * 1. Sidebar toggle (persistent on desktop, slide-out on mobile)
-   *    Desktop: collapse/expand (body.pub-sidebar-collapsed), persisted in localStorage
-   *    Mobile: slide-out overlay (sidebar.open + backdrop.open)
+   * 1. Sidebar toggle
+   *    Desktop : collapse / expand (body.pub-sidebar-collapsed)
+   *              state persisted in localStorage
+   *    Mobile  : slide-out overlay (sidebar.open + backdrop.open)
    * ----------------------------------------------------- */
   function initSidebar() {
     var toggle   = document.getElementById('pubHamburger');
@@ -23,23 +31,26 @@
 
     if (!toggle || !sidebar) return;
 
-    // Remove any event listeners from inline fallback (header.php) to prevent
-    // double-binding which causes sidebar to open then immediately close on mobile
+    // ── FIX-3: Remove the inline fallback listener from header.php ──
+    // header.php marks the button with data-bound="1".
+    // We replace the node with a clean clone so the old addEventListener
+    // (captured in the header.php inline <script>) is discarded entirely.
+    // Then we add our own listener and mark the button as ours.
     if (toggle.dataset.bound) {
       var clean = toggle.cloneNode(true);
       toggle.parentNode.replaceChild(clean, toggle);
       toggle = clean;
     }
-    toggle.dataset.bound = 'js';
+    toggle.dataset.bound = 'js'; // mark as handled by this file
 
     var STORAGE_KEY = 'pub_sidebar_collapsed';
-    var MOBILE_BP   = 768; // matches CSS breakpoint
+    var MOBILE_BP   = 768; // must match CSS @media breakpoint
 
     function isMobile() {
       return window.innerWidth <= MOBILE_BP;
     }
 
-    // ── Desktop: collapse / expand ──
+    // ── Desktop: persist collapsed state ──────────────────
     function restoreDesktopState() {
       if (isMobile()) return;
       try {
@@ -54,7 +65,7 @@
       try { localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0'); } catch (e) {}
     }
 
-    // ── Mobile: slide-out overlay ──
+    // ── Mobile: slide-out overlay ──────────────────────────
     function openMobile() {
       sidebar.classList.add('open');
       if (backdrop) backdrop.classList.add('open');
@@ -69,14 +80,10 @@
       document.body.style.overflow = '';
     }
 
-    // ── Toggle click: desktop vs mobile ──
+    // ── Main toggle click ──────────────────────────────────
     toggle.addEventListener('click', function () {
       if (isMobile()) {
-        if (sidebar.classList.contains('open')) {
-          closeMobile();
-        } else {
-          openMobile();
-        }
+        sidebar.classList.contains('open') ? closeMobile() : openMobile();
       } else {
         toggleDesktop();
       }
@@ -99,17 +106,17 @@
       }
     });
 
-    // On resize: if going from mobile→desktop while sidebar is open, close mobile state
+    // ── FIX-5: Resize — clean up stale mobile-open state ──
     window.addEventListener('resize', function () {
       if (!isMobile() && sidebar.classList.contains('open')) {
         closeMobile();
       }
-    });
+    }, { passive: true });
 
-    // Restore desktop collapsed state from localStorage
+    // Restore desktop collapsed state
     restoreDesktopState();
 
-    // Highlight active link based on current URL (first match only)
+    // Highlight active sidebar link by current URL path
     var currentPath = window.location.pathname;
     var links = sidebar.querySelectorAll('.pub-sidebar-link');
     for (var i = 0; i < links.length; i++) {
@@ -121,10 +128,9 @@
   }
 
   /* -------------------------------------------------------
-   * 2. Apply dynamic theme colors from data attribute
+   * 2. Apply dynamic theme colors from #pubThemeData element
    * ----------------------------------------------------- */
   function applyTheme() {
-    var root = document.documentElement;
     var themeEl = document.getElementById('pubThemeData');
     if (!themeEl) return;
 
@@ -134,23 +140,22 @@
     var theme;
     try { theme = JSON.parse(raw); } catch (e) { return; }
 
+    var root = document.documentElement;
     var map = {
-      primary:           '--pub-primary',
-      secondary:         '--pub-secondary',
-      accent:            '--pub-accent',
-      background:        '--pub-bg',
-      surface:           '--pub-surface',
-      text:              '--pub-text',
-      header_bg:         '--pub-header-bg',
-      header_text_color: '--pub-header-text',
-      footer_bg:         '--pub-footer-bg',
-      footer_text_color: '--pub-footer-text',
+      primary:            '--pub-primary',
+      secondary:          '--pub-secondary',
+      accent:             '--pub-accent',
+      background:         '--pub-bg',
+      surface:            '--pub-surface',
+      text:               '--pub-text',
+      header_bg:          '--pub-header-bg',
+      header_text_color:  '--pub-header-text',
+      footer_bg:          '--pub-footer-bg',
+      footer_text_color:  '--pub-footer-text',
     };
 
     Object.keys(map).forEach(function (key) {
-      if (theme[key]) {
-        root.style.setProperty(map[key], theme[key]);
-      }
+      if (theme[key]) root.style.setProperty(map[key], theme[key]);
     });
   }
 
@@ -159,8 +164,7 @@
    * ----------------------------------------------------- */
   function markActiveNav() {
     var path = window.location.pathname;
-    var links = document.querySelectorAll('.pub-sidebar-link');
-    links.forEach(function (a) {
+    document.querySelectorAll('.pub-sidebar-link').forEach(function (a) {
       if (a.getAttribute('href') && path.indexOf(a.getAttribute('href')) !== -1) {
         a.classList.add('active');
       }
@@ -172,7 +176,6 @@
    * ----------------------------------------------------- */
   function lazyLoadImages() {
     if (!('IntersectionObserver' in window)) {
-      // Fallback: load all immediately
       document.querySelectorAll('img[data-src]').forEach(function (img) {
         img.src = img.dataset.src;
       });
@@ -196,60 +199,54 @@
   }
 
   /* -------------------------------------------------------
-   * 5. Simple search form progressive enhancement
+   * 5. Search form — auto-focus on desktop
    * ----------------------------------------------------- */
   function initSearch() {
     var form = document.getElementById('pubSearchForm');
     if (!form) return;
-
     var input = form.querySelector('.pub-search-input');
     if (!input) return;
-
-    // Auto-focus on desktop
-    if (window.innerWidth >= 768) {
-      input.focus();
-    }
+    if (window.innerWidth >= 768) input.focus();
   }
 
   /* -------------------------------------------------------
-   * 6a. Banner/Slider carousel auto-advance
-   * Finds .pub-banner-slider elements rendered by PHP,
-   * activates the first slide, and auto-advances.
+   * 6. Banner / Slider carousel auto-advance
    * ----------------------------------------------------- */
   function initSliders() {
     var sliders = document.querySelectorAll('.pub-banner-slider');
     sliders.forEach(function (slider) {
       var slides = slider.querySelectorAll('.pub-banner-slide');
-      if (slides.length <= 1) return; // nothing to cycle
+      if (slides.length <= 1) return;
 
       var current = 0;
       var isRtl   = document.documentElement.dir === 'rtl';
 
-      /* Activate first slide */
+      // Activate first slide
       slides.forEach(function (s) { s.classList.remove('active'); });
       slides[0].classList.add('active');
 
-      /* Inject prev / next buttons */
+      // Prev button
       var prevBtn = document.createElement('button');
       prevBtn.className = 'pub-slider-btn pub-slider-btn--prev';
       prevBtn.setAttribute('aria-label', 'Previous');
-      prevBtn.innerHTML = isRtl ? '&#8250;' : '&#8249;'; // › or ‹
+      prevBtn.innerHTML = isRtl ? '&#8250;' : '&#8249;';
       slider.appendChild(prevBtn);
 
+      // Next button
       var nextBtn = document.createElement('button');
       nextBtn.className = 'pub-slider-btn pub-slider-btn--next';
       nextBtn.setAttribute('aria-label', 'Next');
-      nextBtn.innerHTML = isRtl ? '&#8249;' : '&#8250;'; // ‹ or ›
+      nextBtn.innerHTML = isRtl ? '&#8249;' : '&#8250;';
       slider.appendChild(nextBtn);
 
-      /* Inject dot indicators */
+      // Dot indicators
       var dotsWrap = document.createElement('div');
       dotsWrap.className = 'pub-slider-dots';
       slides.forEach(function (_, i) {
         var dot = document.createElement('button');
         dot.className = 'pub-slider-dot' + (i === 0 ? ' active' : '');
         dot.setAttribute('aria-label', 'Go to slide ' + (i + 1));
-        dot.addEventListener('click', function () { goTo(i); });
+        dot.addEventListener('click', function () { goTo(i); resetTimer(); });
         dotsWrap.appendChild(dot);
       });
       slider.appendChild(dotsWrap);
@@ -262,42 +259,45 @@
         dotsWrap.children[current].classList.add('active');
       }
 
-      prevBtn.addEventListener('click', function () { goTo(current - 1); clearInterval(timer); timer = setInterval(advance, 5000); });
-      nextBtn.addEventListener('click', function () { goTo(current + 1); clearInterval(timer); timer = setInterval(advance, 5000); });
+      var timer;
+      function resetTimer() {
+        clearInterval(timer);
+        timer = setInterval(function () { goTo(current + 1); }, 5000);
+      }
 
-      function advance() { goTo(current + 1); }
-      var timer = setInterval(advance, 5000);
+      prevBtn.addEventListener('click', function () { goTo(current - 1); resetTimer(); });
+      nextBtn.addEventListener('click', function () { goTo(current + 1); resetTimer(); });
 
-      /* Pause on hover */
+      resetTimer();
+
       slider.addEventListener('mouseenter', function () { clearInterval(timer); });
-      slider.addEventListener('mouseleave', function () { timer = setInterval(advance, 5000); });
+      slider.addEventListener('mouseleave', resetTimer);
     });
   }
 
   /* -------------------------------------------------------
-   * 6. Animate counters (stats row)
+   * 7. Animate stat counters (.pub-stat-value[data-target])
    * ----------------------------------------------------- */
   function animateCounters() {
     var counters = document.querySelectorAll('.pub-stat-value[data-target]');
-    if (!counters.length) return;
+    if (!counters.length || !('IntersectionObserver' in window)) return;
 
     var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         if (!entry.isIntersecting) return;
-        var el = entry.target;
+        var el     = entry.target;
         var target = parseInt(el.dataset.target, 10);
-        var duration = 800;
-        var start = performance.now();
+        var start  = performance.now();
         observer.unobserve(el);
 
         function step(now) {
-          var elapsed = now - start;
-          var progress = Math.min(elapsed / duration, 1);
-          // easeOut
-          var value = Math.floor(progress * target);
-          el.textContent = value.toLocaleString();
-          if (progress < 1) requestAnimationFrame(step);
-          else el.textContent = target.toLocaleString() + '+';
+          var progress = Math.min((now - start) / 800, 1);
+          el.textContent = Math.floor(progress * target).toLocaleString();
+          if (progress < 1) {
+            requestAnimationFrame(step);
+          } else {
+            el.textContent = target.toLocaleString() + '+';
+          }
         }
         requestAnimationFrame(step);
       });
@@ -307,7 +307,7 @@
   }
 
   /* -------------------------------------------------------
-   * 7. Filter select: submit form on change
+   * 8. Filter selects — auto-submit on change
    * ----------------------------------------------------- */
   function initFilterSelects() {
     document.querySelectorAll('.pub-filter-select[data-auto-submit]').forEach(function (sel) {
@@ -319,7 +319,7 @@
   }
 
   /* -------------------------------------------------------
-   * 8. Back-to-top button
+   * 9. Back-to-top button
    * ----------------------------------------------------- */
   function initBackToTop() {
     var btn = document.getElementById('pubBackToTop');
@@ -335,27 +335,23 @@
   }
 
   /* -------------------------------------------------------
-   * 9. Cart badge — update sidebar cart badge from localStorage
+   * 10. Cart badge — update sidebar badge from localStorage
    * ----------------------------------------------------- */
   function initCartBadge() {
-    var badges = [
-      document.getElementById('pubCartCountSidebar'),
-    ];
     var cart = [];
     try { cart = JSON.parse(localStorage.getItem('pub_cart') || '[]'); } catch (e) {}
     if (!Array.isArray(cart)) cart = [];
-    var total = cart.reduce(function (s, i) { return s + (Math.max(1, parseInt(i.qty, 10) || 1)); }, 0);
-    badges.forEach(function (badge) {
-      if (!badge) return;
-      badge.textContent = total;
-      badge.style.display = total ? 'inline-flex' : 'none';
-    });
+    var total = cart.reduce(function (s, i) {
+      return s + (Math.max(1, parseInt(i.qty, 10) || 1));
+    }, 0);
+    var badge = document.getElementById('pubCartCountSidebar');
+    if (!badge) return;
+    badge.textContent    = total;
+    badge.style.display  = total ? 'inline-flex' : 'none';
   }
 
   /* -------------------------------------------------------
-   * 9b. User display: read localStorage.pubUser set by login.js
-   *     Falls back to window.pubSessionUser injected by PHP (header.php)
-   *     so users who logged in via the admin panel are also recognised.
+   * 11. User display — sync localStorage / PHP session user
    * ----------------------------------------------------- */
   function updateUserDisplay() {
     try {
@@ -363,10 +359,9 @@
       var raw = localStorage.getItem('pubUser');
       if (raw) { try { u = JSON.parse(raw); } catch (e) {} }
 
-      // Fallback: PHP session user injected in <head> by header.php
+      // Fallback to PHP session user injected in <head>
       if (!u || !u.id) {
         u = (typeof window.pubSessionUser !== 'undefined' && window.pubSessionUser) ? window.pubSessionUser : null;
-        // Sync to localStorage so future checks (pubAddToCart, job.php) also see it
         if (u && u.id) {
           try { localStorage.setItem('pubUser', JSON.stringify(u)); } catch (e) {}
         }
@@ -376,9 +371,8 @@
 
       var displayName = u.name || u.username || 'User';
 
-      // Update header login link(s) that still point to login.php
-      var loginLinks = document.querySelectorAll('a.pub-login-btn');
-      loginLinks.forEach(function (el) {
+      // Update header login links that still point to login.php
+      document.querySelectorAll('a.pub-login-btn').forEach(function (el) {
         if (el.href && el.href.indexOf('login.php') !== -1) {
           el.textContent = displayName;
           el.href = '/frontend/profile.php';
@@ -388,9 +382,7 @@
   }
 
   /* -------------------------------------------------------
-   * 9c. Notification Bell
-   *     Reads from #pubNotifData JSON element (injected by header.php).
-   *     Tracks "seen" IDs in localStorage to show unread badge.
+   * 12. Notification bell
    * ----------------------------------------------------- */
   function initNotifBell() {
     var btn      = document.getElementById('pubNotifBtn');
@@ -401,7 +393,6 @@
 
     if (!btn || !dropdown) return;
 
-    // Parse notification data injected by PHP
     var notifications = [];
     var dataEl = document.getElementById('pubNotifData');
     if (dataEl) {
@@ -409,30 +400,22 @@
     }
     if (!Array.isArray(notifications)) notifications = [];
 
-    // Load seen IDs from localStorage
     var seenKey = 'pub_notif_seen';
     var seenIds = [];
     try { seenIds = JSON.parse(localStorage.getItem(seenKey) || '[]'); } catch (e) {}
     if (!Array.isArray(seenIds)) seenIds = [];
 
-    // Count unread: a notification is unread if server says is_read===false AND not in local seenIds
     var unread = notifications.filter(function (n) {
       return !n.is_read && seenIds.indexOf(String(n.id)) === -1;
     }).length;
 
-    // Update badge
     function updateBadge(count) {
       if (!badge) return;
       badge.textContent = count > 99 ? '99+' : String(count);
-      if (count > 0) {
-        badge.classList.add('visible');
-      } else {
-        badge.classList.remove('visible');
-      }
+      badge.classList.toggle('visible', count > 0);
     }
     updateBadge(unread);
 
-    // Notification type code → emoji icon
     function typeIcon(code) {
       var icons = {
         order: '📦', payment: '💳', shipment: '🚚', 'return': '↩️',
@@ -443,32 +426,29 @@
       return icons[code] || '🔔';
     }
 
-    // Render notifications list
     function renderList() {
       if (!list) return;
       if (!notifications.length) {
-        list.innerHTML = '<div class="pub-notif-empty">' +
-          (document.documentElement.lang === 'ar' ? 'لا توجد إشعارات' : 'No notifications') +
-          '</div>';
+        list.innerHTML = '<div class="pub-notif-empty">'
+          + (document.documentElement.lang === 'ar' ? 'لا توجد إشعارات' : 'No notifications')
+          + '</div>';
         return;
       }
       list.innerHTML = notifications.map(function (n) {
         var isSeen = n.is_read || seenIds.indexOf(String(n.id)) !== -1;
         var icon   = typeIcon(n.type_code || '');
         var time   = n.sent_at ? n.sent_at.replace('T', ' ').substring(0, 16) : '';
-        var title  = (n.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        var title  = (n.title   || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         var msg    = (n.message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        return '<div class="pub-notif-item' + (isSeen ? '' : ' unread') + '" data-id="' + n.id + '">' +
-          '<span class="pub-notif-icon">' + icon + '</span>' +
-          '<div class="pub-notif-body">' +
-            '<p class="pub-notif-title">' + title + '</p>' +
-            (msg ? '<p class="pub-notif-msg">' + msg + '</p>' : '') +
-            (time ? '<div class="pub-notif-time">' + time + '</div>' : '') +
-          '</div>' +
-        '</div>';
+        return '<div class="pub-notif-item' + (isSeen ? '' : ' unread') + '" data-id="' + n.id + '">'
+          + '<span class="pub-notif-icon">' + icon + '</span>'
+          + '<div class="pub-notif-body">'
+          + '<p class="pub-notif-title">' + title + '</p>'
+          + (msg  ? '<p class="pub-notif-msg">'  + msg  + '</p>' : '')
+          + (time ? '<div class="pub-notif-time">' + time + '</div>' : '')
+          + '</div></div>';
       }).join('');
 
-      // Click on item → mark as seen locally and persist to server
       list.querySelectorAll('.pub-notif-item').forEach(function (item) {
         item.addEventListener('click', function () {
           var id = String(item.dataset.id);
@@ -478,10 +458,8 @@
             item.classList.remove('unread');
             unread = Math.max(0, unread - 1);
             updateBadge(unread);
-            // Persist to server (best-effort)
             fetch('/api/public/notifications/mark-read', {
-              method: 'POST',
-              credentials: 'include',
+              method: 'POST', credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ ids: [parseInt(id, 10)] })
             }).catch(function () {});
@@ -491,32 +469,26 @@
     }
     renderList();
 
-    // Mark all as seen — also persist to server via API
     if (markAll) {
       markAll.addEventListener('click', function () {
-        // Optimistic local update
         seenIds = notifications.map(function (n) { return String(n.id); });
         try { localStorage.setItem(seenKey, JSON.stringify(seenIds)); } catch (e) {}
         unread = 0;
         updateBadge(0);
         renderList();
-        // Persist to server (best-effort — do not block UI)
         fetch('/api/public/notifications/mark-all-read', {
-          method: 'POST',
-          credentials: 'include',
+          method: 'POST', credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
         }).catch(function () {});
       });
     }
 
-    // Toggle dropdown
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
       var isOpen = dropdown.classList.toggle('open');
       btn.setAttribute('aria-expanded', String(isOpen));
     });
 
-    // Close on outside click
     document.addEventListener('click', function (e) {
       if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
         dropdown.classList.remove('open');
@@ -524,7 +496,6 @@
       }
     });
 
-    // Close on Escape
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         dropdown.classList.remove('open');
@@ -534,7 +505,7 @@
   }
 
   /* -------------------------------------------------------
-   * 10. Init all on DOMContentLoaded
+   * 13. Init all on DOMContentLoaded
    * ----------------------------------------------------- */
   document.addEventListener('DOMContentLoaded', function () {
     applyTheme();
@@ -550,7 +521,7 @@
     updateUserDisplay();
     initNotifBell();
 
-    // Register service worker for PWA support
+    // PWA service worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/frontend/sw.js').catch(function () {});
     }
@@ -558,13 +529,13 @@
 
 })();
 
-/* -------------------------------------------------------
- * Global Add-to-Cart helpers (available on all pages)
- * Used by product detail page and products listing cards.
- * ----------------------------------------------------- */
+
+/* ═══════════════════════════════════════════════════════════════
+ * Global cart helpers (available on all pages, no module wrap)
+ * ════════════════════════════════════════════════════════════ */
 
 /**
- * Change quantity in #pubQtyInput by delta (+1 / -1).
+ * Increment / decrement quantity in #pubQtyInput by delta.
  */
 function pubQtyChange(delta) {
   var inp = document.getElementById('pubQtyInput');
@@ -575,13 +546,11 @@ function pubQtyChange(delta) {
 }
 
 /**
- * Add a product to the cart.
- * Saves to DB (via /api/public/cart/add) when logged in, always to localStorage as fallback.
- * Accepts a button/span element with data-product-* attributes.
- * Quantity is taken from #pubQtyInput (defaults to 1).
+ * Add a product to cart.
+ * Saves to DB when logged in; always writes to localStorage as fallback.
  */
 function pubAddToCart(btn) {
-  // Require login — check localStorage first, then window.pubSessionUser (PHP session)
+  // Require login
   var pubU = null;
   try {
     pubU = JSON.parse(localStorage.getItem('pubUser') || 'null');
@@ -601,18 +570,18 @@ function pubAddToCart(btn) {
   }
 
   var qtyInput = document.getElementById('pubQtyInput');
-  var qty      = qtyInput ? (parseInt(qtyInput.value, 10) || 1) : 1;
-  var id       = parseInt(btn.dataset.productId, 10);
-  var name     = btn.dataset.productName  || '';
-  var price    = parseFloat(btn.dataset.productPrice) || 0;
-  var img      = btn.dataset.productImage || '';
-  var cur      = btn.dataset.currency     || '';
-  var sku      = btn.dataset.productSku   || '';
-  var eid      = parseInt(btn.dataset.entityId, 10) || 1;
+  var qty   = qtyInput ? (parseInt(qtyInput.value, 10) || 1) : 1;
+  var id    = parseInt(btn.dataset.productId, 10);
+  var name  = btn.dataset.productName  || '';
+  var price = parseFloat(btn.dataset.productPrice) || 0;
+  var img   = btn.dataset.productImage || '';
+  var cur   = btn.dataset.currency     || '';
+  var sku   = btn.dataset.productSku   || '';
+  var eid   = parseInt(btn.dataset.entityId, 10) || 1;
 
   if (!id) return;
 
-  // ── 1. Always update localStorage immediately (works offline) ────────────
+  // 1. Update localStorage immediately
   var cart = [];
   try { cart = JSON.parse(localStorage.getItem('pub_cart') || '[]'); } catch (e) {}
   if (!Array.isArray(cart)) cart = [];
@@ -626,39 +595,28 @@ function pubAddToCart(btn) {
   }
   try { localStorage.setItem('pub_cart', JSON.stringify(cart)); } catch (e) {}
 
-  // ── Track add_to_cart event ───────────────────────────────────────────────
+  // Track event
   if (typeof window.pubTrackEvent === 'function') {
     window.pubTrackEvent('product', id, 'add_to_cart', price || null);
   }
 
-  // ── 2. Sync to DB (fire-and-forget — user is logged in) ──────────────────
+  // 2. Sync to DB (fire-and-forget)
   var tenantId = (typeof window.PUB_TENANT_ID !== 'undefined') ? window.PUB_TENANT_ID : 1;
   if (typeof fetch !== 'undefined') {
     fetch('/api/public/cart/add?tenant_id=' + tenantId, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({
-        product_id: id,
-        product_name: name,
-        sku: sku,
-        unit_price: price,
-        qty: qty,
-        entity_id: eid
-      })
-    }).catch(function () {}); // silent fail — localStorage is the fallback
+      body: JSON.stringify({ product_id: id, product_name: name, sku: sku, unit_price: price, qty: qty, entity_id: eid })
+    }).catch(function () {});
   }
 
-  // ── 3. Update sidebar cart count badge ───────────────────────────────────
+  // 3. Update sidebar cart badge
   var total = cart.reduce(function (s, i) { return s + (Math.max(1, parseInt(i.qty, 10) || 1)); }, 0);
-  [document.getElementById('pubCartCountSidebar')]
-    .forEach(function (badge) {
-      if (!badge) return;
-      badge.textContent = total;
-      badge.style.display = total ? 'inline-flex' : 'none';
-    });
+  var badge = document.getElementById('pubCartCountSidebar');
+  if (badge) { badge.textContent = total; badge.style.display = total ? 'inline-flex' : 'none'; }
 
-  // ── 4. Visual feedback + navigate to cart ─────────────────────────────────
+  // 4. Visual feedback then navigate
   var orig = btn.textContent;
   btn.textContent = btn.dataset.addedText || '✅';
   btn.disabled = true;
@@ -667,9 +625,11 @@ function pubAddToCart(btn) {
   }, 1200);
 }
 
-// ── Wishlist ─────────────────────────────────────────────────────────────────
 
-/** Toggle wishlist state for a product. Called by heart buttons. */
+/* ═══════════════════════════════════════════════════════════════
+ * Wishlist helpers
+ * ════════════════════════════════════════════════════════════ */
+
 function pubToggleWishlist(btn) {
   var u = window.pubSessionUser || JSON.parse(localStorage.getItem('pubUser') || 'null');
   if (!u || !u.id) {
@@ -678,76 +638,69 @@ function pubToggleWishlist(btn) {
   }
   var productId = btn.dataset.productId;
   if (!productId) return;
+
   var active = btn.classList.contains('pub-wishlist-active');
   var action = active ? 'remove' : 'add';
   btn.disabled = true;
 
   var fd = new FormData();
   fd.append('product_id', productId);
-  fd.append('entity_id', btn.dataset.entityId || '1');
+  fd.append('entity_id',  btn.dataset.entityId || '1');
 
-  fetch('/api/public/wishlist/' + action, {
-    method: 'POST',
-    credentials: 'include',
-    body: fd
-  })
-  .then(function (r) { return r.json(); })
-  .then(function (data) {
-    if (data.success || data.ok) {
-      if (active) {
-        btn.classList.remove('pub-wishlist-active');
-        btn.title = 'Add to wishlist';
-        btn.textContent = '♡';
-      } else {
-        btn.classList.add('pub-wishlist-active');
-        btn.title = 'In wishlist';
-        btn.textContent = '♥';
-        // Track favorite event when item is added to wishlist
-        if (typeof window.pubTrackEvent === 'function') {
-          window.pubTrackEvent('product', parseInt(productId, 10), 'favorite');
+  fetch('/api/public/wishlist/' + action, { method: 'POST', credentials: 'include', body: fd })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.success || data.ok) {
+        if (active) {
+          btn.classList.remove('pub-wishlist-active');
+          btn.title       = 'Add to wishlist';
+          btn.textContent = '♡';
+        } else {
+          btn.classList.add('pub-wishlist-active');
+          btn.title       = 'In wishlist';
+          btn.textContent = '♥';
+          if (typeof window.pubTrackEvent === 'function') {
+            window.pubTrackEvent('product', parseInt(productId, 10), 'favorite');
+          }
         }
+        pubRefreshWishlistBadge();
       }
-      // Update badge count
-      pubRefreshWishlistBadge();
-    }
-  })
-  .catch(function () {})
-  .finally(function () { btn.disabled = false; });
+    })
+    .catch(function () {})
+    .finally(function () { btn.disabled = false; });
 }
 
-/** Refresh wishlist badge in header */
 function pubRefreshWishlistBadge() {
   fetch('/api/public/wishlist/ids', { credentials: 'include' })
-  .then(function (r) { return r.json(); })
-  .then(function (data) {
-    var ids = (data.data && data.data.ids) ? data.data.ids : [];
-    var count = ids.length;
-    // Update badge
-    var badge = document.getElementById('pubWishlistCount');
-    if (badge) { badge.textContent = count; badge.style.display = count ? 'inline-flex' : 'none'; }
-    var badgeMob = document.getElementById('pubWishlistCountSidebar');
-    if (badgeMob) { badgeMob.textContent = count; badgeMob.style.display = count ? 'inline-flex' : 'none'; }
-    // Update heart buttons on page
-    document.querySelectorAll('.pub-wishlist-btn').forEach(function (btn) {
-      var pid = String(btn.dataset.productId);
-      if (ids.map(String).indexOf(pid) !== -1) {
-        btn.classList.add('pub-wishlist-active');
-        btn.textContent = '♥';
-        btn.title = 'In wishlist';
-      } else {
-        btn.classList.remove('pub-wishlist-active');
-        btn.textContent = '♡';
-        btn.title = 'Add to wishlist';
-      }
-    });
-  })
-  .catch(function () {});
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var ids   = (data.data && data.data.ids) ? data.data.ids : [];
+      var count = ids.length;
+
+      var b1 = document.getElementById('pubWishlistCount');
+      var b2 = document.getElementById('pubWishlistCountSidebar');
+      if (b1) { b1.textContent = count; b1.style.display = count ? 'inline-flex' : 'none'; }
+      if (b2) { b2.textContent = count; b2.style.display = count ? 'inline-flex' : 'none'; }
+
+      document.querySelectorAll('.pub-wishlist-btn').forEach(function (btn) {
+        if (ids.map(String).indexOf(String(btn.dataset.productId)) !== -1) {
+          btn.classList.add('pub-wishlist-active');
+          btn.textContent = '♥';
+          btn.title = 'In wishlist';
+        } else {
+          btn.classList.remove('pub-wishlist-active');
+          btn.textContent = '♡';
+          btn.title = 'Add to wishlist';
+        }
+      });
+    })
+    .catch(function () {});
 }
 
-// ── Init on page load ─────────────────────────────────────────────────────────
+// Auto-refresh wishlist badge on page load when user is logged in
 (function () {
   var u = window.pubSessionUser || JSON.parse(localStorage.getItem('pubUser') || 'null');
   if (u && u.id && document.querySelector('.pub-wishlist-btn')) {
     pubRefreshWishlistBadge();
   }
-})();
+}());
