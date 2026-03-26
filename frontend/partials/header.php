@@ -1,29 +1,44 @@
 <?php
 declare(strict_types=1);
 /**
- * frontend/partials/header.php — Production v3.0
+ * frontend/partials/header.php — Production v3.1
  * QOOQZ — Public Interface Header
  *
- * ─ Design Principles (mirrors admin/includes/header.php) ───────
+ * ─ Fixes vs v3.0 ──────────────────────────────────────────────
+ *   FIX-1  Include guard → prevents double-render (PUB_HEADER_INCLUDED)
+ *   FIX-2  Mobile search bar → shown as second row on ≤640px screens
+ *   FIX-3  Inline hamburger script → data-bound='1' flag so public.js
+ *          can detect and replace it without double-binding
+ * ──────────────────────────────────────────────────────────────
+ *
+ * Design Principles
  *   1. Single source of CSS variables → set HERE, no JS overrides
- *   2. No !important on colors      → natural cascade specificity wins
+ *   2. No !important on colors       → natural cascade specificity wins
  *   3. No race condition             → all CSS injected before <body>
  *   4. No duplication of vars        → underscore + hyphen in one pass
  *   5. generated_css from DB         → button/card concrete classes
- * ───────────────────────────────────────────────────────────────
  *
  * Responsibilities:
  *   1. HTML <head> with public CSS, fonts, meta tags, SEO
- *   2. <header> bar: logo + hamburger toggle (NO menus — menus live in menu.php)
+ *   2. <header> bar: logo + hamburger toggle + search bar
+ *      (search renders inline on desktop, second row on mobile)
  *   3. Opens <div class="pub-layout"> and includes menu.php sidebar
  *   4. Opens <main class="pub-main-content"> for page content
  *
- * The footer.php closes </main> and </div>.
- * Menu.php renders the sidebar navigation independently.
+ * footer.php closes </main> and </div>.
+ * menu.php renders the sidebar navigation independently.
  */
 
 // ════════════════════════════════════════════════════════════
-// 0. Guard: no CLI, no direct /api/ access
+// 0-A. Include guard — prevent double-render
+// ════════════════════════════════════════════════════════════
+if (defined('PUB_HEADER_INCLUDED')) {
+    return;
+}
+define('PUB_HEADER_INCLUDED', true);
+
+// ════════════════════════════════════════════════════════════
+// 0-B. Guard: no CLI, no direct /api/ access
 // ════════════════════════════════════════════════════════════
 if (php_sapi_name() === 'cli') {
     return;
@@ -47,65 +62,50 @@ $_appName   = $GLOBALS['PUB_APP_NAME']  ?? 'QOOQZ';
 $_pageTitle = $GLOBALS['PUB_PAGE_TITLE'] ?? ($_seo['title'] ?? $_appName);
 $_pageDesc  = $GLOBALS['PUB_PAGE_DESC']  ?? ($_seo['description'] ?? '');
 $_basePath  = rtrim($GLOBALS['PUB_BASE_PATH'] ?? '/frontend/public', '/');
-$_authPath  = '/frontend'; // Auth pages (login, register, profile, logout) at /frontend/ level
+$_authPath  = '/frontend';
 
 // ════════════════════════════════════════════════════════════
 // 2. Helpers
 // ════════════════════════════════════════════════════════════
 if (!function_exists('e')) {
-    function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES|ENT_SUBSTITUTE, 'UTF-8'); }
+    function e($v): string {
+        return htmlspecialchars((string)$v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
 }
 if (!function_exists('t')) {
-    function t(string $key, string|array $r = []): string { return is_string($r) ? $r : $key; }
+    function t(string $key, string|array $r = []): string {
+        return is_string($r) ? $r : $key;
+    }
 }
+
 // ════════════════════════════════════════════════════════════
 // 3. Theme → CSS custom properties
 //    Processes: color_settings, font_settings, design_settings
 //    Creates both underscore AND hyphen variants in a single pass
 // ════════════════════════════════════════════════════════════
 
-/**
- * Sanitize a CSS value — strip injection vectors while allowing valid CSS.
- * Matches admin's AdminUiThemeLoader::generateCss() approach: removes { } ; `
- * Also does basic validation for safety.
- */
 if (!function_exists('_pub_safe_css_val')) {
     function _pub_safe_css_val(string $v): string {
         $v = trim($v);
         if ($v === '') return '';
-        // Strip dangerous characters that could break out of CSS context
         $v = preg_replace('/[{};`]/', '', $v);
         if ($v === '') return '';
-        // hex color
         if (preg_match('/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/', $v)) return $v;
-        // rgb/rgba/hsl/hsla
         if (preg_match('/^(rgb|rgba|hsl|hsla)\(\s*[\d\s%,.\/]+\)$/i', $v)) return $v;
-        // named color (2-30 alpha chars)
         if (preg_match('/^[a-zA-Z]{2,30}$/', $v)) return $v;
-        // CSS variable reference
         if (preg_match('/^var\(--[a-zA-Z0-9_-]+\)$/', $v)) return $v;
-        // CSS length (e.g. 16px, 1.5rem, 100%, multi-value shorthand like "20px 16px")
         if (preg_match('/^[\d.]+(px|em|rem|%|vh|vw|pt|ch|ex)(\s+[\d.]+(px|em|rem|%|vh|vw|pt|ch|ex))*$/', $v)) return $v;
-        // Numeric (e.g. font-weight 400, 700, line-height 1.5)
         if (preg_match('/^[\d.]{1,6}$/', $v)) return $v;
-        // Box-shadow value: numeric offsets + optional rgba/hex color
-        // e.g. "0 4px 20px rgba(255,99,71,0.2)" or "0 6px 24px rgba(14,165,233,0.25)"
         if (preg_match('/^[\d\s.]+(px|em|rem)?\s+(rgba?\([\d\s%,.\/]+\))$/i', $v)) return $v;
         if (preg_match('/^[\d.]+(px)?\s+[\d.]+(px)?\s+[\d.]+(px)?(\s+[\d.]+(px)?)?\s+(rgba?\([\d\s%,.\/]+\)|#[0-9a-fA-F]{3,8})$/i', $v)) return $v;
-        // Quoted font name
         if (preg_match('/^"[a-zA-Z0-9\s\-]{1,60}"$/', $v)) return $v;
-        // Font stack (comma-separated, alphanumeric + spaces + quotes)
         if (preg_match('/^[a-zA-Z0-9\s,"\'\-]+$/', $v) && strlen($v) <= 200) return $v;
         return '';
     }
 }
 
-$_cssVars = []; // ['--var-name' => 'value'] map
+$_cssVars = [];
 
-/**
- * Set a CSS custom property in both underscore and hyphen forms.
- * Values are validated through _pub_safe_css_val().
- */
 $_setVar = function (string $key, string $value) use (&$_cssVars): void {
     if ($value === '') return;
     $safe = _pub_safe_css_val($value);
@@ -128,7 +128,7 @@ foreach ($theme['color_settings'] ?? [] as $cs) {
     }
 }
 
-// ── Font settings (matches admin approach) ────────────────
+// ── Font settings ─────────────────────────────────────────
 foreach ($theme['font_settings'] ?? [] as $f) {
     $k = trim($f['setting_key'] ?? '');
     if ($k === '') continue;
@@ -146,8 +146,7 @@ foreach ($theme['design_settings'] ?? [] as $d) {
     }
 }
 
-// ── Button styles → CSS variables (--btn-{slug}-*) ───────
-// Matches db-theme-bridge.css variable naming convention
+// ── Button styles → CSS variables ────────────────────────
 foreach ($theme['buttons'] ?? [] as $b) {
     $slug = trim($b['slug'] ?? '');
     if ($slug === '') continue;
@@ -165,8 +164,7 @@ foreach ($theme['buttons'] ?? [] as $b) {
     if (!empty($b['hover_border_color']))     $_setVar("btn-{$slug}-hover-border", (string)$b['hover_border_color']);
 }
 
-// ── Card styles → CSS variables (--card-{slug}-*) ────────
-// Matches db-theme-bridge.css variable naming convention
+// ── Card styles → CSS variables ───────────────────────────
 foreach ($theme['cards'] ?? [] as $c) {
     $slug = trim($c['slug'] ?? '');
     if ($slug === '') continue;
@@ -180,7 +178,7 @@ foreach ($theme['cards'] ?? [] as $c) {
     if (!empty($c['text_color']))       $_setVar("card-{$slug}-text",         (string)$c['text_color']);
 }
 
-// ── Alias vars for compatibility (matches admin _header_build_alias_vars) ──
+// ── Alias vars for compatibility ──────────────────────────
 $_aliasVars = [];
 $_getVar = function (string ...$names) use (&$_cssVars): string {
     foreach ($names as $n) {
@@ -194,35 +192,24 @@ $_alias = function (string $target, string ...$sources) use (&$_cssVars, $_getVa
     if ($v !== '') $_aliasVars[$target] = $v;
 };
 
-// Surface / background
 $_alias('--surface-color',       '--surface_color', '--background-secondary', '--background_secondary');
 $_alias('--card-bg',             '--card_bg',       '--surface-color', '--background-secondary');
 $_alias('--input-bg',            '--input_bg',      '--surface-color', '--background-secondary');
 $_alias('--input-background',    '--input_background', '--input-bg', '--input_bg');
 $_alias('--background-tertiary', '--background_tertiary', '--background-secondary');
-
-// Colors
 $_alias('--danger-color',        '--danger_color',  '--error-color',   '--error_color');
 $_alias('--error-color',         '--error_color',   '--danger-color',  '--danger_color');
 $_alias('--info-color',          '--info_color',    '--primary-color', '--primary_color');
-
-// Text
 $_alias('--text-secondary',      '--text_secondary', '--text-muted', '--text-light');
 $_alias('--text-tertiary',       '--text_tertiary',  '--text-secondary', '--text_secondary');
-
-// Border
 $_alias('--border-color',        '--border_color',  '--border', '--divider-color');
-
-// Input placeholder
 $_alias('--input-placeholder',   '--input_placeholder', '--text-secondary', '--text_secondary');
-
-// Sidebar hover / active (fall back to primary-color if not set in DB)
 $_alias('--sidebar-hover',       '--sidebar_hover',  '--primary-color', '--primary_color');
 $_alias('--sidebar-active',      '--sidebar_active', '--primary-color', '--primary_color');
 
-// Build the :root CSS block string
+// Build :root CSS block
 $_themeVars = '';
-$_allVars = array_merge($_cssVars, $_aliasVars);
+$_allVars   = array_merge($_cssVars, $_aliasVars);
 if (!empty($_allVars)) {
     $parts = [];
     foreach ($_allVars as $name => $value) {
@@ -233,15 +220,14 @@ if (!empty($_allVars)) {
 }
 
 // ════════════════════════════════════════════════════════════
-// 4. Font detection — also collect DB font links (like admin)
+// 4. Font detection + DB font links
 // ════════════════════════════════════════════════════════════
 $_fontUrl = $dir === 'rtl'
     ? 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap'
     : 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap';
 
-// Collect additional font URLs from DB font_settings (matches admin _header_collect_font_links)
-$_dbFontLinks = [];
-$_systemFonts = [
+$_dbFontLinks  = [];
+$_systemFonts  = [
     'system-ui','ui-sans-serif','ui-serif','ui-monospace',
     'sans-serif','serif','monospace','cursive','fantasy',
     'inherit','initial','unset',
@@ -254,8 +240,7 @@ $_trustedFontHosts = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 foreach ($theme['font_settings'] ?? [] as $_f) {
     if (empty($_f['font_family'])) continue;
     if (!empty($_f['font_url'])) {
-        $_url = $_f['font_url'];
-        // Validate font URL points to trusted source only
+        $_url     = $_f['font_url'];
         $_urlHost = parse_url($_url, PHP_URL_HOST);
         if (!$_urlHost || !in_array($_urlHost, $_trustedFontHosts, true)) continue;
     } else {
@@ -280,7 +265,6 @@ if (!empty($theme['design_settings']) && is_array($theme['design_settings'])) {
         }
     }
 }
-// Fallback: check for static logo files
 if (empty($_logoUrl)) {
     foreach (['logo.png', 'logo.svg', 'logo.webp'] as $_lf) {
         if (@file_exists(FRONTEND_BASE . '/assets/images/' . $_lf)) {
@@ -301,11 +285,10 @@ if (!function_exists('_pub_asset_ver')) {
 }
 
 // ════════════════════════════════════════════════════════════
-// 7. Resolve theme-color for PWA meta tag from DB
+// 7. Theme-color for PWA meta tag
 // ════════════════════════════════════════════════════════════
 $_themeColor = $_allVars['--primary-color'] ?? $_allVars['--primary_color']
             ?? ($theme['primary'] ?? '#2d8cf0');
-// Ensure it's a valid hex or named color (no CSS vars in meta tag)
 if (!preg_match('/^#[0-9a-fA-F]{3,8}$/', $_themeColor) && !preg_match('/^[a-zA-Z]{2,20}$/', $_themeColor)) {
     $_themeColor = '#2d8cf0';
 }
@@ -332,10 +315,10 @@ if (!preg_match('/^#[0-9a-fA-F]{3,8}$/', $_themeColor) && !preg_match('/^[a-zA-Z
     <meta property="og:site_name"   content="<?= e($_appName) ?>">
 
     <!-- PWA / Mobile -->
-    <meta name="mobile-web-app-capable"               content="yes">
-    <meta name="apple-mobile-web-app-capable"         content="yes">
+    <meta name="mobile-web-app-capable"                content="yes">
+    <meta name="apple-mobile-web-app-capable"          content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title"           content="<?= e($_appName) ?>">
+    <meta name="apple-mobile-web-app-title"            content="<?= e($_appName) ?>">
     <meta name="theme-color" content="<?= e($_themeColor) ?>">
     <link rel="manifest" href="/frontend/manifest.json">
     <link rel="apple-touch-icon" href="/images/default-image.png">
@@ -354,19 +337,11 @@ if (!preg_match('/^#[0-9a-fA-F]{3,8}$/', $_themeColor) && !preg_match('/^[a-zA-Z
     <noscript><link rel="stylesheet" href="<?= e($_dbFont) ?>"></noscript>
     <?php endforeach; ?>
 
-    <!-- ════════════════════════════════════════════════════
-         Design Tokens (variables.css) — loaded FIRST
-         Provides defaults & --color-*→--pub-* bridge.
-         DB values injected AFTER this will override defaults.
-         ════════════════════════════════════════════════════ -->
+    <!-- Design Tokens (variables.css) — loaded FIRST -->
     <link rel="stylesheet"
           href="/frontend/assets/css/variables.css?v=<?= _pub_asset_ver('/frontend/assets/css/variables.css') ?>">
 
-    <!-- ════════════════════════════════════════════════════
-         CSS VARIABLES (single source of truth from DB)
-         Overrides variables.css defaults with real DB values.
-         Mirrors admin/includes/header.php approach.
-         ════════════════════════════════════════════════════ -->
+    <!-- CSS VARIABLES (single source of truth from DB) -->
     <style id="pub-theme-vars">
 :root {
 <?php if ($_themeVars): ?>
@@ -374,7 +349,7 @@ if (!preg_match('/^#[0-9a-fA-F]{3,8}$/', $_themeColor) && !preg_match('/^[a-zA-Z
 <?php endif; ?>
 }
 
-/* ── Baseline rules that depend only on CSS vars ── */
+/* ── Baseline rules ── */
 body {
     background:  var(--pub-bg, var(--background-main, var(--background_main, #ffffff)));
     color:       var(--pub-text, var(--text-primary, var(--text_primary, #222831)));
@@ -397,20 +372,46 @@ body {
     background: var(--pub-footer-bg, var(--footer-background, var(--footer_background, #1e2a38)));
     color:      var(--pub-footer-text, var(--footer-text, var(--footer_text, rgba(255,255,255,0.8))));
 }
+
+/* ── FIX-2: Mobile search bar — second row on ≤640px ── */
+@media (max-width: 640px) {
+    .pub-header {
+        height: auto;
+        min-height: var(--pub-header-h, 60px);
+        padding-block: 6px;
+    }
+    .pub-header-inner {
+        flex-wrap: wrap;
+        row-gap: 6px;
+        align-items: center;
+        padding-block: 4px 8px;
+    }
+    .pub-header-search {
+        display: flex !important;   /* override public.css display:none */
+        flex: 0 0 100%;
+        order: 3;
+        max-width: 100%;
+        margin-top: 2px;
+    }
+    .pub-header-search-input {
+        background: rgba(255,255,255,0.18);
+        color: var(--pub-header-text, #fff);
+        border-color: rgba(255,255,255,0.3);
+    }
+    .pub-header-search-input::placeholder {
+        color: rgba(255,255,255,0.6);
+    }
+    .pub-layout {
+        min-height: calc(100vh - 106px);
+    }
+}
     </style>
 
-    <!-- ════════════════════════════════════════════════════
-         Public Stylesheet — loaded AFTER theme-vars so its
-         :root defaults are OVERRIDDEN by DB variables above
-         ════════════════════════════════════════════════════ -->
+    <!-- Public Stylesheet -->
     <link rel="stylesheet"
           href="/frontend/assets/css/public.css?v=<?= _pub_asset_ver('/frontend/assets/css/public.css') ?>">
 
-    <!-- ════════════════════════════════════════════════════
-         Generated CSS (DB-driven button/card/font styles)
-         Loaded LAST — concrete .btn-{slug}, .card-{slug} classes
-         using var() references to :root variables above
-         ════════════════════════════════════════════════════ -->
+    <!-- Generated CSS (DB-driven button/card/font styles) -->
     <?php if (!empty($theme['generated_css'])): ?>
     <style id="pub-theme-generated"><?= $theme['generated_css'] ?></style>
     <?php endif; ?>
@@ -424,31 +425,57 @@ body {
     <script defer
             src="/frontend/assets/js/slider.js?v=<?= _pub_asset_ver('/frontend/assets/js/slider.js') ?>">
     </script>
+
+    <!-- Public JS (deferred) -->
+    <script defer
+            src="/frontend/assets/js/public.js?v=<?= _pub_asset_ver('/frontend/assets/js/public.js') ?>">
+    </script>
+
+    <?php
+    // Inject logged-in user data so public.js / pubAddToCart can read it
+    // without an extra API call. Only emit when a user is authenticated.
+    if ($_isLoggedIn):
+        $_jsUser = json_encode([
+            'id'       => (int)($_user['id']       ?? 0),
+            'name'     => (string)($_user['name']     ?? ''),
+            'username' => (string)($_user['username'] ?? ''),
+            'email'    => (string)($_user['email']    ?? ''),
+        ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+    ?>
+    <script>window.pubSessionUser = <?= $_jsUser ?>;</script>
+    <?php endif; ?>
 </head>
 
 <body class="pub-body <?= e($dir) ?>">
 
-<!-- =============================================
-     HEADER — hamburger + logo
-     Menu button on start side (right for RTL, left for LTR).
-     Logo from DB (design_settings).
-     Colors come from DB theme via CSS custom properties.
-============================================= -->
+<!-- ═══════════════════════════════════════════════
+     HEADER — hamburger + logo + search
+     Search: inline on desktop, second row on mobile.
+═══════════════════════════════════════════════════ -->
 <header class="pub-header" role="banner">
     <div class="pub-container pub-header-inner">
 
-        <!-- Hamburger toggle — start side (first in DOM → right in RTL, left in LTR) -->
+        <!--
+            Hamburger toggle (start side).
+            data-bound="1" marks this inline script as the
+            temporary listener. public.js replaces it cleanly
+            to avoid double-binding (FIX-3).
+        -->
         <button class="pub-hamburger" id="pubHamburger"
-                aria-label="<?= e(t('nav.menu_open')) ?>"
-                aria-expanded="false" aria-controls="pubSidebar">
+                aria-label="<?= e(t('nav.menu_open', 'القائمة')) ?>"
+                aria-expanded="false" aria-controls="pubSidebar"
+                data-bound="1">
             <span></span><span></span><span></span>
         </button>
 
-        <!-- Logo (DB design_settings or fallback) -->
+        <!-- Logo -->
         <a href="<?= e($_basePath . '/index.php') ?>" class="pub-logo" aria-label="<?= e($_appName) ?>">
             <?php if (!empty($_logoUrl)): ?>
-                <img src="<?= e($_logoUrl) ?>" alt="<?= e($_appName) ?>" class="pub-logo-img"
-                     loading="eager" decoding="async">
+                <img src="<?= e($_logoUrl) ?>"
+                     alt="<?= e($_appName) ?>"
+                     class="pub-logo-img"
+                     loading="eager"
+                     decoding="async">
                 <span class="pub-logo-name"><?= e($_appName) ?></span>
             <?php else: ?>
                 <span class="pub-logo-icon" aria-hidden="true">🌐</span>
@@ -456,8 +483,9 @@ body {
             <?php endif; ?>
         </a>
 
-        <!-- Global search — inline on desktop, second row on mobile -->
-        <form class="pub-header-search" method="get"
+        <!-- Global search (inline desktop / second row mobile) -->
+        <form class="pub-header-search"
+              method="get"
               action="<?= e($_basePath . '/search.php') ?>"
               role="search">
             <input type="search"
@@ -470,16 +498,17 @@ body {
                 <?= e(t('search.button', 'بحث')) ?>
             </button>
         </form>
+
     </div>
 </header>
 
-<!-- =============================================
-     LAYOUT: sidebar (from menu.php) + main content
-============================================= -->
+<!-- ═══════════════════════════════════════════════
+     LAYOUT: sidebar (menu.php) + main content
+═══════════════════════════════════════════════════ -->
 <div class="pub-layout">
 
     <?php
-    // Include the sidebar menu — completely separate from header
+    // Sidebar menu — completely separate from header
     $menuFile = __DIR__ . '/menu.php';
     if (is_readable($menuFile)) {
         include $menuFile;
@@ -489,22 +518,40 @@ body {
     <!-- Mobile sidebar backdrop -->
     <div class="pub-sidebar-backdrop" id="pubSidebarOverlay" aria-hidden="true"></div>
 
-    <!-- Inline fallback: ensure hamburger opens sidebar even if public.js fails -->
+    <!--
+        Minimal inline fallback hamburger script.
+        Runs immediately so the sidebar works even before public.js loads.
+        public.js will replace this listener via cloneNode() to prevent
+        double-binding (FIX-3: data-bound="1" on the button is the signal).
+    -->
     <script>
-    (function(){
-        var h=document.getElementById('pubHamburger'),
-            s=document.getElementById('pubSidebar'),
-            b=document.getElementById('pubSidebarOverlay'),
-            c=document.getElementById('pubSidebarClose');
-        if(!h||!s)return;
-        if(h.dataset.bound)return; h.dataset.bound='1';
-        function open(){s.classList.add('open');if(b)b.classList.add('open');h.setAttribute('aria-expanded','true');document.body.style.overflow='hidden';}
-        function close(){s.classList.remove('open');if(b)b.classList.remove('open');h.setAttribute('aria-expanded','false');document.body.style.overflow='';}
-        h.addEventListener('click',function(){s.classList.contains('open')?close():open();});
-        if(b)b.addEventListener('click',close);
-        if(c)c.addEventListener('click',close);
+    (function () {
+        var h = document.getElementById('pubHamburger');
+        var s = document.getElementById('pubSidebar');
+        var b = document.getElementById('pubSidebarOverlay');
+        var c = document.getElementById('pubSidebarClose');
+        if (!h || !s) return;
+
+        function open()  {
+            s.classList.add('open');
+            if (b) b.classList.add('open');
+            h.setAttribute('aria-expanded', 'true');
+            document.body.style.overflow = 'hidden';
+        }
+        function close() {
+            s.classList.remove('open');
+            if (b) b.classList.remove('open');
+            h.setAttribute('aria-expanded', 'false');
+            document.body.style.overflow = '';
+        }
+
+        h.addEventListener('click', function () {
+            s.classList.contains('open') ? close() : open();
+        });
+        if (b) b.addEventListener('click', close);
+        if (c) c.addEventListener('click', close);
     })();
     </script>
 
-    <!-- Main content area — page content goes here -->
+    <!-- Main content area -->
     <main class="pub-main-content">
