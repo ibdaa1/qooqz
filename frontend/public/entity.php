@@ -1249,7 +1249,7 @@ echo '<style>
 // Track entity page view in core_events
 (function () {
     if (typeof window.pubTrackEvent !== 'function') {
-        window.pubTrackEvent = function (entityType, entityId, eventType, value) {
+        window.pubTrackEvent = function (entityType, entityId, eventType, value, onFail) {
             var body = { entity_type: entityType, entity_id: entityId, event_type: eventType };
             if (value !== undefined && value !== null) body.value = value;
             fetch('/api/public/events', {
@@ -1258,7 +1258,14 @@ echo '<style>
                 body: JSON.stringify(body),
                 keepalive: true,
                 credentials: 'include'
-            }).catch(function () {});
+            }).then(function (resp) {
+                return resp.json();
+            }).then(function (json) {
+                var ok = json && json.data && json.data.ok;
+                if (!ok && typeof onFail === 'function') onFail();
+            }).catch(function () {
+                if (typeof onFail === 'function') onFail();
+            });
         };
     }
     window.pubTrackEvent('entity', <?= (int)$entity['id'] ?>, 'view');

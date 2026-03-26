@@ -592,6 +592,8 @@ if (!$_entitiesRenderedViaSection) {
         ?>
         <a href="/frontend/public/entity.php?id=<?= $_entId ?>"
            class="pub-entity-card"
+           data-track-type="entity"
+           data-track-id="<?= $_entId ?>"
            style="text-decoration:none;">
             <div class="pub-entity-avatar">
                 <?php if ($_entLogo !== ''): ?>
@@ -790,10 +792,21 @@ if (!$_entitiesRenderedViaSection) {
         } catch (e) {}
     }
 
+    function _unmarkRecorded(key) {
+        try {
+            var t = _getTrack();
+            delete t[key];
+            localStorage.setItem(STORE_KEY, JSON.stringify(t));
+        } catch (e) {}
+    }
+
     // ── Core tracking function — exposed globally ──────────────────────────
     // Used by pubAddToCart (add_to_cart), pubToggleWishlist (favorite),
     // and any page that needs to fire a manual event.
-    window.pubTrackEvent = function (entityType, entityId, eventType, value) {
+    // onFail: optional callback invoked when the API returns ok:false or on
+    // network error — allows the caller to unmark localStorage so the event
+    // can be retried later.
+    window.pubTrackEvent = function (entityType, entityId, eventType, value, onFail) {
         if (!entityType || !entityId || !eventType) return;
         var body = { entity_type: entityType, entity_id: entityId, event_type: eventType };
         if (value !== undefined && value !== null) body.value = value;
@@ -803,7 +816,17 @@ if (!$_entitiesRenderedViaSection) {
             body:        JSON.stringify(body),
             keepalive:   true,
             credentials: 'include'
-        }).catch(function () {});
+        }).then(function (resp) {
+            return resp.json();
+        }).then(function (json) {
+            // ResponseFormatter wraps payload as {success, data: {ok:bool}}
+            var ok = json && json.data && json.data.ok;
+            if (!ok && typeof onFail === 'function') {
+                onFail();
+            }
+        }).catch(function () {
+            if (typeof onFail === 'function') onFail();
+        });
     };
 
     // ── View tracking via IntersectionObserver ─────────────────────────────
@@ -826,7 +849,9 @@ if (!$_entitiesRenderedViaSection) {
                 viewTimers[key] = setTimeout(function () {
                     if (!_recorded(key)) {
                         _markRecorded(key);
-                        window.pubTrackEvent(type, parseInt(id, 10), 'view');
+                        window.pubTrackEvent(type, parseInt(id, 10), 'view', undefined, function () {
+                            _unmarkRecorded(key); // allow retry later if API failed
+                        });
                     }
                     delete viewTimers[key];
                 }, 1000); // 1-second visibility threshold
@@ -855,7 +880,9 @@ if (!$_entitiesRenderedViaSection) {
         var key = 'c_' + type + '_' + id;
         if (_recorded(key)) return;
         _markRecorded(key);
-        window.pubTrackEvent(type, parseInt(id, 10), 'click');
+        window.pubTrackEvent(type, parseInt(id, 10), 'click', undefined, function () {
+            _unmarkRecorded(key); // allow retry later if API failed
+        });
     }, true);
 })();
 </script>
