@@ -1250,12 +1250,16 @@ echo '<style>
 (function () {
     if (typeof window.pubTrackEvent !== 'function') {
         window.pubTrackEvent = function (entityType, entityId, eventType, value, onFail) {
-            var body = { entity_type: entityType, entity_id: entityId, event_type: eventType };
-            if (value !== undefined && value !== null) body.value = value;
+            var params = 'entity_type=' + encodeURIComponent(entityType)
+                + '&entity_id=' + encodeURIComponent(entityId)
+                + '&event_type=' + encodeURIComponent(eventType);
+            if (value !== undefined && value !== null) {
+                params += '&value=' + encodeURIComponent(value);
+            }
             fetch('/api/public/events', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params,
                 keepalive: true,
                 credentials: 'include'
             }).then(function (resp) {

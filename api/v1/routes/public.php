@@ -46,8 +46,7 @@ if (!$pdo instanceof PDO) {
                         $__cfg['user'],
                         $__cfg['pass'] ?? '',
                         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                         PDO::ATTR_TIMEOUT => 5]
+                         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
                     );
                     $GLOBALS['ADMIN_DB'] = $pdo; // cache for subsequent requires
                 } catch (Throwable $__e) { $pdo = null; }
