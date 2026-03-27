@@ -924,8 +924,8 @@ body {
     if (!bar || !inner || !megaMenu) return;
 
     /* ── Cache ─────────────────────────────────────────── */
-    var _catCache   = {};   // category_id → {subcats, products, brands}
-    var _topCats    = null; // top-level categories array
+    var _catCache   = {};   // category_id → {subs, products, brands}
+    var _topCats    = null; // top-level categories array (each with .children)
 
     /* ── State ─────────────────────────────────────────── */
     var _activeId   = null;
@@ -950,13 +950,22 @@ body {
         return TENANT_ID ? ('&tenant_id=' + TENANT_ID) : '';
     }
 
-    /* ── Load top-level categories ─────────────────────── */
+    /* ── Load categories tree (all parents + children) ─── */
     function loadTopCats() {
-        var url = apiBase() + 'categories?parent_id=0&per=30&lang=' + encodeURIComponent(LANG) + tenantQ();
+        var url = apiBase() + 'categories?tree=1&lang=' + encodeURIComponent(LANG) + tenantQ();
         apiGet(url).then(function (j) {
             if (!j) return;
-            var cats = (j.data && j.data.data) ? j.data.data : (Array.isArray(j.data) ? j.data : []);
+            var cats = (j.data && Array.isArray(j.data.data)) ? j.data.data
+                     : (Array.isArray(j.data) ? j.data : []);
             _topCats = cats;
+            /* Pre-populate the subcategory cache from tree children */
+            cats.forEach(function (cat) {
+                if (cat.children && cat.children.length) {
+                    if (!_catCache[cat.id]) {
+                        _catCache[cat.id] = { subs: cat.children, prods: null, brands: null };
+                    }
+                }
+            });
             renderCatBar(cats);
         }).catch(function () {});
     }
@@ -1002,20 +1011,25 @@ body {
 
     /* ── Fetch mega menu data ──────────────────────────── */
     function fetchMegaData(catId) {
-        if (_catCache[catId]) return Promise.resolve(_catCache[catId]);
+        if (_catCache[catId] && _catCache[catId].prods !== null) {
+            return Promise.resolve(_catCache[catId]);
+        }
 
         var langQ = '&lang=' + encodeURIComponent(LANG);
         var tQ    = tenantQ();
 
-        var pSubs  = apiGet(apiBase() + 'categories?parent_id=' + catId + '&per=15' + langQ + tQ);
-        var pProds = apiGet(apiBase() + 'products?category_id=' + catId + '&per=8' + langQ + tQ);
-        var pBrands= apiGet(apiBase() + 'brands?per=10' + langQ + tQ);
+        /* Use pre-loaded children from tree if available, otherwise fetch */
+        var pSubs = (_catCache[catId] && _catCache[catId].subs)
+            ? Promise.resolve({ data: _catCache[catId].subs })
+            : apiGet(apiBase() + 'categories?parent_id=' + catId + '&per=15' + langQ + tQ);
+        var pProds  = apiGet(apiBase() + 'products?category_id=' + catId + '&per=8' + langQ + tQ);
+        var pBrands = apiGet(apiBase() + 'brands?per=10' + langQ + tQ);
 
         return Promise.all([pSubs, pProds, pBrands]).then(function (results) {
-            var subs    = extractList(results[0]);
-            var prods   = extractList(results[1]);
-            var brands  = extractList(results[2]);
-            var data    = { subs: subs, prods: prods, brands: brands };
+            var subs   = extractList(results[0]);
+            var prods  = extractList(results[1]);
+            var brands = extractList(results[2]);
+            var data   = { subs: subs, prods: prods, brands: brands };
             _catCache[catId] = data;
             return data;
         });

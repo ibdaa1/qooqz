@@ -12,7 +12,7 @@ if ($first === 'categories') {
 
     if ($id) {
         $row = $pdoOne(
-            "SELECT c.id, COALESCE(ct.name, c.slug) AS name, c.slug, c.description,
+            "SELECT c.id, COALESCE(ct.name, c.name, c.slug) AS name, c.slug, c.description,
                     (SELECT i.url FROM images i WHERE i.owner_id = c.id ORDER BY (i.image_type_id = 1) DESC, i.id ASC LIMIT 1) AS image_url,
                     c.is_featured, c.is_active, c.parent_id, c.sort_order, c.tenant_id
                FROM categories c
@@ -22,6 +22,47 @@ if ($first === 'categories') {
         );
         if ($row) ResponseFormatter::success(['ok' => true, 'category' => $row]);
         else      ResponseFormatter::notFound('Category not found');
+        exit;
+    }
+
+    /* ── Tree mode: return ALL categories as a nested hierarchy ──────────── */
+    if (!empty($_GET['tree'])) {
+        $treeWhere  = 'WHERE c.is_active = 1';
+        $treeParams = [];
+        if ($tenantId) { $treeWhere .= ' AND c.tenant_id = ?'; $treeParams[] = $tenantId; }
+
+        $allCats = $pdoList(
+            "SELECT c.id, COALESCE(ct.name, c.name, c.slug) AS name, c.slug,
+                    (SELECT i.url FROM images i WHERE i.owner_id = c.id ORDER BY (i.image_type_id = 1) DESC, i.id ASC LIMIT 1) AS image_url,
+                    c.is_featured, c.parent_id, c.sort_order, c.tenant_id
+               FROM categories c
+          LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
+              $treeWhere ORDER BY c.parent_id ASC, c.sort_order ASC, c.id ASC",
+            array_merge([$lang], $treeParams)
+        );
+
+        /* Build tree from flat list */
+        $map = [];
+        foreach ($allCats as $cat) {
+            $cat['children'] = [];
+            $map[(int)$cat['id']] = $cat;
+        }
+        $tree = [];
+        foreach ($map as $catId => &$node) {
+            $pid = (int)($node['parent_id'] ?? 0);
+            if ($pid && isset($map[$pid])) {
+                $map[$pid]['children'][] = &$node;
+            } else {
+                $tree[] = &$node;
+            }
+        }
+        unset($node);
+
+        ResponseFormatter::success([
+            'ok'   => true,
+            'data' => $tree,
+            'meta' => ['total' => count($allCats)],
+        ]);
         exit;
     }
 
@@ -39,14 +80,15 @@ if ($first === 'categories') {
     if (!empty($_GET['featured'])) { $where .= ' AND c.is_featured = ?'; $whereParams[] = 1; }
     if (!empty($_GET['search'])) {
         $kw = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], trim($_GET['search'])) . '%';
-        $where .= ' AND (c.slug LIKE ? OR EXISTS (SELECT 1 FROM category_translations ct2 WHERE ct2.category_id = c.id AND ct2.name LIKE ?))';
+        $where .= ' AND (c.slug LIKE ? OR c.name LIKE ? OR EXISTS (SELECT 1 FROM category_translations ct2 WHERE ct2.category_id = c.id AND ct2.name LIKE ?))';
+        $whereParams[] = $kw;
         $whereParams[] = $kw;
         $whereParams[] = $kw;
     }
 
     $total = $pdoCount("SELECT COUNT(*) FROM categories c $where", $whereParams);
     $rows  = $pdoList(
-        "SELECT c.id, COALESCE(ct.name, c.slug) AS name, c.slug,
+        "SELECT c.id, COALESCE(ct.name, c.name, c.slug) AS name, c.slug,
                 (SELECT i.url FROM images i WHERE i.owner_id = c.id ORDER BY (i.image_type_id = 1) DESC, i.id ASC LIMIT 1) AS image_url,
                 c.is_featured, c.is_active, c.parent_id, c.sort_order, c.tenant_id,
                 (SELECT COUNT(*) FROM products p
