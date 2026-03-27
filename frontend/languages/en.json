@@ -711,7 +711,8 @@
         "social_title": "Follow Us",
         "login_required_title": "Login Required",
         "login_required_text": "You need to be logged in to send us a message. Please log in or create an account to continue.",
-        "login_cta": "Log In"
+        "login_cta": "Log In",
+        "autofilled": "auto-filled from your account"
     },
     "privacy": {
         "page_title": "Privacy Policy",

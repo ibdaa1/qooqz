@@ -177,11 +177,11 @@ include dirname(__DIR__) . '/partials/header.php';
         <form id="contactForm" class="contact-form" novalidate>
             <div class="form-group">
                 <label for="cName"><?= e(t('contact.name', 'Full Name')) ?></label>
-                <input type="text" id="cName" name="name" value="<?= e($_userName) ?>" placeholder="<?= e(t('contact.name_placeholder', 'Your full name')) ?>" <?= $_userName ? 'readonly' : '' ?> required>
+                <input type="text" id="cName" name="name" value="<?= e($_userName) ?>" placeholder="<?= e(t('contact.name_placeholder', 'Your full name')) ?>" <?= $_userName ? 'readonly aria-label="' . e(t('contact.name', 'Full Name')) . ' — ' . e(t('contact.autofilled', 'auto-filled from your account')) . '"' : '' ?> required>
             </div>
             <div class="form-group">
                 <label for="cEmail"><?= e(t('contact.email', 'Email Address')) ?></label>
-                <input type="email" id="cEmail" name="email" value="<?= e($_userEmail) ?>" placeholder="<?= e(t('contact.email_placeholder', 'your@email.com')) ?>" <?= $_userEmail ? 'readonly' : '' ?> required>
+                <input type="email" id="cEmail" name="email" value="<?= e($_userEmail) ?>" placeholder="<?= e(t('contact.email_placeholder', 'your@email.com')) ?>" <?= $_userEmail ? 'readonly aria-label="' . e(t('contact.email', 'Email Address')) . ' — ' . e(t('contact.autofilled', 'auto-filled from your account')) . '"' : '' ?> required>
             </div>
             <div class="form-group">
                 <label for="cSubject"><?= e(t('contact.subject', 'Subject')) ?></label>

@@ -55,7 +55,7 @@ if ($ctMethod === 'POST') {
     $errors = [];
     if ($name === '')    $errors[] = 'Name is required.';
     if ($email === '')   $errors[] = 'Email is required.';
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL) && $email !== '') {
+    elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $errors[] = 'Invalid email address.';
     }
     if ($subject === '') $errors[] = 'Subject is required.';
@@ -73,24 +73,6 @@ if ($ctMethod === 'POST') {
     }
 
     try {
-        // Ensure table exists (auto-create on first use)
-        $pdo->exec("CREATE TABLE IF NOT EXISTS contact_messages (
-            id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            tenant_id   INT UNSIGNED NOT NULL,
-            user_id     INT UNSIGNED NOT NULL,
-            name        VARCHAR(255) NOT NULL,
-            email       VARCHAR(255) NOT NULL,
-            subject     VARCHAR(255) NOT NULL,
-            message     TEXT         NOT NULL,
-            status      ENUM('new','read','replied','closed') NOT NULL DEFAULT 'new',
-            created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            INDEX idx_contact_tenant  (tenant_id),
-            INDEX idx_contact_user    (user_id),
-            INDEX idx_contact_status  (status),
-            INDEX idx_contact_created (created_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-
         $stmt = $pdo->prepare(
             "INSERT INTO contact_messages (tenant_id, user_id, name, email, subject, message)
              VALUES (?, ?, ?, ?, ?, ?)"
