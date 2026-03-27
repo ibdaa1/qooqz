@@ -837,14 +837,14 @@ body {
      CATEGORY SLIDER + MEGA MENU
 ═══════════════════════════════════════════════════ -->
 <nav class="pub-cat-bar" id="pubCatBar" aria-label="<?= e(t('nav.categories', 'التصنيفات')) ?>">
-    <button class="pub-cat-bar__arrow pub-cat-bar__arrow--start" id="pubCatArrowStart" aria-label="السابق" tabindex="-1">&#8249;</button>
+    <button class="pub-cat-bar__arrow pub-cat-bar__arrow--start" id="pubCatArrowStart" aria-label="<?= e(t('nav.previous', 'السابق')) ?>" tabindex="-1">&#8249;</button>
     <div class="pub-cat-bar__inner" id="pubCatBarInner">
         <!-- Items injected by JS -->
         <?php for ($i = 0; $i < 6; $i++): ?>
         <span class="pub-cat-item" style="width:90px;"><span class="pub-mega-skeleton" style="width:70px;height:14px;border-radius:6px;"></span></span>
         <?php endfor; ?>
     </div>
-    <button class="pub-cat-bar__arrow pub-cat-bar__arrow--end" id="pubCatArrowEnd" aria-label="التالي" tabindex="-1">&#8250;</button>
+    <button class="pub-cat-bar__arrow pub-cat-bar__arrow--end" id="pubCatArrowEnd" aria-label="<?= e(t('nav.next', 'التالي')) ?>" tabindex="-1">&#8250;</button>
 
     <!-- Mega menu panel — shared, repositioned on hover -->
     <div class="pub-mega-menu" id="pubMegaMenu" role="region" aria-live="polite">
@@ -982,62 +982,62 @@ body {
 
         /* Column A: Subcategories */
         html += '<div class="pub-mega-menu__col">';
-        html += '<p class="pub-mega-menu__heading">' + escH(<?= json_encode(t('mega.subcategories','التصنيفات الفرعية')) ?>) + '</p>';
+        html += '<p class="pub-mega-menu__heading">' + escapeHtml(<?= json_encode(t('mega.subcategories','التصنيفات الفرعية')) ?>) + '</p>';
         if (data.subs && data.subs.length) {
             html += '<ul class="pub-mega-sub__list">';
             data.subs.forEach(function (s) {
-                html += '<li><a href="' + escA(BASE_PATH + '/categories.php?id=' + s.id) + '">' + escH(s.name || s.slug || '') + '</a></li>';
+                html += '<li><a href="' + escapeAttr(BASE_PATH + '/categories.php?id=' + s.id) + '">' + escapeHtml(s.name || s.slug || '') + '</a></li>';
             });
             html += '</ul>';
         } else {
-            html += '<p style="font-size:.82rem;color:var(--pub-muted,#aaa)">' + escH(<?= json_encode(t('mega.no_subcategories','لا توجد تصنيفات فرعية')) ?>) + '</p>';
+            html += '<p style="font-size:.82rem;color:var(--pub-muted,#aaa)">' + escapeHtml(<?= json_encode(t('mega.no_subcategories','لا توجد تصنيفات فرعية')) ?>) + '</p>';
         }
         html += '</div>';
 
         /* Column B: Featured Products */
         html += '<div class="pub-mega-menu__col">';
-        html += '<p class="pub-mega-menu__heading">' + escH(<?= json_encode(t('mega.featured_products','منتجات مميزة')) ?>) + '</p>';
+        html += '<p class="pub-mega-menu__heading">' + escapeHtml(<?= json_encode(t('mega.featured_products','منتجات مميزة')) ?>) + '</p>';
         if (data.prods && data.prods.length) {
             html += '<div class="pub-mega-prods">';
             data.prods.slice(0, 8).forEach(function (p) {
                 var href = BASE_PATH + '/product.php?id=' + p.id;
-                html += '<a class="pub-mega-prod" href="' + escA(href) + '">';
+                html += '<a class="pub-mega-prod" href="' + escapeAttr(href) + '">';
                 if (p.image_url || p.thumbnail_url) {
-                    html += '<img src="' + escA(p.image_url || p.thumbnail_url) + '" alt="' + escA(p.name || '') + '" loading="lazy">';
+                    html += '<img src="' + escapeAttr(p.image_url || p.thumbnail_url) + '" alt="' + escapeAttr(p.name || '') + '" loading="lazy">';
                 } else {
                     html += '<div style="aspect-ratio:1;background:var(--pub-hover,#f0f0f0)"></div>';
                 }
                 html += '<div class="pub-mega-prod__info">';
-                html += '<div class="pub-mega-prod__name">' + escH(p.name || '') + '</div>';
+                html += '<div class="pub-mega-prod__name">' + escapeHtml(p.name || '') + '</div>';
                 if (p.price !== undefined && p.price !== null) {
-                    html += '<div class="pub-mega-prod__price">' + escH(formatPrice(p.price, p.currency)) + '</div>';
+                    html += '<div class="pub-mega-prod__price">' + escapeHtml(formatPrice(p.price, p.currency)) + '</div>';
                 }
                 html += '</div></a>';
             });
             html += '</div>';
         } else {
-            html += '<p style="font-size:.82rem;color:var(--pub-muted,#aaa)">' + escH(<?= json_encode(t('mega.no_products','لا توجد منتجات')) ?>) + '</p>';
+            html += '<p style="font-size:.82rem;color:var(--pub-muted,#aaa)">' + escapeHtml(<?= json_encode(t('mega.no_products','لا توجد منتجات')) ?>) + '</p>';
         }
         html += '</div>';
 
         /* Column C: Top Brands */
         html += '<div class="pub-mega-menu__col">';
-        html += '<p class="pub-mega-menu__heading">' + escH(<?= json_encode(t('mega.top_brands','أبرز العلامات')) ?>) + '</p>';
+        html += '<p class="pub-mega-menu__heading">' + escapeHtml(<?= json_encode(t('mega.top_brands','أبرز العلامات')) ?>) + '</p>';
         if (data.brands && data.brands.length) {
             html += '<div class="pub-mega-brands">';
             data.brands.slice(0, 10).forEach(function (b) {
                 var href = BASE_PATH + '/products.php?brand_id=' + b.id;
-                html += '<a class="pub-mega-brand" href="' + escA(href) + '" title="' + escA(b.name || '') + '">';
+                html += '<a class="pub-mega-brand" href="' + escapeAttr(href) + '" title="' + escapeAttr(b.name || '') + '">';
                 if (b.logo_url) {
-                    html += '<img src="' + escA(b.logo_url) + '" alt="' + escA(b.name || '') + '" loading="lazy">';
+                    html += '<img src="' + escapeAttr(b.logo_url) + '" alt="' + escapeAttr(b.name || '') + '" loading="lazy">';
                 } else {
-                    html += '<span class="pub-mega-brand--text">' + escH(b.name || '') + '</span>';
+                    html += '<span class="pub-mega-brand--text">' + escapeHtml(b.name || '') + '</span>';
                 }
                 html += '</a>';
             });
             html += '</div>';
         } else {
-            html += '<p style="font-size:.82rem;color:var(--pub-muted,#aaa)">' + escH(<?= json_encode(t('mega.no_brands','لا توجد علامات')) ?>) + '</p>';
+            html += '<p style="font-size:.82rem;color:var(--pub-muted,#aaa)">' + escapeHtml(<?= json_encode(t('mega.no_brands','لا توجد علامات')) ?>) + '</p>';
         }
         html += '</div>';
 
@@ -1161,11 +1161,11 @@ body {
         };
     }
 
-    function escH(s) {
+    function escapeHtml(s) {
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     }
 
-    function escA(s) {
+    function escapeAttr(s) {
         return String(s).replace(/"/g,'&quot;');
     }
 
