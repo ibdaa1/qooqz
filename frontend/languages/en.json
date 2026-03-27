@@ -29,7 +29,8 @@
         "next": "Next",
         "actions": "Actions",
         "view_all": "View all",
-        "notifications": "Notifications"
+        "notifications": "Notifications",
+        "profile": "Profile"
     },
     "mega": {
         "subcategories": "Subcategories",

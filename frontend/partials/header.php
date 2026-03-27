@@ -774,7 +774,7 @@ body {
             to avoid double-binding (FIX-3).
         -->
         <button class="pub-hamburger" id="pubHamburger"
-                aria-label="<?= e(t('nav.menu_open', 'القائمة')) ?>"
+                aria-label="<?= e(t('nav.menu_open', 'Open menu')) ?>"
                 aria-expanded="false" aria-controls="pubSidebar"
                 data-bound="1">
             <span></span><span></span><span></span>
@@ -807,23 +807,23 @@ body {
                    name="q"
                    id="pubGlobalSearchInput"
                    class="pub-header-search-input"
-                   placeholder="<?= e(t('search.placeholder', 'ابحث عن منتجات، متاجر...')) ?>"
+                   placeholder="<?= e(t('search.placeholder', 'Search products, stores...')) ?>"
                    value="<?= e($_GET['q'] ?? '') ?>"
-                   aria-label="<?= e(t('search.placeholder', 'ابحث عن منتجات، متاجر...')) ?>"
+                   aria-label="<?= e(t('search.placeholder', 'Search products, stores...')) ?>"
                    aria-autocomplete="list"
                    aria-controls="pubSearchSuggest"
                    style="padding-inline-end:2.4rem;">
             <!-- Clear button — shown only when input has value -->
             <button type="button"
                     id="pubSearchClear"
-                    aria-label="<?= e(t('search.clear', 'مسح البحث')) ?>"
+                    aria-label="<?= e(t('search.clear', 'Clear search')) ?>"
                     style="position:absolute;inset-block-start:50%;inset-inline-end:calc(100% - 2.2rem);
                            transform:translateY(-50%);background:none;border:none;cursor:pointer;
                            color:var(--pub-muted,#888);font-size:1.1rem;padding:0 .35rem;line-height:1;
                            display:<?= !empty($_GET['q']) ? 'block' : 'none' ?>;"
                     >✖</button>
             <button type="submit" class="pub-header-search-btn">
-                <?= e(t('search.button', 'بحث')) ?>
+                <?= e(t('search.button', 'Search')) ?>
             </button>
             <ul id="pubSearchSuggest" role="listbox" hidden
                 style="position:absolute;top:100%;inset-inline-start:0;min-width:300px;max-width:520px;width:100%;
@@ -833,22 +833,22 @@ body {
         </form>
 
         <!-- Header action buttons: login/logout + language switcher only -->
-        <nav class="pub-header-actions" aria-label="<?= e(t('nav.actions', 'الإجراءات')) ?>">
+        <nav class="pub-header-actions" aria-label="<?= e(t('nav.actions', 'Actions')) ?>">
             <?php if ($_isLoggedIn): ?>
             <a href="<?= e($_authPath . '/logout.php') ?>"
                class="pub-header-action-btn pub-header-action-btn--auth"
-               title="<?= e(t('nav.logout', 'تسجيل الخروج')) ?>"
-               aria-label="<?= e(t('nav.logout', 'تسجيل الخروج')) ?>">
+               title="<?= e(t('nav.logout', 'Logout')) ?>"
+               aria-label="<?= e(t('nav.logout', 'Logout')) ?>">
                 <span aria-hidden="true">↩</span>
-                <span class="pub-header-action-label"><?= e(t('nav.logout', 'تسجيل الخروج')) ?></span>
+                <span class="pub-header-action-label"><?= e(t('nav.logout', 'Logout')) ?></span>
             </a>
             <?php else: ?>
             <a href="<?= e($_authPath . '/login.php') ?>"
                class="pub-header-action-btn pub-header-action-btn--auth"
-               title="<?= e(t('nav.login', 'تسجيل الدخول')) ?>"
-               aria-label="<?= e(t('nav.login', 'تسجيل الدخول')) ?>">
+               title="<?= e(t('nav.login', 'Login')) ?>"
+               aria-label="<?= e(t('nav.login', 'Login')) ?>">
                 <span aria-hidden="true">👤</span>
-                <span class="pub-header-action-label"><?= e(t('nav.login', 'تسجيل الدخول')) ?></span>
+                <span class="pub-header-action-label"><?= e(t('nav.login', 'Login')) ?></span>
             </a>
             <?php endif; ?>
             <!-- Language switcher -->
@@ -858,8 +858,8 @@ body {
                         id="pubLangBtn"
                         aria-haspopup="listbox"
                         aria-expanded="false"
-                        title="<?= e(t('nav.language', 'اللغة')) ?>"
-                        aria-label="<?= e(t('nav.language', 'اللغة')) ?>">
+                        title="<?= e(t('nav.language', 'Language')) ?>"
+                        aria-label="<?= e(t('nav.language', 'Language')) ?>">
                     <span aria-hidden="true">🌐</span>
                     <span class="pub-header-action-label" id="pubLangLabel"><?= e($lang) ?></span>
                 </button>
@@ -873,15 +873,15 @@ body {
 <!-- ═══════════════════════════════════════════════
      CATEGORY SLIDER + MEGA MENU
 ═══════════════════════════════════════════════════ -->
-<nav class="pub-cat-bar" id="pubCatBar" aria-label="<?= e(t('nav.categories', 'التصنيفات')) ?>">
-    <button class="pub-cat-bar__arrow pub-cat-bar__arrow--start" id="pubCatArrowStart" aria-label="<?= e(t('nav.previous', 'السابق')) ?>" tabindex="-1">&#8249;</button>
+<nav class="pub-cat-bar" id="pubCatBar" aria-label="<?= e(t('nav.categories', 'Categories')) ?>">
+    <button class="pub-cat-bar__arrow pub-cat-bar__arrow--start" id="pubCatArrowStart" aria-label="<?= e(t('nav.previous', 'Previous')) ?>" tabindex="-1">&#8249;</button>
     <div class="pub-cat-bar__inner" id="pubCatBarInner">
         <!-- Items injected by JS -->
         <?php for ($i = 0; $i < 6; $i++): ?>
         <span class="pub-cat-item" style="width:90px;"><span class="pub-mega-skeleton" style="width:70px;height:14px;border-radius:6px;"></span></span>
         <?php endfor; ?>
     </div>
-    <button class="pub-cat-bar__arrow pub-cat-bar__arrow--end" id="pubCatArrowEnd" aria-label="<?= e(t('nav.next', 'التالي')) ?>" tabindex="-1">&#8250;</button>
+    <button class="pub-cat-bar__arrow pub-cat-bar__arrow--end" id="pubCatArrowEnd" aria-label="<?= e(t('nav.next', 'Next')) ?>" tabindex="-1">&#8250;</button>
 
     <!-- Mega menu panel — shared, repositioned on hover -->
     <div class="pub-mega-menu" id="pubMegaMenu" role="region" aria-live="polite">
@@ -1033,7 +1033,7 @@ body {
 
         /* Column A: Subcategories */
         html += '<div class="pub-mega-menu__col">';
-        html += '<p class="pub-mega-menu__heading">' + escapeHtml(<?= json_encode(t('mega.subcategories','التصنيفات الفرعية')) ?>) + '</p>';
+        html += '<p class="pub-mega-menu__heading">' + escapeHtml(<?= json_encode(t('mega.subcategories','Subcategories')) ?>) + '</p>';
         if (data.subs && data.subs.length) {
             html += '<ul class="pub-mega-sub__list">';
             data.subs.forEach(function (s) {
@@ -1041,13 +1041,13 @@ body {
             });
             html += '</ul>';
         } else {
-            html += '<p style="font-size:.82rem;color:var(--pub-muted,#aaa)">' + escapeHtml(<?= json_encode(t('mega.no_subcategories','لا توجد تصنيفات فرعية')) ?>) + '</p>';
+            html += '<p style="font-size:.82rem;color:var(--pub-muted,#aaa)">' + escapeHtml(<?= json_encode(t('mega.no_subcategories','No subcategories')) ?>) + '</p>';
         }
         html += '</div>';
 
         /* Column B: Featured Products */
         html += '<div class="pub-mega-menu__col">';
-        html += '<p class="pub-mega-menu__heading">' + escapeHtml(<?= json_encode(t('mega.featured_products','منتجات مميزة')) ?>) + '</p>';
+        html += '<p class="pub-mega-menu__heading">' + escapeHtml(<?= json_encode(t('mega.featured_products','Featured Products')) ?>) + '</p>';
         if (data.prods && data.prods.length) {
             html += '<div class="pub-mega-prods">';
             data.prods.slice(0, 8).forEach(function (p) {
@@ -1067,13 +1067,13 @@ body {
             });
             html += '</div>';
         } else {
-            html += '<p style="font-size:.82rem;color:var(--pub-muted,#aaa)">' + escapeHtml(<?= json_encode(t('mega.no_products','لا توجد منتجات')) ?>) + '</p>';
+            html += '<p style="font-size:.82rem;color:var(--pub-muted,#aaa)">' + escapeHtml(<?= json_encode(t('mega.no_products','No products')) ?>) + '</p>';
         }
         html += '</div>';
 
         /* Column C: Top Brands */
         html += '<div class="pub-mega-menu__col">';
-        html += '<p class="pub-mega-menu__heading">' + escapeHtml(<?= json_encode(t('mega.top_brands','أبرز العلامات')) ?>) + '</p>';
+        html += '<p class="pub-mega-menu__heading">' + escapeHtml(<?= json_encode(t('mega.top_brands','Top Brands')) ?>) + '</p>';
         if (data.brands && data.brands.length) {
             html += '<div class="pub-mega-brands">';
             data.brands.slice(0, 10).forEach(function (b) {
@@ -1088,7 +1088,7 @@ body {
             });
             html += '</div>';
         } else {
-            html += '<p style="font-size:.82rem;color:var(--pub-muted,#aaa)">' + escapeHtml(<?= json_encode(t('mega.no_brands','لا توجد علامات')) ?>) + '</p>';
+            html += '<p style="font-size:.82rem;color:var(--pub-muted,#aaa)">' + escapeHtml(<?= json_encode(t('mega.no_brands','No brands')) ?>) + '</p>';
         }
         html += '</div>';
 

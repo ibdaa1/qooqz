@@ -70,30 +70,23 @@ if (!function_exists('t')) {
 $_isLoggedIn = !empty(($GLOBALS['PUB_CONTEXT']['user'] ?? [])['id']);
 $_authPath   = '/frontend';
 ?>
-<nav class="pub-bottom-nav" aria-label="<?= e(t('nav.actions', 'التنقل')) ?>">
+<nav class="pub-bottom-nav" aria-label="<?= e(t('nav.actions', 'Navigation')) ?>">
     <a href="<?= e($_basePath . '/index.php') ?>" class="pub-bottom-nav__item">
         <span class="pub-bottom-nav__icon" aria-hidden="true">🏠</span>
-        <span class="pub-bottom-nav__label"><?= e(t('nav.home', 'الرئيسية')) ?></span>
+        <span class="pub-bottom-nav__label"><?= e(t('nav.home', 'Home')) ?></span>
     </a>
     <a href="<?= e($_basePath . '/categories.php') ?>" class="pub-bottom-nav__item">
         <span class="pub-bottom-nav__icon" aria-hidden="true">📂</span>
-        <span class="pub-bottom-nav__label"><?= e(t('nav.categories', 'التصنيفات')) ?></span>
+        <span class="pub-bottom-nav__label"><?= e(t('nav.categories', 'Categories')) ?></span>
     </a>
     <a href="<?= e($_basePath . '/cart.php') ?>" class="pub-bottom-nav__item">
         <span class="pub-bottom-nav__icon" aria-hidden="true">🛒</span>
-        <span class="pub-bottom-nav__label"><?= e(t('nav.cart', 'السلة')) ?></span>
+        <span class="pub-bottom-nav__label"><?= e(t('nav.cart', 'Cart')) ?></span>
     </a>
-    <?php if ($_isLoggedIn): ?>
-    <a href="<?= e($_authPath . '/logout.php') ?>" class="pub-bottom-nav__item">
-        <span class="pub-bottom-nav__icon" aria-hidden="true">↩</span>
-        <span class="pub-bottom-nav__label"><?= e(t('nav.logout', 'خروج')) ?></span>
-    </a>
-    <?php else: ?>
-    <a href="<?= e($_authPath . '/login.php') ?>" class="pub-bottom-nav__item">
+    <a href="<?= e($_isLoggedIn ? $_authPath . '/profile.php' : $_authPath . '/login.php') ?>" class="pub-bottom-nav__item">
         <span class="pub-bottom-nav__icon" aria-hidden="true">👤</span>
-        <span class="pub-bottom-nav__label"><?= e(t('nav.login', 'دخول')) ?></span>
+        <span class="pub-bottom-nav__label"><?= e(t('nav.profile', 'Profile')) ?></span>
     </a>
-    <?php endif; ?>
 </nav>
 
 <!-- Back-to-top button -->
