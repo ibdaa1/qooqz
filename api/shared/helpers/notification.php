@@ -1,794 +1,823 @@
 <?php
-// htdocs/api/helpers/notification.php
-// ملف دوال الإشعارات (Notification Helper)
-// يدعم Email, SMS, Push Notifications, Database
-// تم التعديل لدعم PDO
+// htdocs/api/shared/helpers/notification.php
+// ملف دوال الإشعارات - معدّل حسب هيكل قاعدة البيانات الفعلي
+// يدعم: Database, Email, SMS, Push (Firebase FCM)
+
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../config/constants.php';
+require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../helpers/mail.php';
+require_once __DIR__ . '/../helpers/sms.php';
 
 // ===========================================
-// تحميل الملفات المطلوبة
+// إعدادات Firebase FCM
 // ===========================================
-
-require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../config/constants.php';
-require_once __DIR__ . '/../config/db.php';
-require_once __DIR__ . '/mail.php';
-require_once __DIR__ . '/sms.php';
+if (!defined('FCM_SERVER_KEY'))    define('FCM_SERVER_KEY',    $_ENV['FCM_SERVER_KEY']    ?? '');
+if (!defined('FCM_ENDPOINT'))      define('FCM_ENDPOINT',      'https://fcm.googleapis.com/fcm/send');
+if (!defined('APP_LOGO_URL'))      define('APP_LOGO_URL',      '/frontend/assets/images/logo.png');
 
 // ===========================================
 // Notification Class
 // ===========================================
 
-class Notification {
-    
+class Notification
+{
     private static ?PDO $pdo = null;
-    
-    /**
-     * تعيين PDO instance
-     * 
-     * @param PDO $pdo
-     */
-    public static function setPDO(PDO $pdo) {
+
+    // كاش محلي للقنوات والأنواع لتفادي استعلامات متكررة
+    private static array $channelsCache = [];
+    private static array $typesCache    = [];
+
+    // -------------------------------------------------------
+    // تهيئة PDO
+    // -------------------------------------------------------
+
+    public static function setPDO(PDO $pdo): void
+    {
         self::$pdo = $pdo;
     }
-    
-    // ===========================================
-    // 1️⃣ إرسال إشعار (Send Notification)
-    // ===========================================
-    
+
+    // -------------------------------------------------------
+    // 1️⃣  إرسال إشعار (نقطة الدخول الرئيسية)
+    // -------------------------------------------------------
+
     /**
-     * إرسال إشعار متعدد القنوات
-     * 
-     * @param int $userId معرف المستخدم
-     * @param string $type نوع الإشعار
-     * @param string $title العنوان
-     * @param string $message الرسالة
-     * @param array $data بيانات إضافية
-     * @param array $channels القنوات ['email', 'sms', 'push', 'database']
+     * @param int    $recipientId    معرف المستلم (user أو entity)
+     * @param string $recipientType  'user' | 'entity' | 'tenant'
+     * @param int    $tenantId       معرف الـ tenant
+     * @param string $typeCode       كود نوع الإشعار (يُطابق notification_types.code)
+     * @param string $title          العنوان
+     * @param string $message        نص الرسالة
+     * @param array  $data           بيانات إضافية (JSON)
+     * @param array  $channels       ['database','email','sms','push']
+     * @param string $priority       'low'|'normal'|'high'|'urgent'
+     * @param string|null $expiresAt  تاريخ انتهاء الصلاحية 'Y-m-d H:i:s' أو null
+     * @param int|null $senderEntityId معرف المُرسل (entity) أو null
      * @return array
      */
-    public static function send($userId, $type, $title, $message, $data = [], $channels = ['database']) {
+    public static function send(
+        int     $recipientId,
+        string  $recipientType = 'user',
+        int     $tenantId      = 1,
+        string  $typeCode      = 'general',
+        string  $title         = '',
+        string  $message       = '',
+        array   $data          = [],
+        array   $channels      = ['database'],
+        string  $priority      = 'normal',
+        ?string $expiresAt     = null,
+        ?int    $senderEntityId = null
+    ): array {
         if (!self::$pdo) {
-            return [
-                'success' => false,
-                'message' => 'PDO not set'
-            ];
+            return ['success' => false, 'message' => 'PDO not initialized'];
         }
-        
+
         $results = [
-            'user_id' => $userId,
-            'type' => $type,
-            'channels' => []
+            'success'  => false,
+            'channels' => [],
         ];
-        
+
         try {
-            // جلب بيانات المستخدم
-            $user = self::getUserData($userId);
-            
-            if (!$user) {
-                return [
-                    'success' => false,
-                    'message' => 'User not found'
-                ];
+            // جلب معرف نوع الإشعار
+            $typeId = self::resolveTypeId($typeCode);
+
+            // حفظ الإشعار الرئيسي في notifications
+            $notificationId = self::insertNotification(
+                $tenantId,
+                $senderEntityId,
+                $recipientId,        // entity_id
+                $title,
+                $message,
+                $data,
+                $typeId,
+                $priority,
+                $expiresAt
+            );
+
+            if (!$notificationId) {
+                return ['success' => false, 'message' => 'Failed to insert notification'];
             }
-            
-            // جلب إعدادات الإشعارات للمستخدم
-            $settings = self::getUserNotificationSettings($userId, $type);
-            
-            // إرسال حسب القنوات المطلوبة
+
+            $results['notification_id'] = $notificationId;
+
+            // جلب بيانات المستخدم إن كان النوع 'user'
+            $user = ($recipientType === 'user') ? self::getUserData($recipientId) : null;
+
+            // المعالجة لكل قناة
             foreach ($channels as $channel) {
-                switch ($channel) {
-                    case 'database':
-                        $results['channels']['database'] = self::saveToDatabase(
-                            $userId,
-                            $type,
-                            $title,
-                            $message,
-                            $data
-                        );
-                        break;
-                        
-                    case 'email': 
-                        if ($settings['email_enabled']) {
-                            $results['channels']['email'] = self::sendEmail(
-                                $user['email'],
-                                $user['username'],
-                                $title,
-                                $message,
-                                $type
-                            );
-                        } else {
-                            $results['channels']['email'] = [
-                                'success' => false,
-                                'message' => 'Email notifications disabled by user'
-                            ];
-                        }
-                        break;
-                        
-                    case 'sms':
-                        if ($settings['sms_enabled'] && ! empty($user['phone'])) {
-                            $results['channels']['sms'] = self::sendSMS(
-                                $user['phone'],
-                                $message
-                            );
-                        } else {
-                            $results['channels']['sms'] = [
-                                'success' => false,
-                                'message' => 'SMS notifications disabled or no phone'
-                            ];
-                        }
-                        break;
-                        
-                    case 'push': 
-                        if ($settings['push_enabled']) {
-                            $results['channels']['push'] = self::sendPushNotification(
-                                $userId,
-                                $title,
-                                $message,
-                                $data
-                            );
-                        } else {
-                            $results['channels']['push'] = [
-                                'success' => false,
-                                'message' => 'Push notifications disabled by user'
-                            ];
-                        }
-                        break;
-                }
+                $channelId = self::resolveChannelId($channel);
+                $deliveryId = self::insertDelivery($notificationId, $channelId);
+
+                $channelResult = match ($channel) {
+                    'database' => self::handleDatabaseChannel(
+                        $recipientId, $recipientType, $tenantId
+                    ),
+                    'email' => self::handleEmailChannel(
+                        $user, $title, $message, $typeCode
+                    ),
+                    'sms' => self::handleSmsChannel(
+                        $user, $message
+                    ),
+                    'push' => self::handlePushChannel(
+                        $recipientId, $recipientType, $title, $message, $data, $notificationId
+                    ),
+                    default => ['success' => false, 'message' => "Unknown channel: {$channel}"]
+                };
+
+                // تحديث حالة التسليم
+                self::updateDeliveryStatus(
+                    $deliveryId,
+                    $channelResult['success'] ? 'sent' : 'failed',
+                    $channelResult['error'] ?? null
+                );
+
+                $results['channels'][$channel] = $channelResult;
             }
-            
+
             $results['success'] = true;
-            
-        } catch (Exception $e) {
-            self::logError('Notification send failed: ' . $e->getMessage());
-            $results['success'] = false;
+
+        } catch (Throwable $e) {
+            self::logError('Notification::send — ' . $e->getMessage());
             $results['error'] = $e->getMessage();
         }
-        
+
         return $results;
     }
-    
-    // ===========================================
-    // 2️⃣ حفظ الإشعار في قاعدة البيانات
-    // ===========================================
-    
-    /**
-     * حفظ الإشعار في جدول notifications
-     * 
-     * @param int $userId
-     * @param string $type
-     * @param string $title
-     * @param string $message
-     * @param array $data
-     * @return array
-     */
-    private static function saveToDatabase($userId, $type, $title, $message, $data = []) {
-        if (!self::$pdo) return ['success' => false, 'message' => 'PDO not set'];
-        
-        $dataJson = ! empty($data) ? json_encode($data, JSON_UNESCAPED_UNICODE) : null;
-        
+
+    // -------------------------------------------------------
+    // 2️⃣  حفظ الإشعار في جدول notifications
+    // -------------------------------------------------------
+
+    private static function insertNotification(
+        int     $tenantId,
+        ?int    $senderEntityId,
+        int     $entityId,
+        string  $title,
+        string  $message,
+        array   $data,
+        ?int    $typeId,
+        string  $priority,
+        ?string $expiresAt
+    ): ?int {
+        $dataJson = !empty($data) ? json_encode($data, JSON_UNESCAPED_UNICODE) : null;
+
+        $stmt = self::$pdo->prepare("
+            INSERT INTO notifications
+                (tenant_id, sender_entity_id, entity_id, title, message, data,
+                 notification_type_id, priority, expires_at, sent_at)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        ");
+
+        $stmt->execute([
+            $tenantId,
+            $senderEntityId,
+            $entityId,
+            $title,
+            $message,
+            $dataJson,
+            $typeId,
+            $priority,
+            $expiresAt,
+        ]);
+
+        return (int) self::$pdo->lastInsertId() ?: null;
+    }
+
+    // -------------------------------------------------------
+    // 3️⃣  قناة Database — تحديث عداد الإشعارات غير المقروءة
+    // -------------------------------------------------------
+
+    private static function handleDatabaseChannel(
+        int    $recipientId,
+        string $recipientType,
+        int    $tenantId
+    ): array {
         try {
-            $stmt = self::$pdo->prepare("INSERT INTO notifications (user_id, notification_type, title, message, data, is_read, created_at) 
-                    VALUES (?, ?, ?, ?, ?, 0, NOW())");
-            $stmt->execute([$userId, $type, $title, $message, $dataJson]);
-            $notificationId = self::$pdo->lastInsertId();
-            
-            self::logNotification('database', $userId, $type, 'saved');
-            
-            return [
-                'success' => true,
-                'notification_id' => $notificationId
-            ];
+            // upsert في notification_counters
+            $stmt = self::$pdo->prepare("
+                INSERT INTO notification_counters
+                    (tenant_id, recipient_type, recipient_id, unread_count)
+                VALUES
+                    (?, ?, ?, 1)
+                ON DUPLICATE KEY UPDATE
+                    unread_count = unread_count + 1
+            ");
+            $stmt->execute([$tenantId, $recipientType, $recipientId]);
+
+            self::logNotification('database', $recipientId, 'counter_updated');
+            return ['success' => true];
+
         } catch (PDOException $e) {
-            return [
-                'success' => false,
-                'message' => $e->errorInfo()[2]
-            ];
+            return ['success' => false, 'error' => $e->errorInfo()[2]];
         }
     }
-    
-    // ===========================================
-    // 3️⃣ إرسال بريد إلكتروني
-    // ===========================================
-    
-    /**
-     * إرسال إشعار عبر البريد الإلكتروني
-     * 
-     * @param string $email
-     * @param string $name
-     * @param string $title
-     * @param string $message
-     * @param string $type
-     * @return array
-     */
-    private static function sendEmail($email, $name, $title, $message, $type) {
-        $sent = Mail::send($email, $title, $message);
-        
-        self::logNotification('email', $email, $type, $sent ? 'sent' : 'failed');
-        
-        return [
-            'success' => $sent,
-            'message' => $sent ? 'Email sent' : 'Email failed'
-        ];
+
+    // -------------------------------------------------------
+    // 4️⃣  قناة Email
+    // -------------------------------------------------------
+
+    private static function handleEmailChannel(?array $user, string $title, string $message, string $type): array
+    {
+        if (!$user || empty($user['email'])) {
+            return ['success' => false, 'message' => 'No email address'];
+        }
+
+        $sent = Mail::send($user['email'], $title, $message);
+        self::logNotification('email', $user['email'], $type . ':' . ($sent ? 'sent' : 'failed'));
+
+        return ['success' => $sent, 'message' => $sent ? 'Email sent' : 'Email failed'];
     }
-    
-    // ===========================================
-    // 4️⃣ إرسال رسالة نصية
-    // ===========================================
-    
-    /**
-     * إرسال إشعار عبر SMS
-     * 
-     * @param string $phone
-     * @param string $message
-     * @return array
-     */
-    private static function sendSMS($phone, $message) {
-        $result = SMS::send($phone, $message);
-        
-        self:: logNotification('sms', $phone, 'sms', $result['success'] ? 'sent' :  'failed');
-        
+
+    // -------------------------------------------------------
+    // 5️⃣  قناة SMS
+    // -------------------------------------------------------
+
+    private static function handleSmsChannel(?array $user, string $message): array
+    {
+        if (!$user || empty($user['phone'])) {
+            return ['success' => false, 'message' => 'No phone number'];
+        }
+
+        $result = SMS::send($user['phone'], $message);
+        self::logNotification('sms', $user['phone'], $result['success'] ? 'sent' : 'failed');
+
         return $result;
     }
-    
-    // ===========================================
-    // 5️⃣ إرسال Push Notification
-    // ===========================================
-    
-    /**
-     * إرسال Push Notification (Firebase FCM)
-     * 
-     * @param int $userId
-     * @param string $title
-     * @param string $message
-     * @param array $data
-     * @return array
-     */
-    private static function sendPushNotification($userId, $title, $message, $data = []) {
-        // TODO: تنفيذ Firebase Cloud Messaging
-        // يحتاج إلى: 
-        // 1. Firebase Server Key
-        // 2. Device tokens من جدول user_devices
-        
-        self::logNotification('push', $userId, 'push', 'not_implemented');
-        
+
+    // -------------------------------------------------------
+    // 6️⃣  قناة Push — Firebase FCM
+    // -------------------------------------------------------
+
+    private static function handlePushChannel(
+        int    $recipientId,
+        string $recipientType,
+        string $title,
+        string $message,
+        array  $data,
+        int    $notificationId
+    ): array {
+        // جلب FCM tokens من user_devices
+        $tokens = self::getFcmTokens($recipientId, $recipientType);
+
+        if (empty($tokens)) {
+            return ['success' => false, 'message' => 'No active FCM tokens found'];
+        }
+
+        if (empty(FCM_SERVER_KEY)) {
+            return ['success' => false, 'message' => 'FCM_SERVER_KEY not configured'];
+        }
+
+        $payload = [
+            'registration_ids' => $tokens,
+            'notification'     => [
+                'title' => $title,
+                'body'  => $message,
+                'icon'  => APP_LOGO_URL,
+                'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+            ],
+            'data' => array_merge($data, [
+                'notification_id' => $notificationId,
+                'click_action'    => 'FLUTTER_NOTIFICATION_CLICK',
+            ]),
+            'priority' => 'high',
+        ];
+
+        $ch = curl_init(FCM_ENDPOINT);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: key=' . FCM_SERVER_KEY,
+                'Content-Type: application/json',
+            ],
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_TIMEOUT    => 10,
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlErr) {
+            self::logError("FCM cURL error: {$curlErr}");
+            return ['success' => false, 'error' => $curlErr];
+        }
+
+        $decoded = json_decode($response, true);
+        $success = ($httpCode === 200 && isset($decoded['success']) && $decoded['success'] > 0);
+
+        // تنظيف الـ tokens غير الصالحة (invalid registration)
+        if (isset($decoded['results'])) {
+            self::cleanInvalidTokens($tokens, $decoded['results']);
+        }
+
+        self::logNotification('push', $recipientId, $success ? 'sent' : 'failed');
+
         return [
-            'success' => false,
-            'message' => 'Push notifications not implemented yet'
+            'success'      => $success,
+            'tokens_sent'  => count($tokens),
+            'fcm_success'  => $decoded['success']  ?? 0,
+            'fcm_failure'  => $decoded['failure']  ?? 0,
+            'http_code'    => $httpCode,
         ];
     }
-    
-    // ===========================================
-    // 6️⃣ إشعارات خاصة بالطلبات
-    // ===========================================
-    
-    /**
-     * إشعار تأكيد طلب جديد
-     * 
-     * @param int $userId
-     * @param array $order
-     * @return array
-     */
-    public static function orderCreated($userId, $order) {
-        $title = 'تأكيد الطلب - Order Confirmation';
-        $message = "تم استلام طلبك #{$order['order_number']} بنجاح.  المبلغ: {$order['grand_total']} " .  DEFAULT_CURRENCY_SYMBOL;
-        
-        $data = [
-            'order_id' => $order['id'],
-            'order_number' => $order['order_number'],
-            'total' => $order['grand_total']
-        ];
-        
-        return self::send(
-            $userId,
-            NOTIFICATION_TYPE_ORDER,
-            $title,
-            $message,
-            $data,
-            ['database', 'email', 'sms']
-        );
-    }
-    
-    /**
-     * إشعار تغيير حالة الطلب
-     * 
-     * @param int $userId
-     * @param string $orderNumber
-     * @param string $status
-     * @return array
-     */
-    public static function orderStatusChanged($userId, $orderNumber, $status) {
-        $statusTexts = [
-            ORDER_STATUS_CONFIRMED => 'تم تأكيد طلبك - Order Confirmed',
-            ORDER_STATUS_PROCESSING => 'جاري تجهيز طلبك - Order Processing',
-            ORDER_STATUS_SHIPPED => 'تم شحن طلبك - Order Shipped',
-            ORDER_STATUS_DELIVERED => 'تم توصيل طلبك - Order Delivered',
-            ORDER_STATUS_CANCELLED => 'تم إلغاء طلبك - Order Cancelled'
-        ];
-        
-        $title = $statusTexts[$status] ?? 'تحديث الطلب - Order Update';
-        $message = "طلبك #{$orderNumber}:  {$title}";
-        
-        $data = [
-            'order_number' => $orderNumber,
-            'status' => $status
-        ];
-        
-        return self::send(
-            $userId,
-            NOTIFICATION_TYPE_ORDER,
-            $title,
-            $message,
-            $data,
-            ['database', 'sms']
-        );
-    }
-    
-    /**
-     * إشعار شحن الطلب
-     * 
-     * @param int $userId
-     * @param string $orderNumber
-     * @param string $trackingNumber
-     * @return array
-     */
-    public static function orderShipped($userId, $orderNumber, $trackingNumber) {
-        $title = 'تم شحن طلبك - Order Shipped';
-        $message = "طلبك #{$orderNumber} في الطريق إليك. رقم التتبع: {$trackingNumber}";
-        
-        $data = [
-            'order_number' => $orderNumber,
-            'tracking_number' => $trackingNumber
-        ];
-        
-        return self::send(
-            $userId,
-            NOTIFICATION_TYPE_SHIPMENT,
-            $title,
-            $message,
-            $data,
-            ['database', 'email', 'sms']
-        );
-    }
-    
-    /**
-     * إشعار توصيل الطلب
-     * 
-     * @param int $userId
-     * @param string $orderNumber
-     * @return array
-     */
-    public static function orderDelivered($userId, $orderNumber) {
-        $title = 'تم توصيل طلبك - Order Delivered';
-        $message = "تم توصيل طلبك #{$orderNumber} بنجاح. نتمنى أن تكون راضياً عن خدمتنا! ";
-        
-        $data = [
-            'order_number' => $orderNumber
-        ];
-        
-        return self::send(
-            $userId,
-            NOTIFICATION_TYPE_SHIPMENT,
-            $title,
-            $message,
-            $data,
-            ['database', 'sms']
-        );
-    }
-    
-    // ===========================================
-    // 7️⃣ إشعارات الدفع
-    // ===========================================
-    
-    /**
-     * إشعار دفع ناجح
-     * 
-     * @param int $userId
-     * @param string $orderNumber
-     * @param float $amount
-     * @return array
-     */
-    public static function paymentSuccess($userId, $orderNumber, $amount) {
-        $title = 'دفع ناجح - Payment Success';
-        $message = "تم استلام دفعتك بنجاح. المبلغ: {$amount} " . DEFAULT_CURRENCY_SYMBOL .  " للطلب #{$orderNumber}";
-        
-        $data = [
-            'order_number' => $orderNumber,
-            'amount' => $amount
-        ];
-        
-        return self::send(
-            $userId,
-            NOTIFICATION_TYPE_PAYMENT,
-            $title,
-            $message,
-            $data,
-            ['database', 'email']
-        );
-    }
-    
-    /**
-     * إشعار فشل الدفع
-     * 
-     * @param int $userId
-     * @param string $orderNumber
-     * @param string $reason
-     * @return array
-     */
-    public static function paymentFailed($userId, $orderNumber, $reason) {
-        $title = 'فشل الدفع - Payment Failed';
-        $message = "فشلت عملية الدفع للطلب #{$orderNumber}. السبب: {$reason}";
-        
-        $data = [
-            'order_number' => $orderNumber,
-            'reason' => $reason
-        ];
-        
-        return self::send(
-            $userId,
-            NOTIFICATION_TYPE_PAYMENT,
-            $title,
-            $message,
-            $data,
-            ['database', 'email', 'sms']
-        );
-    }
-    
-    // ===========================================
-    // 8️⃣ إشعارات المرتجعات
-    // ===========================================
-    
-    /**
-     * إشعار طلب إرجاع جديد
-     * 
-     * @param int $userId
-     * @param string $returnNumber
-     * @return array
-     */
-    public static function returnRequested($userId, $returnNumber) {
-        $title = 'طلب إرجاع - Return Request';
-        $message = "تم استلام طلب الإرجاع #{$returnNumber}. سيتم مراجعته خلال 24 ساعة.";
-        
-        $data = [
-            'return_number' => $returnNumber
-        ];
-        
-        return self:: send(
-            $userId,
-            NOTIFICATION_TYPE_RETURN,
-            $title,
-            $message,
-            $data,
-            ['database', 'email']
-        );
-    }
-    
-    /**
-     * إشعار موافقة على الإرجاع
-     * 
-     * @param int $userId
-     * @param string $returnNumber
-     * @return array
-     */
-    public static function returnApproved($userId, $returnNumber) {
-        $title = 'تمت الموافقة على الإرجاع - Return Approved';
-        $message = "تمت الموافقة على طلب الإرجاع #{$returnNumber}. يرجى إرسال المنتج خلال 7 أيام.";
-        
-        $data = [
-            'return_number' => $returnNumber
-        ];
-        
-        return self::send(
-            $userId,
-            NOTIFICATION_TYPE_RETURN,
-            $title,
-            $message,
-            $data,
-            ['database', 'email', 'sms']
-        );
-    }
-    
-    // ===========================================
-    // 9️⃣ إشعارات التقييم
-    // ===========================================
-    
-    /**
-     * تذكير بتقييم المنتج
-     * 
-     * @param int $userId
-     * @param string $productName
-     * @param int $productId
-     * @return array
-     */
-    public static function reviewReminder($userId, $productName, $productId) {
-        $title = 'قيّم منتجك - Rate Your Product';
-        $message = "ما رأيك في {$productName}؟ شارك تجربتك مع الآخرين! ";
-        
-        $data = [
-            'product_id' => $productId,
-            'product_name' => $productName
-        ];
-        
-        return self::send(
-            $userId,
-            NOTIFICATION_TYPE_REVIEW,
-            $title,
-            $message,
-            $data,
-            ['database']
-        );
-    }
-    
-    // ===========================================
-    // 🔟 إشعارات العروض والتسويق
-    // ===========================================
-    
-    /**
-     * إشعار عرض خاص
-     * 
-     * @param int $userId
-     * @param string $offerTitle
-     * @param string $offerDescription
-     * @return array
-     */
-    public static function specialOffer($userId, $offerTitle, $offerDescription) {
-        $title = 'عرض خاص - Special Offer';
-        $message = "{$offerTitle}:  {$offerDescription}";
-        
-        $data = [
-            'offer_title' => $offerTitle
-        ];
-        
-        return self::send(
-            $userId,
-            NOTIFICATION_TYPE_PROMOTION,
-            $title,
-            $message,
-            $data,
-            ['database', 'email']
-        );
-    }
-    
-    /**
-     * إشعار سلة مهجورة
-     * 
-     * @param int $userId
-     * @param int $itemsCount
-     * @return array
-     */
-    public static function abandonedCart($userId, $itemsCount) {
-        $title = 'أكمل طلبك - Complete Your Order';
-        $message = "لديك {$itemsCount} منتج في سلة التسوق.  أكمل طلبك الآن واحصل على خصم 10%!";
-        
-        $data = [
-            'items_count' => $itemsCount
-        ];
-        
-        return self:: send(
-            $userId,
-            NOTIFICATION_TYPE_PROMOTION,
-            $title,
-            $message,
-            $data,
-            ['database', 'email', 'sms']
-        );
-    }
-    
-    // ===========================================
-    // 1️⃣1️⃣ إشعارات الحساب
-    // ===========================================
-    
-    /**
-     * إشعار تسجيل دخول من جهاز جديد
-     * 
-     * @param int $userId
-     * @param string $device
-     * @param string $location
-     * @return array
-     */
-    public static function newDeviceLogin($userId, $device, $location) {
-        $title = 'تسجيل دخول جديد - New Login';
-        $message = "تم تسجيل دخول إلى حسابك من جهاز جديد:  {$device} في {$location}";
-        
-        $data = [
-            'device' => $device,
-            'location' => $location
-        ];
-        
-        return self::send(
-            $userId,
-            NOTIFICATION_TYPE_ACCOUNT,
-            $title,
-            $message,
-            $data,
-            ['database', 'email']
-        );
-    }
-    
-    /**
-     * إشعار تغيير كلمة المرور
-     * 
-     * @param int $userId
-     * @return array
-     */
-    public static function passwordChanged($userId) {
-        $title = 'تم تغيير كلمة المرور - Password Changed';
-        $message = "تم تغيير كلمة المرور لحسابك بنجاح. إذا لم تقم بذلك، يرجى التواصل معنا فوراً.";
-        
-        return self::send(
-            $userId,
-            NOTIFICATION_TYPE_ACCOUNT,
-            $title,
-            $message,
-            [],
-            ['database', 'email', 'sms']
-        );
-    }
-    
-    // ===========================================
-    // 1️⃣2️⃣ إشعارات الدعم الفني
-    // ===========================================
-    
-    /**
-     * إشعار رد على تذكرة دعم
-     * 
-     * @param int $userId
-     * @param string $ticketNumber
-     * @return array
-     */
-    public static function supportTicketReply($userId, $ticketNumber) {
-        $title = 'رد على تذكرتك - Ticket Reply';
-        $message = "تم الرد على تذكرة الدعم #{$ticketNumber}. تحقق من الردود الجديدة. ";
-        
-        $data = [
-            'ticket_number' => $ticketNumber
-        ];
-        
-        return self::send(
-            $userId,
-            NOTIFICATION_TYPE_SUPPORT,
-            $title,
-            $message,
-            $data,
-            ['database', 'email']
-        );
-    }
-    
-    // ===========================================
-    // 🔧 دوال مساعدة (Helper Functions)
-    // ===========================================
-    
-    /**
-     * جلب بيانات المستخدم
-     * 
-     * @param int $userId
-     * @return array|null
-     */
-    private static function getUserData($userId) {
-        if (!self::$pdo) return null;
-        
+
+    // -------------------------------------------------------
+    // 7️⃣  جلب FCM tokens من user_devices
+    // -------------------------------------------------------
+
+    private static function getFcmTokens(int $userId, string $recipientType): array
+    {
+        if (!self::$pdo) return [];
+
+        // حالياً يدعم النوع 'user' فقط عبر جدول user_devices
+        if ($recipientType !== 'user') return [];
+
         try {
-            $stmt = self::$pdo->prepare("SELECT id, username, email, phone FROM users WHERE id = ?");
+            $stmt = self::$pdo->prepare("
+                SELECT fcm_token FROM user_devices
+                WHERE user_id = ? AND is_active = 1 AND fcm_token IS NOT NULL
+            ");
             $stmt->execute([$userId]);
-            return $stmt->fetch(PDO::FETCH_ASSOC);
+            return $stmt->fetchAll(PDO::FETCH_COLUMN);
+        } catch (PDOException $e) {
+            self::logError('getFcmTokens: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    // -------------------------------------------------------
+    // 8️⃣  تنظيف FCM tokens المنتهية الصلاحية
+    // -------------------------------------------------------
+
+    private static function cleanInvalidTokens(array $tokens, array $results): void
+    {
+        foreach ($results as $index => $result) {
+            if (isset($result['error']) && in_array($result['error'], [
+                'InvalidRegistration',
+                'NotRegistered',
+            ], true)) {
+                $invalidToken = $tokens[$index] ?? null;
+                if ($invalidToken) {
+                    try {
+                        $stmt = self::$pdo->prepare("
+                            UPDATE user_devices SET is_active = 0 WHERE fcm_token = ?
+                        ");
+                        $stmt->execute([$invalidToken]);
+                    } catch (PDOException $e) {
+                        self::logError('cleanInvalidTokens: ' . $e->getMessage());
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------
+    // 9️⃣  حفظ سجل التسليم في notification_deliveries
+    // -------------------------------------------------------
+
+    private static function insertDelivery(int $notificationId, ?int $channelId): ?int
+    {
+        if (!$channelId) return null;
+
+        try {
+            $stmt = self::$pdo->prepare("
+                INSERT INTO notification_deliveries
+                    (notification_id, channel_id, delivery_status, attempts, created_at)
+                VALUES
+                    (?, ?, 'pending', 0, NOW())
+            ");
+            $stmt->execute([$notificationId, $channelId]);
+            return (int) self::$pdo->lastInsertId();
+        } catch (PDOException $e) {
+            self::logError('insertDelivery: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    private static function updateDeliveryStatus(?int $deliveryId, string $status, ?string $errorMessage = null): void
+    {
+        if (!$deliveryId) return;
+
+        try {
+            $stmt = self::$pdo->prepare("
+                UPDATE notification_deliveries
+                SET delivery_status = ?,
+                    attempts        = attempts + 1,
+                    sent_at         = IF(? = 'sent', NOW(), sent_at),
+                    error_message   = ?
+                WHERE id = ?
+            ");
+            $stmt->execute([$status, $status, $errorMessage, $deliveryId]);
+        } catch (PDOException $e) {
+            self::logError('updateDeliveryStatus: ' . $e->getMessage());
+        }
+    }
+
+    // -------------------------------------------------------
+    // 🔟  دوال حل معرفات القنوات والأنواع
+    // -------------------------------------------------------
+
+    private static function resolveChannelId(string $code): ?int
+    {
+        if (isset(self::$channelsCache[$code])) {
+            return self::$channelsCache[$code];
+        }
+
+        try {
+            $stmt = self::$pdo->prepare("
+                SELECT id FROM notification_channels WHERE code = ? AND is_active = 1 LIMIT 1
+            ");
+            $stmt->execute([$code]);
+            $id = $stmt->fetchColumn();
+            self::$channelsCache[$code] = $id ?: null;
+            return self::$channelsCache[$code];
         } catch (PDOException $e) {
             return null;
         }
     }
-    
-    /**
-     * جلب إعدادات الإشعارات للمستخدم
-     * 
-     * @param int $userId
-     * @param string $type
-     * @return array
-     */
-    private static function getUserNotificationSettings($userId, $type) {
-        if (!self::$pdo) {
-            return [
-                'email_enabled' => NOTIFICATION_EMAIL_ENABLED,
-                'sms_enabled' => NOTIFICATION_SMS_ENABLED,
-                'push_enabled' => NOTIFICATION_PUSH_ENABLED
-            ];
+
+    private static function resolveTypeId(string $code): ?int
+    {
+        if (isset(self::$typesCache[$code])) {
+            return self::$typesCache[$code];
         }
-        
+
         try {
-            $stmt = self::$pdo->prepare("SELECT email_enabled, sms_enabled, push_enabled 
-                    FROM user_notification_settings 
-                    WHERE user_id = ? AND notification_type = ?");
-            $stmt->execute([$userId, $type]);
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($row) {
-                return $row;
-            }
+            $stmt = self::$pdo->prepare("
+                SELECT id FROM notification_types WHERE code = ? AND is_active = 1 LIMIT 1
+            ");
+            $stmt->execute([$code]);
+            $id = $stmt->fetchColumn();
+            self::$typesCache[$code] = $id ?: null;
+            return self::$typesCache[$code];
         } catch (PDOException $e) {
-            // fallback to defaults
+            return null;
         }
-        
-        // الإعدادات الافتراضية
-        return [
-            'email_enabled' => NOTIFICATION_EMAIL_ENABLED,
-            'sms_enabled' => NOTIFICATION_SMS_ENABLED,
-            'push_enabled' => NOTIFICATION_PUSH_ENABLED
+    }
+
+    // -------------------------------------------------------
+    // 1️⃣1️⃣  جلب بيانات المستخدم
+    // -------------------------------------------------------
+
+    private static function getUserData(int $userId): ?array
+    {
+        if (!self::$pdo) return null;
+
+        try {
+            $stmt = self::$pdo->prepare("
+                SELECT id, username, email, phone FROM users WHERE id = ? LIMIT 1
+            ");
+            $stmt->execute([$userId]);
+            return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (PDOException $e) {
+            return null;
+        }
+    }
+
+    // -------------------------------------------------------
+    // 1️⃣2️⃣  عمليات القراءة وإدارة الإشعارات
+    // -------------------------------------------------------
+
+    /**
+     * جلب إشعارات المستخدم مع بيانات التسليم
+     */
+    public static function getUserNotifications(
+        int    $recipientId,
+        int    $tenantId,
+        int    $limit  = 20,
+        int    $offset = 0
+    ): array {
+        if (!self::$pdo) return [];
+
+        try {
+            $stmt = self::$pdo->prepare("
+                SELECT
+                    n.id,
+                    n.title,
+                    n.message,
+                    n.data,
+                    n.priority,
+                    n.sent_at,
+                    n.expires_at,
+                    nt.code  AS type_code,
+                    nt.name  AS type_name
+                FROM notifications n
+                LEFT JOIN notification_types nt ON nt.id = n.notification_type_id
+                WHERE n.entity_id  = ?
+                  AND n.tenant_id  = ?
+                  AND (n.expires_at IS NULL OR n.expires_at > NOW())
+                ORDER BY n.sent_at DESC
+                LIMIT ? OFFSET ?
+            ");
+            $stmt->execute([$recipientId, $tenantId, $limit, $offset]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            self::logError('getUserNotifications: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * جلب عدد الإشعارات غير المقروءة
+     */
+    public static function getUnreadCount(
+        int    $recipientId,
+        string $recipientType = 'user',
+        int    $tenantId      = 1
+    ): int {
+        if (!self::$pdo) return 0;
+
+        try {
+            $stmt = self::$pdo->prepare("
+                SELECT unread_count FROM notification_counters
+                WHERE tenant_id      = ?
+                  AND recipient_type = ?
+                  AND recipient_id   = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$tenantId, $recipientType, $recipientId]);
+            return (int) ($stmt->fetchColumn() ?? 0);
+        } catch (PDOException $e) {
+            return 0;
+        }
+    }
+
+    /**
+     * إعادة تعيين عداد القراءة إلى صفر
+     */
+    public static function markAllRead(
+        int    $recipientId,
+        string $recipientType = 'user',
+        int    $tenantId      = 1
+    ): bool {
+        if (!self::$pdo) return false;
+
+        try {
+            $stmt = self::$pdo->prepare("
+                UPDATE notification_counters
+                SET unread_count = 0
+                WHERE tenant_id      = ?
+                  AND recipient_type = ?
+                  AND recipient_id   = ?
+            ");
+            $stmt->execute([$tenantId, $recipientType, $recipientId]);
+            return true;
+        } catch (PDOException $e) {
+            self::logError('markAllRead: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    // -------------------------------------------------------
+    // 1️⃣3️⃣  إدارة FCM Token للجهاز
+    // -------------------------------------------------------
+
+    /**
+     * تسجيل أو تحديث FCM token للمستخدم
+     */
+    public static function registerDeviceToken(
+        int    $userId,
+        string $fcmToken,
+        string $deviceType = 'web',
+        string $deviceName = '',
+        string $userAgent  = '',
+        string $ip         = ''
+    ): bool {
+        if (!self::$pdo) return false;
+
+        try {
+            $stmt = self::$pdo->prepare("
+                INSERT INTO user_devices
+                    (user_id, fcm_token, device_type, device_name, user_agent, ip,
+                     is_active, last_seen_at, created_at)
+                VALUES
+                    (?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
+                ON DUPLICATE KEY UPDATE
+                    user_id      = VALUES(user_id),
+                    device_type  = VALUES(device_type),
+                    device_name  = VALUES(device_name),
+                    user_agent   = VALUES(user_agent),
+                    ip           = VALUES(ip),
+                    is_active    = 1,
+                    last_seen_at = NOW()
+            ");
+            $stmt->execute([$userId, $fcmToken, $deviceType, $deviceName, $userAgent, $ip]);
+            return true;
+        } catch (PDOException $e) {
+            self::logError('registerDeviceToken: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * إلغاء تسجيل FCM token (تسجيل خروج)
+     */
+    public static function deregisterDeviceToken(string $fcmToken): bool
+    {
+        if (!self::$pdo) return false;
+
+        try {
+            $stmt = self::$pdo->prepare("
+                UPDATE user_devices SET is_active = 0 WHERE fcm_token = ?
+            ");
+            $stmt->execute([$fcmToken]);
+            return true;
+        } catch (PDOException $e) {
+            self::logError('deregisterDeviceToken: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    // -------------------------------------------------------
+    // 1️⃣4️⃣  اختصارات (Shorthand methods)
+    // -------------------------------------------------------
+
+    /** تأكيد الطلب */
+    public static function orderCreated(int $userId, array $order, int $tenantId = 1): array
+    {
+        return self::send(
+            $userId, 'user', $tenantId,
+            'order_created',
+            'تأكيد الطلب - Order Confirmation',
+            "تم استلام طلبك #{$order['order_number']} بنجاح. المبلغ: {$order['grand_total']} " . (defined('DEFAULT_CURRENCY_SYMBOL') ? DEFAULT_CURRENCY_SYMBOL : ''),
+            ['order_id' => $order['id'], 'order_number' => $order['order_number'], 'total' => $order['grand_total']],
+            ['database', 'email', 'sms', 'push'],
+            'high'
+        );
+    }
+
+    /** تغيير حالة الطلب */
+    public static function orderStatusChanged(int $userId, string $orderNumber, string $status, int $tenantId = 1): array
+    {
+        $labels = [
+            'confirmed'  => 'تم تأكيد طلبك',
+            'processing' => 'جاري تجهيز طلبك',
+            'shipped'    => 'تم شحن طلبك',
+            'delivered'  => 'تم توصيل طلبك',
+            'cancelled'  => 'تم إلغاء طلبك',
         ];
+        $title = $labels[$status] ?? 'تحديث الطلب';
+
+        return self::send(
+            $userId, 'user', $tenantId,
+            'order_status',
+            $title,
+            "طلبك #{$orderNumber}: {$title}",
+            ['order_number' => $orderNumber, 'status' => $status],
+            ['database', 'sms', 'push']
+        );
     }
-    
-    /**
-     * تسجيل عملية إشعار
-     * 
-     * @param string $channel
-     * @param mixed $recipient
-     * @param string $type
-     * @param string $status
-     */
-    private static function logNotification($channel, $recipient, $type, $status) {
-        if (LOG_ENABLED) {
-            $message = sprintf(
-                "[%s] Notification %s via %s:  Recipient=%s, Type=%s\n",
-                date('Y-m-d H:i:s'),
-                $status,
-                $channel,
-                $recipient,
-                $type
-            );
-            
-            error_log($message, 3, LOG_FILE_API);
-        }
+
+    /** شحن الطلب */
+    public static function orderShipped(int $userId, string $orderNumber, string $trackingNumber, int $tenantId = 1): array
+    {
+        return self::send(
+            $userId, 'user', $tenantId,
+            'order_shipped',
+            'تم شحن طلبك - Order Shipped',
+            "طلبك #{$orderNumber} في الطريق إليك. رقم التتبع: {$trackingNumber}",
+            ['order_number' => $orderNumber, 'tracking_number' => $trackingNumber],
+            ['database', 'email', 'sms', 'push']
+        );
     }
-    
-    /**
-     * تسجيل خطأ
-     * 
-     * @param string $message
-     */
-    private static function logError($message) {
-        if (LOG_ENABLED) {
-            error_log("[Notification Error] " . $message, 3, LOG_FILE_ERROR);
-        }
+
+    /** نجاح الدفع */
+    public static function paymentSuccess(int $userId, string $orderNumber, float $amount, int $tenantId = 1): array
+    {
+        $currency = defined('DEFAULT_CURRENCY_SYMBOL') ? DEFAULT_CURRENCY_SYMBOL : '';
+        return self::send(
+            $userId, 'user', $tenantId,
+            'payment_success',
+            'دفع ناجح - Payment Success',
+            "تم استلام دفعتك بنجاح. المبلغ: {$amount} {$currency} للطلب #{$orderNumber}",
+            ['order_number' => $orderNumber, 'amount' => $amount],
+            ['database', 'email', 'push'],
+            'high'
+        );
     }
-    
-    /**
-     * إرسال إشعار جماعي
-     * 
-     * @param array $userIds
-     * @param string $type
-     * @param string $title
-     * @param string $message
-     * @param array $data
-     * @param array $channels
-     * @return array
-     */
-    public static function sendBulk($userIds, $type, $title, $message, $data = [], $channels = ['database']) {
-        $results = [];
+
+    /** فشل الدفع */
+    public static function paymentFailed(int $userId, string $orderNumber, string $reason, int $tenantId = 1): array
+    {
+        return self::send(
+            $userId, 'user', $tenantId,
+            'payment_failed',
+            'فشل الدفع - Payment Failed',
+            "فشلت عملية الدفع للطلب #{$orderNumber}. السبب: {$reason}",
+            ['order_number' => $orderNumber, 'reason' => $reason],
+            ['database', 'email', 'sms', 'push'],
+            'urgent'
+        );
+    }
+
+    /** طلب إرجاع */
+    public static function returnRequested(int $userId, string $returnNumber, int $tenantId = 1): array
+    {
+        return self::send(
+            $userId, 'user', $tenantId,
+            'return_requested',
+            'طلب إرجاع - Return Request',
+            "تم استلام طلب الإرجاع #{$returnNumber}. سيتم مراجعته خلال 24 ساعة.",
+            ['return_number' => $returnNumber],
+            ['database', 'email']
+        );
+    }
+
+    /** تسجيل دخول من جهاز جديد */
+    public static function newDeviceLogin(int $userId, string $device, string $location, int $tenantId = 1): array
+    {
+        return self::send(
+            $userId, 'user', $tenantId,
+            'new_device_login',
+            'تسجيل دخول جديد - New Login',
+            "تم تسجيل دخول إلى حسابك من جهاز جديد: {$device} في {$location}",
+            ['device' => $device, 'location' => $location],
+            ['database', 'email'],
+            'high'
+        );
+    }
+
+    /** تغيير كلمة المرور */
+    public static function passwordChanged(int $userId, int $tenantId = 1): array
+    {
+        return self::send(
+            $userId, 'user', $tenantId,
+            'password_changed',
+            'تم تغيير كلمة المرور - Password Changed',
+            'تم تغيير كلمة المرور لحسابك بنجاح. إذا لم تقم بذلك، يرجى التواصل معنا فوراً.',
+            [],
+            ['database', 'email', 'sms'],
+            'urgent'
+        );
+    }
+
+    /** رد على تذكرة دعم */
+    public static function supportTicketReply(int $userId, string $ticketNumber, int $tenantId = 1): array
+    {
+        return self::send(
+            $userId, 'user', $tenantId,
+            'support_reply',
+            'رد على تذكرتك - Ticket Reply',
+            "تم الرد على تذكرة الدعم #{$ticketNumber}. تحقق من الردود الجديدة.",
+            ['ticket_number' => $ticketNumber],
+            ['database', 'email', 'push']
+        );
+    }
+
+    /** إرسال جماعي */
+    public static function sendBulk(
+        array  $userIds,
+        string $typeCode,
+        string $title,
+        string $message,
+        array  $data      = [],
+        array  $channels  = ['database'],
+        int    $tenantId  = 1
+    ): array {
         $successCount = 0;
-        $failCount = 0;
-        
+        $failCount    = 0;
+        $results      = [];
+
         foreach ($userIds as $userId) {
-            $result = self::send($userId, $type, $title, $message, $data, $channels);
-            
-            $results[] = [
-                'user_id' => $userId,
-                'result' => $result
-            ];
-            
-            if ($result['success']) {
-                $successCount++;
-            } else {
-                $failCount++;
-            }
+            $result = self::send($userId, 'user', $tenantId, $typeCode, $title, $message, $data, $channels);
+            $results[] = ['user_id' => $userId, 'result' => $result];
+            $result['success'] ? $successCount++ : $failCount++;
         }
-        
+
         return [
-            'total' => count($userIds),
+            'total'         => count($userIds),
             'success_count' => $successCount,
-            'fail_count' => $failCount,
-            'results' => $results
+            'fail_count'    => $failCount,
+            'results'       => $results,
         ];
+    }
+
+    // -------------------------------------------------------
+    // 🔧  Logging
+    // -------------------------------------------------------
+
+    private static function logNotification(string $channel, mixed $recipient, string $status): void
+    {
+        if (defined('LOG_ENABLED') && LOG_ENABLED) {
+            $line = sprintf(
+                "[%s] [Notification] channel=%s recipient=%s status=%s\n",
+                date('Y-m-d H:i:s'), $channel, $recipient, $status
+            );
+            $logFile = defined('LOG_FILE_API') ? LOG_FILE_API : ini_get('error_log');
+            error_log($line, 3, $logFile);
+        }
+    }
+
+    private static function logError(string $message): void
+    {
+        if (defined('LOG_ENABLED') && LOG_ENABLED) {
+            $logFile = defined('LOG_FILE_ERROR') ? LOG_FILE_ERROR : ini_get('error_log');
+            error_log('[Notification Error] ' . $message . "\n", 3, $logFile);
+        }
     }
 }
 
-// ===========================================
 // ✅ تم تحميل Notification Helper بنجاح
-// ===========================================
-
-?>
