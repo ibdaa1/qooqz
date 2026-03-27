@@ -877,7 +877,7 @@ body {
                         title="<?= e(t('nav.language', 'اللغة')) ?>"
                         aria-label="<?= e(t('nav.language', 'اللغة')) ?>">
                     <span aria-hidden="true">🌐</span>
-                    <span class="pub-header-action-label" id="pubLangLabel"><?= e(strtoupper($lang)) ?></span>
+                    <span class="pub-header-action-label" id="pubLangLabel"><?= e($lang) ?></span>
                 </button>
                 <ul class="pub-lang-dropdown" id="pubLangDropdown" role="listbox" hidden></ul>
             </div>
@@ -1284,7 +1284,7 @@ body {
             .then(function (j) {
                 if (!j) return;
                 _langs = (j.data && Array.isArray(j.data.data)) ? j.data.data
-                       : (Array.isArray(j.data) ? j.data : []);
+                       : (Array.isArray(j.data) ? j.data : []); /* ResponseFormatter wraps as {success,data:{data:[]}} */
                 if (_langs.length === 0) return;
                 renderDropdown(_langs);
                 dropdown.hidden = false;
