@@ -47,8 +47,10 @@ $searchEntityId = isset($_GET['entity_id']) && (int)$_GET['entity_id'] > 0
  * when a user is logged in, a per-user row so we can later
  * identify which users searched for what (for targeted offers).
  * ----------------------------------------------------- */
-$trackQuery = function (string $query) use ($pdo, $lang, $tenantId, $currentUserId, $searchEntityId): void {
+$trackQuery = function (string $query, ?int $entityIdOverride = null) use ($pdo, $lang, $tenantId, $currentUserId, $searchEntityId): void {
     if (!$pdo instanceof PDO || strlen($query) < 2) return;
+    // Prefer the entity_id detected from search results; fall back to context entity_id from request.
+    $eid = $entityIdOverride ?? $searchEntityId;
     try {
         $st = $pdo->prepare("
             INSERT INTO search_logs (query, tenant_id, user_id, entity_id, lang, count, last_searched_at)
@@ -56,10 +58,10 @@ $trackQuery = function (string $query) use ($pdo, $lang, $tenantId, $currentUser
             ON DUPLICATE KEY UPDATE count = count + 1, last_searched_at = NOW()
         ");
         // Global/guest row (user_id=NULL)
-        $st->execute([$query, $tenantId ?: null, null, $searchEntityId, $lang]);
+        $st->execute([$query, $tenantId ?: null, null, $eid, $lang]);
         // Per-user row so we can target the user with offers/notifications
         if ($currentUserId !== null) {
-            $st->execute([$query, $tenantId ?: null, $currentUserId, $searchEntityId, $lang]);
+            $st->execute([$query, $tenantId ?: null, $currentUserId, $eid, $lang]);
         }
     } catch (Throwable $e) {
         // Table may not exist yet or columns not migrated — ignore
@@ -105,9 +107,6 @@ if (strlen($q) < 2) {
     ]);
     exit;
 }
-
-// Track this query (best-effort, fires on each suggest call)
-$trackQuery($q);
 
 // context = all | products | categories | entities | jobs
 $context = strtolower(trim($_GET['context'] ?? 'all'));
@@ -169,10 +168,13 @@ $ftProductSql = "
     SELECT DISTINCT p.id,
         COALESCE(pt.name, p.slug) AS name,
         p.slug,
+        e.id AS entity_id,
         MATCH(pt.name) AGAINST(? IN BOOLEAN MODE) AS score
     FROM products p
     LEFT JOIN product_translations pt
         ON pt.product_id = p.id AND pt.language_code = ?
+    LEFT JOIN entities e
+        ON e.tenant_id = p.tenant_id AND e.status NOT IN ('suspended','rejected')
     WHERE p.is_active = 1
       AND MATCH(pt.name) AGAINST(? IN BOOLEAN MODE)
       $tenantCond
@@ -182,10 +184,13 @@ $ftProductSql = "
 $likeProductSql = "
     SELECT DISTINCT p.id,
         COALESCE(pt.name, p.slug) AS name,
-        p.slug
+        p.slug,
+        e.id AS entity_id
     FROM products p
     LEFT JOIN product_translations pt
         ON pt.product_id = p.id AND pt.language_code = ?
+    LEFT JOIN entities e
+        ON e.tenant_id = p.tenant_id AND e.status NOT IN ('suspended','rejected')
     WHERE p.is_active = 1
       AND (pt.name LIKE ? OR p.sku LIKE ? OR p.slug LIKE ?)
       $tenantCond
@@ -210,11 +215,12 @@ $rows = $ftSearch(
 
 foreach ($rows as $r) {
     $results['products'][] = [
-        'id'   => (int)$r['id'],
-        'name' => (string)($r['name'] ?? ''),
-        'url'  => '/frontend/public/product.php?id=' . $r['id'],
-        'icon' => '🛍',
-        'type' => 'product',
+        'id'        => (int)$r['id'],
+        'name'      => (string)($r['name'] ?? ''),
+        'url'       => '/frontend/public/product.php?id=' . $r['id'],
+        'icon'      => '🛍',
+        'type'      => 'product',
+        'entity_id' => isset($r['entity_id']) && (int)$r['entity_id'] > 0 ? (int)$r['entity_id'] : null,
     ];
 }
 
@@ -378,6 +384,21 @@ foreach ($results as $type => $items) {
         $allSuggestions[] = $item;
     }
 }
+
+/* -------------------------------------------------------
+ * Track this query now that we know which entity/tenant
+ * the search results belong to.
+ * Priority: explicit GET entity_id > first entity result >
+ *           first product result's entity_id.
+ * ----------------------------------------------------- */
+$logEntityId = $searchEntityId;
+if ($logEntityId === null && !empty($results['entities'])) {
+    $logEntityId = (int)($results['entities'][0]['id'] ?? 0) ?: null;
+}
+if ($logEntityId === null && !empty($results['products'])) {
+    $logEntityId = ($results['products'][0]['entity_id'] ?? null) ?: null;
+}
+$trackQuery($q, $logEntityId);
 
 ResponseFormatter::success(array_merge($results, ['suggestions' => $allSuggestions]));
 exit;
