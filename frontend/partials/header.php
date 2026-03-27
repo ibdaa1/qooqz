@@ -696,10 +696,12 @@ body {
             var q = inp.value.trim();
             showClear(inp.value.length > 0);
 
-            // If input cleared → redirect to clean page
+            // If input cleared AND we came from a search page, go back to clean page
             if (inp.value === '') {
                 hide();
-                window.location.href = window.location.pathname;
+                if (window.location.search.indexOf('q=') !== -1) {
+                    window.location.href = window.location.pathname;
+                }
                 return;
             }
 

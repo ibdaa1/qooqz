@@ -110,7 +110,15 @@ $likeProductSql = "
     ORDER BY p.id DESC
     LIMIT $limit";
 
-$boolQ = '+' . implode('* +', array_filter(explode(' ', $safe))) . '*';
+// Build boolean-mode query: at least first term required, rest optional for lenient matching
+$terms = array_values(array_filter(explode(' ', $safe)));
+if (count($terms) > 1) {
+    $required = '+' . $terms[0] . '*';
+    $optional = implode('* ', array_slice($terms, 1)) . '*';
+    $boolQ = $required . ' ' . $optional;
+} else {
+    $boolQ = $safe . '*';
+}
 $rows = $ftSearch(
     $ftProductSql,
     array_merge([$boolQ, $lang, $boolQ], $tenantParam),
