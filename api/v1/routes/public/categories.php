@@ -48,15 +48,14 @@ if ($first === 'categories') {
             $map[(int)$cat['id']] = $cat;
         }
         $tree = [];
-        foreach ($map as $catId => &$node) {
-            $pid = (int)($node['parent_id'] ?? 0);
+        foreach (array_keys($map) as $catId) {
+            $pid = (int)($map[$catId]['parent_id'] ?? 0);
             if ($pid && isset($map[$pid])) {
-                $map[$pid]['children'][] = &$node;
+                $map[$pid]['children'][] =& $map[$catId];
             } else {
-                $tree[] = &$node;
+                $tree[] =& $map[$catId];
             }
         }
-        unset($node);
 
         ResponseFormatter::success([
             'ok'   => true,
