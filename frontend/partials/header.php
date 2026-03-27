@@ -386,7 +386,7 @@ body {
 .pub-header-actions {
     display: flex;
     align-items: center;
-    gap: .3rem;
+    gap: .5rem;
     flex-shrink: 0;
     margin-inline-start: .5rem;
 }
@@ -412,6 +412,10 @@ body {
 .pub-header-action-btn--auth {
     background: rgba(255,255,255,.12);
     border: 1px solid rgba(255,255,255,.25);
+}
+.pub-header-action-btn span[aria-hidden] {
+    font-size: 1.2rem;
+    line-height: 1;
 }
 .pub-header-action-btn--auth:hover {
     background: rgba(255,255,255,.25);
@@ -467,7 +471,7 @@ body {
     top: var(--pub-header-h, 60px);
     background: var(--pub-cat-bar-bg, var(--pub-primary, #2d8cf0));
     border-top: 1px solid rgba(255,255,255,.12);
-    z-index: 900;
+    z-index: 999;
 }
 .pub-cat-bar__inner {
     display: flex;

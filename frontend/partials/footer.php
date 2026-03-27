@@ -65,6 +65,37 @@ if (!function_exists('t')) {
     </div>
 </footer>
 
+<!-- Mobile bottom navigation bar -->
+<?php
+$_isLoggedIn = !empty(($GLOBALS['PUB_CONTEXT']['user'] ?? [])['id']);
+$_authPath   = '/frontend';
+?>
+<nav class="pub-bottom-nav" aria-label="<?= e(t('nav.actions', 'التنقل')) ?>">
+    <a href="<?= e($_basePath . '/index.php') ?>" class="pub-bottom-nav__item">
+        <span class="pub-bottom-nav__icon" aria-hidden="true">🏠</span>
+        <span class="pub-bottom-nav__label"><?= e(t('nav.home', 'الرئيسية')) ?></span>
+    </a>
+    <a href="<?= e($_basePath . '/categories.php') ?>" class="pub-bottom-nav__item">
+        <span class="pub-bottom-nav__icon" aria-hidden="true">📂</span>
+        <span class="pub-bottom-nav__label"><?= e(t('nav.categories', 'التصنيفات')) ?></span>
+    </a>
+    <a href="<?= e($_basePath . '/cart.php') ?>" class="pub-bottom-nav__item">
+        <span class="pub-bottom-nav__icon" aria-hidden="true">🛒</span>
+        <span class="pub-bottom-nav__label"><?= e(t('nav.cart', 'السلة')) ?></span>
+    </a>
+    <?php if ($_isLoggedIn): ?>
+    <a href="<?= e($_authPath . '/logout.php') ?>" class="pub-bottom-nav__item">
+        <span class="pub-bottom-nav__icon" aria-hidden="true">↩</span>
+        <span class="pub-bottom-nav__label"><?= e(t('nav.logout', 'خروج')) ?></span>
+    </a>
+    <?php else: ?>
+    <a href="<?= e($_authPath . '/login.php') ?>" class="pub-bottom-nav__item">
+        <span class="pub-bottom-nav__icon" aria-hidden="true">👤</span>
+        <span class="pub-bottom-nav__label"><?= e(t('nav.login', 'دخول')) ?></span>
+    </a>
+    <?php endif; ?>
+</nav>
+
 <!-- Back-to-top button -->
 <?php $_btt_side = ($_ctx['dir'] ?? 'rtl') === 'rtl' ? 'left' : 'right'; ?>
 <button id="pubBackToTop" title="<?= e(t('footer.back_to_top')) ?>"
