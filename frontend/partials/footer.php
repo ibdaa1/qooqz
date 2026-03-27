@@ -44,10 +44,11 @@ if (!function_exists('t')) {
             <!-- Support -->
             <div class="pub-footer-col">
                 <p class="pub-footer-col-title"><?= e(t('footer.support')) ?></p>
-                <a href="#"><?= e(t('footer.about')) ?></a>
-                <a href="#"><?= e(t('footer.contact')) ?></a>
-                <a href="#"><?= e(t('footer.privacy')) ?></a>
-                <a href="#"><?= e(t('footer.terms')) ?></a>
+                <a href="<?= e($_basePath . '/about.php') ?>"><?= e(t('footer.about')) ?></a>
+                <a href="<?= e($_basePath . '/contact.php') ?>"><?= e(t('footer.contact')) ?></a>
+                <a href="<?= e($_basePath . '/privacy.php') ?>"><?= e(t('footer.privacy')) ?></a>
+                <a href="<?= e($_basePath . '/terms.php') ?>"><?= e(t('footer.terms')) ?></a>
+                <a href="<?= e($_basePath . '/support.php') ?>"><?= e(t('footer.support_center')) ?></a>
             </div>
 
             <!-- Auth -->
@@ -90,7 +91,7 @@ $_authPath   = '/frontend';
 </nav>
 
 <!-- Back-to-top button -->
-<?php $_btt_side = ($_ctx['dir'] ?? 'rtl') === 'rtl' ? 'left' : 'right'; ?>
+<?php $_btt_side = ($_ctx['dir'] ?? 'ltr') === 'rtl' ? 'left' : 'right'; ?>
 <button id="pubBackToTop" title="<?= e(t('footer.back_to_top')) ?>"
         style="display:none;position:fixed;bottom:20px;<?= e($_btt_side) ?>:20px;
                z-index:200;width:40px;height:40px;background:var(--pub-primary);color:var(--pub-btn-primary-text,#fff);

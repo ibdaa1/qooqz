@@ -82,7 +82,7 @@ if (!function_exists('pub_detect_lang')) {
      * Returns the 2-letter language code if a translation file exists.
      * (Kept for potential future use but not called in the main flow.)
      */
-    function pub_detect_lang(string $default = 'ar'): string {
+    function pub_detect_lang(string $default = 'en'): string {
         $langDir = FRONTEND_BASE . '/languages';
         $avail   = [];
 
@@ -141,10 +141,10 @@ if (isset($_GET['lang']) && preg_match('/^[a-z]{2,5}$/', $_GET['lang'])) {
     $lang = pub_detect_lang($appConfig['default_lang'] ?? 'en');
 }
 
-// Fallback to 'ar' if no translation file exists
+// Fallback to 'en' if no translation file exists
 $langFile = FRONTEND_BASE . '/languages/' . $lang . '.json';
 if (!is_readable($langFile)) {
-    $lang     = $appConfig['default_lang'] ?? 'ar';
+    $lang     = $appConfig['default_lang'] ?? 'en';
     $langFile = FRONTEND_BASE . '/languages/' . $lang . '.json';
 }
 
