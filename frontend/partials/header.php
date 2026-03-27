@@ -419,6 +419,259 @@ body {
 @media (max-width: 640px) {
     .pub-header-action-label { display: none; }
 }
+
+/* ══════════════════════════════════════════════════════════
+   CATEGORY SLIDER + MEGA MENU
+   ══════════════════════════════════════════════════════════ */
+.pub-cat-bar {
+    position: relative;
+    background: var(--pub-cat-bar-bg, var(--pub-primary, #2d8cf0));
+    border-top: 1px solid rgba(255,255,255,.12);
+    z-index: 900;
+}
+.pub-cat-bar__inner {
+    display: flex;
+    align-items: stretch;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    gap: 0;
+    position: relative;
+}
+.pub-cat-bar__inner::-webkit-scrollbar { display: none; }
+
+/* Scroll arrow buttons */
+.pub-cat-bar__arrow {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 36px;
+    background: linear-gradient(to var(--arrow-dir,right), var(--pub-primary,#2d8cf0) 60%, transparent);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    padding: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+}
+.pub-cat-bar__arrow--start { inset-inline-start: 0; --arrow-dir: left; }
+.pub-cat-bar__arrow--end   { inset-inline-end:   0; --arrow-dir: right; }
+.pub-cat-bar--can-start .pub-cat-bar__arrow--start,
+.pub-cat-bar--can-end   .pub-cat-bar__arrow--end   { opacity: 1; pointer-events: auto; }
+
+/* Category items */
+.pub-cat-item {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .55rem .9rem;
+    color: rgba(255,255,255,.92);
+    font-size: .83rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    text-decoration: none;
+    transition: background .15s, border-color .15s;
+    user-select: none;
+    flex-shrink: 0;
+}
+.pub-cat-item:hover,
+.pub-cat-item.active {
+    background: rgba(255,255,255,.15);
+    border-bottom-color: #fff;
+    color: #fff;
+}
+.pub-cat-item img {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+/* ── Mega Menu panel ── */
+.pub-mega-menu {
+    position: absolute;
+    inset-inline-start: 0;
+    inset-inline-end: 0;
+    top: 100%;
+    background: var(--pub-surface, #fff);
+    border: 1px solid var(--pub-border, #e0e0e0);
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.14);
+    z-index: 1000;
+    display: none;
+    min-height: 280px;
+    overflow: hidden;
+}
+.pub-mega-menu.open { display: flex; }
+
+.pub-mega-menu__col {
+    flex: 1 1 0;
+    padding: 1rem 1.1rem;
+    border-inline-end: 1px solid var(--pub-border, #e8e8e8);
+    overflow: hidden;
+    min-width: 0;
+}
+.pub-mega-menu__col:last-child { border-inline-end: none; }
+
+.pub-mega-menu__heading {
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--pub-muted, #888);
+    margin: 0 0 .6rem;
+    padding-bottom: .4rem;
+    border-bottom: 1px solid var(--pub-border, #eee);
+}
+
+/* Subcategory list */
+.pub-mega-sub__list {
+    list-style: none;
+    margin: 0; padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+}
+.pub-mega-sub__list a {
+    display: block;
+    padding: .3rem .4rem;
+    font-size: .85rem;
+    color: var(--pub-text, #222);
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background .12s, color .12s;
+}
+.pub-mega-sub__list a:hover {
+    background: var(--pub-hover, #f0f4ff);
+    color: var(--pub-primary, #2d8cf0);
+}
+
+/* Product grid */
+.pub-mega-prods {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: .55rem;
+}
+.pub-mega-prod {
+    background: var(--pub-surface, #fff);
+    border: 1px solid var(--pub-border, #eee);
+    border-radius: 8px;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow .15s, transform .12s;
+}
+.pub-mega-prod:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    transform: translateY(-2px);
+}
+.pub-mega-prod img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+}
+.pub-mega-prod__info {
+    padding: .35rem .4rem;
+    font-size: .76rem;
+}
+.pub-mega-prod__name {
+    font-weight: 600;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.3;
+    margin-bottom: .2rem;
+}
+.pub-mega-prod__price {
+    color: var(--pub-primary, #2d8cf0);
+    font-weight: 700;
+    font-size: .82rem;
+}
+
+/* Brand logos */
+.pub-mega-brands {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+.pub-mega-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 50px;
+    border: 1px solid var(--pub-border, #eee);
+    border-radius: 7px;
+    padding: .3rem;
+    text-decoration: none;
+    background: var(--pub-surface, #fff);
+    transition: box-shadow .15s, border-color .15s;
+}
+.pub-mega-brand:hover {
+    box-shadow: 0 2px 10px rgba(0,0,0,.1);
+    border-color: var(--pub-primary, #2d8cf0);
+}
+.pub-mega-brand img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+.pub-mega-brand--text {
+    font-size: .72rem;
+    font-weight: 600;
+    color: var(--pub-text, #222);
+    text-align: center;
+    word-break: break-word;
+    line-height: 1.2;
+}
+
+/* Skeleton/loading shimmer */
+.pub-mega-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: pubSkeleton .9s infinite;
+    border-radius: 5px;
+    min-height: 18px;
+    margin-bottom: .4rem;
+}
+@keyframes pubSkeleton {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Mobile accordion for category bar */
+@media (max-width: 768px) {
+    .pub-cat-bar__inner {
+        flex-wrap: nowrap;
+        padding-bottom: 2px;
+    }
+    .pub-mega-menu.open {
+        flex-direction: column;
+        position: fixed;
+        inset: 0;
+        top: var(--pub-mega-mobile-top, 110px);
+        z-index: 1200;
+        overflow-y: auto;
+        border-radius: 0;
+    }
+    .pub-mega-menu__col {
+        border-inline-end: none;
+        border-bottom: 1px solid var(--pub-border, #eee);
+    }
+}
     </style>
 
     <!-- Public Stylesheet -->
@@ -579,6 +832,358 @@ body {
 
     </div>
 </header>
+
+<!-- ═══════════════════════════════════════════════
+     CATEGORY SLIDER + MEGA MENU
+═══════════════════════════════════════════════════ -->
+<nav class="pub-cat-bar" id="pubCatBar" aria-label="<?= e(t('nav.categories', 'التصنيفات')) ?>">
+    <button class="pub-cat-bar__arrow pub-cat-bar__arrow--start" id="pubCatArrowStart" aria-label="السابق" tabindex="-1">&#8249;</button>
+    <div class="pub-cat-bar__inner" id="pubCatBarInner">
+        <!-- Items injected by JS -->
+        <?php for ($i = 0; $i < 6; $i++): ?>
+        <span class="pub-cat-item" style="width:90px;"><span class="pub-mega-skeleton" style="width:70px;height:14px;border-radius:6px;"></span></span>
+        <?php endfor; ?>
+    </div>
+    <button class="pub-cat-bar__arrow pub-cat-bar__arrow--end" id="pubCatArrowEnd" aria-label="التالي" tabindex="-1">&#8250;</button>
+
+    <!-- Mega menu panel — shared, repositioned on hover -->
+    <div class="pub-mega-menu" id="pubMegaMenu" role="region" aria-live="polite">
+        <!-- Content injected by JS -->
+    </div>
+</nav>
+
+<script>
+(function () {
+    'use strict';
+
+    var TENANT_ID  = (window.__qzTenantId || 0);
+    var LANG       = <?= json_encode($lang) ?>;
+    var BASE_PATH  = <?= json_encode($_basePath) ?>;
+    var IS_RTL     = <?= json_encode($dir === 'rtl') ?>;
+    var DEBOUNCE   = 150;
+
+    var bar        = document.getElementById('pubCatBar');
+    var inner      = document.getElementById('pubCatBarInner');
+    var megaMenu   = document.getElementById('pubMegaMenu');
+    var arrowStart = document.getElementById('pubCatArrowStart');
+    var arrowEnd   = document.getElementById('pubCatArrowEnd');
+
+    if (!bar || !inner || !megaMenu) return;
+
+    /* ── Cache ─────────────────────────────────────────── */
+    var _catCache   = {};   // category_id → {subcats, products, brands}
+    var _topCats    = null; // top-level categories array
+
+    /* ── State ─────────────────────────────────────────── */
+    var _activeId   = null;
+    var _menuTimer  = null;
+    var _isMobile   = window.matchMedia('(max-width:768px)').matches;
+
+    window.matchMedia('(max-width:768px)').addEventListener('change', function (e) {
+        _isMobile = e.matches;
+    });
+
+    /* ── API helper ────────────────────────────────────── */
+    function apiGet(url) {
+        return fetch(url, { credentials: 'include' })
+            .then(function (r) { return r.ok ? r.json() : null; });
+    }
+
+    function apiBase() {
+        return '/api/public/';
+    }
+
+    function tenantQ() {
+        return TENANT_ID ? ('&tenant_id=' + TENANT_ID) : '';
+    }
+
+    /* ── Load top-level categories ─────────────────────── */
+    function loadTopCats() {
+        var url = apiBase() + 'categories?parent_id=0&per=30&lang=' + encodeURIComponent(LANG) + tenantQ();
+        apiGet(url).then(function (j) {
+            if (!j) return;
+            var cats = (j.data && j.data.data) ? j.data.data : (Array.isArray(j.data) ? j.data : []);
+            _topCats = cats;
+            renderCatBar(cats);
+        }).catch(function () {});
+    }
+
+    /* ── Render category bar ───────────────────────────── */
+    function renderCatBar(cats) {
+        inner.innerHTML = '';
+        if (!cats || !cats.length) { bar.style.display = 'none'; return; }
+        bar.style.display = '';
+        cats.forEach(function (cat) {
+            var el = document.createElement('a');
+            el.className = 'pub-cat-item';
+            el.href = BASE_PATH + '/categories.php?id=' + encodeURIComponent(cat.id);
+            el.dataset.catId = cat.id;
+            el.setAttribute('aria-haspopup', 'true');
+            el.setAttribute('aria-expanded', 'false');
+            if (cat.image_url) {
+                var img = document.createElement('img');
+                img.src = cat.image_url;
+                img.alt = '';
+                img.loading = 'lazy';
+                el.appendChild(img);
+            }
+            var span = document.createElement('span');
+            span.textContent = cat.name || cat.slug || '';
+            el.appendChild(span);
+            inner.appendChild(el);
+
+            if (_isMobile) {
+                el.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    toggleMobileMega(cat.id, el);
+                });
+            } else {
+                el.addEventListener('mouseenter', debounce(function () {
+                    openMega(cat.id, el);
+                }, DEBOUNCE));
+                el.addEventListener('focus', function () { openMega(cat.id, el); });
+            }
+        });
+        updateArrows();
+    }
+
+    /* ── Fetch mega menu data ──────────────────────────── */
+    function fetchMegaData(catId) {
+        if (_catCache[catId]) return Promise.resolve(_catCache[catId]);
+
+        var langQ = '&lang=' + encodeURIComponent(LANG);
+        var tQ    = tenantQ();
+
+        var pSubs  = apiGet(apiBase() + 'categories?parent_id=' + catId + '&per=15' + langQ + tQ);
+        var pProds = apiGet(apiBase() + 'products?category_id=' + catId + '&per=8' + langQ + tQ);
+        var pBrands= apiGet(apiBase() + 'brands?per=10' + langQ + tQ);
+
+        return Promise.all([pSubs, pProds, pBrands]).then(function (results) {
+            var subs    = extractList(results[0]);
+            var prods   = extractList(results[1]);
+            var brands  = extractList(results[2]);
+            var data    = { subs: subs, prods: prods, brands: brands };
+            _catCache[catId] = data;
+            return data;
+        });
+    }
+
+    function extractList(j) {
+        if (!j) return [];
+        var d = j.data || j;
+        if (Array.isArray(d)) return d;
+        if (d && Array.isArray(d.data)) return d.data;
+        return [];
+    }
+
+    /* ── Render mega menu ──────────────────────────────── */
+    function renderMega(data) {
+        var html = '';
+
+        /* Column A: Subcategories */
+        html += '<div class="pub-mega-menu__col">';
+        html += '<p class="pub-mega-menu__heading">' + escH(<?= json_encode(t('mega.subcategories','التصنيفات الفرعية')) ?>) + '</p>';
+        if (data.subs && data.subs.length) {
+            html += '<ul class="pub-mega-sub__list">';
+            data.subs.forEach(function (s) {
+                html += '<li><a href="' + escA(BASE_PATH + '/categories.php?id=' + s.id) + '">' + escH(s.name || s.slug || '') + '</a></li>';
+            });
+            html += '</ul>';
+        } else {
+            html += '<p style="font-size:.82rem;color:var(--pub-muted,#aaa)">' + escH(<?= json_encode(t('mega.no_subcategories','لا توجد تصنيفات فرعية')) ?>) + '</p>';
+        }
+        html += '</div>';
+
+        /* Column B: Featured Products */
+        html += '<div class="pub-mega-menu__col">';
+        html += '<p class="pub-mega-menu__heading">' + escH(<?= json_encode(t('mega.featured_products','منتجات مميزة')) ?>) + '</p>';
+        if (data.prods && data.prods.length) {
+            html += '<div class="pub-mega-prods">';
+            data.prods.slice(0, 8).forEach(function (p) {
+                var href = BASE_PATH + '/product.php?id=' + p.id;
+                html += '<a class="pub-mega-prod" href="' + escA(href) + '">';
+                if (p.image_url || p.thumbnail_url) {
+                    html += '<img src="' + escA(p.image_url || p.thumbnail_url) + '" alt="' + escA(p.name || '') + '" loading="lazy">';
+                } else {
+                    html += '<div style="aspect-ratio:1;background:var(--pub-hover,#f0f0f0)"></div>';
+                }
+                html += '<div class="pub-mega-prod__info">';
+                html += '<div class="pub-mega-prod__name">' + escH(p.name || '') + '</div>';
+                if (p.price !== undefined && p.price !== null) {
+                    html += '<div class="pub-mega-prod__price">' + escH(formatPrice(p.price, p.currency)) + '</div>';
+                }
+                html += '</div></a>';
+            });
+            html += '</div>';
+        } else {
+            html += '<p style="font-size:.82rem;color:var(--pub-muted,#aaa)">' + escH(<?= json_encode(t('mega.no_products','لا توجد منتجات')) ?>) + '</p>';
+        }
+        html += '</div>';
+
+        /* Column C: Top Brands */
+        html += '<div class="pub-mega-menu__col">';
+        html += '<p class="pub-mega-menu__heading">' + escH(<?= json_encode(t('mega.top_brands','أبرز العلامات')) ?>) + '</p>';
+        if (data.brands && data.brands.length) {
+            html += '<div class="pub-mega-brands">';
+            data.brands.slice(0, 10).forEach(function (b) {
+                var href = BASE_PATH + '/products.php?brand_id=' + b.id;
+                html += '<a class="pub-mega-brand" href="' + escA(href) + '" title="' + escA(b.name || '') + '">';
+                if (b.logo_url) {
+                    html += '<img src="' + escA(b.logo_url) + '" alt="' + escA(b.name || '') + '" loading="lazy">';
+                } else {
+                    html += '<span class="pub-mega-brand--text">' + escH(b.name || '') + '</span>';
+                }
+                html += '</a>';
+            });
+            html += '</div>';
+        } else {
+            html += '<p style="font-size:.82rem;color:var(--pub-muted,#aaa)">' + escH(<?= json_encode(t('mega.no_brands','لا توجد علامات')) ?>) + '</p>';
+        }
+        html += '</div>';
+
+        megaMenu.innerHTML = html;
+    }
+
+    /* ── Skeleton loading ──────────────────────────────── */
+    function renderSkeleton() {
+        var sk = '';
+        for (var c = 0; c < 3; c++) {
+            sk += '<div class="pub-mega-menu__col">';
+            for (var r = 0; r < 5; r++) {
+                sk += '<div class="pub-mega-skeleton" style="margin-bottom:.5rem;height:' + (r === 0 ? 14 : 18) + 'px;"></div>';
+            }
+            sk += '</div>';
+        }
+        megaMenu.innerHTML = sk;
+    }
+
+    /* ── Open mega menu ────────────────────────────────── */
+    function openMega(catId, itemEl) {
+        clearTimeout(_menuTimer);
+        _activeId = catId;
+
+        /* Mark active item */
+        inner.querySelectorAll('.pub-cat-item').forEach(function (el) {
+            el.classList.toggle('active', el.dataset.catId == catId);
+            el.setAttribute('aria-expanded', el.dataset.catId == catId ? 'true' : 'false');
+        });
+
+        megaMenu.classList.add('open');
+        renderSkeleton();
+
+        fetchMegaData(catId).then(function (data) {
+            if (_activeId == catId) renderMega(data);
+        }).catch(function () {
+            megaMenu.classList.remove('open');
+        });
+    }
+
+    /* ── Close mega menu ───────────────────────────────── */
+    function closeMega() {
+        _activeId = null;
+        megaMenu.classList.remove('open');
+        inner.querySelectorAll('.pub-cat-item').forEach(function (el) {
+            el.classList.remove('active');
+            el.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    /* ── Mobile toggle ─────────────────────────────────── */
+    function toggleMobileMega(catId, itemEl) {
+        if (_activeId == catId && megaMenu.classList.contains('open')) {
+            closeMega();
+        } else {
+            openMega(catId, itemEl);
+        }
+    }
+
+    /* ── Mouse-leave guard (keep open while inside menu) ── */
+    bar.addEventListener('mouseleave', function () {
+        if (!_isMobile) {
+            _menuTimer = setTimeout(closeMega, 250);
+        }
+    });
+    bar.addEventListener('mouseenter', function () {
+        clearTimeout(_menuTimer);
+    });
+
+    /* ── Close on outside click ────────────────────────── */
+    document.addEventListener('click', function (e) {
+        if (!bar.contains(e.target)) closeMega();
+    });
+
+    /* ── Keyboard: Escape ──────────────────────────────── */
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeMega();
+    });
+
+    /* ── Scroll arrows ─────────────────────────────────── */
+    function updateArrows() {
+        var sl = inner.scrollLeft;
+        var maxSl = inner.scrollWidth - inner.clientWidth;
+        if (IS_RTL) {
+            bar.classList.toggle('pub-cat-bar--can-start', sl < -2);
+            bar.classList.toggle('pub-cat-bar--can-end',   sl > -(maxSl - 2));
+        } else {
+            bar.classList.toggle('pub-cat-bar--can-start', sl > 2);
+            bar.classList.toggle('pub-cat-bar--can-end',   sl < maxSl - 2);
+        }
+    }
+    inner.addEventListener('scroll', updateArrows, { passive: true });
+
+    arrowStart.addEventListener('click', function () {
+        inner.scrollBy({ left: IS_RTL ? 160 : -160, behavior: 'smooth' });
+    });
+    arrowEnd.addEventListener('click', function () {
+        inner.scrollBy({ left: IS_RTL ? -160 : 160, behavior: 'smooth' });
+    });
+
+    /* ── Touch / drag scroll ───────────────────────────── */
+    var _touchX = null;
+    inner.addEventListener('touchstart', function (e) {
+        _touchX = e.touches[0].clientX;
+    }, { passive: true });
+    inner.addEventListener('touchmove', function (e) {
+        if (_touchX === null) return;
+        var dx = _touchX - e.touches[0].clientX;
+        inner.scrollLeft += dx;
+        _touchX = e.touches[0].clientX;
+    }, { passive: true });
+    inner.addEventListener('touchend', function () { _touchX = null; });
+
+    /* ── Utilities ─────────────────────────────────────── */
+    function debounce(fn, ms) {
+        var t;
+        return function () {
+            var ctx = this, args = arguments;
+            clearTimeout(t);
+            t = setTimeout(function () { fn.apply(ctx, args); }, ms);
+        };
+    }
+
+    function escH(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    function escA(s) {
+        return String(s).replace(/"/g,'&quot;');
+    }
+
+    function formatPrice(price, currency) {
+        var n = parseFloat(price);
+        if (isNaN(n)) return '';
+        return n.toLocaleString(LANG === 'ar' ? 'ar-SA' : 'en-US', {
+            style: 'currency',
+            currency: currency || 'SAR',
+            maximumFractionDigits: 2,
+        });
+    }
+
+    /* ── Boot ──────────────────────────────────────────── */
+    loadTopCats();
+
+})();
+</script>
 
 <!-- ═══════════════════════════════════════════════
      LAYOUT: sidebar (menu.php) + main content
