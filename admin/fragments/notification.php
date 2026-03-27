@@ -112,6 +112,10 @@ $apiBase = '/api';
             <i class="fas fa-paper-plane"></i>
             <span data-i18n="notifications.tabs.deliveries"><?= __t('notifications.tabs.deliveries', 'Deliveries') ?></span>
         </button>
+        <button class="notif-tab-btn" data-tab="devices">
+            <i class="fas fa-mobile-alt"></i>
+            <span data-i18n="notifications.tabs.devices"><?= __t('notifications.tabs.devices', 'Devices') ?></span>
+        </button>
     </div>
 
     <!-- ── FORM CONTAINER (shared, reused per tab) ── -->
@@ -226,6 +230,46 @@ $apiBase = '/api';
                         <textarea id="fData" name="data" class="form-control" rows="2"
                                   placeholder='{"key": "value"}'></textarea>
                     </div>
+                    <div class="form-group notif-channels-group">
+                        <label data-i18n="form.fields.channels.label"><?= __t('form.fields.channels.label','Delivery Channels') ?></label>
+                        <div class="notif-channels-checkboxes">
+                            <label class="notif-channel-check">
+                                <input type="checkbox" name="channels[]" value="database" checked>
+                                <span><i class="fas fa-database"></i> <span data-i18n="form.fields.channels.database"><?= __t('form.fields.channels.database','Database') ?></span></span>
+                            </label>
+                            <label class="notif-channel-check">
+                                <input type="checkbox" name="channels[]" value="push">
+                                <span><i class="fab fa-firebase"></i> <span data-i18n="form.fields.channels.push"><?= __t('form.fields.channels.push','Push (Firebase)') ?></span></span>
+                            </label>
+                            <label class="notif-channel-check">
+                                <input type="checkbox" name="channels[]" value="email">
+                                <span><i class="fas fa-envelope"></i> <span data-i18n="form.fields.channels.email"><?= __t('form.fields.channels.email','Email') ?></span></span>
+                            </label>
+                            <label class="notif-channel-check">
+                                <input type="checkbox" name="channels[]" value="sms">
+                                <span><i class="fas fa-sms"></i> <span data-i18n="form.fields.channels.sms"><?= __t('form.fields.channels.sms','SMS') ?></span></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group notif-recipient-group">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="fSendRecipientType" class="required" data-i18n="send_notification.recipient_type"><?= __t('send_notification.recipient_type','Recipient Type') ?></label>
+                                <select id="fSendRecipientType" name="send_recipient_type" class="form-control">
+                                    <option value="user"><?= __t('form.fields.recipient_type.user','User') ?></option>
+                                    <option value="entity"><?= __t('form.fields.recipient_type.entity','Entity') ?></option>
+                                    <option value="tenant"><?= __t('form.fields.recipient_type.tenant','Tenant') ?></option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="fSendRecipientId" class="required" data-i18n="send_notification.recipient_id"><?= __t('send_notification.recipient_id','Recipient ID') ?></label>
+                                <input type="number" id="fSendRecipientId" name="send_recipient_id" class="form-control"
+                                       placeholder="<?= __t('form.fields.recipient_id.placeholder','Enter ID') ?>"
+                                       data-lookup="recipient_send">
+                                <span class="id-lookup-hint" data-for="fSendRecipientId"></span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- ── CHANNELS fields ── -->
@@ -324,12 +368,57 @@ $apiBase = '/api';
                     </div>
                 </div>
 
+                <!-- ── DEVICES fields ── -->
+                <div class="notif-form-section" data-form-tab="devices" style="display:none">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="fDevUserId" class="required" data-i18n="form.fields.user_id.label"><?= __t('form.fields.user_id.label','User ID') ?></label>
+                            <input type="number" id="fDevUserId" name="user_id" class="form-control"
+                                   placeholder="<?= __t('form.fields.user_id.placeholder','Enter user ID') ?>"
+                                   data-lookup="device_user">
+                            <span class="id-lookup-hint" data-for="fDevUserId"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="fDeviceType" data-i18n="form.fields.device_type.label"><?= __t('form.fields.device_type.label','Device Type') ?></label>
+                            <select id="fDeviceType" name="device_type" class="form-control">
+                                <option value="web">Web</option>
+                                <option value="android">Android</option>
+                                <option value="ios">iOS</option>
+                                <option value="mobile">Mobile</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="fDevIsActive" data-i18n="form.fields.is_active.label"><?= __t('form.fields.is_active.label','Status') ?></label>
+                            <select id="fDevIsActive" name="is_active" class="form-control">
+                                <option value="1"><?= __t('form.fields.is_active.active','Active') ?></option>
+                                <option value="0"><?= __t('form.fields.is_active.inactive','Inactive') ?></option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="fFcmToken" class="required" data-i18n="form.fields.fcm_token.label"><?= __t('form.fields.fcm_token.label','FCM Token') ?></label>
+                        <textarea id="fFcmToken" name="fcm_token" class="form-control" rows="2"
+                                  placeholder="<?= __t('form.fields.fcm_token.placeholder','Firebase Cloud Messaging token') ?>"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="fDeviceName" data-i18n="form.fields.device_name.label"><?= __t('form.fields.device_name.label','Device Name') ?></label>
+                        <input type="text" id="fDeviceName" name="device_name" class="form-control"
+                               placeholder="<?= __t('form.fields.device_name.placeholder','Enter device name') ?>">
+                    </div>
+                </div>
+
                 <!-- Form Actions -->
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary" id="btnSubmitForm">
                         <i class="fas fa-save"></i>
                         <span data-i18n="form.buttons.save"><?= __t('form.buttons.save','Save') ?></span>
                     </button>
+                    <?php if ($canCreate): ?>
+                    <button type="button" class="btn btn-success" id="btnSendNotification" style="display:none">
+                        <i class="fas fa-paper-plane"></i>
+                        <span data-i18n="form.buttons.send"><?= __t('form.buttons.send','Send Notification') ?></span>
+                    </button>
+                    <?php endif; ?>
                     <button type="button" class="btn btn-secondary" id="btnCancelForm" data-i18n="form.buttons.cancel">
                         <?= __t('form.buttons.cancel','Cancel') ?>
                     </button>
@@ -402,6 +491,17 @@ $apiBase = '/api';
                            placeholder="<?= __t('filters.tenant_placeholder','Filter by tenant') ?>">
                 </div>
                 <?php endif; ?>
+                <!-- Device type filter (Devices) -->
+                <div class="filter-group" id="filterDeviceTypeGroup" style="display:none">
+                    <label for="deviceTypeFilter"><?= __t('form.fields.device_type.label','Device Type') ?></label>
+                    <select id="deviceTypeFilter" class="form-control">
+                        <option value="">All</option>
+                        <option value="web">Web</option>
+                        <option value="android">Android</option>
+                        <option value="ios">iOS</option>
+                        <option value="mobile">Mobile</option>
+                    </select>
+                </div>
                 <div class="filter-actions">
                     <button id="btnApplyFilters" class="btn btn-primary" data-i18n="filters.apply"><?= __t('filters.apply','Apply') ?></button>
                     <button id="btnResetFilters" class="btn btn-secondary"    data-i18n="filters.reset"><?= __t('filters.reset','Reset') ?></button>
@@ -482,7 +582,9 @@ window.NOTIFICATIONS_CONFIG = {
         list:      '<?= $apiBase ?>/notifications',
         channels:  '<?= $apiBase ?>/notification_channels',
         counters:  '<?= $apiBase ?>/notification_counters',
-        deliveries:'<?= $apiBase ?>/notification_deliveries'
+        deliveries:'<?= $apiBase ?>/notification_deliveries',
+        devices:   '<?= $apiBase ?>/user_devices',
+        send:      '<?= $apiBase ?>/notifications/send'
     },
     tenantId:  <?= $tenantId ?>,
     csrfToken: '<?= addslashes($csrf) ?>',

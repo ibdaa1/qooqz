@@ -116,6 +116,70 @@ try {
             exit;
         }
 
+        // Send notification via helper (multi-channel: database, push, email, sms)
+        if ($lastSegment === 'send') {
+            require_once dirname(__DIR__, 2) . '/shared/helpers/notification.php';
+            \Notification::setPDO($pdo);
+
+            $recipientId   = isset($data['recipient_id']) && is_numeric($data['recipient_id']) ? (int)$data['recipient_id'] : 0;
+            $recipientType = in_array($data['recipient_type'] ?? '', ['user', 'entity', 'tenant']) ? $data['recipient_type'] : 'user';
+            $tenantId      = isset($data['tenant_id']) && is_numeric($data['tenant_id']) ? (int)$data['tenant_id'] : 1;
+            $typeCode      = !empty($data['type_code']) ? $data['type_code'] : 'general';
+            $title         = trim($data['title'] ?? '');
+            $message       = trim($data['message'] ?? '');
+            $extraData     = [];
+            $channels      = isset($data['channels']) && is_array($data['channels']) ? $data['channels'] : ['database'];
+            $priority      = in_array($data['priority'] ?? '', ['low', 'normal', 'high', 'urgent']) ? $data['priority'] : 'normal';
+            $expiresAt     = !empty($data['expires_at']) ? $data['expires_at'] : null;
+            $senderEntityId = isset($data['sender_entity_id']) && is_numeric($data['sender_entity_id']) ? (int)$data['sender_entity_id'] : null;
+
+            if ($recipientId <= 0) {
+                ResponseFormatter::error('recipient_id is required and must be positive', 422);
+                exit;
+            }
+            if ($title === '') {
+                ResponseFormatter::error('title is required', 422);
+                exit;
+            }
+            if ($message === '') {
+                ResponseFormatter::error('message is required', 422);
+                exit;
+            }
+
+            // Parse extra JSON data
+            if (!empty($data['data'])) {
+                if (is_string($data['data'])) {
+                    $extraData = json_decode($data['data'], true) ?? [];
+                } elseif (is_array($data['data'])) {
+                    $extraData = $data['data'];
+                }
+            }
+
+            // Validate channels
+            $validChannels = ['database', 'push', 'email', 'sms'];
+            $channels = array_values(array_intersect($channels, $validChannels));
+            if (empty($channels)) {
+                $channels = ['database'];
+            }
+
+            $result = \Notification::send(
+                $recipientId,
+                $recipientType,
+                $tenantId,
+                $typeCode,
+                $title,
+                $message,
+                $extraData,
+                $channels,
+                $priority,
+                $expiresAt,
+                $senderEntityId
+            );
+
+            ResponseFormatter::success($result, 'Notification sent successfully', 201);
+            exit;
+        }
+
         $newId = $controller->create($data);
         ResponseFormatter::success(['id' => $newId], 'Created successfully', 201);
         exit;

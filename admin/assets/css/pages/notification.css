@@ -537,3 +537,81 @@ select.form-control option {
     content: '✗ ';
     font-weight: 700;
 }
+
+/* ── Channel Checkboxes ─────────────────────────── */
+.notif-channels-group {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color, #263044);
+}
+
+.notif-channels-group > label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-primary, #fff);
+    font-size: 0.9rem;
+}
+
+.notif-channels-checkboxes {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.notif-channel-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--border-color, #263044);
+    border-radius: 8px;
+    background: var(--card-bg, #081127);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.85rem;
+    color: var(--text-secondary, #94a3b8);
+}
+
+.notif-channel-check:hover {
+    border-color: var(--primary-color, #3b82f6);
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.notif-channel-check input[type="checkbox"] {
+    accent-color: var(--primary-color, #3b82f6);
+    width: 16px;
+    height: 16px;
+}
+
+.notif-channel-check input[type="checkbox"]:checked + span {
+    color: var(--text-primary, #fff);
+}
+
+.notif-channel-check span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.notif-channel-check i {
+    font-size: 0.9rem;
+}
+
+/* ── Recipient Group ─────────────────────────── */
+.notif-recipient-group {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color, #263044);
+}
+
+/* ── Send Button ─────────────────────────── */
+#btnSendNotification {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#btnSendNotification i {
+    font-size: 0.85rem;
+}

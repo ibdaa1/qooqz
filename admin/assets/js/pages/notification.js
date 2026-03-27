@@ -99,6 +99,7 @@
             showDeliveryStatus: false,
             showRecipientType: false,
             showTenant: false,
+            showDeviceType: false,
         },
         list: {
             apiKey: 'list',
@@ -112,6 +113,7 @@
             showDeliveryStatus: false,
             showRecipientType: false,
             showTenant: true,
+            showDeviceType: false,
         },
         channels: {
             apiKey: 'channels',
@@ -125,6 +127,7 @@
             showDeliveryStatus: false,
             showRecipientType: false,
             showTenant: false,
+            showDeviceType: false,
         },
         counters: {
             apiKey: 'counters',
@@ -138,6 +141,7 @@
             showDeliveryStatus: false,
             showRecipientType: true,
             showTenant: true,
+            showDeviceType: false,
         },
         deliveries: {
             apiKey: 'deliveries',
@@ -151,6 +155,21 @@
             showDeliveryStatus: true,
             showRecipientType: false,
             showTenant: false,
+            showDeviceType: false,
+        },
+        devices: {
+            apiKey: 'devices',
+            titleKey: 'devices.title',
+            addKey: 'devices.add_new',
+            emptyKey: 'devices.empty_title',
+            emptyMsgKey: 'devices.empty_message',
+            addFirstKey: 'devices.add_first',
+            showStatus: true,
+            showPriority: false,
+            showDeliveryStatus: false,
+            showRecipientType: false,
+            showTenant: false,
+            showDeviceType: true,
         },
     };
 
@@ -209,6 +228,13 @@
                     t('table.headers.id'), t('table.headers.tenant'), t('table.headers.notification'),
                     t('table.headers.channel'), t('table.headers.delivery_status'), t('table.headers.attempts'),
                     t('table.headers.sent_at'), t('table.headers.error'), act
+                ];
+            case 'devices':
+                return [
+                    t('table.headers.id'), t('table.headers.user_id'), t('table.headers.device_type'),
+                    t('table.headers.device_name'), t('table.headers.fcm_token'),
+                    t('table.headers.ip'), t('table.headers.last_seen'),
+                    t('table.headers.status'), act
                 ];
         }
         return [];
@@ -317,6 +343,24 @@
                     <td>${actions}</td>
                 </tr>`;
             }
+            case 'devices': {
+                const status = (item.is_active == 1)
+                    ? `<span class="badge badge-success">${t('table.status.active')}</span>`
+                    : `<span class="badge badge-danger">${t('table.status.inactive')}</span>`;
+                const dtLabel = t('device_type_labels.' + (item.device_type || 'web')) || item.device_type || 'web';
+                const tokenShort = item.fcm_token ? truncate(item.fcm_token, 25) : '—';
+                return `<tr data-id="${item.id}">
+                    <td>${esc(item.id)}</td>
+                    <td>${esc(item.user_id)}</td>
+                    <td><span class="badge badge-info">${esc(dtLabel)}</span></td>
+                    <td>${esc(item.device_name || '—')}</td>
+                    <td><code style="font-size:0.75rem;color:var(--text-secondary,#94a3b8);" title="${esc(item.fcm_token)}">${esc(tokenShort)}</code></td>
+                    <td style="font-size:0.8rem;color:var(--text-secondary,#94a3b8);">${esc(item.ip || '—')}</td>
+                    <td style="font-size:0.8rem;color:var(--text-secondary,#94a3b8);">${dateFmt(item.last_seen_at)}</td>
+                    <td>${status}</td>
+                    <td>${actions}</td>
+                </tr>`;
+            }
         }
         return '';
     }
@@ -349,6 +393,7 @@
         if (f.delivery_status) params.set('delivery_status', f.delivery_status);
         if (f.recipient_type) params.set('recipient_type', f.recipient_type);
         if (f.tenant_id) params.set('tenant_id', f.tenant_id);
+        if (f.device_type) params.set('device_type', f.device_type);
 
         try {
             const json = await apiFetch(`${apiUrl}?${params}`);
@@ -467,6 +512,7 @@
         const formId = getEl('formId');
         const formTabInput = getEl('formTab');
         const deleteBtn = getEl('btnDeleteRecord');
+        const sendBtn = getEl('btnSendNotification');
 
         // Show correct form section
         getEls('.notif-form-section').forEach(sec => {
@@ -477,6 +523,17 @@
         if (formId) formId.value = editData ? editData.id : '';
         if (formTabInput) formTabInput.value = tab;
         if (deleteBtn) deleteBtn.style.display = editData && perm().canDelete ? '' : 'none';
+
+        // Show Send button only for list tab when creating (not editing)
+        if (sendBtn) {
+            sendBtn.style.display = (tab === 'list' && !editData && perm().canCreate) ? '' : 'none';
+        }
+
+        // Show/hide channels and recipient groups
+        const channelsGroup = document.querySelector('.notif-channels-group');
+        const recipientGroup = document.querySelector('.notif-recipient-group');
+        if (channelsGroup) channelsGroup.style.display = (tab === 'list' && !editData) ? '' : 'none';
+        if (recipientGroup) recipientGroup.style.display = (tab === 'list' && !editData) ? '' : 'none';
 
         // Reset form
         const form = getEl('notifForm');
@@ -547,9 +604,49 @@
         if (section) {
             section.querySelectorAll('input, textarea, select').forEach(el => {
                 if (!el.name || el.name === 'csrf_token' || el.name === '_tab') return;
+                // Skip channel checkboxes and send_ prefixed fields (handled separately)
+                if (el.name === 'channels[]' || el.name.startsWith('send_')) return;
                 const v = el.value.trim();
                 data[el.name] = v === '' ? null : v;
             });
+        }
+
+        return data;
+    }
+
+    /* Collect send notification data (channels + recipient from list tab) */
+    function collectSendData() {
+        const form = getEl('notifForm');
+        const section = form.querySelector(`.notif-form-section[data-form-tab="list"]`);
+        const data = {};
+
+        // Collect standard fields
+        if (section) {
+            section.querySelectorAll('input, textarea, select').forEach(el => {
+                if (!el.name || el.name === 'csrf_token' || el.name === '_tab'
+                    || el.name === 'channels[]' || el.name.startsWith('send_')) return;
+                const v = el.value.trim();
+                data[el.name] = v === '' ? null : v;
+            });
+        }
+
+        // Collect channels
+        const channels = [];
+        form.querySelectorAll('input[name="channels[]"]:checked').forEach(cb => {
+            channels.push(cb.value);
+        });
+        data.channels = channels.length > 0 ? channels : ['database'];
+
+        // Collect recipient
+        const rtEl = getEl('fSendRecipientType');
+        const riEl = getEl('fSendRecipientId');
+        data.recipient_type = rtEl ? rtEl.value : 'user';
+        data.recipient_id = riEl ? parseInt(riEl.value, 10) || null : null;
+
+        // Map notification_type_id to type_code if we have it cached
+        if (data.notification_type_id) {
+            const typeObj = state.notifTypes.find(t => String(t.id) === String(data.notification_type_id));
+            if (typeObj) data.type_code = typeObj.code;
         }
 
         return data;
@@ -636,6 +733,53 @@
             await loadData();
         } catch (err) {
             showToast(err.message, 'error');
+        }
+    }
+
+    /* ──────────────────────────────────────────
+       SEND NOTIFICATION (multi-channel via helper)
+    ────────────────────────────────────────── */
+    async function sendNotification() {
+        const data = collectSendData();
+
+        if (!data.recipient_id || data.recipient_id <= 0) {
+            showToast(t('send_notification.recipient_id') + ' is required', 'error');
+            return;
+        }
+        if (!data.title) {
+            showToast(t('form.fields.title.label') + ' is required', 'error');
+            return;
+        }
+        if (!data.message) {
+            showToast(t('form.fields.message.label') + ' is required', 'error');
+            return;
+        }
+
+        if (!confirmDialog(t('send_notification.confirm'))) return;
+
+        const sendBtn = getEl('btnSendNotification');
+        if (sendBtn) {
+            sendBtn.disabled = true;
+            const span = sendBtn.querySelector('span');
+            if (span) span.textContent = t('form.buttons.sending');
+        }
+
+        try {
+            const result = await apiFetch(cfg().api.send, {
+                method: 'POST',
+                body: JSON.stringify(data),
+            });
+            showToast(t('messages.success.sent'), 'success');
+            hideForm();
+            await loadData();
+        } catch (err) {
+            showToast(err.message || t('messages.error.send_failed'), 'error');
+        } finally {
+            if (sendBtn) {
+                sendBtn.disabled = false;
+                const span = sendBtn.querySelector('span');
+                if (span) span.textContent = t('form.buttons.send');
+            }
         }
     }
 
@@ -803,6 +947,44 @@
                 }
             }
 
+            else if (lookupType === 'recipient_send') {
+                // Same as recipient but uses fSendRecipientType
+                const rtSelect = document.getElementById('fSendRecipientType');
+                const rType = rtSelect?.value || 'user';
+
+                if (rType === 'user') {
+                    const json = await fetch(`${apiBase.types.replace('/notification_types', '')}/user?id=${id}`, {
+                        credentials: 'same-origin',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    }).then(r => r.json()).catch(() => null);
+                    const row = json?.data || json;
+                    name = row?.username || row?.email || null;
+                } else if (rType === 'entity') {
+                    const json = await fetch(`${apiBase.types.replace('/notification_types', '')}/entities?id=${id}&tenant_id=${tenantId}`, {
+                        credentials: 'same-origin',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    }).then(r => r.json()).catch(() => null);
+                    const row = json?.data || json;
+                    name = row?.store_name || null;
+                } else if (rType === 'tenant') {
+                    const json = await fetch(`${apiBase.types.replace('/notification_types', '')}/tenants/${id}`, {
+                        credentials: 'same-origin',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    }).then(r => r.json()).catch(() => null);
+                    const row = json?.data || json;
+                    name = row?.name || null;
+                }
+            }
+
+            else if (lookupType === 'device_user') {
+                const json = await fetch(`${apiBase.types.replace('/notification_types', '')}/user?id=${id}`, {
+                    credentials: 'same-origin',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                }).then(r => r.json()).catch(() => null);
+                const row = json?.data || json;
+                name = row?.username || row?.email || null;
+            }
+
             if (name) {
                 setHint(inputEl, 'found', name);
             } else {
@@ -843,6 +1025,15 @@
                 if (recipientInput?.value) doLookup(recipientInput, 'recipient');
             });
         }
+
+        // Re-trigger send recipient lookup when send_recipient_type changes
+        const srtSelect = document.getElementById('fSendRecipientType');
+        if (srtSelect) {
+            srtSelect.addEventListener('change', () => {
+                const recipientInput = document.getElementById('fSendRecipientId');
+                if (recipientInput?.value) doLookup(recipientInput, 'recipient_send');
+            });
+        }
     }
 
     /* Helper to fire lookup hints for all prefilled ID inputs (edit mode) */
@@ -878,6 +1069,7 @@
         show('filterDeliveryStatusGroup', tabDef.showDeliveryStatus);
         show('filterRecipientTypeGroup', tabDef.showRecipientType);
         show('filterTenantGroup', tabDef.showTenant && perm().isSuperAdmin);
+        show('filterDeviceTypeGroup', tabDef.showDeviceType);
 
         // Reset filter inputs
         const si = getEl('searchInput');
@@ -890,6 +1082,8 @@
         if (ds) ds.value = '';
         const rt = getEl('recipientTypeFilter');
         if (rt) rt.value = '';
+        const dt = getEl('deviceTypeFilter');
+        if (dt) dt.value = '';
 
         hideForm();
         loadData();
@@ -927,6 +1121,12 @@
             });
         }
 
+        // Send Notification button
+        const sendNotifBtn = getEl('btnSendNotification');
+        if (sendNotifBtn) {
+            sendNotifBtn.addEventListener('click', () => sendNotification());
+        }
+
         // Form submit
         const form = getEl('notifForm');
         if (form) {
@@ -956,6 +1156,8 @@
                 if (rf?.value) state.filters.recipient_type = rf.value;
                 const tf = getEl('tenantFilter');
                 if (tf?.value) state.filters.tenant_id = tf.value;
+                const dtf = getEl('deviceTypeFilter');
+                if (dtf?.value) state.filters.device_type = dtf.value;
                 loadData();
             });
         }
@@ -963,7 +1165,7 @@
             resetBtn.addEventListener('click', () => {
                 state.filters = {};
                 state.currentPage = 1;
-                ['searchInput', 'statusFilter', 'priorityFilter', 'deliveryStatusFilter', 'recipientTypeFilter'].forEach(id => {
+                ['searchInput', 'statusFilter', 'priorityFilter', 'deliveryStatusFilter', 'recipientTypeFilter', 'deviceTypeFilter'].forEach(id => {
                     const el = getEl(id);
                     if (el) el.value = '';
                 });
