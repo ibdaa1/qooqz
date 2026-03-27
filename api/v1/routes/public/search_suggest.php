@@ -57,7 +57,7 @@ if (!empty($_GET['popular'])) {
     } catch (Throwable $e) {
         // search_logs may not exist yet
     }
-    ResponseFormatter::success(['popular' => array_map(fn($r) => (string)$r['query'], $popular)]);
+    ResponseFormatter::success(['popular' => array_map(fn($row) => (string)$row['query'], $popular)]);
     exit;
 }
 

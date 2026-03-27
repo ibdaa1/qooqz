@@ -722,7 +722,7 @@ body {
                         _clearRecent();
                         hide();
                     });
-                    rh.innerHTML = '<span>' + _esc('🕐 ' + _s.recent) + '</span>';
+                    rh.innerHTML = '<span>🕐 ' + _esc(_s.recent) + '</span>';
                     rh.appendChild(clearHistBtn);
                     list.appendChild(rh);
 

@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS search_logs (
     count       INT UNSIGNED    NOT NULL DEFAULT 1,
     last_searched_at DATETIME   NOT NULL DEFAULT CURRENT_TIMESTAMP
                                 ON UPDATE CURRENT_TIMESTAMP,
+    -- Note: index uses first 100 chars of query; queries differing only beyond char 100 are treated as one.
     UNIQUE KEY uq_query_tenant_lang (query(100), tenant_id, lang),
     INDEX idx_tenant_lang_count (tenant_id, lang, count DESC),
     INDEX idx_global_lang_count (lang, count DESC)
