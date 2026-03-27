@@ -57,6 +57,7 @@ $dir       = $_ctx['dir']  ?? 'rtl';
 $theme     = $_ctx['theme'] ?? [];
 $_seo      = $_ctx['seo']  ?? [];
 $_user     = $_ctx['user'] ?? [];
+$_tenantId = (int)($_ctx['tenant_id'] ?? 1);
 $_isLoggedIn = !empty($_user['id']);
 $_appName   = $GLOBALS['PUB_APP_NAME']  ?? 'QOOQZ';
 $_pageTitle = $GLOBALS['PUB_PAGE_TITLE'] ?? ($_seo['title'] ?? $_appName);
@@ -419,6 +420,7 @@ body {
     ?>
     <script>window.pubSessionUser = <?= $_jsUser ?>;</script>
     <?php endif; ?>
+    <script>window.__qzTenantId = <?= $_tenantId ?>;</script>
 </head>
 
 <body class="pub-body <?= e($dir) ?>">
