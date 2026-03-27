@@ -463,7 +463,8 @@ body {
    CATEGORY SLIDER + MEGA MENU
    ══════════════════════════════════════════════════════════ */
 .pub-cat-bar {
-    position: relative;
+    position: sticky;
+    top: var(--pub-header-h, 60px);
     background: var(--pub-cat-bar-bg, var(--pub-primary, #2d8cf0));
     border-top: 1px solid rgba(255,255,255,.12);
     z-index: 900;

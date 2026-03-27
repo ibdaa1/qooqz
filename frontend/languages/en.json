@@ -27,7 +27,17 @@
         "language": "Language",
         "previous": "Previous",
         "next": "Next",
-        "actions": "Actions"
+        "actions": "Actions",
+        "view_all": "View all",
+        "notifications": "Notifications"
+    },
+    "mega": {
+        "subcategories": "Subcategories",
+        "featured_products": "Featured Products",
+        "top_brands": "Top Brands",
+        "no_subcategories": "No subcategories",
+        "no_products": "No products",
+        "no_brands": "No brands"
     },
     "hero": {
         "title": "QOOQZ Global Platform",

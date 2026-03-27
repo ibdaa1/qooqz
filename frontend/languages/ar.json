@@ -27,7 +27,17 @@
         "language": "اللغة",
         "previous": "السابق",
         "next": "التالي",
-        "actions": "الإجراءات"
+        "actions": "الإجراءات",
+        "view_all": "عرض الكل",
+        "notifications": "الإشعارات"
+    },
+    "mega": {
+        "subcategories": "التصنيفات الفرعية",
+        "featured_products": "منتجات مميزة",
+        "top_brands": "أبرز العلامات",
+        "no_subcategories": "لا توجد تصنيفات فرعية",
+        "no_products": "لا توجد منتجات",
+        "no_brands": "لا توجد علامات"
     },
     "hero": {
         "title": "منصة QOOQZ العالمية",
