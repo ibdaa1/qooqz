@@ -3,6 +3,7 @@ declare(strict_types=1);
 /**
  * Public API sub-route: search_suggest
  * GET /api/public/search_suggest?q=...&context=all&lang=ar&tenant_id=1
+ *   OR ?popular=1&lang=ar&tenant_id=1  → returns popular/trending queries
  *
  * Returns grouped live-search suggestions:
  * {
@@ -16,6 +17,50 @@ declare(strict_types=1);
  * Variables available: $pdo, $pdoList, $lang, $tenantId
  */
 
+/* -------------------------------------------------------
+ * Helper: upsert a query into search_logs (best-effort)
+ * ----------------------------------------------------- */
+$trackQuery = function (string $query) use ($pdo, $lang, $tenantId): void {
+    if (!$pdo instanceof PDO || strlen($query) < 2) return;
+    try {
+        $st = $pdo->prepare("
+            INSERT INTO search_logs (query, tenant_id, lang, count, last_searched_at)
+            VALUES (?, ?, ?, 1, NOW())
+            ON DUPLICATE KEY UPDATE count = count + 1, last_searched_at = NOW()
+        ");
+        $st->execute([$query, $tenantId ?: null, $lang]);
+    } catch (Throwable $e) {
+        // Table may not exist yet — ignore
+    }
+};
+
+/* -------------------------------------------------------
+ * Popular searches: ?popular=1 — return top queries
+ * ----------------------------------------------------- */
+if (!empty($_GET['popular'])) {
+    $popular = [];
+    try {
+        if ($pdo instanceof PDO) {
+            $tenantCond  = $tenantId ? ' AND (tenant_id = ? OR tenant_id IS NULL)' : '';
+            $tenantParam = $tenantId ? [$lang, $tenantId] : [$lang];
+            $st = $pdo->prepare("
+                SELECT query, SUM(count) AS total
+                FROM search_logs
+                WHERE lang = ? $tenantCond
+                GROUP BY query
+                ORDER BY total DESC
+                LIMIT 8
+            ");
+            $st->execute($tenantParam);
+            $popular = $st->fetchAll(PDO::FETCH_ASSOC);
+        }
+    } catch (Throwable $e) {
+        // search_logs may not exist yet
+    }
+    ResponseFormatter::success(['popular' => array_map(fn($r) => (string)$r['query'], $popular)]);
+    exit;
+}
+
 $q = trim($_GET['q'] ?? '');
 if (strlen($q) < 2) {
     ResponseFormatter::success([
@@ -26,6 +71,9 @@ if (strlen($q) < 2) {
     ]);
     exit;
 }
+
+// Track this query (best-effort, fires on each suggest call)
+$trackQuery($q);
 
 // context = all | products | categories | entities | jobs
 $context = strtolower(trim($_GET['context'] ?? 'all'));

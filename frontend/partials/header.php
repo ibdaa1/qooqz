@@ -560,6 +560,19 @@ body {
         var timer = null;
         var lastQ = '';
 
+        /* ── i18n strings (injected from PHP) ─────────────────── */
+        var _s = <?= json_encode([
+            'recent'        => ($GLOBALS['PUB_STRINGS']['search']['recent']        ?? 'Recent Searches'),
+            'popular'       => ($GLOBALS['PUB_STRINGS']['search']['popular']       ?? 'Popular Searches'),
+            'clear_history' => ($GLOBALS['PUB_STRINGS']['search']['clear_history'] ?? 'Clear History'),
+            'no_recent'     => ($GLOBALS['PUB_STRINGS']['search']['no_recent']     ?? 'No recent searches'),
+            'view_all'      => ($GLOBALS['PUB_STRINGS']['search']['view_all']      ?? 'View all results'),
+            'type_products'   => ($GLOBALS['PUB_STRINGS']['search']['type_products']   ?? '🛍 Products'),
+            'type_categories' => ($GLOBALS['PUB_STRINGS']['search']['type_categories'] ?? '📂 Categories'),
+            'type_entities'   => ($GLOBALS['PUB_STRINGS']['search']['type_entities']   ?? '🏢 Stores'),
+            'type_jobs'       => ($GLOBALS['PUB_STRINGS']['search']['type_jobs']       ?? '💼 Jobs'),
+        ], JSON_UNESCAPED_UNICODE) ?>;
+
         /* ── helpers ──────────────────────────────────────────── */
         function _esc(s) {
             return String(s).replace(/[&<>"']/g, function (c) {
@@ -582,14 +595,40 @@ body {
             if (clearBtn) clearBtn.style.display = has ? 'block' : 'none';
         }
 
+        /* ── recent searches (localStorage) ──────────────────── */
+        var _storageKey = 'qz_recent_searches';
+        function _getRecent() {
+            try {
+                return JSON.parse(localStorage.getItem(_storageKey) || '[]');
+            } catch(e) { return []; }
+        }
+        function _saveRecent(q) {
+            if (!q || q.length < 2) return;
+            var list2 = _getRecent().filter(function(x){ return x !== q; });
+            list2.unshift(q);
+            if (list2.length > 8) list2 = list2.slice(0, 8);
+            try { localStorage.setItem(_storageKey, JSON.stringify(list2)); } catch(e){}
+        }
+        function _clearRecent() {
+            try { localStorage.removeItem(_storageKey); } catch(e){}
+        }
+
         /* ── grouped dropdown ─────────────────────────────────── */
         var _typeLabels = {
-            products:   '🛍 منتجات',
-            categories: '📂 تصنيفات',
-            entities:   '🏢 متاجر',
-            jobs:       '💼 وظائف'
+            products:   _s.type_products,
+            categories: _s.type_categories,
+            entities:   _s.type_entities,
+            jobs:       _s.type_jobs
         };
         var _typeOrder = ['products', 'categories', 'entities', 'jobs'];
+
+        function _makeSectionHeader(label) {
+            var header = document.createElement('li');
+            header.setAttribute('role', 'presentation');
+            header.style.cssText = 'padding:5px 14px 3px;font-size:.75rem;font-weight:700;color:var(--pub-muted,#888);text-transform:uppercase;letter-spacing:.05em;border-top:1px solid var(--pub-border,#eee);';
+            header.innerHTML = label;
+            return header;
+        }
 
         function show(data, q) {
             list.innerHTML = '';
@@ -600,12 +639,7 @@ body {
                 if (!items || !items.length) return;
                 hasAny = true;
 
-                // Group header
-                var header = document.createElement('li');
-                header.setAttribute('role', 'presentation');
-                header.style.cssText = 'padding:5px 14px 3px;font-size:.75rem;font-weight:700;color:var(--pub-muted,#888);text-transform:uppercase;letter-spacing:.05em;border-top:1px solid var(--pub-border,#eee);';
-                header.innerHTML = _typeLabels[type] || type;
-                list.appendChild(header);
+                list.appendChild(_makeSectionHeader(_typeLabels[type] || type));
 
                 items.forEach(function (item) {
                     var li = document.createElement('li');
@@ -619,8 +653,8 @@ body {
                     li.addEventListener('mousedown', function (e) {
                         e.preventDefault();
                         inp.value = item.name;
+                        _saveRecent(item.name);
                         hide();
-                        // Navigate directly to item URL if available
                         if (item.url) {
                             window.location.href = item.url + '&q=' + encodeURIComponent(item.name);
                         } else {
@@ -643,11 +677,101 @@ body {
             a.style.cssText = 'color:var(--pub-primary,#0066cc);font-size:.85rem;text-decoration:none;font-weight:600;';
             a.href = inp.form.action + '?q=' + encodeURIComponent(q) +
                      '&context=' + encodeURIComponent((inp.form.querySelector('[name="context"]') || {}).value || 'all');
-            a.textContent = '← عرض كل النتائج';
+            a.textContent = '← ' + _s.view_all;
             a.addEventListener('mousedown', function (e) { e.preventDefault(); window.location.href = this.href; });
             footer.appendChild(a);
             list.appendChild(footer);
             list.hidden = false;
+        }
+
+        /* ── show recent + popular when input is focused & empty ── */
+        var _popularCache = null;
+        function fetchPopular(cb) {
+            if (_popularCache !== null) { cb(_popularCache); return; }
+            var url = '/api/public/search_suggest?popular=1&lang=<?= urlencode($lang) ?>' +
+                      (window.__qzTenantId ? '&tenant_id=' + window.__qzTenantId : '');
+            fetch(url, {credentials: 'include'})
+                .then(function(r){ return r.ok ? r.json() : null; })
+                .then(function(j){
+                    var arr = (j && (j.data || j).popular) ? (j.data || j).popular : [];
+                    _popularCache = arr;
+                    cb(arr);
+                })
+                .catch(function(){ _popularCache = []; cb([]); });
+        }
+
+        function showRecentAndPopular() {
+            var recent = _getRecent();
+            fetchPopular(function(popular) {
+                list.innerHTML = '';
+                var hasAny = false;
+
+                // Recent searches
+                if (recent.length > 0) {
+                    hasAny = true;
+                    // Section header with clear button
+                    var rh = document.createElement('li');
+                    rh.setAttribute('role', 'presentation');
+                    rh.style.cssText = 'padding:5px 14px 3px;font-size:.75rem;font-weight:700;color:var(--pub-muted,#888);text-transform:uppercase;letter-spacing:.05em;display:flex;justify-content:space-between;align-items:center;';
+                    var clearHistBtn = document.createElement('button');
+                    clearHistBtn.type = 'button';
+                    clearHistBtn.textContent = _s.clear_history;
+                    clearHistBtn.style.cssText = 'font-size:.7rem;color:var(--pub-primary,#0066cc);background:none;border:none;cursor:pointer;padding:0;';
+                    clearHistBtn.addEventListener('mousedown', function(e){
+                        e.preventDefault();
+                        _clearRecent();
+                        hide();
+                    });
+                    rh.innerHTML = '<span>' + _esc('🕐 ' + _s.recent) + '</span>';
+                    rh.appendChild(clearHistBtn);
+                    list.appendChild(rh);
+
+                    recent.forEach(function(q) {
+                        var li = document.createElement('li');
+                        li.setAttribute('role', 'option');
+                        li.style.cssText = 'padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .15s;';
+                        li.innerHTML = '<span style="font-size:1rem;flex-shrink:0;">🕐</span>' +
+                            '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _esc(q) + '</span>';
+                        li.addEventListener('mousedown', function(e){
+                            e.preventDefault();
+                            inp.value = q;
+                            showClear(true);
+                            hide();
+                            inp.form.submit();
+                        });
+                        li.addEventListener('mouseover', function(){ this.style.background='var(--pub-hover,#f5f5f5)'; });
+                        li.addEventListener('mouseout',  function(){ this.style.background=''; });
+                        list.appendChild(li);
+                    });
+                }
+
+                // Popular searches
+                if (popular.length > 0) {
+                    hasAny = true;
+                    list.appendChild(_makeSectionHeader('🔥 ' + _s.popular));
+                    popular.forEach(function(q) {
+                        var li = document.createElement('li');
+                        li.setAttribute('role', 'option');
+                        li.style.cssText = 'padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .15s;';
+                        li.innerHTML = '<span style="font-size:1rem;flex-shrink:0;">🔥</span>' +
+                            '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _esc(q) + '</span>';
+                        li.addEventListener('mousedown', function(e){
+                            e.preventDefault();
+                            inp.value = q;
+                            showClear(true);
+                            hide();
+                            inp.form.submit();
+                        });
+                        li.addEventListener('mouseover', function(){ this.style.background='var(--pub-hover,#f5f5f5)'; });
+                        li.addEventListener('mouseout',  function(){ this.style.background=''; });
+                        list.appendChild(li);
+                    });
+                }
+
+                if (hasAny) {
+                    list.hidden = false;
+                }
+            });
         }
 
         /* ── fetch suggestions ────────────────────────────────── */
@@ -691,6 +815,12 @@ body {
         }
 
         /* ── input events ─────────────────────────────────────── */
+        inp.addEventListener('focus', function () {
+            if (inp.value.trim() === '') {
+                showRecentAndPopular();
+            }
+        });
+
         inp.addEventListener('input', function () {
             clearTimeout(timer);
             var q = inp.value.trim();
@@ -698,7 +828,8 @@ body {
 
             // If input cleared AND we came from a search page, go back to clean page
             if (inp.value === '') {
-                hide();
+                // Show recent+popular instead of hiding
+                showRecentAndPopular();
                 if (window.location.search.indexOf('q=') !== -1) {
                     window.location.href = window.location.pathname;
                 }
@@ -710,6 +841,13 @@ body {
             if (q.length < 2) { hide(); return; }
             timer = setTimeout(function () { fetchSuggestions(q); }, 300);
         });
+
+        /* ── save to recent when form submitted ───────────────── */
+        if (inp.form) {
+            inp.form.addEventListener('submit', function() {
+                _saveRecent(inp.value.trim());
+            });
+        }
 
         inp.addEventListener('blur', function () { setTimeout(hide, 200); });
         document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
