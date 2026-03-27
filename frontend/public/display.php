@@ -709,6 +709,7 @@ foreach ($categories as $c) {
         :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
         button { font-family: var(--font); }
     </style>
+    <script>window.__qzTenantId = <?= (int)$tenantId ?>;</script>
 </head>
 <body>
 
@@ -719,9 +720,34 @@ foreach ($categories as $c) {
     <button class="topbar-menu-toggle" id="menuToggle" aria-label="Toggle menu">☰</button>
     <a class="topbar-brand" href="/frontend/public/display.php">QOOQZ</a>
 
-    <div class="topbar-spacer"></div>
+    <div class="topbar-search" style="position:relative;">
+        <form method="get"
+              action="/frontend/public/search.php"
+              role="search"
+              autocomplete="off"
+              style="display:flex;background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:hidden;">
+            <input type="search"
+                   name="q"
+                   id="dpSearchInput"
+                   placeholder="<?= $isRtl ? 'ابحث عن منتجات، متاجر...' : 'Search products, stores...' ?>"
+                   value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
+                   aria-label="<?= $isRtl ? 'بحث' : 'Search' ?>"
+                   aria-autocomplete="list"
+                   aria-controls="dpSearchSuggest"
+                   style="flex:1;background:none;border:none;outline:none;padding:8px 14px;color:var(--text);font-size:.9rem;">
+            <button type="submit"
+                    style="background:var(--primary);border:none;color:#fff;padding:8px 16px;cursor:pointer;font-size:.9rem;transition:background .15s;">
+                <?= $isRtl ? 'بحث' : 'Search' ?>
+            </button>
+        </form>
+        <ul id="dpSearchSuggest" role="listbox" hidden
+            style="position:absolute;top:100%;inset-inline-start:0;min-width:300px;max-width:480px;width:100%;
+                   background:var(--surface);border:1px solid var(--border);
+                   border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);
+                   list-style:none;margin:4px 0 0;padding:4px 0;z-index:9999;font-size:.9rem;"></ul>
+    </div>
 
-    <nav style="display:flex;gap:16px;font-size:.85rem;font-weight:500">
+    <nav style="display:flex;gap:16px;font-size:.85rem;font-weight:500;flex-shrink:0;">
         <a href="/frontend/public/index.php"      style="color:var(--text-muted)"><?= $isRtl ? 'الرئيسية'  : 'Home' ?></a>
         <a href="/frontend/public/products.php"   style="color:var(--text-muted)"><?= $isRtl ? 'المنتجات'  : 'Products' ?></a>
         <a href="/frontend/public/categories.php" style="color:var(--text-muted)"><?= $isRtl ? 'التصنيفات' : 'Categories' ?></a>
@@ -1079,6 +1105,139 @@ foreach ($categories as $c) {
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') closeSidebar();
     });
+
+    /* ----------------------------------------------------------
+     * Global Search Autocomplete (search_suggest.php)
+     * -------------------------------------------------------- */
+    (function () {
+        var inp  = document.getElementById('dpSearchInput');
+        var list = document.getElementById('dpSearchSuggest');
+        if (!inp || !list) return;
+
+        var _lang     = '<?= addslashes($lang) ?>';
+        var _debounce = null;
+
+        function _esc(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+        function hide() { list.hidden = true; list.innerHTML = ''; }
+        function _tenantParam() {
+            return window.__qzTenantId ? '&tenant_id=' + window.__qzTenantId : '';
+        }
+
+        function buildSuggestUrl(q) {
+            return '/api/public/search_suggest?q=' + encodeURIComponent(q) +
+                   '&context=all&lang=' + encodeURIComponent(_lang) + _tenantParam();
+        }
+        function buildPopularUrl() {
+            return '/api/public/search_suggest?popular=1&lang=' + encodeURIComponent(_lang) + _tenantParam();
+        }
+
+        function makeItem(icon, label, onClick) {
+            var li = document.createElement('li');
+            li.setAttribute('role', 'option');
+            li.style.cssText = 'padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .15s;';
+            li.innerHTML = '<span style="flex-shrink:0;">' + icon + '</span>' +
+                           '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _esc(label) + '</span>';
+            li.addEventListener('mousedown', function(e){ e.preventDefault(); onClick(); });
+            li.addEventListener('mouseover', function(){ this.style.background='rgba(255,255,255,.07)'; });
+            li.addEventListener('mouseout',  function(){ this.style.background=''; });
+            return li;
+        }
+        function makeSectionHdr(txt) {
+            var li = document.createElement('li');
+            li.setAttribute('role','presentation');
+            li.style.cssText = 'padding:5px 14px 3px;font-size:.72rem;font-weight:700;color:var(--text-muted,#888);text-transform:uppercase;letter-spacing:.05em;';
+            li.textContent = txt;
+            return li;
+        }
+
+        var _popularCache = null;
+        function fetchPopular(cb) {
+            if (_popularCache !== null) { cb(_popularCache); return; }
+            fetch(buildPopularUrl(), {credentials:'include'})
+                .then(function(r){ return r.ok ? r.json() : null; })
+                .then(function(j){
+                    var arr = (j && (j.data || j).popular) ? (j.data || j).popular : [];
+                    _popularCache = arr; cb(arr);
+                }).catch(function(){ _popularCache = []; cb([]); });
+        }
+
+        function showPopular() {
+            fetchPopular(function(popular) {
+                if (!popular.length) return;
+                list.innerHTML = '';
+                list.appendChild(makeSectionHdr('🔥 <?= $isRtl ? "الأكثر بحثاً" : "Popular" ?>'));
+                popular.forEach(function(q) {
+                    list.appendChild(makeItem('🔥', q, function(){ inp.value = q; inp.form.submit(); }));
+                });
+                list.hidden = false;
+            });
+        }
+
+        function showResults(d, q) {
+            list.innerHTML = '';
+            var any = false;
+            var groups = [
+                {key:'products',  icon:'🛍️', label:'<?= $isRtl ? "المنتجات" : "Products" ?>'},
+                {key:'categories',icon:'📂', label:'<?= $isRtl ? "التصنيفات" : "Categories" ?>'},
+                {key:'entities',  icon:'🏢', label:'<?= $isRtl ? "البائعون" : "Sellers" ?>'},
+                {key:'jobs',      icon:'💼', label:'<?= $isRtl ? "الوظائف" : "Jobs" ?>'}
+            ];
+            groups.forEach(function(g) {
+                var items = (d[g.key] || []).slice(0,4);
+                if (!items.length) return;
+                any = true;
+                list.appendChild(makeSectionHdr(g.icon + ' ' + g.label));
+                items.forEach(function(it) {
+                    var name = it.name || it.title || it.query || '';
+                    list.appendChild(makeItem(g.icon, name, function(){
+                        inp.value = name; inp.form.submit();
+                    }));
+                });
+            });
+            if (any) {
+                var foot = document.createElement('li');
+                foot.setAttribute('role','presentation');
+                foot.style.cssText = 'border-top:1px solid var(--border);padding:6px 14px;text-align:center;';
+                var a = document.createElement('a');
+                a.href = '/frontend/public/search.php?q=' + encodeURIComponent(q);
+                a.style.cssText = 'font-size:.8rem;color:var(--primary,#03874e);text-decoration:none;';
+                a.textContent = '<?= $isRtl ? "← عرض كل النتائج" : "← View all results" ?>';
+                a.addEventListener('mousedown', function(e){ e.preventDefault(); window.location.href = this.href; });
+                foot.appendChild(a);
+                list.appendChild(foot);
+                list.hidden = false;
+            } else {
+                hide();
+            }
+        }
+
+        inp.addEventListener('input', function() {
+            clearTimeout(_debounce);
+            var q = inp.value.trim();
+            if (!q) { hide(); return; }
+            _debounce = setTimeout(function() {
+                fetch(buildSuggestUrl(q), {credentials:'include'})
+                    .then(function(r){ return r.ok ? r.json() : null; })
+                    .then(function(j){
+                        if (!j) { hide(); return; }
+                        var d = j.data || j;
+                        showResults(d, q);
+                    }).catch(hide);
+            }, 220);
+        });
+
+        inp.addEventListener('focus', function() {
+            if (!inp.value.trim()) showPopular();
+        });
+        inp.addEventListener('blur', function() {
+            setTimeout(hide, 200);
+        });
+        inp.form.addEventListener('submit', function() {
+            hide();
+        });
+    })();
 
 })();
 </script>
