@@ -47,7 +47,7 @@ body {
   background: var(--pub-bg);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden; /* prevent content overflow on mobile */
-  padding-top: var(--pub-header-h, 60px);
+  /* No padding-top needed — header uses position:sticky (in normal flow) */
 }
 
 img, video, svg { max-width: 100%; height: auto; display: block; }
@@ -147,7 +147,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
     padding-block: 6px;
   }
   body {
-    padding-top: 110px;
+    padding-top: 0; /* header is sticky, not fixed */
     padding-bottom: 60px; /* room for bottom nav */
   }
   .pub-header-inner {

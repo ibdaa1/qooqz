@@ -832,29 +832,8 @@ body {
                        list-style:none;margin:4px 0 0;padding:4px 0;z-index:9999;font-size:.9rem;"></ul>
         </form>
 
-        <!-- Header action buttons: home, wishlist, cart, login/logout -->
+        <!-- Header action buttons: login/logout + language switcher only -->
         <nav class="pub-header-actions" aria-label="<?= e(t('nav.actions', 'الإجراءات')) ?>">
-            <a href="<?= e($_basePath . '/index.php') ?>"
-               class="pub-header-action-btn"
-               title="<?= e(t('nav.home', 'الرئيسية')) ?>"
-               aria-label="<?= e(t('nav.home', 'الرئيسية')) ?>">
-                <span aria-hidden="true">🏠</span>
-                <span class="pub-header-action-label"><?= e(t('nav.home', 'الرئيسية')) ?></span>
-            </a>
-            <a href="<?= e($_basePath . '/wishlist.php') ?>"
-               class="pub-header-action-btn"
-               title="<?= e(t('nav.wishlist', 'المفضلة')) ?>"
-               aria-label="<?= e(t('nav.wishlist', 'المفضلة')) ?>">
-                <span aria-hidden="true">♥</span>
-                <span class="pub-header-action-label"><?= e(t('nav.wishlist', 'المفضلة')) ?></span>
-            </a>
-            <a href="<?= e($_basePath . '/cart.php') ?>"
-               class="pub-header-action-btn"
-               title="<?= e(t('nav.cart', 'سلة التسوق')) ?>"
-               aria-label="<?= e(t('nav.cart', 'سلة التسوق')) ?>">
-                <span aria-hidden="true">🛒</span>
-                <span class="pub-header-action-label"><?= e(t('nav.cart', 'سلة التسوق')) ?></span>
-            </a>
             <?php if ($_isLoggedIn): ?>
             <a href="<?= e($_authPath . '/logout.php') ?>"
                class="pub-header-action-btn pub-header-action-btn--auth"
