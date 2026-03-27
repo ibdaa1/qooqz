@@ -23,7 +23,11 @@
         "auctions": "Auctions",
         "orders": "My Orders",
         "tickets": "Support",
-        "returns": "Returns"
+        "returns": "Returns",
+        "language": "Language",
+        "previous": "Previous",
+        "next": "Next",
+        "actions": "Actions"
     },
     "hero": {
         "title": "QOOQZ Global Platform",

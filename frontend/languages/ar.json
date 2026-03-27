@@ -23,7 +23,11 @@
         "auctions": "المزادات",
         "orders": "طلباتي",
         "tickets": "الدعم",
-        "returns": "الإرجاع"
+        "returns": "الإرجاع",
+        "language": "اللغة",
+        "previous": "السابق",
+        "next": "التالي",
+        "actions": "الإجراءات"
     },
     "hero": {
         "title": "منصة QOOQZ العالمية",

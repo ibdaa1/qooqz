@@ -420,6 +420,45 @@ body {
     .pub-header-action-label { display: none; }
 }
 
+/* Language switcher */
+.pub-lang-switcher {
+    position: relative;
+}
+.pub-lang-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    inset-inline-end: 0;
+    min-width: 130px;
+    background: var(--pub-surface, #fff);
+    border: 1px solid var(--pub-border, #ddd);
+    border-radius: 8px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.15);
+    z-index: 9999;
+    list-style: none;
+    margin: 0; padding: 4px 0;
+    font-size: .88rem;
+    color: var(--pub-text, #222);
+}
+.pub-lang-dropdown[hidden] { display: none; }
+.pub-lang-dropdown__item a {
+    display: block;
+    padding: .45rem .85rem;
+    text-decoration: none;
+    color: inherit;
+    white-space: nowrap;
+    transition: background .12s;
+    border-radius: 4px;
+}
+.pub-lang-dropdown__item a:hover {
+    background: var(--pub-hover, #f0f4ff);
+    color: var(--pub-primary, #2d8cf0);
+}
+.pub-lang-dropdown__item--active a {
+    background: var(--pub-hover, #f0f4ff);
+    color: var(--pub-primary, #2d8cf0);
+    font-weight: 700;
+}
+
 /* ══════════════════════════════════════════════════════════
    CATEGORY SLIDER + MEGA MENU
    ══════════════════════════════════════════════════════════ */
@@ -828,6 +867,20 @@ body {
                 <span class="pub-header-action-label"><?= e(t('nav.login', 'تسجيل الدخول')) ?></span>
             </a>
             <?php endif; ?>
+            <!-- Language switcher -->
+            <div class="pub-lang-switcher" id="pubLangSwitcher">
+                <button type="button"
+                        class="pub-header-action-btn"
+                        id="pubLangBtn"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        title="<?= e(t('nav.language', 'اللغة')) ?>"
+                        aria-label="<?= e(t('nav.language', 'اللغة')) ?>">
+                    <span aria-hidden="true">🌐</span>
+                    <span class="pub-header-action-label" id="pubLangLabel"><?= e(strtoupper($lang)) ?></span>
+                </button>
+                <ul class="pub-lang-dropdown" id="pubLangDropdown" role="listbox" hidden></ul>
+            </div>
         </nav>
 
     </div>
@@ -1182,6 +1235,81 @@ body {
     /* ── Boot ──────────────────────────────────────────── */
     loadTopCats();
 
+})();
+</script>
+
+<script>
+/* ── Language Switcher ─────────────────────────────── */
+(function () {
+    'use strict';
+
+    var btn      = document.getElementById('pubLangBtn');
+    var dropdown = document.getElementById('pubLangDropdown');
+    if (!btn || !dropdown) return;
+
+    var CURRENT_LANG = <?= json_encode($lang) ?>;
+    var _langs = null;
+
+    function buildSwitchUrl(code) {
+        var url = new URL(window.location.href);
+        url.searchParams.set('lang', code);
+        return url.toString();
+    }
+
+    function renderDropdown(langs) {
+        dropdown.innerHTML = '';
+        langs.forEach(function (l) {
+            var li = document.createElement('li');
+            li.className = 'pub-lang-dropdown__item' +
+                (l.code === CURRENT_LANG ? ' pub-lang-dropdown__item--active' : '');
+            li.setAttribute('role', 'option');
+            li.setAttribute('aria-selected', String(l.code === CURRENT_LANG));
+            var a = document.createElement('a');
+            a.href = buildSwitchUrl(l.code);
+            a.textContent = l.name;
+            li.appendChild(a);
+            dropdown.appendChild(li);
+        });
+    }
+
+    function openDropdown() {
+        if (_langs) {
+            renderDropdown(_langs);
+            dropdown.hidden = false;
+            btn.setAttribute('aria-expanded', 'true');
+            return;
+        }
+        fetch('/api/public/languages', { credentials: 'include' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (j) {
+                if (!j) return;
+                _langs = (j.data && Array.isArray(j.data.data)) ? j.data.data
+                       : (Array.isArray(j.data) ? j.data : []);
+                if (_langs.length === 0) return;
+                renderDropdown(_langs);
+                dropdown.hidden = false;
+                btn.setAttribute('aria-expanded', 'true');
+            })
+            .catch(function () {});
+    }
+
+    function closeDropdown() {
+        dropdown.hidden = true;
+        btn.setAttribute('aria-expanded', 'false');
+    }
+
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (dropdown.hidden) { openDropdown(); } else { closeDropdown(); }
+    });
+
+    dropdown.addEventListener('click', function (e) { e.stopPropagation(); });
+
+    document.addEventListener('click', function () { closeDropdown(); });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { closeDropdown(); }
+    });
 })();
 </script>
 
