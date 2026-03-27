@@ -104,11 +104,13 @@ if (strlen($q) < 2) {
         'categories' => [],
         'entities'   => [],
         'jobs'       => [],
+        'brands'     => [],
+        'auctions'   => [],
     ]);
     exit;
 }
 
-// context = all | products | categories | entities | jobs
+// context = all | products | categories | entities | jobs | brands | auctions
 $context = strtolower(trim($_GET['context'] ?? 'all'));
 
 // Boost limit for the active context type (show more of it)
@@ -117,6 +119,8 @@ $contextLimits = [
     'categories' => 5,
     'entities'   => 5,
     'jobs'       => 5,
+    'brands'     => 5,
+    'auctions'   => 5,
 ];
 if (isset($contextLimits[$context])) {
     $contextLimits[$context] = 8;
@@ -153,6 +157,8 @@ $results = [
     'categories' => [],
     'entities'   => [],
     'jobs'       => [],
+    'brands'     => [],
+    'auctions'   => [],
 ];
 
 /* ═══════════════════════════════════════════════════════
@@ -372,6 +378,106 @@ foreach ($rows as $r) {
         'url'  => '/frontend/public/jobs.php?job_id=' . $r['id'],
         'icon' => '💼',
         'type' => 'job',
+    ];
+}
+
+/* ═══════════════════════════════════════════════════════
+ *  BRANDS
+ * ═══════════════════════════════════════════════════════ */
+$limit = $contextLimits['brands'];
+
+$brandTenantCond  = $tenantId ? ' AND b.tenant_id = ?' : '';
+$brandTenantParam = $tenantId ? [$tenantId] : [];
+
+$ftBrandSql = "
+    SELECT DISTINCT b.id,
+        COALESCE(bt.name, b.slug) AS name,
+        b.slug,
+        MATCH(bt.name) AGAINST(? IN BOOLEAN MODE) AS score
+    FROM brands b
+    LEFT JOIN brand_translations bt
+        ON bt.brand_id = b.id AND bt.language_code = ?
+    WHERE b.is_active = 1 $brandTenantCond
+      AND MATCH(bt.name) AGAINST(? IN BOOLEAN MODE)
+    ORDER BY score DESC
+    LIMIT $limit";
+
+$likeBrandSql = "
+    SELECT DISTINCT b.id,
+        COALESCE(bt.name, b.slug) AS name,
+        b.slug
+    FROM brands b
+    LEFT JOIN brand_translations bt
+        ON bt.brand_id = b.id AND bt.language_code = ?
+    WHERE b.is_active = 1 $brandTenantCond
+      AND (bt.name LIKE ? OR b.slug LIKE ?)
+    ORDER BY b.sort_order ASC, b.id DESC
+    LIMIT $limit";
+
+$rows = $ftSearch(
+    $ftBrandSql,
+    array_merge([$boolQ, $lang, $boolQ], $brandTenantParam),
+    $likeBrandSql,
+    array_merge([$lang], $brandTenantParam, [$like, $like])
+);
+
+foreach ($rows as $r) {
+    $results['brands'][] = [
+        'id'   => (int)$r['id'],
+        'name' => (string)($r['name'] ?? ''),
+        'url'  => '/frontend/public/products.php?brand_id=' . $r['id'],
+        'icon' => '🏷',
+        'type' => 'brand',
+    ];
+}
+
+/* ═══════════════════════════════════════════════════════
+ *  AUCTIONS
+ * ═══════════════════════════════════════════════════════ */
+$limit = $contextLimits['auctions'];
+
+$auctionTenantCond  = $tenantId ? ' AND a.tenant_id = ?' : '';
+$auctionTenantParam = $tenantId ? [$tenantId] : [];
+
+$ftAuctionSql = "
+    SELECT DISTINCT a.id,
+        COALESCE(at2.title, a.slug) AS name,
+        a.slug,
+        MATCH(at2.title) AGAINST(? IN BOOLEAN MODE) AS score
+    FROM auctions a
+    LEFT JOIN auction_translations at2
+        ON at2.auction_id = a.id AND at2.language_code = ?
+    WHERE a.status IN ('active','scheduled') $auctionTenantCond
+      AND MATCH(at2.title) AGAINST(? IN BOOLEAN MODE)
+    ORDER BY score DESC
+    LIMIT $limit";
+
+$likeAuctionSql = "
+    SELECT DISTINCT a.id,
+        COALESCE(at2.title, a.slug) AS name,
+        a.slug
+    FROM auctions a
+    LEFT JOIN auction_translations at2
+        ON at2.auction_id = a.id AND at2.language_code = ?
+    WHERE a.status IN ('active','scheduled') $auctionTenantCond
+      AND (at2.title LIKE ? OR a.slug LIKE ?)
+    ORDER BY a.end_date ASC, a.id DESC
+    LIMIT $limit";
+
+$rows = $ftSearch(
+    $ftAuctionSql,
+    array_merge([$boolQ, $lang, $boolQ], $auctionTenantParam),
+    $likeAuctionSql,
+    array_merge([$lang], $auctionTenantParam, [$like, $like])
+);
+
+foreach ($rows as $r) {
+    $results['auctions'][] = [
+        'id'   => (int)$r['id'],
+        'name' => (string)($r['name'] ?? ''),
+        'url'  => '/frontend/public/auction.php?id=' . $r['id'],
+        'icon' => '🔨',
+        'type' => 'auction',
     ];
 }
 

@@ -381,6 +381,44 @@ body {
         min-height: calc(100vh - 116px);
     }
 }
+
+/* ── Header action buttons (home, wishlist, cart, login/logout) ── */
+.pub-header-actions {
+    display: flex;
+    align-items: center;
+    gap: .3rem;
+    flex-shrink: 0;
+    margin-inline-start: .5rem;
+}
+.pub-header-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .4rem .5rem;
+    border-radius: 6px;
+    color: var(--pub-header-text, var(--header-text, var(--header_text, #fff)));
+    text-decoration: none;
+    font-size: .82rem;
+    font-weight: 600;
+    transition: background .15s;
+    white-space: nowrap;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+.pub-header-action-btn:hover {
+    background: rgba(255,255,255,.18);
+}
+.pub-header-action-btn--auth {
+    background: rgba(255,255,255,.12);
+    border: 1px solid rgba(255,255,255,.25);
+}
+.pub-header-action-btn--auth:hover {
+    background: rgba(255,255,255,.25);
+}
+@media (max-width: 640px) {
+    .pub-header-action-label { display: none; }
+}
     </style>
 
     <!-- Public Stylesheet -->
@@ -497,6 +535,48 @@ body {
                        list-style:none;margin:4px 0 0;padding:4px 0;z-index:9999;font-size:.9rem;"></ul>
         </form>
 
+        <!-- Header action buttons: home, wishlist, cart, login/logout -->
+        <nav class="pub-header-actions" aria-label="<?= e(t('nav.actions', 'الإجراءات')) ?>">
+            <a href="<?= e($_basePath . '/index.php') ?>"
+               class="pub-header-action-btn"
+               title="<?= e(t('nav.home', 'الرئيسية')) ?>"
+               aria-label="<?= e(t('nav.home', 'الرئيسية')) ?>">
+                <span aria-hidden="true">🏠</span>
+                <span class="pub-header-action-label"><?= e(t('nav.home', 'الرئيسية')) ?></span>
+            </a>
+            <a href="<?= e($_basePath . '/wishlist.php') ?>"
+               class="pub-header-action-btn"
+               title="<?= e(t('nav.wishlist', 'المفضلة')) ?>"
+               aria-label="<?= e(t('nav.wishlist', 'المفضلة')) ?>">
+                <span aria-hidden="true">♥</span>
+                <span class="pub-header-action-label"><?= e(t('nav.wishlist', 'المفضلة')) ?></span>
+            </a>
+            <a href="<?= e($_basePath . '/cart.php') ?>"
+               class="pub-header-action-btn"
+               title="<?= e(t('nav.cart', 'سلة التسوق')) ?>"
+               aria-label="<?= e(t('nav.cart', 'سلة التسوق')) ?>">
+                <span aria-hidden="true">🛒</span>
+                <span class="pub-header-action-label"><?= e(t('nav.cart', 'سلة التسوق')) ?></span>
+            </a>
+            <?php if ($_isLoggedIn): ?>
+            <a href="<?= e($_authPath . '/logout.php') ?>"
+               class="pub-header-action-btn pub-header-action-btn--auth"
+               title="<?= e(t('nav.logout', 'تسجيل الخروج')) ?>"
+               aria-label="<?= e(t('nav.logout', 'تسجيل الخروج')) ?>">
+                <span aria-hidden="true">↩</span>
+                <span class="pub-header-action-label"><?= e(t('nav.logout', 'تسجيل الخروج')) ?></span>
+            </a>
+            <?php else: ?>
+            <a href="<?= e($_authPath . '/login.php') ?>"
+               class="pub-header-action-btn pub-header-action-btn--auth"
+               title="<?= e(t('nav.login', 'تسجيل الدخول')) ?>"
+               aria-label="<?= e(t('nav.login', 'تسجيل الدخول')) ?>">
+                <span aria-hidden="true">👤</span>
+                <span class="pub-header-action-label"><?= e(t('nav.login', 'تسجيل الدخول')) ?></span>
+            </a>
+            <?php endif; ?>
+        </nav>
+
     </div>
 </header>
 
@@ -573,6 +653,8 @@ body {
             'type_categories' => ($GLOBALS['PUB_STRINGS']['search']['type_categories'] ?? '📂 Categories'),
             'type_entities'   => ($GLOBALS['PUB_STRINGS']['search']['type_entities']   ?? '🏢 Stores'),
             'type_jobs'       => ($GLOBALS['PUB_STRINGS']['search']['type_jobs']       ?? '💼 Jobs'),
+            'type_brands'     => ($GLOBALS['PUB_STRINGS']['search']['type_brands']     ?? '🏷 Brands'),
+            'type_auctions'   => ($GLOBALS['PUB_STRINGS']['search']['type_auctions']   ?? '🔨 Auctions'),
         ], JSON_UNESCAPED_UNICODE) ?>;
 
         /* ── helpers ──────────────────────────────────────────── */
@@ -620,9 +702,11 @@ body {
             products:   _s.type_products,
             categories: _s.type_categories,
             entities:   _s.type_entities,
-            jobs:       _s.type_jobs
+            jobs:       _s.type_jobs,
+            brands:     _s.type_brands,
+            auctions:   _s.type_auctions
         };
-        var _typeOrder = ['products', 'categories', 'entities', 'jobs'];
+        var _typeOrder = ['products', 'categories', 'entities', 'jobs', 'brands', 'auctions'];
 
         function _makeSectionHeader(label) {
             var header = document.createElement('li');
