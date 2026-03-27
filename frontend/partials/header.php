@@ -689,7 +689,8 @@ body {
         function fetchPopular(cb) {
             if (_popularCache !== null) { cb(_popularCache); return; }
             var url = '/api/public/search_suggest?popular=1&lang=<?= urlencode($lang) ?>' +
-                      (window.__qzTenantId ? '&tenant_id=' + window.__qzTenantId : '');
+                      (window.__qzTenantId ? '&tenant_id=' + window.__qzTenantId : '') +
+                      (window.__qzEntityId ? '&entity_id=' + window.__qzEntityId : '');
             fetch(url, {credentials: 'include'})
                 .then(function(r){ return r.ok ? r.json() : null; })
                 .then(function(j){
@@ -780,7 +781,8 @@ body {
             var url = '/api/public/search_suggest?q=' + encodeURIComponent(q) +
                       '&context=' + encodeURIComponent(ctx) +
                       '&lang=<?= urlencode($lang) ?>' +
-                      (window.__qzTenantId ? '&tenant_id=' + window.__qzTenantId : '');
+                      (window.__qzTenantId ? '&tenant_id=' + window.__qzTenantId : '') +
+                      (window.__qzEntityId ? '&entity_id=' + window.__qzEntityId : '');
             fetch(url, {credentials: 'include'})
                 .then(function (r) { return r.ok ? r.json() : null; })
                 .then(function (j) {

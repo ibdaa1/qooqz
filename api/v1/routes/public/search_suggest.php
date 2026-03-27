@@ -18,19 +18,51 @@ declare(strict_types=1);
  */
 
 /* -------------------------------------------------------
- * Helper: upsert a query into search_logs (best-effort)
+ * Resolve current user_id from session (best-effort)
+ * Follows the same pattern as events.php session fallback.
  * ----------------------------------------------------- */
-$trackQuery = function (string $query) use ($pdo, $lang, $tenantId): void {
+$currentUserId = null;
+try {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_name('APP_SESSID');
+        session_save_path(sys_get_temp_dir());
+        @session_start(['cookie_secure' => true, 'cookie_httponly' => true, 'cookie_samesite' => 'Lax']);
+    }
+    $sessUser = $_SESSION['user'] ?? null;
+    if ($sessUser && isset($sessUser['id']) && (int)$sessUser['id'] > 0) {
+        $currentUserId = (int)$sessUser['id'];
+    }
+} catch (Throwable $e) {
+    // Session unavailable — treat as guest
+}
+
+// entity_id from request (e.g. when user is browsing an entity page)
+$searchEntityId = isset($_GET['entity_id']) && (int)$_GET['entity_id'] > 0
+    ? (int)$_GET['entity_id']
+    : null;
+
+/* -------------------------------------------------------
+ * Helper: upsert a query into search_logs (best-effort)
+ * Logs both the global aggregated row (user_id=NULL) and,
+ * when a user is logged in, a per-user row so we can later
+ * identify which users searched for what (for targeted offers).
+ * ----------------------------------------------------- */
+$trackQuery = function (string $query) use ($pdo, $lang, $tenantId, $currentUserId, $searchEntityId): void {
     if (!$pdo instanceof PDO || strlen($query) < 2) return;
     try {
         $st = $pdo->prepare("
-            INSERT INTO search_logs (query, tenant_id, lang, count, last_searched_at)
-            VALUES (?, ?, ?, 1, NOW())
+            INSERT INTO search_logs (query, tenant_id, user_id, entity_id, lang, count, last_searched_at)
+            VALUES (?, ?, ?, ?, ?, 1, NOW())
             ON DUPLICATE KEY UPDATE count = count + 1, last_searched_at = NOW()
         ");
-        $st->execute([$query, $tenantId ?: null, $lang]);
+        // Global/guest row (user_id=NULL)
+        $st->execute([$query, $tenantId ?: null, null, $searchEntityId, $lang]);
+        // Per-user row so we can target the user with offers/notifications
+        if ($currentUserId !== null) {
+            $st->execute([$query, $tenantId ?: null, $currentUserId, $searchEntityId, $lang]);
+        }
     } catch (Throwable $e) {
-        // Table may not exist yet — ignore
+        // Table may not exist yet or columns not migrated — ignore
     }
 };
 
@@ -43,10 +75,12 @@ if (!empty($_GET['popular'])) {
         if ($pdo instanceof PDO) {
             $tenantCond  = $tenantId ? ' AND (tenant_id = ? OR tenant_id IS NULL)' : '';
             $tenantParam = $tenantId ? [$lang, $tenantId] : [$lang];
+            // Only aggregate global rows (user_id IS NULL) to avoid double-counting
+            // per-user rows that were inserted alongside each global row.
             $st = $pdo->prepare("
                 SELECT query, SUM(count) AS total
                 FROM search_logs
-                WHERE lang = ? $tenantCond
+                WHERE lang = ? AND user_id IS NULL $tenantCond
                 GROUP BY query
                 ORDER BY total DESC
                 LIMIT 8

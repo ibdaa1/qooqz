@@ -1234,6 +1234,8 @@ echo '<style>
 <script>
 // Track entity page view in core_events
 (function () {
+    // Expose entity ID for search tracking (header.php passes entity_id to search_suggest)
+    window.__qzEntityId = <?= (int)$entity['id'] ?>;
     if (typeof window.pubTrackEvent !== 'function') {
         window.pubTrackEvent = function (entityType, entityId, eventType, value, onFail) {
             var params = 'entity_type=' + encodeURIComponent(entityType)
