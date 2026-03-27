@@ -169,6 +169,7 @@ $_pubRoutes = [
     'ticket_categories'  => 'ticket_categories',
     'returns'            => 'returns',
     'events'             => 'events',
+    'search_suggest'     => 'search_suggest',
 ];
 
 $_pubFile = isset($_pubRoutes[$first])

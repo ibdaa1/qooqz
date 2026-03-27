@@ -463,7 +463,8 @@ body {
               method="get"
               action="<?= e($_basePath . '/search.php') ?>"
               role="search"
-              autocomplete="off">
+              autocomplete="off"
+              style="position:relative;">
             <input type="hidden" name="context" value="<?= e($GLOBALS['PUB_PAGE_TYPE'] ?? 'all') ?>">
             <input type="search"
                    name="q"
@@ -473,12 +474,22 @@ body {
                    value="<?= e($_GET['q'] ?? '') ?>"
                    aria-label="<?= e(t('search.placeholder', 'ابحث عن منتجات، متاجر...')) ?>"
                    aria-autocomplete="list"
-                   aria-controls="pubSearchSuggest">
+                   aria-controls="pubSearchSuggest"
+                   style="padding-inline-end:2.4rem;">
+            <!-- Clear button — shown only when input has value -->
+            <button type="button"
+                    id="pubSearchClear"
+                    aria-label="<?= e(t('search.clear', 'مسح البحث')) ?>"
+                    style="position:absolute;inset-block-start:50%;inset-inline-end:calc(100% - 2.2rem);
+                           transform:translateY(-50%);background:none;border:none;cursor:pointer;
+                           color:var(--pub-muted,#888);font-size:1.1rem;padding:0 .35rem;line-height:1;
+                           display:<?= !empty($_GET['q']) ? 'block' : 'none' ?>;"
+                    >✖</button>
             <button type="submit" class="pub-header-search-btn">
                 <?= e(t('search.button', 'بحث')) ?>
             </button>
             <ul id="pubSearchSuggest" role="listbox" hidden
-                style="position:absolute;top:100%;inset-inline-start:0;min-width:300px;max-width:480px;
+                style="position:absolute;top:100%;inset-inline-start:0;min-width:300px;max-width:520px;width:100%;
                        background:var(--pub-surface,#fff);border:1px solid var(--pub-border,#ddd);
                        border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.12);
                        list-style:none;margin:4px 0 0;padding:4px 0;z-index:9999;font-size:.9rem;"></ul>
@@ -538,68 +549,160 @@ body {
     })();
     </script>
 
-    <!-- Live search autocomplete -->
+    <!-- Live search autocomplete (grouped suggestions + clear button) -->
     <script>
     (function () {
-        var inp  = document.getElementById('pubGlobalSearchInput');
-        var list = document.getElementById('pubSearchSuggest');
+        var inp   = document.getElementById('pubGlobalSearchInput');
+        var list  = document.getElementById('pubSearchSuggest');
+        var clearBtn = document.getElementById('pubSearchClear');
         if (!inp || !list) return;
 
-        var timer    = null;
-        var lastQ    = '';
-        var basePath = '<?= e($_basePath) ?>';
+        var timer = null;
+        var lastQ = '';
 
-        function hide() {
-            list.hidden = true;
-            list.innerHTML = '';
-        }
-
-        function show(items) {
-            if (!items || !items.length) { hide(); return; }
-            list.innerHTML = '';
-            items.forEach(function (item) {
-                var li = document.createElement('li');
-                li.setAttribute('role', 'option');
-                li.style.cssText = 'padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;';
-                li.innerHTML =
-                    '<span style="font-size:1rem;">' + (item.icon || '🔍') + '</span>' +
-                    '<span style="flex:1;"><strong>' + _esc(item.name) + '</strong>' +
-                    (item.type ? ' <small style="color:var(--pub-muted,.#888);">· ' + _esc(item.type) + '</small>' : '') + '</span>';
-                li.addEventListener('mousedown', function (e) {
-                    e.preventDefault();
-                    inp.value = item.name;
-                    hide();
-                    inp.form.submit();
-                });
-                li.addEventListener('mouseover', function () { this.style.background = 'var(--pub-surface,#f5f5f5)'; });
-                li.addEventListener('mouseout',  function () { this.style.background = ''; });
-                list.appendChild(li);
-            });
-            list.hidden = false;
-        }
-
+        /* ── helpers ──────────────────────────────────────────── */
         function _esc(s) {
             return String(s).replace(/[&<>"']/g, function (c) {
                 return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
             });
         }
 
+        function _highlight(text, q) {
+            if (!q) return _esc(text);
+            var re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+            return _esc(text).replace(re, '<mark style="background:rgba(255,220,0,.4);border-radius:2px;">$1</mark>');
+        }
+
+        function hide() {
+            list.hidden = true;
+            list.innerHTML = '';
+        }
+
+        function showClear(has) {
+            if (clearBtn) clearBtn.style.display = has ? 'block' : 'none';
+        }
+
+        /* ── grouped dropdown ─────────────────────────────────── */
+        var _typeLabels = {
+            products:   '🛍 منتجات',
+            categories: '📂 تصنيفات',
+            entities:   '🏢 متاجر',
+            jobs:       '💼 وظائف'
+        };
+        var _typeOrder = ['products', 'categories', 'entities', 'jobs'];
+
+        function show(data, q) {
+            list.innerHTML = '';
+            var hasAny = false;
+
+            _typeOrder.forEach(function (type) {
+                var items = data[type];
+                if (!items || !items.length) return;
+                hasAny = true;
+
+                // Group header
+                var header = document.createElement('li');
+                header.setAttribute('role', 'presentation');
+                header.style.cssText = 'padding:5px 14px 3px;font-size:.75rem;font-weight:700;color:var(--pub-muted,#888);text-transform:uppercase;letter-spacing:.05em;border-top:1px solid var(--pub-border,#eee);';
+                header.innerHTML = _typeLabels[type] || type;
+                list.appendChild(header);
+
+                items.forEach(function (item) {
+                    var li = document.createElement('li');
+                    li.setAttribute('role', 'option');
+                    li.style.cssText = 'padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .15s;';
+                    li.innerHTML =
+                        '<span style="font-size:1rem;flex-shrink:0;">' + _esc(item.icon || '🔍') + '</span>' +
+                        '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+                            _highlight(item.name, q) +
+                        '</span>';
+                    li.addEventListener('mousedown', function (e) {
+                        e.preventDefault();
+                        inp.value = item.name;
+                        hide();
+                        // Navigate directly to item URL if available
+                        if (item.url) {
+                            window.location.href = item.url + '&q=' + encodeURIComponent(item.name);
+                        } else {
+                            inp.form.submit();
+                        }
+                    });
+                    li.addEventListener('mouseover', function () { this.style.background = 'var(--pub-hover,#f5f5f5)'; });
+                    li.addEventListener('mouseout',  function () { this.style.background = ''; });
+                    list.appendChild(li);
+                });
+            });
+
+            if (!hasAny) { hide(); return; }
+
+            // "View all results" footer
+            var footer = document.createElement('li');
+            footer.setAttribute('role', 'presentation');
+            footer.style.cssText = 'padding:8px 14px;border-top:1px solid var(--pub-border,#eee);text-align:center;';
+            var a = document.createElement('a');
+            a.style.cssText = 'color:var(--pub-primary,#0066cc);font-size:.85rem;text-decoration:none;font-weight:600;';
+            a.href = inp.form.action + '?q=' + encodeURIComponent(q) +
+                     '&context=' + encodeURIComponent((inp.form.querySelector('[name="context"]') || {}).value || 'all');
+            a.textContent = '← عرض كل النتائج';
+            a.addEventListener('mousedown', function (e) { e.preventDefault(); window.location.href = this.href; });
+            footer.appendChild(a);
+            list.appendChild(footer);
+            list.hidden = false;
+        }
+
+        /* ── fetch suggestions ────────────────────────────────── */
         function fetchSuggestions(q) {
             var ctx = (inp.form.querySelector('[name="context"]') || {}).value || 'all';
-            var url = '/api/public/search_suggest?q=' + encodeURIComponent(q) + '&context=' + encodeURIComponent(ctx) + '&lang=<?= urlencode($lang) ?>';
+            var url = '/api/public/search_suggest?q=' + encodeURIComponent(q) +
+                      '&context=' + encodeURIComponent(ctx) +
+                      '&lang=<?= urlencode($lang) ?>' +
+                      (window.__qzTenantId ? '&tenant_id=' + window.__qzTenantId : '');
             fetch(url, {credentials: 'include'})
                 .then(function (r) { return r.ok ? r.json() : null; })
                 .then(function (j) {
                     if (!j) return;
-                    var items = (j.data && j.data.suggestions) ? j.data.suggestions : (j.suggestions || []);
-                    show(items);
+                    var d = (j.data) ? j.data : j;
+                    // Check if grouped data present
+                    if (d.products !== undefined) {
+                        show(d, q);
+                    } else {
+                        // backward-compat flat list
+                        var items = d.suggestions || [];
+                        if (!items.length) { hide(); return; }
+                        var fake = {products:[], categories:[], entities:[], jobs:[]};
+                        items.forEach(function(it) {
+                            var t = it.type || 'products';
+                            if (fake[t]) fake[t].push(it);
+                        });
+                        show(fake, q);
+                    }
                 })
                 .catch(function () { hide(); });
         }
 
+        /* ── clear button ─────────────────────────────────────── */
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function () {
+                inp.value = '';
+                showClear(false);
+                hide();
+                window.location.href = window.location.pathname;
+            });
+        }
+
+        /* ── input events ─────────────────────────────────────── */
         inp.addEventListener('input', function () {
             clearTimeout(timer);
             var q = inp.value.trim();
+            showClear(inp.value.length > 0);
+
+            // If input cleared → redirect to clean page
+            if (inp.value === '') {
+                hide();
+                window.location.href = window.location.pathname;
+                return;
+            }
+
             if (q === lastQ) return;
             lastQ = q;
             if (q.length < 2) { hide(); return; }
