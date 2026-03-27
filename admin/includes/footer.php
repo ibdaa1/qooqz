@@ -17,10 +17,10 @@ if ($xhr || $acceptJson || strpos((string)$uri, '/api/') === 0) {
 // USE THE SAME PAYLOAD AS HEADER.PHP
 // ════════════════════════════════════════════════════════════
 $payload = $GLOBALS['ADMIN_UI'] ?? [];
-$theme = $payload['theme'] ?? [];
-$user = $payload['user'] ?? [];
-$lang = $payload['lang'] ?? 'en';
-$dir = $payload['direction'] ?? 'ltr';
+$theme   = $payload['theme']     ?? [];
+$user    = $payload['user']      ?? [];
+$lang    = $payload['lang']      ?? 'en';
+$dir     = $payload['direction'] ?? 'ltr';
 
 // ════════════════════════════════════════════════════════════
 // EXTRACT COLORS FROM THEME (SAME AS HEADER.PHP)
@@ -32,8 +32,6 @@ foreach ($theme['color_settings'] ?? [] as $c) {
     }
 }
 
-// Get specific colors
-// Get design settings for footer text
 $footerText = '© ' . date('Y') . ' Admin Panel';
 foreach ($theme['design_settings'] ?? [] as $d) {
     if (($d['setting_key'] ?? '') === 'footer_text') {
@@ -42,11 +40,38 @@ foreach ($theme['design_settings'] ?? [] as $d) {
     }
 }
 
-// If there's a brand name in strings, use it
 $brand = $payload['strings']['brand'] ?? 'Admin';
+
+// ════════════════════════════════════════════════════════════
+// FCM: قراءة إعدادات Firebase من config أو DB
+// ════════════════════════════════════════════════════════════
+$fcmEnabled = defined('FCM_ENABLED') ? FCM_ENABLED : false;
+
+// إعدادات Firebase — تُقرأ من constants/config أو DB
+$fcmConfig = [];
+if ($fcmEnabled) {
+    $fcmConfig = [
+        'apiKey'            => defined('FCM_API_KEY')             ? FCM_API_KEY             : '',
+        'authDomain'        => defined('FCM_AUTH_DOMAIN')         ? FCM_AUTH_DOMAIN         : '',
+        'projectId'         => defined('FCM_PROJECT_ID')          ? FCM_PROJECT_ID          : '',
+        'messagingSenderId' => defined('FCM_MESSAGING_SENDER_ID') ? FCM_MESSAGING_SENDER_ID : '',
+        'appId'             => defined('FCM_APP_ID')              ? FCM_APP_ID              : '',
+        'vapidKey'          => defined('FCM_VAPID_KEY')           ? FCM_VAPID_KEY           : '',
+    ];
+
+    // بديل: جلب من DB إذا كانت مخزّنة في جدول settings
+    // foreach ($theme['fcm_settings'] ?? [] as $s) {
+    //     $fcmConfig[$s['key']] = $s['value'];
+    // }
+}
+
+// هل المستخدم مسجّل دخوله ومعرّفه متاح؟
+$currentUserId = $user['id'] ?? 0;
+$apiBase = defined('API_BASE_URL') ? API_BASE_URL : '/api';
+$csrfToken = $payload['csrf'] ?? ($_SESSION['csrf_token'] ?? '');
 ?>
-    </main> <!-- #adminMainContent -->
-  </div> <!-- .admin-layout -->
+    </main><!-- #adminMainContent -->
+  </div><!-- .admin-layout -->
 
   <footer class="admin-footer" role="contentinfo">
     <div class="container">
@@ -55,7 +80,6 @@ $brand = $payload['strings']['brand'] ?? 'Admin';
   </footer>
 
 <style>
-/* Dynamic CSS Variables from DB (both underscore and hyphen for compatibility) */
 :root {
     <?php foreach ($colors as $key => $value):
         $hkey = str_replace('_', '-', $key);
@@ -66,7 +90,6 @@ $brand = $payload['strings']['brand'] ?? 'Admin';
     <?php endforeach; ?>
 }
 
-/* Footer styles — colors from DB via :root vars above */
 .admin-footer {
     background: var(--footer_background, var(--background_secondary, #1e2533)) !important;
     color: var(--footer_text, var(--text_secondary, #B0B0B0)) !important;
@@ -93,41 +116,41 @@ $brand = $payload['strings']['brand'] ?? 'Admin';
 <script>
 (function(){
   'use strict';
-  
+
   window.Admin = window.Admin || {};
 
-  // Sidebar toggle (persist in localStorage)
+  // ── Sidebar toggle ────────────────────────────────────────────────
   (function(){
-    const toggle = document.getElementById('sidebarToggle');
-    const sidebar = document.getElementById('adminSidebar');
+    const toggle   = document.getElementById('sidebarToggle');
+    const sidebar  = document.getElementById('adminSidebar');
     const backdrop = document.querySelector('.sidebar-backdrop');
     if (!toggle || !sidebar) return;
 
     const stateKey = 'admin_sidebar_collapsed';
     try {
-      const collapsed = localStorage.getItem(stateKey);
-      if (collapsed === '1') document.body.classList.add('sidebar-collapsed');
+      if (localStorage.getItem(stateKey) === '1') {
+        document.body.classList.add('sidebar-collapsed');
+      }
     } catch(e){}
 
     function setCollapsed(val) {
-      if (val) document.body.classList.toggle('sidebar-collapsed', val);
+      document.body.classList.toggle('sidebar-collapsed', val);
       try { localStorage.setItem(stateKey, val ? '1' : '0'); } catch(e){}
     }
 
     toggle.addEventListener('click', function(e){
       e.preventDefault();
-      const isCollapsed = document.body.classList.toggle('sidebar-collapsed');
-      setCollapsed(isCollapsed);
+      setCollapsed(document.body.classList.toggle('sidebar-collapsed'));
     });
 
     if (backdrop) {
-      backdrop.addEventListener('click', function(){ document.body.classList.remove('sidebar-open'); });
+      backdrop.addEventListener('click', function(){
+        document.body.classList.remove('sidebar-open');
+      });
     }
   })();
 
-  // fetchAndInsert: guard — admin_core.js (defer) provides the full version with CSS loading,
-  // script execution, theme, and translations. Only set a minimal fallback here if it hasn't
-  // been defined yet (i.e., when admin_core.js is not loaded on the page).
+  // ── fetchAndInsert fallback ───────────────────────────────────────
   if (!window.Admin.__installed) {
     window.Admin.fetchAndInsert = function(url, targetSelector) {
       const target = document.querySelector(targetSelector);
@@ -138,21 +161,20 @@ $brand = $payload['strings']['brand'] ?? 'Admin';
     };
   }
 
-  // AJAX helper
+  // ── AJAX helper ───────────────────────────────────────────────────
   window.Admin.ajax = function(url, opts = {}) {
-    opts = Object.assign({method:'GET', headers:{}, credentials:'same-origin'}, opts);
+    opts = Object.assign({ method: 'GET', headers: {}, credentials: 'same-origin' }, opts);
     return fetch(url, opts)
-      .then(res => res.headers.get('content-type').includes('json') ? res.json() : res.text());
+      .then(res => res.headers.get('content-type').includes('json')
+        ? res.json() : res.text());
   };
 
-  // Apply theme from DB
+  // ── Apply theme from DB ───────────────────────────────────────────
   window.Admin.applyTheme = function(theme) {
     if (!theme || !Array.isArray(theme.colors)) return;
     const root = document.documentElement;
     theme.colors.forEach(c => {
       if (c.setting_key && c.color_value) {
-        // Set both underscore and hyphenated forms so CSS var() references work regardless
-        // of which naming convention was used (DB stores underscores, CSS uses hyphens)
         root.style.setProperty('--' + c.setting_key, c.color_value);
         const hk = c.setting_key.replace(/_/g, '-');
         if (hk !== c.setting_key) root.style.setProperty('--' + hk, c.color_value);
@@ -160,54 +182,75 @@ $brand = $payload['strings']['brand'] ?? 'Admin';
     });
   };
 
-  // Apply initial theme from PHP
   <?php if (!empty($theme)): ?>
-    window.Admin.applyTheme(<?= json_encode(['colors' => $theme['color_settings'] ?? []]) ?>);
+  window.Admin.applyTheme(<?= json_encode(['colors' => $theme['color_settings'] ?? []]) ?>);
   <?php endif; ?>
 
-  // Notify (uses dynamic colors)
+  // ── Notify ────────────────────────────────────────────────────────
   window.Admin.notify = function(msg, type = 'info') {
     const toast = document.createElement('div');
-    toast.style.position = 'fixed';
-    toast.style.bottom = '20px';
-    toast.style.right = '20px';
-    toast.style.padding = '10px';
-    toast.style.borderRadius = '5px';
-    toast.style.zIndex = '10000';
-
-    // Get colors from CSS variables (set by theme from DB)
+    toast.style.cssText = 'position:fixed;bottom:20px;right:20px;padding:10px;border-radius:5px;z-index:10000;';
     const rootStyles = getComputedStyle(document.documentElement);
-    const colors = {
-      info: rootStyles.getPropertyValue('--info_color').trim(),
-      success: rootStyles.getPropertyValue('--success_color').trim(),
-      warning: rootStyles.getPropertyValue('--warning_color').trim(),
-      error: rootStyles.getPropertyValue('--danger_color').trim(),
-      default: rootStyles.getPropertyValue('--primary_color').trim()
+    const colorMap = {
+      info: '--info_color', success: '--success_color',
+      warning: '--warning_color', error: '--danger_color'
     };
-
-    const bg = colors[type] || colors.default;
+    const bg = rootStyles.getPropertyValue(colorMap[type] || '--primary_color').trim();
     if (bg) toast.style.background = bg;
     const fg = rootStyles.getPropertyValue('--sidebar_text').trim();
     toast.style.color = fg || 'inherit';
     toast.textContent = msg;
     document.body.appendChild(toast);
-    setTimeout(() => document.body.removeChild(toast), 4000);
+    setTimeout(() => toast.remove(), 4000);
   };
 
-  // Bind links with data-load-url
+  // ── data-load-url links ───────────────────────────────────────────
   document.addEventListener('click', function(e){
     const a = e.target.closest('a[data-load-url]');
     if (!a) return;
     e.preventDefault();
-    const url = a.getAttribute('data-load-url');
-    const target = a.getAttribute('data-target') || '#adminMainContent';
-    window.Admin.fetchAndInsert(url, target).catch(() => {
-      window.Admin.notify('Failed to load', 'error');
-    });
+    window.Admin.fetchAndInsert(
+      a.getAttribute('data-load-url'),
+      a.getAttribute('data-target') || '#adminMainContent'
+    ).catch(() => window.Admin.notify('Failed to load', 'error'));
   });
+
+  // ── APP_CONFIG: إضافة FCM keys للـ window ────────────────────────
+  window.APP_CONFIG = window.APP_CONFIG || {};
+  <?php if ($fcmEnabled && !empty($fcmConfig['projectId'])): ?>
+  Object.assign(window.APP_CONFIG, {
+    FCM_API_KEY:             <?= json_encode($fcmConfig['apiKey']) ?>,
+    FCM_AUTH_DOMAIN:         <?= json_encode($fcmConfig['authDomain']) ?>,
+    FCM_PROJECT_ID:          <?= json_encode($fcmConfig['projectId']) ?>,
+    FCM_MESSAGING_SENDER_ID: <?= json_encode($fcmConfig['messagingSenderId']) ?>,
+    FCM_APP_ID:              <?= json_encode($fcmConfig['appId']) ?>,
+    FCM_VAPID_KEY:           <?= json_encode($fcmConfig['vapidKey']) ?>,
+    API_BASE:                <?= json_encode($apiBase) ?>,
+    CSRF_TOKEN:              <?= json_encode($csrfToken) ?>,
+    USER_ID:                 <?= (int)$currentUserId ?>,
+  });
+  <?php else: ?>
+  /* FCM disabled or not configured — skipping FCM_* keys */
+  window.APP_CONFIG.API_BASE   = window.APP_CONFIG.API_BASE   || <?= json_encode($apiBase) ?>;
+  window.APP_CONFIG.CSRF_TOKEN = window.APP_CONFIG.CSRF_TOKEN || <?= json_encode($csrfToken) ?>;
+  window.APP_CONFIG.USER_ID    = window.APP_CONFIG.USER_ID    || <?= (int)$currentUserId ?>;
+  <?php endif; ?>
 
 })();
 </script>
+
+<?php if ($fcmEnabled && !empty($fcmConfig['projectId']) && $currentUserId > 0): ?>
+<!-- ══════════════════════════════════════════════════════════
+     Firebase Push Notifications
+     يُحمَّل فقط إذا:
+       1. FCM_ENABLED = true في config
+       2. المستخدم مسجّل دخوله (user_id > 0)
+       3. المتصفح يدعم Service Worker
+     ══════════════════════════════════════════════════════════ -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js" defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js" defer></script>
+<script src="/assets/js/fcm-init.js" defer></script>
+<?php endif; ?>
 
 </body>
 </html>
