@@ -708,7 +708,10 @@
         "hours_value": "Sunday – Thursday, 9:00 AM – 6:00 PM (GST)",
         "response_label": "Response Time",
         "response_value": "Within 24 business hours",
-        "social_title": "Follow Us"
+        "social_title": "Follow Us",
+        "login_required_title": "Login Required",
+        "login_required_text": "You need to be logged in to send us a message. Please log in or create an account to continue.",
+        "login_cta": "Log In"
     },
     "privacy": {
         "page_title": "Privacy Policy",

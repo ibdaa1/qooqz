@@ -3,6 +3,7 @@ declare(strict_types=1);
 /**
  * frontend/public/contact.php
  * QOOQZ — Contact Us Page
+ * Requires login — user_id is stored with every message.
  */
 require_once dirname(__DIR__) . '/includes/public_context.php';
 
@@ -10,6 +11,10 @@ $GLOBALS['PUB_APP_NAME']   = 'QOOQZ';
 $GLOBALS['PUB_BASE_PATH']  = '/frontend/public';
 $GLOBALS['PUB_PAGE_TITLE'] = t('contact.page_title', 'Contact Us') . ' — QOOQZ';
 $GLOBALS['PUB_PAGE_TYPE']  = 'contact';
+
+/* Pre-fill name / email from session when logged in */
+$_userName  = $_isLoggedIn ? ($_user['name'] ?? $_user['username'] ?? '') : '';
+$_userEmail = $_isLoggedIn ? ($_user['email'] ?? '') : '';
 
 include dirname(__DIR__) . '/partials/header.php';
 ?>
@@ -70,6 +75,11 @@ include dirname(__DIR__) . '/partials/header.php';
 }
 .contact-form input:focus,
 .contact-form textarea:focus { outline: none; border-color: var(--pub-primary, #2563eb); }
+.contact-form input[readonly] {
+    background: var(--pub-surface, #f3f4f6);
+    color: var(--pub-text-muted, #6b7280);
+    cursor: not-allowed;
+}
 .contact-form textarea { resize: vertical; min-height: 130px; }
 .contact-form-submit {
     width: 100%;
@@ -118,12 +128,45 @@ include dirname(__DIR__) . '/partials/header.php';
 }
 #contactMsg.success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
 #contactMsg.error   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+
+.contact-login-notice {
+    max-width: 600px;
+    margin: 3rem auto;
+    padding: 2.5rem 2rem;
+    text-align: center;
+    background: var(--pub-surface, #f9fafb);
+    border: 1px solid var(--pub-border, #e5e7eb);
+    border-radius: 12px;
+}
+.contact-login-notice .icon { font-size: 2.5rem; margin-bottom: 1rem; }
+.contact-login-notice h2 { font-size: 1.3rem; margin-bottom: .6rem; color: var(--pub-text, #111827); }
+.contact-login-notice p  { color: var(--pub-text-muted, #6b7280); margin-bottom: 1.5rem; }
+.contact-login-notice a {
+    display: inline-block;
+    background: var(--pub-primary, #2563eb);
+    color: #fff;
+    padding: .7rem 2rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+}
+.contact-login-notice a:hover { opacity: .9; }
 </style>
 
 <section class="contact-hero">
     <h1><?= e(t('contact.hero_title', 'Get in Touch')) ?></h1>
     <p><?= e(t('contact.hero_subtitle', 'We are here to help.')) ?></p>
 </section>
+
+<?php if (!$_isLoggedIn): ?>
+<!-- Login required notice -->
+<div class="contact-login-notice">
+    <div class="icon">🔒</div>
+    <h2><?= e(t('contact.login_required_title', 'Login Required')) ?></h2>
+    <p><?= e(t('contact.login_required_text', 'You need to be logged in to send us a message. Please log in or create an account to continue.')) ?></p>
+    <a href="/frontend/login.php?redirect=<?= urlencode('/frontend/public/contact.php') ?>"><?= e(t('contact.login_cta', 'Log In')) ?></a>
+</div>
+<?php else: ?>
 
 <div class="contact-layout">
 
@@ -134,11 +177,11 @@ include dirname(__DIR__) . '/partials/header.php';
         <form id="contactForm" class="contact-form" novalidate>
             <div class="form-group">
                 <label for="cName"><?= e(t('contact.name', 'Full Name')) ?></label>
-                <input type="text" id="cName" name="name" placeholder="<?= e(t('contact.name_placeholder', 'Your full name')) ?>" required>
+                <input type="text" id="cName" name="name" value="<?= e($_userName) ?>" placeholder="<?= e(t('contact.name_placeholder', 'Your full name')) ?>" <?= $_userName ? 'readonly' : '' ?> required>
             </div>
             <div class="form-group">
                 <label for="cEmail"><?= e(t('contact.email', 'Email Address')) ?></label>
-                <input type="email" id="cEmail" name="email" placeholder="<?= e(t('contact.email_placeholder', 'your@email.com')) ?>" required>
+                <input type="email" id="cEmail" name="email" value="<?= e($_userEmail) ?>" placeholder="<?= e(t('contact.email_placeholder', 'your@email.com')) ?>" <?= $_userEmail ? 'readonly' : '' ?> required>
             </div>
             <div class="form-group">
                 <label for="cSubject"><?= e(t('contact.subject', 'Subject')) ?></label>
@@ -207,6 +250,7 @@ include dirname(__DIR__) . '/partials/header.php';
 
         fetch('/api/public/contact', {
             method: 'POST',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({ name, email, subject, message })
         })
@@ -227,5 +271,7 @@ include dirname(__DIR__) . '/partials/header.php';
     });
 })();
 </script>
+
+<?php endif; ?>
 
 <?php include dirname(__DIR__) . '/partials/footer.php'; ?>

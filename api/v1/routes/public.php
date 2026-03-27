@@ -171,6 +171,7 @@ $_pubRoutes = [
     'events'             => 'events',
     'search_suggest'     => 'search_suggest',
     'languages'          => 'languages',
+    'contact'            => 'contact',
 ];
 
 $_pubFile = isset($_pubRoutes[$first])
