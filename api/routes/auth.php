@@ -20,8 +20,11 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
         'httponly' => true,
         'samesite' => 'Lax'
     ];
-    // session_name can be set centrally in bootstrap; set here only if not set
-    if (session_name() === '') session_name('APP_SESSID');
+    // Always use APP_SESSID to match admin/login.php and public_context.php.
+    // PHP default session_name() is 'PHPSESSID' (never empty), so the old
+    // `=== ''` guard never fired → sessions were created under PHPSESSID
+    // while the frontend read APP_SESSID → user always appeared logged out.
+    if (session_name() !== 'APP_SESSID') session_name('APP_SESSID');
     // some PHP versions accept array param
     if (PHP_VERSION_ID >= 70300) {
         session_set_cookie_params($cookieParams);
@@ -155,15 +158,87 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     exit;
 }
 
-// ---------------- POST: login ----------------
+// ---------------- POST: login / register ----------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     _no_cache();
-    if ($action !== '' && $action !== 'login') {
+
+    $payload = _read_payload();
+    // Detect action from payload first, then from URL segment
+    $postAction = strtolower(trim((string)($payload['action'] ?? '')));
+    $routeAction = $action;
+    $effectiveAction = ($routeAction !== '' && $routeAction !== 'login' && $routeAction !== 'register')
+        ? $routeAction
+        : ($postAction ?: ($routeAction ?: 'login'));
+
+    if ($effectiveAction !== 'login' && $effectiveAction !== 'register') {
         ResponseFormatter::notFound('Auth POST route not found');
         exit;
     }
 
-    $payload = _read_payload();
+    // ---------------- REGISTER ----------------
+    if ($effectiveAction === 'register') {
+        $regUsername = trim((string)($payload['username'] ?? ''));
+        $regEmail    = trim((string)($payload['email'] ?? ''));
+        $regPassword = (string)($payload['password'] ?? '');
+        $regPhone    = trim((string)($payload['phone'] ?? ''));
+        $regLang     = preg_replace('/[^a-z\-]/', '', strtolower((string)($payload['preferred_language'] ?? 'en')));
+
+        $errors = [];
+        if ($regUsername === '') $errors['username'] = 'Username is required';
+        elseif (!preg_match('/^[a-zA-Z0-9_]{3,50}$/', $regUsername)) $errors['username'] = 'Username must be 3-50 alphanumeric characters or underscores';
+        if ($regEmail === '') $errors['email'] = 'Email is required';
+        elseif (!filter_var($regEmail, FILTER_VALIDATE_EMAIL)) $errors['email'] = 'Invalid email address';
+        if (strlen($regPassword) < 6) $errors['password'] = 'Password must be at least 6 characters';
+
+        if ($errors) {
+            ResponseFormatter::error('Validation failed', 422, $errors);
+            exit;
+        }
+
+        try {
+            // Check duplicates
+            $chk = $pdo->prepare('SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1');
+            $chk->execute([$regUsername, $regEmail]);
+            if ($chk->fetch()) {
+                ResponseFormatter::error('Username or email already exists', 409);
+                exit;
+            }
+
+            $hash = password_hash($regPassword, PASSWORD_DEFAULT);
+            $ins  = $pdo->prepare(
+                'INSERT INTO users (username, email, password_hash, phone, preferred_language, is_active, created_at)
+                 VALUES (?, ?, ?, ?, ?, 1, NOW())'
+            );
+            $ins->execute([$regUsername, $regEmail, $hash, $regPhone ?: null, $regLang ?: 'en']);
+            $newId = (int)$pdo->lastInsertId();
+
+            session_regenerate_id(true);
+            $user = [
+                'id'                 => $newId,
+                'name'               => $regUsername,
+                'username'           => $regUsername,
+                'email'              => $regEmail,
+                'role_id'            => null,
+                'preferred_language' => $regLang ?: 'en',
+                'is_active'          => true,
+                'permissions'        => [],
+                'roles'              => [],
+                'permissions_count'  => 0,
+                'roles_count'        => 0,
+            ];
+            $_SESSION['user_id'] = $newId;
+            $_SESSION['user']    = $user;
+            $GLOBALS['ADMIN_USER'] = $user;
+
+            ResponseFormatter::success(['ok' => true, 'message' => 'Registration successful', 'user' => $user]);
+        } catch (Throwable $e) {
+            if (class_exists('Logger')) Logger::error('Register error: ' . $e->getMessage());
+            ResponseFormatter::serverError(app_env('debug') ? $e->getMessage() : 'Registration failed');
+        }
+        exit;
+    }
+
+    // ---------------- LOGIN ----------------
     $username = trim((string)($payload['username'] ?? $payload['email'] ?? ''));
     $password = (string)($payload['password'] ?? '');
 
@@ -206,12 +281,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // set session + global user
         $user = [
-            'id' => isset($row['id']) ? (int)$row['id'] : null,
-            'username' => $row['username'] ?? $row['email'] ?? null,
-            'email' => $row['email'] ?? null,
-            'role_id' => isset($row['role_id']) ? (int)$row['role_id'] : null,
+            'id'                 => isset($row['id']) ? (int)$row['id'] : null,
+            'name'               => $row['name'] ?? $row['full_name'] ?? $row['username'] ?? null,
+            'username'           => $row['username'] ?? $row['email'] ?? null,
+            'email'              => $row['email'] ?? null,
+            'role_id'            => isset($row['role_id']) ? (int)$row['role_id'] : null,
             'preferred_language' => $row['preferred_language'] ?? null,
-            'is_active' => !empty($row['is_active']),
+            'is_active'          => !empty($row['is_active']),
         ];
 
         $rbac = _load_user_rbac($pdo, (int)$user['id'], $user['role_id'] ?? null);

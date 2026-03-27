@@ -116,6 +116,11 @@ final class ResponseFormatter
         );
     }
 
+    public static function notFound(string $message = 'Not Found'): void
+    {
+        self::error($message, 404);
+    }
+
     /* =========================
      * Meta
      * ========================= */

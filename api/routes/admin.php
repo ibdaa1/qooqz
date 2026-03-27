@@ -1,89 +1,74 @@
 <?php
 declare(strict_types=1);
-/**
- * routes/admin.php
- *
- * Handles admin UI related endpoints under /api/admin/*
- * - Example endpoints:
- *   GET  /api/admin                -> basic admin info
- *   GET  /api/admin/ui             -> admin UI metadata
- *   GET  /api/admin/settings       -> settings list placeholder (requires permission)
- *
- * Expects dispatcher to provide:
- *  - $_GET['segments'] (array) | $_GET['splat'] (string)
- *  - $_SERVER['CONTAINER'] with 'db' and 'user' fields
- */
 
 if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
 
-$segments = $_GET['segments'] ?? [];
-$action = strtolower($segments[0] ?? '');
-
 $pdo = $GLOBALS['ADMIN_DB'] ?? null;
-$user = $GLOBALS['ADMIN_USER'] ?? $_SESSION['user'] ?? null;
+$user = $_SESSION['user'] ?? null;
 
-// Small permission helper (fallback)
-function _has_perm(string $perm): bool {
-    if (empty($GLOBALS['ADMIN_USER'])) return false;
-    if (!empty($GLOBALS['ADMIN_USER']['role_id']) && (int)$GLOBALS['ADMIN_USER']['role_id'] === 1) return true;
-    $perms = $_SESSION['permissions'] ?? $GLOBALS['ADMIN_USER']['permissions'] ?? [];
-    return in_array($perm, (array)$perms, true);
-}
-
-// Root admin info: GET /api/admin
-if ($action === '' || $action === null) {
-    ResponseFormatter::success([
-        'ok' => true,
-        'module' => 'admin',
-        'db_connected' => $pdo instanceof PDO,
-        'user' => $user,
-    ]);
+if (!$pdo instanceof PDO || !$user) {
+    ResponseFormatter::error('User or database not initialized', 500);
     exit;
 }
 
-// Admin UI metadata: GET /api/admin/ui
-if ($action === 'ui') {
-    ResponseFormatter::success([
-        'ok' => true,
-        'detected_module' => 'BootstrapAdminUi',
-        'db_connected' => $pdo instanceof PDO,
-        'user_lang' => $user['preferred_language'] ?? 'ar',
-        'user_direction' => in_array($user['preferred_language'] ?? 'ar', ['ar','fa','ur']) ? 'rtl' : 'ltr',
-        'languages_dir' => defined('LANGUAGES_PATH') ? LANGUAGES_PATH : null,
-        'strings_count' => function_exists('i18n_count') ? i18n_count() : 0,
-        'user_info' => [
-            'id' => $user['id'] ?? null,
-            'username' => $user['username'] ?? null,
-            'email' => $user['email'] ?? null,
-            'preferred_language' => $user['preferred_language'] ?? ($user['lang'] ?? 'ar'),
-            'role_id' => $user['role_id'] ?? null,
-            'roles' => $_SESSION['roles'] ?? ($user['roles'] ?? []),
-            'permissions' => $_SESSION['permissions'] ?? ($user['permissions'] ?? []),
-            'permissions_count' => count($_SESSION['permissions'] ?? ($user['permissions'] ?? [])),
-            'roles_count' => count($_SESSION['roles'] ?? ($user['roles'] ?? [])),
-            'is_active' => $user['is_active'] ?? true,
-        ],
-        'session_roles' => $_SESSION['roles'] ?? [],
-        'session_permissions' => $_SESSION['permissions'] ?? [],
-    ]);
-    exit;
-}
+// جلب جميع tenants التي ينتمي إليها المستخدم
+$stmt = $pdo->prepare("
+    SELECT tu.tenant_id, tu.role_id, tu.is_active AS tenant_user_active,
+           t.name AS tenant_name, t.domain AS tenant_domain,
+           r.key_name AS role_key, r.display_name AS role_name
+    FROM tenant_users tu
+    JOIN tenants t ON tu.tenant_id = t.id
+    LEFT JOIN roles r ON tu.role_id = r.id
+    WHERE tu.user_id = :uid
+");
+$stmt->execute([':uid' => $user['id']]);
+$tenantsData = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Settings placeholder: GET /api/admin/settings
-if ($action === 'settings') {
-    if (!_has_perm('manage_settings')) {
-        ResponseFormatter::error('Forbidden', 403);
-        exit;
+// جلب الصلاحيات لكل دور ضمن الـ tenants
+$rolesPermissions = [];
+foreach ($tenantsData as $td) {
+    $roleId = $td['role_id'];
+    $tenantId = $td['tenant_id'];
+    if ($roleId) {
+        $permStmt = $pdo->prepare("
+            SELECT p.key_name
+            FROM role_permissions rp
+            JOIN permissions p ON rp.permission_id = p.id
+            WHERE rp.role_id = :role_id AND rp.tenant_id = :tenant_id
+        ");
+        $permStmt->execute([':role_id' => $roleId, ':tenant_id' => $tenantId]);
+        $perms = $permStmt->fetchAll(PDO::FETCH_COLUMN);
+        $rolesPermissions[$tenantId] = $perms;
     }
-    // Example: return a placeholder list or real from DB if exists
-    $settings = [
-        ['key' => 'site_name', 'value' => 'My Site', 'type' => 'string'],
-        ['key' => 'maintenance', 'value' => false, 'type' => 'boolean']
-    ];
-    ResponseFormatter::success(['ok' => true, 'data' => $settings]);
-    exit;
 }
 
-// Unknown admin sub-route
-ResponseFormatter::notFound('Admin route not found: ' . ($action ?: '/'));
-exit;
+// إعداد الرد النهائي
+$response = [
+    'ok' => true,
+    'module' => 'admin',
+    'db_connected' => true,
+    'user' => [
+        'id' => $user['id'],
+        'username' => $user['username'],
+        'email' => $user['email'],
+        'preferred_language' => $user['preferred_language'] ?? 'ar',
+        'is_active' => $user['is_active'] ?? true,
+        'tenants' => []
+    ]
+];
+
+foreach ($tenantsData as $td) {
+    $tid = $td['tenant_id'];
+    $response['user']['tenants'][] = [
+        'tenant_id' => $tid,
+        'tenant_name' => $td['tenant_name'],
+        'tenant_domain' => $td['tenant_domain'],
+        'role_id' => $td['role_id'],
+        'role_key' => $td['role_key'],
+        'role_name' => $td['role_name'],
+        'is_active' => (bool)$td['tenant_user_active'],
+        'permissions' => $rolesPermissions[$tid] ?? []
+    ];
+}
+
+ResponseFormatter::success($response);
