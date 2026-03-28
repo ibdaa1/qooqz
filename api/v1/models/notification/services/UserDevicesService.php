@@ -64,8 +64,9 @@ final class UserDevicesService
             }
         }
 
-        // Deduplicate by user_id + user_agent if no FCM token (session-based tracking)
-        if (empty($data['fcm_token']) && !empty($data['user_id']) && !empty($data['user_agent'])) {
+        // Deduplicate by user_id + user_agent (fallback for session-based tracking,
+        // and also when a new FCM token needs to be attached to an existing device row)
+        if (!empty($data['user_id']) && !empty($data['user_agent'])) {
             $existing = $this->repo->findByUserAndAgent((int)$data['user_id'], $data['user_agent']);
             if ($existing) {
                 $data['id'] = $existing['id'];
