@@ -1,0 +1,25 @@
+# Environment files
+.env
+*.env.local
+
+# Firebase service account (contains private keys - NEVER commit)
+firebase-service-account.json
+**/firebase-service-account.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Vendor / Dependencies
+vendor/
+node_modules/

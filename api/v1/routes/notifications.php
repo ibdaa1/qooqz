@@ -146,10 +146,11 @@ try {
                 exit;
             }
 
-            // Parse extra JSON data
+            // Parse extra JSON data (must always be an array for Notification::send)
             if (!empty($data['data'])) {
                 if (is_string($data['data'])) {
-                    $extraData = json_decode($data['data'], true) ?? [];
+                    $decoded = json_decode($data['data'], true);
+                    $extraData = is_array($decoded) ? $decoded : [];
                 } elseif (is_array($data['data'])) {
                     $extraData = $data['data'];
                 }
