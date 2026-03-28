@@ -10,11 +10,32 @@ require_once __DIR__ . '/mail.php';
 require_once __DIR__ . '/sms.php';
 
 // ===========================================
-// إعدادات Firebase FCM
+// إعدادات Firebase FCM (v1 API + Legacy fallback)
 // ===========================================
-if (!defined('FCM_SERVER_KEY'))    define('FCM_SERVER_KEY',    $_ENV['FCM_SERVER_KEY']    ?? '');
+if (!defined('FCM_SERVER_KEY'))    define('FCM_SERVER_KEY',    getenv('FCM_SERVER_KEY')    ?: ($_ENV['FCM_SERVER_KEY'] ?? ''));
 if (!defined('FCM_ENDPOINT'))      define('FCM_ENDPOINT',      'https://fcm.googleapis.com/fcm/send');
 if (!defined('APP_LOGO_URL'))      define('APP_LOGO_URL',      '/frontend/assets/images/logo.png');
+
+// FCM v1 API settings
+if (!defined('FCM_PROJECT_ID'))    define('FCM_PROJECT_ID',    getenv('FCM_PROJECT_ID')    ?: 'qooqz-2011');
+if (!defined('FCM_SERVICE_ACCOUNT_PATH')) {
+    $saPath = getenv('FCM_SERVICE_ACCOUNT_PATH') ?: '';
+    if (!$saPath) {
+        // Default locations for service account file
+        $candidates = [
+            __DIR__ . '/../config/firebase-service-account.json',
+            __DIR__ . '/../../firebase-service-account.json',
+        ];
+        foreach ($candidates as $c) {
+            if (file_exists($c)) { $saPath = $c; break; }
+        }
+    }
+    define('FCM_SERVICE_ACCOUNT_PATH', $saPath);
+}
+
+// Define MAIL_ENABLED / SMS_ENABLED if not defined (prevents fatal errors)
+if (!defined('MAIL_ENABLED')) define('MAIL_ENABLED', (bool)(getenv('MAIL_ENABLED') ?: false));
+if (!defined('SMS_ENABLED'))  define('SMS_ENABLED',  (bool)(getenv('SMS_ENABLED')  ?: false));
 
 // ===========================================
 // Notification Class
@@ -266,10 +287,147 @@ class Notification
             return ['success' => false, 'message' => 'No active FCM tokens found'];
         }
 
-        if (empty(FCM_SERVER_KEY)) {
-            return ['success' => false, 'message' => 'FCM_SERVER_KEY not configured'];
+        // محاولة FCM v1 API أولاً (الطريقة الحديثة)
+        $accessToken = self::getFcmAccessToken();
+        if ($accessToken) {
+            return self::sendViaFcmV1($tokens, $title, $message, $data, $notificationId, $recipientId, $accessToken);
         }
 
+        // Fallback: Legacy FCM API (deprecated)
+        if (!empty(FCM_SERVER_KEY) && FCM_SERVER_KEY !== 'REPLACE_WITH_YOUR_SERVER_KEY') {
+            return self::sendViaFcmLegacy($tokens, $title, $message, $data, $notificationId, $recipientId);
+        }
+
+        return ['success' => false, 'message' => 'FCM not configured: set service account JSON file or FCM_SERVER_KEY'];
+    }
+
+    // -------------------------------------------------------
+    // 6️⃣.1  FCM v1 API — الطريقة الحديثة (OAuth2 + Service Account)
+    // -------------------------------------------------------
+
+    private static function sendViaFcmV1(
+        array  $tokens,
+        string $title,
+        string $message,
+        array  $data,
+        int    $notificationId,
+        int    $recipientId,
+        string $accessToken
+    ): array {
+        $projectId = FCM_PROJECT_ID;
+        $endpoint  = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
+
+        $successCount = 0;
+        $failureCount = 0;
+        $invalidTokens = [];
+
+        // v1 API يرسل رسالة واحدة لكل جهاز
+        foreach ($tokens as $token) {
+            $payload = [
+                'message' => [
+                    'token'        => $token,
+                    'notification' => [
+                        'title' => $title,
+                        'body'  => $message,
+                        'image' => APP_LOGO_URL,
+                    ],
+                    'data' => array_map('strval', array_merge($data, [
+                        'notification_id' => (string) $notificationId,
+                        'click_action'    => 'FLUTTER_NOTIFICATION_CLICK',
+                    ])),
+                    'android' => [
+                        'priority' => 'high',
+                        'notification' => [
+                            'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+                            'icon'         => 'ic_notification',
+                        ],
+                    ],
+                    'webpush' => [
+                        'notification' => [
+                            'icon'  => APP_LOGO_URL,
+                            'badge' => APP_LOGO_URL,
+                        ],
+                        'fcm_options' => [
+                            'link' => '/',
+                        ],
+                    ],
+                ],
+            ];
+
+            $ch = curl_init($endpoint);
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER     => [
+                    'Authorization: Bearer ' . $accessToken,
+                    'Content-Type: application/json',
+                ],
+                CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+                CURLOPT_TIMEOUT    => 10,
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr  = curl_error($ch);
+            curl_close($ch);
+
+            if ($curlErr) {
+                self::logError("FCM v1 cURL error: {$curlErr}");
+                $failureCount++;
+                continue;
+            }
+
+            if ($httpCode === 200) {
+                $successCount++;
+            } else {
+                $failureCount++;
+                $decoded = json_decode($response, true);
+                $errorCode = $decoded['error']['details'][0]['errorCode'] ?? ($decoded['error']['status'] ?? '');
+
+                // Token منتهي الصلاحية أو غير صالح
+                if (in_array($errorCode, ['UNREGISTERED', 'INVALID_ARGUMENT', 'NOT_FOUND'], true)
+                    || ($httpCode === 404)) {
+                    $invalidTokens[] = $token;
+                }
+
+                self::logError("FCM v1 error [{$httpCode}]: " . ($response ?: 'empty'));
+            }
+        }
+
+        // تنظيف tokens غير صالحة
+        foreach ($invalidTokens as $badToken) {
+            try {
+                $stmt = self::$pdo->prepare("UPDATE user_devices SET is_active = 0 WHERE fcm_token = ?");
+                $stmt->execute([$badToken]);
+            } catch (PDOException $e) {
+                self::logError('cleanInvalidToken: ' . $e->getMessage());
+            }
+        }
+
+        $success = $successCount > 0;
+        self::logNotification('push', $recipientId, $success ? 'sent' : 'failed');
+
+        return [
+            'success'      => $success,
+            'tokens_sent'  => count($tokens),
+            'fcm_success'  => $successCount,
+            'fcm_failure'  => $failureCount,
+            'api_version'  => 'v1',
+        ];
+    }
+
+    // -------------------------------------------------------
+    // 6️⃣.2  FCM Legacy API — fallback (deprecated)
+    // -------------------------------------------------------
+
+    private static function sendViaFcmLegacy(
+        array  $tokens,
+        string $title,
+        string $message,
+        array  $data,
+        int    $notificationId,
+        int    $recipientId
+    ): array {
         $payload = [
             'registration_ids' => $tokens,
             'notification'     => [
@@ -303,14 +461,13 @@ class Notification
         curl_close($ch);
 
         if ($curlErr) {
-            self::logError("FCM cURL error: {$curlErr}");
+            self::logError("FCM Legacy cURL error: {$curlErr}");
             return ['success' => false, 'error' => $curlErr];
         }
 
         $decoded = json_decode($response, true);
         $success = ($httpCode === 200 && isset($decoded['success']) && $decoded['success'] > 0);
 
-        // تنظيف الـ tokens غير الصالحة (invalid registration)
         if (isset($decoded['results'])) {
             self::cleanInvalidTokens($tokens, $decoded['results']);
         }
@@ -323,7 +480,105 @@ class Notification
             'fcm_success'  => $decoded['success']  ?? 0,
             'fcm_failure'  => $decoded['failure']  ?? 0,
             'http_code'    => $httpCode,
+            'api_version'  => 'legacy',
         ];
+    }
+
+    // -------------------------------------------------------
+    // 6️⃣.3  FCM v1 API — OAuth2 Access Token من Service Account
+    // -------------------------------------------------------
+
+    private static ?string $cachedAccessToken = null;
+    private static int $tokenExpiresAt = 0;
+
+    private static function getFcmAccessToken(): ?string
+    {
+        // استخدام التوكن المحفوظ إن لم ينتهِ
+        if (self::$cachedAccessToken && time() < self::$tokenExpiresAt) {
+            return self::$cachedAccessToken;
+        }
+
+        $saPath = FCM_SERVICE_ACCOUNT_PATH;
+        if (!$saPath || !file_exists($saPath)) {
+            return null;
+        }
+
+        $sa = json_decode(file_get_contents($saPath), true);
+        if (!$sa || empty($sa['private_key']) || empty($sa['client_email']) || empty($sa['token_uri'])) {
+            self::logError('FCM service account JSON invalid or missing required fields');
+            return null;
+        }
+
+        try {
+            $now = time();
+            $exp = $now + 3600; // 1 ساعة
+
+            // بناء JWT header + claims
+            $header = self::base64UrlEncode(json_encode(['alg' => 'RS256', 'typ' => 'JWT']));
+            $claims = self::base64UrlEncode(json_encode([
+                'iss'   => $sa['client_email'],
+                'scope' => 'https://www.googleapis.com/auth/firebase.messaging',
+                'aud'   => $sa['token_uri'],
+                'iat'   => $now,
+                'exp'   => $exp,
+            ]));
+
+            $signingInput = "{$header}.{$claims}";
+
+            // توقيع RS256
+            $privateKey = openssl_pkey_get_private($sa['private_key']);
+            if (!$privateKey) {
+                self::logError('FCM: Failed to parse private key from service account');
+                return null;
+            }
+
+            $signature = '';
+            openssl_sign($signingInput, $signature, $privateKey, OPENSSL_ALGO_SHA256);
+            $jwt = $signingInput . '.' . self::base64UrlEncode($signature);
+
+            // تبادل JWT بـ access token
+            $ch = curl_init($sa['token_uri']);
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
+                CURLOPT_POSTFIELDS     => http_build_query([
+                    'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                    'assertion'  => $jwt,
+                ]),
+                CURLOPT_TIMEOUT => 10,
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr  = curl_error($ch);
+            curl_close($ch);
+
+            if ($curlErr) {
+                self::logError("FCM OAuth2 cURL error: {$curlErr}");
+                return null;
+            }
+
+            $tokenData = json_decode($response, true);
+            if ($httpCode !== 200 || empty($tokenData['access_token'])) {
+                self::logError("FCM OAuth2 failed [{$httpCode}]: " . ($response ?: 'empty'));
+                return null;
+            }
+
+            self::$cachedAccessToken = $tokenData['access_token'];
+            self::$tokenExpiresAt    = $now + (int)($tokenData['expires_in'] ?? 3500) - 60; // 60 ثانية هامش
+
+            return self::$cachedAccessToken;
+
+        } catch (Throwable $e) {
+            self::logError('FCM getAccessToken: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    private static function base64UrlEncode(string $data): string
+    {
+        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
     }
 
     // -------------------------------------------------------

@@ -308,6 +308,12 @@ return [
     'REGEX_POSTAL_CODE'          => '/^[0-9]{5}$/',
 
     // ══════════════════════════════════════════════════════════
+    // Email & SMS Enabled Flags
+    // ══════════════════════════════════════════════════════════
+    'MAIL_ENABLED' => filter_var(getenv('MAIL_ENABLED') ?: 'false', FILTER_VALIDATE_BOOLEAN),
+    'SMS_ENABLED'  => filter_var(getenv('SMS_ENABLED')  ?: 'false', FILTER_VALIDATE_BOOLEAN),
+
+    // ══════════════════════════════════════════════════════════
     // Firebase Cloud Messaging (FCM) — Push Notifications
     // ══════════════════════════════════════════════════════════
 
@@ -332,4 +338,9 @@ return [
     // Firebase Console → Project Settings → Cloud Messaging → Server key
     // أو استخدم Service Account مع FCM v1 API (موصى به)
     'FCM_SERVER_KEY' => getenv('FCM_SERVER_KEY') ?: 'REPLACE_WITH_YOUR_SERVER_KEY',
+
+    // مسار ملف Service Account JSON (للإرسال عبر FCM v1 API — موصى به)
+    // Firebase Console → Project Settings → Service accounts → Generate new private key
+    // ضع الملف في api/shared/config/firebase-service-account.json
+    'FCM_SERVICE_ACCOUNT_PATH' => getenv('FCM_SERVICE_ACCOUNT_PATH') ?: '',
 ];

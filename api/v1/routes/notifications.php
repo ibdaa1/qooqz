@@ -161,7 +161,8 @@ try {
                 $deviceIds = array_map('intval', array_filter($data['device_ids'], 'is_numeric'));
             }
 
-            // Validate channels
+            // Validate channels — filter empty strings and invalid values
+            $channels = array_filter($channels, fn($ch) => is_string($ch) && $ch !== '');
             $validChannels = ['database', 'push', 'email', 'sms'];
             $channels = array_values(array_intersect($channels, $validChannels));
             if (empty($channels)) {
@@ -222,7 +223,10 @@ try {
         'error' => $e->getMessage(),
         'file'  => $e->getFile(),
         'line'  => $e->getLine(),
+        'trace' => array_slice(array_map(fn($f) => ($f['file'] ?? '?') . ':' . ($f['line'] ?? '?') . ' ' . ($f['class'] ?? '') . ($f['type'] ?? '') . ($f['function'] ?? ''), $e->getTrace()), 0, 5),
         'GET'   => $_GET,
     ]);
-    ResponseFormatter::error('Internal server error', 500);
+    // Surface the actual error in development; hide in production
+    $msg = (defined('IS_DEBUG') && IS_DEBUG) ? $e->getMessage() : 'Internal server error';
+    ResponseFormatter::error($msg, 500);
 }
