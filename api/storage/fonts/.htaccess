@@ -1,0 +1,3 @@
+# Block direct HTTP access to cached font files
+Order deny,allow
+Deny from all

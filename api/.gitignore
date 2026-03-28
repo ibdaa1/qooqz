@@ -1,0 +1,18 @@
+# Dependencies — use the server's existing ~/vendor (dompdf is pre-installed on the host)
+/vendor/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Logs
+/logs/*.log
+
+# Sessions
+/storage/sessions/*
+!/storage/sessions/.gitkeep
+
+# Arabic font cache (downloaded at runtime from CDN)
+/storage/fonts/*.ttf
+/storage/fonts/*.otf

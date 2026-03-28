@@ -1,12 +1,13 @@
 <?php
 /**
  * api/routes/print_certificate.php
- * Professional print view for certificates (returns HTML)
+ * Professional print view for certificates (returns HTML with PDF/QR support)
  */
 declare(strict_types=1);
 
 $baseDir = dirname(__DIR__);
 require_once $baseDir . '/bootstrap.php';
+require_once $baseDir . '/shared/helpers/CertificatePdfHelper.php';
 // Session check
 if (session_status() === PHP_SESSION_NONE) session_start();
 header('Content-Type: text/html; charset=utf-8');
@@ -33,20 +34,27 @@ if (!$pdo instanceof PDO) {
 }
 
 try {
-    // Fetch Request Data
+    // Fetch Request Data (including issued record fields)
     $sql = "
-        SELECT cr.*, 
+        SELECT cr.*,
                c_imp.name AS importer_country,
                e.store_name AS exporter_name,
                ce.certificate_version,
                ce.scope,
                ci.certificate_number,
-               ci.issued_at
+               ci.issued_at,
+               ci.verification_code,
+               ci.qr_code_path,
+               ci.pdf_path,
+               mo.name     AS official_name,
+               mo.position AS official_position
         FROM certificates_requests cr
         LEFT JOIN countries c_imp ON c_imp.id = cr.importer_country_id
         LEFT JOIN entities e ON e.id = cr.entity_id
         LEFT JOIN certificate_editions ce ON ce.id = cr.certificate_edition_id
         LEFT JOIN certificates_issued ci ON ci.id = cr.issued_id
+        LEFT JOIN certificates_versions cv ON cv.id = ci.version_id
+        LEFT JOIN municipality_officials mo ON mo.id = cv.municipality_official_id
         WHERE cr.id = :id
     ";
     $stmt = $pdo->prepare($sql);
@@ -63,14 +71,84 @@ try {
     $itemRepo = new PdoCertificatesRequestItemsRepository($pdo);
     $items = $itemRepo->getItemsWithDetails($id, $lang);
 
-    // Determine Template
+    // Determine Template version
     $version = $data['certificate_version'] ?? null;
     if (!$version && isset($data['scope'])) {
         $version = $lang . '_' . $data['scope'];
     }
     if (!$version) $version = 'ar_gcc'; // Hard fallback
 
-    $adminDir = dirname($baseDir) . '/admin';
+    // Load certificate template configuration from DB
+    require_once API_VERSION_PATH . '/models/certificates/repositories/PdoCertificatesTemplatesRepository.php';
+    $templateRepo = new PdoCertificatesTemplatesRepository($pdo);
+    $template = $templateRepo->findByCode($version);
+
+    // Default template values if not found in DB
+    if (!$template) {
+        $template = [
+            'font_family'      => 'Arial',
+            'font_size'        => '12.00',
+            'background_image' => null,
+            'table_start_x'    => '10.00',
+            'table_start_y'    => '50.00',
+            'table_row_height' => '12.00',
+            'table_max_rows'   => 12,
+            'qr_x'             => '180.00',
+            'qr_y'             => '250.00',
+            'qr_width'         => '50.00',
+            'qr_height'        => '50.00',
+            'signature_x'      => '100.00',
+            'signature_y'      => '250.00',
+            'signature_width'  => '50.00',
+            'signature_height' => '50.00',
+            'stamp_x'          => '150.00',
+            'stamp_y'          => '250.00',
+            'stamp_width'      => '50.00',
+            'stamp_height'     => '50.00',
+            'logo_x'           => '10.00',
+            'logo_y'           => '10.00',
+            'logo_width'       => '50.00',
+            'logo_height'      => '50.00',
+        ];
+    }
+
+    // Normalize background image path
+    // DB may store 'admin/templates/...' but actual files live under 'admin/assets/templates/...'
+    if (!empty($template['background_image'])) {
+        $adminDir    = dirname($baseDir) . '/admin';
+        $bgRelative  = $template['background_image'];
+        $bgFullPath  = $_SERVER['DOCUMENT_ROOT'] . '/' . $bgRelative;
+        if (!file_exists($bgFullPath)) {
+            // Try the assets sub-path
+            $bgAlt = str_replace('admin/templates/', 'admin/assets/templates/', $bgRelative);
+            $bgAltFull = $_SERVER['DOCUMENT_ROOT'] . '/' . $bgAlt;
+            if (file_exists($bgAltFull)) {
+                $template['background_image'] = $bgAlt;
+            }
+        }
+    }
+
+    // QR code path: use stored path, or build a dynamic URL via the generate_qr endpoint
+    $verificationCode = $data['verification_code'] ?? '';
+    $qrPath = '';
+    if (!empty($data['qr_code_path'])) {
+        $qrPath = $data['qr_code_path'];
+    } elseif ($verificationCode !== '') {
+        $qrPath = '/api/generate_qr?code=' . rawurlencode($verificationCode);
+    }
+
+    // Stamp and signature — loaded from private storage as data URIs
+    $signaturePath = CertificatePdfHelper::assetDataUri('signature');
+    $stampPath     = CertificatePdfHelper::assetDataUri('stamp');
+
+    // Labels for this language
+    $labels = CertificatePdfHelper::labels($lang);
+
+    // Official info
+    $officialName     = $data['official_name']     ?? '';
+    $officialPosition = $data['official_position'] ?? '';
+
+    $adminDir     = dirname($baseDir) . '/admin';
     $templatePath = $adminDir . "/assets/templates/certificates/{$version}.php";
 
     if (!file_exists($templatePath)) {
@@ -82,14 +160,16 @@ try {
     }
 
     // Render Template
-    // Variables $data and $items are available inside the template
+    // Variables available inside template:
+    //   $data, $items, $template, $qrPath, $signaturePath, $stampPath
+    //   $labels, $officialName, $officialPosition, $lang
     include $templatePath;
 
 } catch (Throwable $e) {
     http_response_code(500);
     echo "<h1>Error Generating Certificate</h1>";
     echo "<p>" . htmlspecialchars($e->getMessage()) . "</p>";
-    if (ENVIRONMENT === 'development' || true) { // Force true for debugging
+    if (ENVIRONMENT === 'development') {
         echo "<pre>" . htmlspecialchars($e->getTraceAsString()) . "</pre>";
     }
 }
