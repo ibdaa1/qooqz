@@ -340,6 +340,7 @@ class Notification
         try {
             // إذا تم تحديد أجهزة معينة، جلب tokens لتلك الأجهزة فقط
             if (!empty($deviceIds)) {
+                $deviceIds = array_slice($deviceIds, 0, 100); // حد أقصى 100 جهاز
                 $placeholders = implode(',', array_fill(0, count($deviceIds), '?'));
                 $stmt = self::$pdo->prepare("
                     SELECT fcm_token FROM user_devices
