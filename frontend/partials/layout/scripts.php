@@ -1,4 +1,12 @@
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js"></script>
-
-<script src="/frontend/assets/js/firebase.js"></script>
+<?php
+/**
+ * frontend/partials/layout/scripts.php
+ * Firebase SDK + device registration
+ * يُحمَّل من footer.php تلقائياً عند تسجيل الدخول
+ *
+ * NOTE: This file is kept for backward compatibility but
+ *       Firebase is now loaded conditionally from footer.php.
+ */
+// Firebase SDK and firebase.js are now loaded conditionally in footer.php
+// based on FCM_ENABLED and user login status.
+?>

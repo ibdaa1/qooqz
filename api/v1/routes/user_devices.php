@@ -33,6 +33,11 @@ $userId = isset($_GET['user_id']) && is_numeric($_GET['user_id'])
     ? (int)$_GET['user_id']
     : (isset($user['id']) ? (int)$user['id'] : null);
 
+// Fallback: check $_SESSION['user_id'] (used by public frontend)
+if ($userId === null && isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
+    $userId = (int)$_SESSION['user_id'];
+}
+
 // Allow public registration (e.g., for push tokens) – you may require auth via token or session
 // Here we assume either the user is logged in OR we have a user_id provided as query param (for backend calls)
 

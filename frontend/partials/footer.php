@@ -101,5 +101,69 @@ $_authPath   = '/frontend';
 <!-- Public JS — ?v= cache-busting -->
 <?php $_pubJsV = @filemtime(FRONTEND_BASE . '/assets/js/public.js') ?: '1'; ?>
 <script src="/frontend/assets/js/public.js?v=<?= $_pubJsV ?>"></script>
+
+<?php
+// ════════════════════════════════════════════════════════════
+// Firebase Push Notifications — Device Registration
+// يُحمَّل فقط إذا: FCM مفعّل + المستخدم مسجّل دخول
+// ════════════════════════════════════════════════════════════
+$_fcmEnabled = defined('FCM_ENABLED') ? FCM_ENABLED : false;
+if (!$_fcmEnabled) {
+    // Try loading constants if not yet defined
+    $_constFile = dirname(__DIR__, 2) . '/api/shared/config/constants.php';
+    if (file_exists($_constFile)) {
+        $_consts = @include $_constFile;
+        if (is_array($_consts)) {
+            $_fcmEnabled = !empty($_consts['FCM_ENABLED']);
+            if ($_fcmEnabled) {
+                foreach ($_consts as $_ck => $_cv) {
+                    if (str_starts_with($_ck, 'FCM_') && !defined($_ck)) {
+                        define($_ck, $_cv);
+                    }
+                }
+            }
+        }
+    }
+}
+
+$_fcmUserId = 0;
+if (isset($_user) && !empty($_user['id'])) {
+    $_fcmUserId = (int)$_user['id'];
+} elseif (!empty($_SESSION['user_id'])) {
+    $_fcmUserId = (int)$_SESSION['user_id'];
+} elseif (!empty($_SESSION['user']['id'])) {
+    $_fcmUserId = (int)$_SESSION['user']['id'];
+}
+
+if ($_fcmEnabled && $_fcmUserId > 0):
+    $_fcmCfg = [
+        'apiKey'            => defined('FCM_API_KEY')             ? FCM_API_KEY             : '',
+        'authDomain'        => defined('FCM_AUTH_DOMAIN')         ? FCM_AUTH_DOMAIN         : '',
+        'projectId'         => defined('FCM_PROJECT_ID')          ? FCM_PROJECT_ID          : '',
+        'messagingSenderId' => defined('FCM_MESSAGING_SENDER_ID') ? FCM_MESSAGING_SENDER_ID : '',
+        'appId'             => defined('FCM_APP_ID')              ? FCM_APP_ID              : '',
+        'vapidKey'          => defined('FCM_VAPID_KEY')           ? FCM_VAPID_KEY           : '',
+    ];
+    if (!empty($_fcmCfg['projectId'])):
+?>
+<script>
+window.APP_CONFIG = window.APP_CONFIG || {};
+Object.assign(window.APP_CONFIG, {
+    FCM_API_KEY:             <?= json_encode($_fcmCfg['apiKey']) ?>,
+    FCM_AUTH_DOMAIN:         <?= json_encode($_fcmCfg['authDomain']) ?>,
+    FCM_PROJECT_ID:          <?= json_encode($_fcmCfg['projectId']) ?>,
+    FCM_MESSAGING_SENDER_ID: <?= json_encode($_fcmCfg['messagingSenderId']) ?>,
+    FCM_APP_ID:              <?= json_encode($_fcmCfg['appId']) ?>,
+    FCM_VAPID_KEY:           <?= json_encode($_fcmCfg['vapidKey']) ?>,
+    API_BASE:                '/api',
+    USER_ID:                 <?= $_fcmUserId ?>
+});
+</script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js" defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js" defer></script>
+<?php $_fcmJsV = @filemtime(FRONTEND_BASE . '/assets/js/firebase.js') ?: '1'; ?>
+<script src="/frontend/assets/js/firebase.js?v=<?= $_fcmJsV ?>" defer></script>
+<?php endif; // projectId check ?>
+<?php endif; // fcmEnabled + userId check ?>
 </body>
 </html>
