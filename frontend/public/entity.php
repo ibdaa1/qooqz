@@ -1,11 +1,26 @@
 <?php
 /**
  * frontend/public/entity.php
- * QOOQZ — Public Entity/Vendor Profile Page
+ * QOOQZ — Dynamic Store Page Builder (Entity/Vendor Profile)
  *
- * Shows: banner (entity_cover), logo (entity_logo), store name, description,
- *        social links, working hours, addresses (with coordinates), products,
- *        payment methods, attributes, type badge
+ * Renders a fully dynamic, section-based store page similar to Shopify / Google Maps.
+ * Sections are loaded from store_pages + store_sections tables (with fallback defaults).
+ *
+ * Section types: header, contact, tabs, products, info, hours, location, offers, reviews
+ * Each section is rendered via a partial template in /partials/store_sections/{type}.php
+ *
+ * Features:
+ *   - Cover image + logo + store name + rating + verified badge + open/closed status
+ *   - Contact info, social links, share button
+ *   - Tabbed navigation (products, info, hours, location, offers, reviews)
+ *   - Product grid with categories, search, pagination, add-to-cart
+ *   - Working hours with live open/closed logic
+ *   - Location with OpenStreetMap + Google Maps links
+ *   - Discounts/promotions with copy codes
+ *   - Ratings/reviews with submission form
+ *   - Multi-language support (LTR + RTL)
+ *   - Multi-tenant isolation
+ *   - Mobile-first responsive design
  */
 
 require_once dirname(__DIR__) . '/includes/public_context.php';
@@ -383,9 +398,52 @@ $_entityProductCardClass = pub_card_css_class('product');
 $_entityProductImgStyle  = pub_card_img_style('product');
 $_entityDiscountCardStyle = pub_card_inline_style('discount');
 $_entityDiscountCardClass = pub_card_css_class('discount');
+
+/* -------------------------------------------------------
+ * Dynamic Section System — Load from store_pages / store_sections
+ * Falls back to default section order when no DB config exists
+ * ----------------------------------------------------- */
+$storeSections = [];
+if ($pdo) {
+    try {
+        $spStmt = $pdo->prepare(
+            "SELECT ss.id, ss.type, ss.position, ss.settings
+               FROM store_sections ss
+               JOIN store_pages sp ON sp.id = ss.page_id
+              WHERE sp.entity_id = ? AND sp.is_active = 1 AND ss.is_active = 1
+              ORDER BY ss.position ASC"
+        );
+        $spStmt->execute([$entity['id'] ?? $entityId]);
+        $storeSections = $spStmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $_) {
+        // Table may not exist yet — fall back to defaults
+        $storeSections = [];
+    }
+}
+
+// Default section order when no DB config exists
+if (empty($storeSections)) {
+    $storeSections = [
+        ['type' => 'header',   'position' => 10, 'settings' => null],
+        ['type' => 'contact',  'position' => 20, 'settings' => null],
+        ['type' => 'tabs',     'position' => 30, 'settings' => null],
+        ['type' => 'products', 'position' => 40, 'settings' => null],
+        ['type' => 'info',     'position' => 50, 'settings' => null],
+        ['type' => 'hours',    'position' => 60, 'settings' => null],
+        ['type' => 'location', 'position' => 70, 'settings' => null],
+        ['type' => 'offers',   'position' => 80, 'settings' => null],
+        ['type' => 'reviews',  'position' => 90, 'settings' => null],
+    ];
+}
+
+// Build list of active section types for tabs section
+$activeSections = array_column($storeSections, 'type');
+
+// Section template directory
+$sectionDir = dirname(__DIR__) . '/partials/store_sections';
 ?>
 
-<!-- Entity Banner -->
+<!-- Entity Page -->
 <?php if ($entityInMaintenance): ?>
 <div class="pub-container" style="padding:40px 0;text-align:center;">
     <div style="background:var(--pub-surface);border:1px solid var(--pub-border);border-radius:var(--pub-radius);padding:40px 20px;">
@@ -395,600 +453,37 @@ $_entityDiscountCardClass = pub_card_css_class('discount');
     </div>
 </div>
 <?php else: ?>
-<div class="pub-entity-banner">
-    <?php if (!empty($entity['cover_url'])): ?>
-        <img src="<?= e(pub_img($entity['cover_url'], 'entity_cover')) ?>"
-             alt="<?= e($entity['store_name']) ?>"
-             class="pub-entity-banner-img"
-             loading="eager"
-             onerror="this.style.display='none'">
-    <?php else: ?>
-        <div class="pub-entity-banner-placeholder"></div>
-    <?php endif; ?>
-</div>
 
-<!-- Entity Header Card -->
-<div class="pub-container">
-    <div class="pub-entity-profile-header">
+<?php
+/* -------------------------------------------------------
+ * Dynamic Section Renderer
+ * Loops through active sections and includes partial templates
+ * ----------------------------------------------------- */
+$insideContainer = false;  // Track whether we're inside a .pub-container
+foreach ($storeSections as $section):
+    $sectionType     = $section['type'];
+    $sectionSettings = is_string($section['settings'] ?? null) ? (json_decode($section['settings'], true) ?: []) : ($section['settings'] ?? []);
+    $sectionFile     = $sectionDir . '/' . basename($sectionType) . '.php';
 
-        <!-- Logo -->
-        <div class="pub-entity-profile-logo">
-            <?php if (!empty($entity['logo_url'])): ?>
-                <img src="<?= e(pub_img($entity['logo_url'], 'entity_logo')) ?>"
-                     alt="<?= e($entity['store_name']) ?>"
-                     loading="eager"
-                     onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-                <span style="display:none;align-items:center;justify-content:center;font-size:2rem;">🏢</span>
-            <?php else: ?>
-                <span style="display:flex;align-items:center;justify-content:center;font-size:2.5rem;">🏢</span>
-            <?php endif; ?>
-        </div>
+    // Use partial template if available, otherwise skip unknown types
+    if (file_exists($sectionFile)):
+        // header and contact sections manage their own containers
+        // tabs through reviews are inside a shared container
+        if (in_array($sectionType, ['products', 'info', 'hours', 'location', 'offers', 'reviews']) && !$insideContainer):
+            echo '<div class="pub-container">';
+            $insideContainer = true;
+        endif;
 
-        <!-- Info -->
-        <div class="pub-entity-profile-info">
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <h1 class="pub-entity-profile-name"><?= e($entity['store_name'] ?? '') ?></h1>
-                    <?php if ($entityRatingAvg !== null): ?>
-                        <span class="pub-entity-rating-avg" title="<?= (int)$entityRatingTotal ?> reviews">
-                            ⭐ <?= number_format((float)$entityRatingAvg, 1) ?>
-                            <span style="font-size:0.78rem;opacity:0.7;">(<?= $entityRatingTotal ?>)</span>
-                        </span>
-                    <?php endif; ?>
-                    <?php if (!empty($entity['is_verified'])): ?>
-                    <span class="pub-entity-verified">✅ <?= e(t('entities.verified')) ?></span>
-                <?php endif; ?>
-                <?php if ($entityIsOpen !== null): ?>
-                    <span class="pub-open-badge <?= $entityIsOpen ? 'pub-open-badge--open' : 'pub-open-badge--closed' ?>">
-                        <?= $entityIsOpen ? '🟢' : '🔴' ?> <?= e($entityOpenLabel) ?>
-                    </span>
-                <?php endif; ?>
-                <?php if (!empty($entity['type_name'] ?? $entity['vendor_type'])): ?>
-                    <span class="pub-tag" style="font-size:0.8rem;">
-                        <?= e($entity['type_icon'] ?? '') ?> <?= e($entity['type_name'] ?? $entity['vendor_type']) ?>
-                    </span>
-                <?php endif; ?>
-            </div>
+        include $sectionFile;
+    endif;
+endforeach;
 
-            <?php if (!empty($entity['description'])): ?>
-                <p class="pub-entity-profile-desc"><?= e($entity['description']) ?></p>
-            <?php endif; ?>
+if ($insideContainer):
+    echo '</div><!-- /.pub-container sections -->';
+endif;
+?>
 
-            <!-- Contact info -->
-            <?php if ($entityShowContactInfo): ?>
-            <div class="pub-entity-contacts">
-                <?php if (!empty($entity['phone'])): ?>
-                    <a href="tel:<?= e($entity['phone']) ?>" class="pub-contact-item">
-                        📞 <?= e($entity['phone']) ?>
-                    </a>
-                <?php endif; ?>
-                <?php if (!empty($entity['email'])): ?>
-                    <a href="mailto:<?= e($entity['email']) ?>" class="pub-contact-item">
-                        📧 <?= e($entity['email']) ?>
-                    </a>
-                <?php endif; ?>
-                <?php if (!empty($entity['website'])): ?>
-                    <a href="<?= e($entity['website']) ?>" target="_blank" rel="noopener" class="pub-contact-item">
-                        🌐 <?= e(parse_url($entity['website'], PHP_URL_HOST) ?: $entity['website']) ?>
-                    </a>
-                <?php endif; ?>
-            </div>
-            <?php endif; ?>
-
-            <!-- Social links -->
-            <div class="pub-entity-social">
-                <?php
-                $waNum = ltrim($entity['whatsapp'] ?? '', '+');
-                $socials = [
-                    'whatsapp'  => [$waNum ? 'https://wa.me/' . $waNum : '', '💬 WhatsApp'],
-                    'facebook'  => [$entity['facebook']  ?? '', '📘 Facebook'],
-                    'instagram' => [$entity['instagram'] ?? '', '📷 Instagram'],
-                    'twitter'   => [$entity['twitter']   ?? '', '🐦 Twitter'],
-                    'snapchat'  => [$entity['snapchat']  ?? '', '👻 Snapchat'],
-                ];
-                foreach ($socials as $net => [$url, $label]):
-                    if (empty($entity[$net])) continue;
-                ?>
-                    <a href="<?= e($url) ?>"
-                       target="_blank" rel="noopener" class="pub-social-btn pub-social-btn--<?= e($net) ?>">
-                        <?= $label ?>
-                    </a>
-                <?php endforeach; ?>
-            </div>
-
-            <!-- Share button -->
-            <div style="margin-top:12px;">
-                <button class="pub-btn pub-btn--ghost pub-btn--sm" id="pubShareBtn"
-                        onclick="pubShareEntity()" style="display:inline-flex;align-items:center;gap:6px;">
-                    📤 <?= e(t('entity.share')) ?>
-                </button>
-                <div id="pubSharePanel" style="display:none;margin-top:10px;padding:12px;
-                     background:var(--pub-surface);border:1px solid var(--pub-border);
-                     border-radius:var(--pub-radius);max-width:320px;">
-                    <p style="margin:0 0 10px;font-size:0.85rem;font-weight:600;"><?= e(t('entity.share')) ?></p>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                        <a href="https://api.whatsapp.com/send?text=<?= urlencode($entity['store_name'] ?? '') ?>%20" id="pubShareWA"
-                           target="_blank" rel="noopener" class="pub-social-btn">💬 WhatsApp</a>
-                        <a href="https://twitter.com/intent/tweet?text=<?= urlencode($entity['store_name'] ?? '') ?>&url=" id="pubShareTW"
-                           target="_blank" rel="noopener" class="pub-social-btn">🐦 Twitter/X</a>
-                        <button class="pub-social-btn" onclick="pubCopyLink()">🔗 <?= e(t('entity.copy_link')) ?></button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Main tabs -->
-    <div class="pub-tabs" style="margin-top:24px;" role="tablist">
-        <button class="pub-tab active" data-tab="products" role="tab"
-                aria-selected="true" aria-controls="tabProducts">
-            🛍️ <?= e(t('entity.products_tab')) ?>
-        </button>
-        <button class="pub-tab" data-tab="info" role="tab"
-                aria-selected="false" aria-controls="tabInfo">
-            ℹ️ <?= e(t('entity.info_tab')) ?>
-        </button>
-        <button class="pub-tab" data-tab="hours" role="tab"
-                aria-selected="false" aria-controls="tabHours">
-            🕐 <?= e(t('entity.hours_tab')) ?>
-        </button>
-        <button class="pub-tab" data-tab="map" role="tab"
-                aria-selected="false" aria-controls="tabMap">
-            🗺️ <?= e(t('entity.location_tab')) ?>
-        </button>
-        <?php if (!empty($discounts)): ?>
-        <button class="pub-tab" data-tab="discounts" role="tab"
-                aria-selected="false" aria-controls="tabDiscounts">
-            🏷️ <?= e(t('entity.discounts_tab')) ?>
-            <span class="pub-tab-count"><?= count($discounts) ?></span>
-        </button>
-        <?php endif; ?>
-        <?php if ($entityShowReviews): ?>
-        <button class="pub-tab" data-tab="ratings" role="tab"
-                aria-selected="false" aria-controls="tabRatings">
-            ⭐ <?= e(t('entity.ratings_tab')) ?>
-            <?php if ($entityRatingTotal > 0): ?><span class="pub-tab-count"><?= $entityRatingTotal ?></span><?php endif; ?>
-        </button>
-        <?php endif; ?>
-    </div>
-
-    <!-- TAB: Products -->
-    <div class="pub-tab-panel active" id="tabProducts">
-        <!-- Hierarchical category menus + search -->
-        <?php if (!empty($categoryTree)):
-            // Pre-compute which parent category (if any) contains the selected category
-            $activePrimaryId = 0;
-            foreach ($categoryTree as $mainCat) {
-                $mId = (int)($mainCat['id'] ?? 0);
-                if ($selectedCat === $mId) { $activePrimaryId = $mId; break; }
-                foreach (($mainCat['children'] ?? []) as $ch) {
-                    if ($selectedCat === (int)($ch['id'] ?? 0)) { $activePrimaryId = $mId; break 2; }
-                }
-            }
-        ?>
-        <!-- Main category tabs (parent categories) -->
-        <div class="pub-cat-tabs pub-cat-tabs--main" style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;overflow-x:auto;padding-bottom:4px;" role="tablist">
-            <a href="?id=<?= $entityId ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
-               class="pub-cat-tab-btn <?= !$selectedCat ? 'active' : '' ?>" role="tab"
-               aria-selected="<?= !$selectedCat ? 'true' : 'false' ?>">
-                <?= e(t('entity.all_categories')) ?>
-            </a>
-            <?php foreach ($categoryTree as $mainCat):
-                $mainId      = (int)($mainCat['id'] ?? 0);
-                $parentActive = ($activePrimaryId === $mainId);
-            ?>
-            <a href="?id=<?= $entityId ?>&cat=<?= $mainId ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
-               class="pub-cat-tab-btn <?= $parentActive ? 'active' : '' ?>" role="tab"
-               aria-selected="<?= $parentActive ? 'true' : 'false' ?>">
-                <?= e($mainCat['name'] ?? '') ?>
-            </a>
-            <?php endforeach; ?>
-        </div>
-        <?php if ($activePrimaryId):
-            // Find the active parent and render its sub-category tabs
-            foreach ($categoryTree as $mainCat):
-                if ((int)($mainCat['id'] ?? 0) !== $activePrimaryId) continue;
-                $children = $mainCat['children'] ?? [];
-                if (empty($children)) break;
-        ?>
-        <!-- Sub-category tabs -->
-        <div class="pub-cat-tabs pub-cat-tabs--sub" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;overflow-x:auto;padding-bottom:4px;padding-inline-start:16px;" role="tablist">
-            <a href="?id=<?= $entityId ?>&cat=<?= $activePrimaryId ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
-               class="pub-cat-tab-btn pub-cat-tab-btn--sub <?= ($selectedCat === $activePrimaryId) ? 'active' : '' ?>">
-                <?= e(t('entity.all_in_category', 'All items')) ?>
-            </a>
-            <?php foreach ($children as $subCat):
-                $subId = (int)($subCat['id'] ?? 0);
-            ?>
-            <a href="?id=<?= $entityId ?>&cat=<?= $subId ?><?= $productSearch ? '&q=' . urlencode($productSearch) : '' ?>"
-               class="pub-cat-tab-btn pub-cat-tab-btn--sub <?= $selectedCat === $subId ? 'active' : '' ?>">
-                <?= e($subCat['name'] ?? '') ?>
-            </a>
-            <?php endforeach; ?>
-        </div>
-        <?php endforeach; endif; ?>
-        <?php endif; ?>
-
-                <?php if (!empty($products)): ?>
-        <div class="pub-grid" style="margin-top:20px;">
-            <?php foreach ($products as $p): ?>
-            <?php
-                // Build all images list for slideshow
-                $pAllImgs = [];
-                if (!empty($p['image_urls'])) {
-                    foreach (explode('|', $p['image_urls']) as $rawU) {
-                        $s = pub_img(trim($rawU), 'product_thumb');
-                        if ($s) $pAllImgs[] = $s;
-                    }
-                } elseif (!empty($p['image_url'])) {
-                    $pAllImgs[] = pub_img($p['image_url'], 'product_thumb');
-                }
-                $pHasMulti = count($pAllImgs) > 1;
-            ?>
-            <div class="pub-product-card<?= $_entityProductCardClass ? ' ' . $_entityProductCardClass : '' ?>"<?= $_entityProductCardStyle ? ' style="' . e($_entityProductCardStyle) . '"' : '' ?><?= $pHasMulti ? ' data-img-slide="1"' : '' ?>>
-                <a href="/frontend/public/product.php?id=<?= (int)($p['id'] ?? 0) ?>"
-                   style="text-decoration:none;display:block;">
-                <div class="pub-cat-img-wrap" style="<?= e($_entityProductImgStyle) ?>">
-                    <?php if (!empty($pAllImgs)): ?>
-                        <?php foreach ($pAllImgs as $piIdx => $piSrc): ?>
-                        <img src="<?= e($piSrc) ?>"
-                             alt="<?= e($p['name'] ?? '') ?>" class="pub-cat-img pub-slide-img<?= $piIdx > 0 ? ' pub-slide-img--hidden' : '' ?>" loading="lazy"
-                             onerror="this.style.display='none'">
-                        <?php endforeach; ?>
-                        <span class="pub-img-placeholder" style="display:none;">🖼️</span>
-                        <?php if ($pHasMulti): ?>
-                        <div class="pub-slide-dots" aria-hidden="true">
-                            <?php for ($pdi = 0; $pdi < count($pAllImgs); $pdi++): ?>
-                            <span class="pub-slide-dot<?= $pdi === 0 ? ' pub-slide-dot--active' : '' ?>"></span>
-                            <?php endfor; ?>
-                        </div>
-                        <?php endif; ?>
-                    <?php else: ?>
-                        <span class="pub-img-placeholder">🖼️</span>
-                    <?php endif; ?>
-                </div>
-                <div class="pub-product-card-body">
-                    <?php if (!empty($p['is_featured'])): ?>
-                        <span class="pub-product-badge"><?= e(t('products.featured')) ?></span>
-                    <?php endif; ?>
-                    <p class="pub-product-name"><?= e($p['name'] ?? '') ?></p>
-                    <?php if (!empty($p['price'])): ?>
-                        <p class="pub-product-price"><?= number_format((float)$p['price'], 2) ?> <?= e($p['currency_code'] ?? t('common.currency')) ?></p>
-                    <?php endif; ?>
-                </div>
-                </a>
-                <button class="pub-cart-add-btn"
-                        onclick="pubAddToCart(this)"
-                        data-product-id="<?= (int)($p['id'] ?? 0) ?>"
-                        data-product-name="<?= e($p['name'] ?? '') ?>"
-                        data-product-price="<?= (float)($p['price'] ?? 0) ?>"
-                        data-product-image="<?= e($pAllImgs[0] ?? ($p['image_url'] ?? '')) ?>"
-                        data-product-sku="<?= e($p['sku'] ?? '') ?>">
-                    🛒 <?= e(t('cart.add')) ?>
-                </button>
-            </div>
-            <?php endforeach; ?>
-        </div>
-        <!-- Product pagination -->
-        <?php
-        $totalPg = (int)($productMeta['total_pages'] ?? 1);
-        if ($totalPg > 1):
-            $pg_url = fn(int $pg) => '?id=' . $entityId . ($selectedCat ? '&cat=' . $selectedCat : '') . '&page=' . $pg . '#tabProducts';
-        ?>
-        <nav class="pub-pagination" style="margin-top:24px;">
-            <a href="<?= $pg_url(max(1,$productPage-1)) ?>" class="pub-page-btn <?= $productPage<=1?'disabled':'' ?>">
-                <?= e(t('pagination.prev')) ?>
-            </a>
-            <?php for ($i=max(1,$productPage-2); $i<=min($totalPg,$productPage+2); $i++): ?>
-                <a href="<?= $pg_url($i) ?>" class="pub-page-btn <?= $i===$productPage?'active':'' ?>"><?= $i ?></a>
-            <?php endfor; ?>
-            <a href="<?= $pg_url(min($totalPg,$productPage+1)) ?>" class="pub-page-btn <?= $productPage>=$totalPg?'disabled':'' ?>">
-                <?= e(t('pagination.next')) ?>
-            </a>
-        </nav>
-        <?php endif; ?>
-        <?php else: ?>
-        <div class="pub-empty" style="margin-top:40px;">
-            <div class="pub-empty-icon">🛍️</div>
-            <p class="pub-empty-msg"><?= e(t('entity.no_products')) ?></p>
-        </div>
-        <?php endif; ?>
-    </div>
-
-    <!-- TAB: Info -->
-    <div class="pub-tab-panel" id="tabInfo" style="display:none;">
-        <div style="margin-top:20px;display:grid;gap:16px;">
-
-            <!-- Attributes -->
-            <?php if (!empty($entity['attributes'])): ?>
-            <div class="pub-info-card">
-                <h3 class="pub-info-card-title"><?= e(t('entity.details')) ?></h3>
-                <div class="pub-attr-grid">
-                    <?php foreach ($entity['attributes'] as $attr): ?>
-                        <?php if (empty($attr['value'])) continue; ?>
-                        <div class="pub-attr-row">
-                            <span class="pub-attr-key"><?= e($attr['attribute_name'] ?? '') ?></span>
-                            <span class="pub-attr-val"><?= e($attr['value'] ?? '') ?></span>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <!-- Payment Methods -->
-            <?php if (!empty($entity['payment_methods'])): ?>
-            <div class="pub-info-card">
-                <h3 class="pub-info-card-title"><?= e(t('entity.payment_methods')) ?></h3>
-                <div style="display:flex;gap:10px;flex-wrap:wrap;padding:12px 16px;">
-                    <?php foreach ($entity['payment_methods'] as $pm): ?>
-                        <span class="pub-tag" style="font-size:0.85rem;padding:6px 14px;">
-                            <?= e($pm['icon'] ?? '💳') ?> <?= e($pm['name'] ?? '') ?>
-                        </span>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <!-- Entity Settings / Business Info -->
-            <?php
-            $_esRows = [];
-            if (!empty($entitySettings)) {
-                if ((float)($entitySettings['min_order_amount'] ?? 0) > 0)
-                    $_esRows[] = ['🛒', t('entity.settings_min_order'), number_format((float)$entitySettings['min_order_amount'], 2) . ' ' . e(t('common.currency'))];
-                if ((int)($entitySettings['preparation_time_minutes'] ?? 0) > 0)
-                    $_esRows[] = ['⏱️', t('entity.settings_prep_time'), (int)$entitySettings['preparation_time_minutes'] . ' ' . e(t('entity.settings_minutes'))];
-                if ((float)($entitySettings['delivery_radius_km'] ?? 0) > 0)
-                    $_esRows[] = ['🚚', t('entity.settings_delivery_radius'), (float)$entitySettings['delivery_radius_km'] . ' ' . e(t('entity.settings_km'))];
-                if ((float)($entitySettings['free_delivery_min_order'] ?? 0) > 0)
-                    $_esRows[] = ['🆓', t('entity.settings_free_delivery'), number_format((float)$entitySettings['free_delivery_min_order'], 2) . ' ' . e(t('common.currency'))];
-                if (!empty($entitySettings['allow_online_booking']))
-                    $_esRows[] = ['📅', t('entity.settings_online_booking'), e(t('common.yes'))];
-                if (!empty($entitySettings['booking_window_days']) && (int)$entitySettings['booking_window_days'] > 0)
-                    $_esRows[] = ['📆', t('entity.settings_booking_window'), (int)$entitySettings['booking_window_days'] . ' ' . e(t('entity.settings_days'))];
-                if (!empty($entitySettings['max_bookings_per_slot']) && (int)$entitySettings['max_bookings_per_slot'] > 0)
-                    $_esRows[] = ['👥', t('entity.settings_max_per_slot'), (int)$entitySettings['max_bookings_per_slot']];
-                if (isset($entitySettings['booking_cancellation_allowed']))
-                    $_esRows[] = ['↩️', t('entity.settings_cancellation'), !empty($entitySettings['booking_cancellation_allowed']) ? e(t('common.yes')) : e(t('common.no'))];
-                if (!empty($entitySettings['allow_preorders']))
-                    $_esRows[] = ['📋', t('entity.settings_preorders'), e(t('common.yes'))];
-                if (!empty($entitySettings['allow_cod']))
-                    $_esRows[] = ['💵', t('entity.settings_cod'), e(t('common.yes'))];
-                if (!empty($entitySettings['auto_accept_orders']))
-                    $_esRows[] = ['✅', t('entity.settings_auto_accept'), e(t('common.yes'))];
-                if (!empty($entitySettings['max_daily_orders']) && (int)$entitySettings['max_daily_orders'] > 0)
-                    $_esRows[] = ['📦', t('entity.settings_max_daily'), (int)$entitySettings['max_daily_orders']];
-                if (!empty($entitySettings['default_payment_method']))
-                    $_esRows[] = ['💳', t('entity.settings_default_payment'), e($entitySettings['default_payment_method'])];
-                if (!empty($entitySettings['featured_in_app']))
-                    $_esRows[] = ['⭐', t('entity.settings_featured'), e(t('common.yes'))];
-            }
-            if (!empty($_esRows)):
-            ?>
-            <div class="pub-info-card">
-                <h3 class="pub-info-card-title">⚙️ <?= e(t('entity.settings_title')) ?></h3>
-                <div class="pub-attr-grid">
-                    <?php foreach ($_esRows as [$icon, $label, $value]): ?>
-                    <div class="pub-attr-row">
-                        <span class="pub-attr-key"><?= $icon ?> <?= $label ?></span>
-                        <span class="pub-attr-val"><?= $value ?></span>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <!-- TAB: Working Hours -->
-    <div class="pub-tab-panel" id="tabHours" style="display:none;">
-        <?php if (!empty($entity['working_hours'])): ?>
-        <div class="pub-info-card" style="margin-top:20px;">
-            <h3 class="pub-info-card-title">🕐 <?= e(t('entity.hours_tab')) ?></h3>
-            <div class="pub-hours-table">
-                <?php foreach ($entity['working_hours'] as $h): ?>
-                <div class="pub-hours-row <?= empty($h['is_open']) ? 'pub-hours-row--closed' : '' ?>">
-                    <span class="pub-hours-day"><?= e($dayNames[(int)($h['day_of_week'] ?? 0)] ?? $h['day_of_week']) ?></span>
-                    <span class="pub-hours-time">
-                        <?php if (empty($h['is_open'])): ?>
-                            <span style="color:var(--pub-muted);"><?= e(t('entity.closed')) ?></span>
-                        <?php else: ?>
-                            <?= e($h['open_time'] ?? '') ?> — <?= e($h['close_time'] ?? '') ?>
-                        <?php endif; ?>
-                    </span>
-                </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
-        <?php endif; ?>
-    </div>
-
-    <!-- TAB: Map / Location -->
-    <div class="pub-tab-panel" id="tabMap" style="display:none;">
-        <?php if (!empty($entity['addresses'])): ?>
-        <div style="margin-top:20px;display:grid;gap:16px;">
-            <?php foreach ($entity['addresses'] as $addr): ?>
-            <div class="pub-info-card">
-                <h3 class="pub-info-card-title">
-                    📍 <?= e($addr['label'] ?? '') ?>
-                    <?php if (!empty($addr['is_primary'])): ?>
-                        <span style="font-size:0.75rem;background:var(--pub-primary);color:#fff;padding:2px 8px;border-radius:20px;margin-inline-start:6px;">★</span>
-                    <?php endif; ?>
-                </h3>
-                <p style="padding:8px 16px;color:var(--pub-text);margin:0;">
-                    <?= e($addr['address_line1'] ?? '') ?>
-                    <?php if (!empty($addr['address_line2'])): ?>, <?= e($addr['address_line2']) ?><?php endif; ?>
-                </p>
-                <?php if (!empty($addr['latitude']) && !empty($addr['longitude'])): ?>
-                <div style="padding:0 16px 16px;">
-                    <a href="https://www.openstreetmap.org/?mlat=<?= e($addr['latitude']) ?>&mlon=<?= e($addr['longitude']) ?>#map=16/<?= e($addr['latitude']) ?>/<?= e($addr['longitude']) ?>"
-                       target="_blank" rel="noopener" class="pub-btn pub-btn--ghost pub-btn--sm" style="display:inline-flex;gap:6px;align-items:center;">
-                        🗺️ <?= e(t('entity.view_on_map')) ?>
-                    </a>
-                    <a href="https://maps.google.com/?q=<?= e($addr['latitude']) ?>,<?= e($addr['longitude']) ?>"
-                       target="_blank" rel="noopener" class="pub-btn pub-btn--ghost pub-btn--sm" style="display:inline-flex;gap:6px;align-items:center;margin-inline-start:8px;">
-                        📍 Google Maps
-                    </a>
-                </div>
-                <?php endif; ?>
-            </div>
-            <?php endforeach; ?>
-        </div>
-        <?php else: ?>
-        <div class="pub-empty" style="margin-top:40px;">
-            <div class="pub-empty-icon">📍</div>
-            <p class="pub-empty-msg"><?= e(t('entity.no_addresses')) ?></p>
-        </div>
-        <?php endif; ?>
-    </div>
-
-</div><!-- /.pub-container -->
-
-<?php if (!empty($discounts)): ?>
-<!-- TAB: Discounts (rendered outside container so it spans full context) -->
-<?php endif; ?>
-
-<!-- Discounts tab panel (inside container) -->
-<div class="pub-container">
-
-    <!-- TAB: Discounts panel -->
-    <div class="pub-tab-panel" id="tabDiscounts" style="display:none;">
-        <?php if (!empty($discounts)): ?>
-        <div style="margin-top:20px;display:grid;gap:14px;">
-            <?php foreach ($discounts as $d): ?>
-            <div class="pub-discount-card<?= $_entityDiscountCardClass ? ' ' . $_entityDiscountCardClass : '' ?>"<?= $_entityDiscountCardStyle ? ' style="' . e($_entityDiscountCardStyle) . '"' : '' ?>>
-                <?php if (!empty($d['marketing_badge'])): ?>
-                    <span class="pub-discount-badge-top"><?= e($d['marketing_badge']) ?></span>
-                <?php endif; ?>
-                <div class="pub-discount-inner">
-                    <div class="pub-discount-icon">🏷️</div>
-                    <div class="pub-discount-body">
-                        <p class="pub-discount-title"><?= e($d['title'] ?? $d['code'] ?? '') ?></p>
-                        <?php if (!empty($d['description'])): ?>
-                            <p class="pub-discount-desc"><?= e($d['description']) ?></p>
-                        <?php endif; ?>
-                        <?php if (!empty($d['code'])): ?>
-                            <div class="pub-discount-code-row">
-                                <span class="pub-discount-code"><?= e($d['code']) ?></span>
-                                <button class="pub-btn pub-btn--ghost pub-btn--sm"
-                                        onclick="pubCopyDiscount('<?= e(addslashes($d['code'])) ?>', this)">
-                                    📋 <?= e(t('discounts.copy_code')) ?>
-                                </button>
-                            </div>
-                        <?php endif; ?>
-                        <?php if (!empty($d['ends_at'])): ?>
-                            <p class="pub-discount-expires">
-                                ⏰ <?= e(t('discounts.expires')) ?>: <?= e(substr($d['ends_at'], 0, 10)) ?>
-                            </p>
-                        <?php endif; ?>
-                    </div>
-                </div>
-                <?php if (!empty($d['terms_conditions'])): ?>
-                    <details class="pub-discount-terms">
-                        <summary><?= e(t('discounts.terms')) ?></summary>
-                        <p><?= e($d['terms_conditions']) ?></p>
-                    </details>
-                <?php endif; ?>
-            </div>
-            <?php endforeach; ?>
-        </div>
-        <?php else: ?>
-        <div class="pub-empty" style="margin-top:40px;">
-            <div class="pub-empty-icon">🏷️</div>
-            <p class="pub-empty-msg"><?= e(t('discounts.none')) ?></p>
-        </div>
-        <?php endif; ?>
-    </div>
-
-    <!-- TAB: Ratings -->
-    <?php if ($entityShowReviews): ?>
-    <div class="pub-tab-panel" id="tabRatings" style="display:none;">
-        <div style="margin-top:20px;">
-            <?php if ($entityRatingAvg !== null): ?>
-            <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
-                <div style="font-size:2.8rem;font-weight:900;color:var(--pub-accent,#F59E0B);">
-                    <?= number_format((float)$entityRatingAvg, 1) ?>
-                </div>
-                <div>
-                    <div style="font-size:1.3rem;letter-spacing:2px;">
-                        <?php for ($si=1; $si<=5; $si++): ?>
-                            <?php if ($si <= $entityRatingAvg): ?>
-                                <span style="color:var(--pub-accent, #F59E0B);">★</span>
-                            <?php elseif ($si - 0.5 <= $entityRatingAvg): ?>
-                                <span style="color:var(--pub-accent, #F59E0B);opacity:0.6;">★</span>
-                            <?php else: ?>
-                                <span style="color:var(--pub-border);">☆</span>
-                            <?php endif; ?>
-                        <?php endfor; ?>
-                    </div>
-                    <div style="font-size:0.82rem;color:var(--pub-muted);"><?= $entityRatingTotal ?> <?= e(t('entity.ratings_count')) ?></div>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <?php if (!empty($entityRatings)): ?>
-            <div style="display:grid;gap:12px;">
-                <?php foreach ($entityRatings as $r): ?>
-                <div style="background:var(--pub-surface);border:1px solid var(--pub-border);border-radius:var(--pub-radius);padding:14px 16px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
-                        <span style="font-weight:700;font-size:0.9rem;"><?= e($r['reviewer_name']) ?></span>
-                        <div style="display:flex;align-items:center;gap:6px;">
-                            <span style="color:var(--pub-accent, #F59E0B);font-size:1rem;">
-                                <?php for ($si=1; $si<=5; $si++): ?>
-                                    <?= $si <= (float)$r['rating'] ? '★' : '☆' ?>
-                                <?php endfor; ?>
-                            </span>
-                            <span style="font-size:0.75rem;color:var(--pub-muted);"><?= e(substr($r['created_at'] ?? '', 0, 10)) ?></span>
-                        </div>
-                    </div>
-                    <?php if (!empty($r['review'])): ?>
-                        <p style="margin:0;font-size:0.88rem;color:var(--pub-text);"><?= e($r['review']) ?></p>
-                    <?php endif; ?>
-                </div>
-                <?php endforeach; ?>
-            </div>
-            <?php else: ?>
-            <div class="pub-empty" style="padding:40px 0;">
-                <div class="pub-empty-icon">⭐</div>
-                <p class="pub-empty-msg"><?= e(t('entity.no_ratings')) ?></p>
-            </div>
-            <?php endif; ?>
-
-            <!-- Rate this entity (login-gated) -->
-            <?php if ($_isLoggedIn): ?>
-            <div style="margin-top:24px;background:var(--pub-surface);border:1px solid var(--pub-border);border-radius:var(--pub-radius);padding:20px;">
-                <h3 style="margin:0 0 14px;font-size:1rem;font-weight:700;"><?= e(t('entity.rate_title')) ?></h3>
-                <form id="pubEntityRateForm" onsubmit="pubSubmitEntityRating(event)">
-                    <div style="margin-bottom:12px;">
-                        <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:6px;"><?= e(t('entity.your_rating')) ?></label>
-                        <div id="pubEntityStarPicker" style="display:flex;gap:6px;font-size:1.8rem;cursor:pointer;" role="group" aria-label="<?= e(t('entity.your_rating')) ?>">
-                            <?php for ($si=1; $si<=5; $si++): ?>
-                                <span class="pub-star-pick" data-val="<?= $si ?>" onclick="pubPickEntityStar(<?= $si ?>)"
-                                      style="color:var(--pub-border);transition:color 0.15s;user-select:none;">★</span>
-                            <?php endfor; ?>
-                        </div>
-                        <input type="hidden" id="pubEntityRating" name="rating" value="0">
-                    </div>
-                    <div style="margin-bottom:12px;">
-                        <textarea id="pubEntityReview" name="review" rows="3"
-                                  placeholder="<?= e(t('entity.write_review')) ?>"
-                                  class="pub-input" style="width:100%;padding:8px 12px;border-radius:var(--pub-radius);border:1px solid var(--pub-border);background:var(--pub-bg);color:var(--pub-text);font-size:0.88rem;resize:vertical;"></textarea>
-                    </div>
-                    <button type="submit" class="pub-btn pub-btn--primary">
-                        ⭐ <?= e(t('entity.submit_rating')) ?>
-                    </button>
-                    <p id="pubEntityRateMsg" style="margin:8px 0 0;font-size:0.85rem;display:none;"></p>
-                </form>
-            </div>
-            <?php else: ?>
-            <p style="text-align:center;margin-top:20px;font-size:0.88rem;color:var(--pub-muted);">
-                <a href="/frontend/login.php?redirect=<?= urlencode($_SERVER['REQUEST_URI'] ?? '') ?>" class="pub-link"><?= e(t('common.login')) ?></a>
-                <?= e(t('entity.login_to_rate')) ?>
-            </p>
-            <?php endif; ?>
-        </div>
-    </div>
-    <?php endif; // end show_reviews ?>
-
-</div><!-- /.pub-container discounts -->
+<?php /* (Legacy inline sections removed — now rendered via partials/store_sections/) */ ?>
 
 <script>
 // Simple tab switcher
