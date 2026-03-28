@@ -131,3 +131,19 @@
 [2026-03-10 20:36:46] [info] [RID:deee3e9eea7f8a41] RedisHelper loaded | {"request_id":"deee3e9eea7f8a41","memory_mb":2,"timestamp":"2026-03-10 20:36:46"}
 [2026-03-10 20:36:46] [info] [RID:deee3e9eea7f8a41] RequestContext class loaded | {"request_id":"deee3e9eea7f8a41","memory_mb":2,"timestamp":"2026-03-10 20:36:46"}
 [2026-03-10 20:36:46] [critical] [RID:deee3e9eea7f8a41] Database connection failed during bootstrap | {"message":"Database environment variables missing","file":"/home/runner/work/qooqz/qooqz/api/shared/core/DatabaseConnection.php","line":21,"request_id":"deee3e9eea7f8a41","memory_mb":2,"timestamp":"2026-03-10 20:36:46"}
+[2026-03-28 13:19:56] [info] [RID:9acd8baf4cd3ea59] Advanced Logger initialized successfully | {"request_id":"9acd8baf4cd3ea59","memory_mb":2,"timestamp":"2026-03-28 13:19:56"}
+[2026-03-28 13:19:56] [info] [RID:9acd8baf4cd3ea59] Bootstrap initializing | {"env":"production","request_id":"9acd8baf4cd3ea59","memory_mb":2,"timestamp":"2026-03-28 13:19:56"}
+[2026-03-28 13:19:56] [info] [RID:9acd8baf4cd3ea59] API routing detected | {"version":"v1","route":"/notifications/send","is_versioned":true,"request_id":"9acd8baf4cd3ea59","memory_mb":2,"timestamp":"2026-03-28 13:19:56"}
+[2026-03-28 13:19:56] [info] [RID:9acd8baf4cd3ea59] .env loaded | {"variables":36,"request_id":"9acd8baf4cd3ea59","memory_mb":2,"timestamp":"2026-03-28 13:19:56"}
+[2026-03-28 13:19:56] [info] [RID:9acd8baf4cd3ea59] Session config loaded | {"request_id":"9acd8baf4cd3ea59","memory_mb":2,"timestamp":"2026-03-28 13:19:56"}
+[2026-03-28 13:19:56] [info] [RID:9acd8baf4cd3ea59] RedisHelper loaded | {"request_id":"9acd8baf4cd3ea59","memory_mb":2,"timestamp":"2026-03-28 13:19:56"}
+[2026-03-28 13:19:56] [info] [RID:9acd8baf4cd3ea59] RequestContext class loaded | {"request_id":"9acd8baf4cd3ea59","memory_mb":2,"timestamp":"2026-03-28 13:19:56"}
+[2026-03-28 13:19:56] [critical] [RID:9acd8baf4cd3ea59] Database connection failed during bootstrap | {"message":"SQLSTATE[HY000] [2002] php_network_getaddresses: getaddrinfo for sv61.ifastnet10.org failed: No address associated with hostname","file":"/home/runner/work/qooqz/qooqz/api/shared/core/DatabaseConnection.php","line":26,"request_id":"9acd8baf4cd3ea59","memory_mb":2,"timestamp":"2026-03-28 13:19:56"}
+[2026-03-28 13:20:10] [info] [RID:8adad899591c57fe] Advanced Logger initialized successfully | {"request_id":"8adad899591c57fe","memory_mb":2,"timestamp":"2026-03-28 13:20:10"}
+[2026-03-28 13:20:10] [info] [RID:8adad899591c57fe] Bootstrap initializing | {"env":"production","request_id":"8adad899591c57fe","memory_mb":2,"timestamp":"2026-03-28 13:20:10"}
+[2026-03-28 13:20:10] [info] [RID:8adad899591c57fe] API routing detected | {"version":"v1","route":"/notifications/send","is_versioned":true,"request_id":"8adad899591c57fe","memory_mb":2,"timestamp":"2026-03-28 13:20:10"}
+[2026-03-28 13:20:10] [info] [RID:8adad899591c57fe] .env loaded | {"variables":36,"request_id":"8adad899591c57fe","memory_mb":2,"timestamp":"2026-03-28 13:20:10"}
+[2026-03-28 13:20:10] [info] [RID:8adad899591c57fe] Session config loaded | {"request_id":"8adad899591c57fe","memory_mb":2,"timestamp":"2026-03-28 13:20:10"}
+[2026-03-28 13:20:10] [info] [RID:8adad899591c57fe] RedisHelper loaded | {"request_id":"8adad899591c57fe","memory_mb":2,"timestamp":"2026-03-28 13:20:10"}
+[2026-03-28 13:20:10] [info] [RID:8adad899591c57fe] RequestContext class loaded | {"request_id":"8adad899591c57fe","memory_mb":2,"timestamp":"2026-03-28 13:20:10"}
+[2026-03-28 13:20:10] [critical] [RID:8adad899591c57fe] Database connection failed during bootstrap | {"message":"SQLSTATE[HY000] [2002] php_network_getaddresses: getaddrinfo for sv61.ifastnet10.org failed: No address associated with hostname","file":"/home/runner/work/qooqz/qooqz/api/shared/core/DatabaseConnection.php","line":26,"request_id":"8adad899591c57fe","memory_mb":2,"timestamp":"2026-03-28 13:20:10"}
