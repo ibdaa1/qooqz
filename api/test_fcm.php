@@ -432,7 +432,7 @@ $report['summary'] = [
     'instructions' => $hasErrors ? [
         '1. Download Service Account JSON from Firebase Console → Project Settings → Service accounts → Generate new private key',
         '2. Save as: api/shared/config/firebase-service-account.json',
-        '3. Ensure FCM_PROJECT_ID=qooqz-2011 is set in api/shared/config/.env',
+        '3. Ensure FCM_PROJECT_ID is set in api/shared/config/.env (e.g., your Firebase project ID)',
         '4. Ensure users have registered FCM tokens (check user_devices table)',
         '5. Re-run this test: /api/test_fcm.php',
         '6. To send a real test: /api/test_fcm.php?send=1&user_id=1',
