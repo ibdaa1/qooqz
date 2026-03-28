@@ -22,8 +22,8 @@ messaging.onBackgroundMessage(function (payload) {
 
     const title = payload.notification?.title || "إشعار جديد";
     const body  = payload.notification?.body  || "";
-    const icon  = payload.notification?.icon  || "/frontend/assets/images/logo.png";
-    const badge = "/frontend/assets/images/logo.png";
+    const icon  = payload.notification?.icon  || "/admin/assets/img/default-image.png";
+    const badge = "/admin/assets/img/default-image.png";
     const data  = payload.data || {};
 
     // بناء رابط النقر (إذا أُرسل في data)

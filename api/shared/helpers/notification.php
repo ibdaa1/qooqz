@@ -14,7 +14,12 @@ require_once __DIR__ . '/sms.php';
 // ===========================================
 if (!defined('FCM_SERVER_KEY'))    define('FCM_SERVER_KEY',    getenv('FCM_SERVER_KEY')    ?: ($_ENV['FCM_SERVER_KEY'] ?? ''));
 if (!defined('FCM_ENDPOINT'))      define('FCM_ENDPOINT',      'https://fcm.googleapis.com/fcm/send');
-if (!defined('APP_LOGO_URL'))      define('APP_LOGO_URL',      '/frontend/assets/images/logo.png');
+// APP_LOGO_URL must be an absolute HTTPS URL for FCM notification icons/images to work
+if (!defined('APP_LOGO_URL')) {
+    $appUrl = getenv('APP_URL') ?: ($_ENV['APP_URL'] ?? '');
+    $iconPath = getenv('APP_NOTIFICATION_ICON') ?: '/admin/assets/img/default-image.png';
+    define('APP_LOGO_URL', $appUrl ? rtrim($appUrl, '/') . $iconPath : $iconPath);
+}
 
 // FCM v1 API settings
 if (!defined('FCM_PROJECT_ID'))    define('FCM_PROJECT_ID',    getenv('FCM_PROJECT_ID')    ?: '');

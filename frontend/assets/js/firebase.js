@@ -129,7 +129,7 @@
     function handleForegroundMessage(payload) {
         var title = (payload.notification && payload.notification.title) || '';
         var body  = (payload.notification && payload.notification.body)  || '';
-        var icon  = (payload.notification && payload.notification.icon)  || '/frontend/assets/images/logo.png';
+        var icon  = (payload.notification && payload.notification.icon)  || '/admin/assets/img/default-image.png';
 
         if (Notification.permission === 'granted' && title) {
             new Notification(title, { body: body, icon: icon });
