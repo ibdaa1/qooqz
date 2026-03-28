@@ -50,7 +50,7 @@
         el.style.cssText = `
             position:fixed; top:20px; right:20px; z-index:99999;
             padding:12px 20px; border-radius:8px; color:#fff; font-size:0.9rem;
-            background:${type === 'success' ? '#22c55e' : '#ef4444'};
+            background:${type === 'success' ? 'var(--success, #22c55e)' : 'var(--danger, #ef4444)'};
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             animation: slideInRight 0.3s ease;
         `;
@@ -261,7 +261,7 @@
                     : `<span class="badge badge-danger">${t('table.status.inactive')}</span>`;
                 return `<tr data-id="${item.id}">
                     <td>${esc(item.id)}</td>
-                    <td><code style="background:rgba(59,130,246,0.1);padding:2px 6px;border-radius:4px;font-size:0.8rem;">${esc(item.code)}</code></td>
+                    <td><code style="background:var(--primary-light, rgba(59,130,246,0.1));padding:2px 6px;border-radius:4px;font-size:0.8rem;">${esc(item.code)}</code></td>
                     <td>${esc(item.name)}</td>
                     <td><span class="text-truncate" title="${esc(item.description)}">${esc(truncate(item.description))}</span></td>
                     <td>${status}</td>
@@ -296,7 +296,7 @@
                     : `<span class="badge badge-danger">${t('table.status.inactive')}</span>`;
                 return `<tr data-id="${item.id}">
                     <td>${esc(item.id)}</td>
-                    <td><code style="background:rgba(59,130,246,0.1);padding:2px 6px;border-radius:4px;font-size:0.8rem;">${esc(item.code)}</code></td>
+                    <td><code style="background:var(--primary-light, rgba(59,130,246,0.1));padding:2px 6px;border-radius:4px;font-size:0.8rem;">${esc(item.code)}</code></td>
                     <td>${esc(item.name)}</td>
                     <td>${status}</td>
                     <td style="font-size:0.8rem;color:var(--text-secondary,#94a3b8);">${dateFmt(item.created_at)}</td>
@@ -320,7 +320,7 @@
                     <td>${tName}</td>
                     <td><span class="badge badge-info">${esc(rtLabel)}</span></td>
                     <td>${rName}</td>
-                    <td><strong style="color:${item.unread_count > 0 ? '#f59e0b' : '#94a3b8'};">${esc(item.unread_count ?? 0)}</strong></td>
+                    <td><strong style="color:${item.unread_count > 0 ? 'var(--warning, #f59e0b)' : 'var(--text-secondary, #94a3b8)'};">${esc(item.unread_count ?? 0)}</strong></td>
                     <td style="font-size:0.8rem;color:var(--text-secondary,#94a3b8);">${dateFmt(item.updated_at)}</td>
                     <td><div class="action-btns">${editBtn}${extraBtns}${deleteBtn}</div></td>
                 </tr>`;
@@ -338,7 +338,7 @@
                     <td>${esc(item.attempts ?? 0)}</td>
                     <td style="font-size:0.8rem;color:var(--text-secondary,#94a3b8);">${dateFmt(item.sent_at)}</td>
                     <td style="font-size:0.8rem;color:var(--text-secondary,#94a3b8);">
-                        ${item.error_message ? `<span title="${esc(item.error_message)}" style="color:#ef4444;">${esc(truncate(item.error_message, 35))}</span>` : '—'}
+                        ${item.error_message ? `<span title="${esc(item.error_message)}" style="color:var(--danger, #ef4444);">${esc(truncate(item.error_message, 35))}</span>` : '—'}
                     </td>
                     <td>${actions}</td>
                 </tr>`;
@@ -1140,10 +1140,37 @@
 
         // Update Add button label
         const addLabel = getEl('btnAddLabel');
-        if (addLabel) addLabel.textContent = t(TABS[tab].addKey);
+        const addBtn = getEl('btnAddRecord');
+        if (tab === 'bulk_send') {
+            if (addBtn) addBtn.style.display = 'none';
+        } else {
+            if (addBtn) addBtn.style.display = '';
+            if (addLabel) addLabel.textContent = t(TABS[tab]?.addKey || 'types.add_new');
+        }
+
+        // Show/hide bulk send panel vs regular content
+        const bulkPanel = getEl('bulkSendPanel');
+        const filterCard = document.querySelector('.filter-card');
+        const tableCard = document.querySelector('.table-card');
+        const resultsCount = getEl('resultsCount');
+
+        if (tab === 'bulk_send') {
+            if (bulkPanel) bulkPanel.style.display = '';
+            if (filterCard) filterCard.style.display = 'none';
+            if (tableCard) tableCard.style.display = 'none';
+            if (resultsCount) resultsCount.style.display = 'none';
+            hideForm();
+            initBulkSendTab();
+            return;
+        } else {
+            if (bulkPanel) bulkPanel.style.display = 'none';
+            if (filterCard) filterCard.style.display = '';
+            if (tableCard) tableCard.style.display = '';
+        }
 
         // Update filters visibility
         const tabDef = TABS[tab];
+        if (!tabDef) return;
         const show = (id, v) => { const el = getEl(id); if (el) el.style.display = v ? '' : 'none'; };
         show('filterStatusGroup', tabDef.showStatus);
         show('filterPriorityGroup', tabDef.showPriority);
@@ -1293,12 +1320,290 @@
     }
 
     /* ──────────────────────────────────────────
+       BULK SEND
+    ────────────────────────────────────────── */
+    let _bulkState = {
+        selectedUserIds: new Set(),
+        usersPage: 1,
+        usersData: [],
+        usersMeta: {},
+    };
+
+    function initBulkSendTab() {
+        // Populate type code dropdown
+        const typeSelect = getEl('bsTypeCode');
+        if (typeSelect && state.notifTypes.length) {
+            typeSelect.innerHTML = '<option value="general">General</option>';
+            state.notifTypes.forEach(ty => {
+                const opt = document.createElement('option');
+                opt.value = ty.code;
+                opt.textContent = `${ty.name} (${ty.code})`;
+                typeSelect.appendChild(opt);
+            });
+        } else if (typeSelect && !state.notifTypes.length) {
+            // Load types first
+            populateDropdowns().then(() => {
+                typeSelect.innerHTML = '<option value="general">General</option>';
+                state.notifTypes.forEach(ty => {
+                    const opt = document.createElement('option');
+                    opt.value = ty.code;
+                    opt.textContent = `${ty.name} (${ty.code})`;
+                    typeSelect.appendChild(opt);
+                });
+            });
+        }
+    }
+
+    function updateBulkSendCount() {
+        const countEl = getEl('bsSelectedCount');
+        const sendCountEl = getEl('bsSendCount');
+        const count = _bulkState.selectedUserIds.size;
+        if (countEl) countEl.textContent = count + ' ' + (t('bulk_send.selected') || 'selected');
+        if (sendCountEl) sendCountEl.textContent = count;
+    }
+
+    async function loadBulkUsers(page = 1) {
+        _bulkState.usersPage = page;
+        const listEl = getEl('bsUserList');
+        const pagEl = getEl('bsUserPagination');
+        if (!listEl) return;
+
+        listEl.innerHTML = '<p class="bulk-send-loading"><i class="fas fa-spinner fa-spin"></i> ' + (t('bulk_send.loading_users') || 'Loading users...') + '</p>';
+
+        const params = new URLSearchParams({ page, per_page: 50 });
+        const search = getEl('bsFilterSearch')?.value?.trim();
+        if (search) params.set('search', search);
+        const roleId = getEl('bsFilterRole')?.value;
+        if (roleId) params.set('role_id', roleId);
+        const isActive = getEl('bsFilterActive')?.value;
+        if (isActive !== '' && isActive !== undefined) params.set('is_active', isActive);
+        const deviceType = getEl('bsFilterDeviceType')?.value;
+        if (deviceType) params.set('device_type', deviceType);
+
+        try {
+            const apiBase = cfg().api.types.replace('/notification_types', '');
+            const json = await apiFetch(`${apiBase}/users?${params}`);
+            const items = json.data?.items || json.items || [];
+            const meta = json.data?.meta || json.meta || {};
+            _bulkState.usersData = items;
+            _bulkState.usersMeta = meta;
+
+            if (items.length === 0) {
+                listEl.innerHTML = '<p class="bulk-send-empty">' + (t('bulk_send.no_users_found') || 'No users found with the current filters.') + '</p>';
+                if (pagEl) pagEl.style.display = 'none';
+                return;
+            }
+
+            let html = '<table class="data-table bulk-send-table"><thead><tr>'
+                + '<th><input type="checkbox" id="bsCheckAll"></th>'
+                + '<th>ID</th><th>' + (t('table.headers.username') || 'Username') + '</th>'
+                + '<th>' + (t('table.headers.email') || 'Email') + '</th>'
+                + '<th>' + (t('table.headers.status') || 'Status') + '</th>'
+                + '</tr></thead><tbody>';
+
+            items.forEach(u => {
+                const checked = _bulkState.selectedUserIds.has(u.id) ? ' checked' : '';
+                const statusBadge = String(u.is_active) === '1'
+                    ? '<span class="badge badge-success">' + (t('table.status.active') || 'Active') + '</span>'
+                    : '<span class="badge badge-danger">' + (t('table.status.inactive') || 'Inactive') + '</span>';
+                html += '<tr>'
+                    + '<td><input type="checkbox" class="bs-user-check" value="' + esc(u.id) + '"' + checked + '></td>'
+                    + '<td>' + esc(u.id) + '</td>'
+                    + '<td>' + esc(u.username || '—') + '</td>'
+                    + '<td>' + esc(u.email || '—') + '</td>'
+                    + '<td>' + statusBadge + '</td>'
+                    + '</tr>';
+            });
+            html += '</tbody></table>';
+            listEl.innerHTML = html;
+
+            // Bind checkboxes
+            listEl.querySelectorAll('.bs-user-check').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const uid = parseInt(cb.value, 10);
+                    if (cb.checked) {
+                        _bulkState.selectedUserIds.add(uid);
+                    } else {
+                        _bulkState.selectedUserIds.delete(uid);
+                    }
+                    updateBulkSendCount();
+                });
+            });
+
+            // Check All checkbox
+            const checkAll = getEl('bsCheckAll');
+            if (checkAll) {
+                checkAll.checked = items.every(u => _bulkState.selectedUserIds.has(u.id));
+                checkAll.addEventListener('change', () => {
+                    items.forEach(u => {
+                        if (checkAll.checked) {
+                            _bulkState.selectedUserIds.add(u.id);
+                        } else {
+                            _bulkState.selectedUserIds.delete(u.id);
+                        }
+                    });
+                    listEl.querySelectorAll('.bs-user-check').forEach(cb => {
+                        cb.checked = checkAll.checked;
+                    });
+                    updateBulkSendCount();
+                });
+            }
+
+            // Render pagination
+            if (pagEl) {
+                const totalPages = meta.total_pages || Math.ceil((meta.total || items.length) / 50);
+                if (totalPages <= 1) {
+                    pagEl.style.display = 'none';
+                } else {
+                    pagEl.style.display = '';
+                    let pagHtml = '';
+                    if (page > 1) pagHtml += '<button class="btn btn-sm btn-secondary bs-page-btn" data-page="' + (page - 1) + '">‹</button> ';
+                    const start = Math.max(1, page - 2);
+                    const end = Math.min(totalPages, page + 2);
+                    for (let i = start; i <= end; i++) {
+                        pagHtml += '<button class="btn btn-sm ' + (i === page ? 'btn-primary' : 'btn-secondary') + ' bs-page-btn" data-page="' + i + '">' + i + '</button> ';
+                    }
+                    if (page < totalPages) pagHtml += '<button class="btn btn-sm btn-secondary bs-page-btn" data-page="' + (page + 1) + '">›</button>';
+                    pagHtml += ' <span style="color:var(--text-secondary, #94a3b8);font-size:0.85rem;margin-inline-start:8px;">' + (meta.total || items.length) + ' ' + (t('bulk_send.total_users') || 'total') + '</span>';
+                    pagEl.innerHTML = pagHtml;
+                    pagEl.querySelectorAll('.bs-page-btn').forEach(btn => {
+                        btn.addEventListener('click', () => loadBulkUsers(parseInt(btn.dataset.page, 10)));
+                    });
+                }
+            }
+
+            updateBulkSendCount();
+        } catch (err) {
+            listEl.innerHTML = '<p class="bulk-send-empty" style="color:var(--danger, #ef4444);">' + esc(err.message || 'Failed to load users') + '</p>';
+        }
+    }
+
+    async function executeBulkSend() {
+        const userIds = Array.from(_bulkState.selectedUserIds);
+        if (userIds.length === 0) {
+            showToast(t('bulk_send.no_recipients_selected') || 'Please select at least one recipient', 'error');
+            return;
+        }
+
+        const title = getEl('bsTitle')?.value?.trim();
+        const message = getEl('bsMessage')?.value?.trim();
+        if (!title) { showToast((t('form.fields.title.label') || 'Title') + ' is required', 'error'); return; }
+        if (!message) { showToast((t('form.fields.message.label') || 'Message') + ' is required', 'error'); return; }
+
+        const channels = [];
+        document.querySelectorAll('input[name="bs_channels[]"]:checked').forEach(cb => channels.push(cb.value));
+        if (channels.length === 0) channels.push('database');
+
+        const confirmMsg = (t('bulk_send.confirm_send') || 'Send notification to {count} recipients?').replace('{count}', userIds.length);
+        if (!confirmDialog(confirmMsg)) return;
+
+        const sendBtn = getEl('btnBulkSend');
+        if (sendBtn) {
+            sendBtn.disabled = true;
+            sendBtn.querySelector('span')?.replaceWith(document.createTextNode(t('form.buttons.sending') || 'Sending...'));
+        }
+
+        try {
+            const payload = {
+                user_ids: userIds,
+                tenant_id: parseInt(getEl('bsTenantId')?.value, 10) || 1,
+                type_code: getEl('bsTypeCode')?.value || 'general',
+                title: title,
+                message: message,
+                channels: channels,
+                priority: getEl('bsPriority')?.value || 'normal',
+            };
+
+            const result = await apiFetch(cfg().api.sendBulk, {
+                method: 'POST',
+                body: JSON.stringify(payload),
+            });
+
+            const data = result.data || result;
+            const successCount = data.success_count ?? 0;
+            const failCount = data.fail_count ?? 0;
+            const total = data.total ?? userIds.length;
+
+            showToast(
+                (t('bulk_send.send_complete') || 'Sent: {success}/{total}, Failed: {fail}')
+                    .replace('{success}', successCount)
+                    .replace('{total}', total)
+                    .replace('{fail}', failCount),
+                failCount > 0 ? 'error' : 'success'
+            );
+
+            // Clear selections
+            _bulkState.selectedUserIds.clear();
+            updateBulkSendCount();
+            if (_bulkState.usersData.length) loadBulkUsers(_bulkState.usersPage);
+        } catch (err) {
+            showToast(err.message || (t('bulk_send.send_failed') || 'Bulk send failed'), 'error');
+        } finally {
+            if (sendBtn) {
+                sendBtn.disabled = false;
+                const span = document.createElement('span');
+                span.textContent = t('bulk_send.send_button') || 'Send to Selected Recipients';
+                const icon = sendBtn.querySelector('i');
+                sendBtn.innerHTML = '';
+                if (icon) sendBtn.appendChild(icon);
+                sendBtn.appendChild(document.createTextNode(' '));
+                sendBtn.appendChild(span);
+                sendBtn.appendChild(document.createTextNode(' ('));
+                const countSpan = document.createElement('span');
+                countSpan.id = 'bsSendCount';
+                countSpan.textContent = _bulkState.selectedUserIds.size;
+                sendBtn.appendChild(countSpan);
+                sendBtn.appendChild(document.createTextNode(')'));
+            }
+        }
+    }
+
+    function bindBulkSendEvents() {
+        const loadBtn = getEl('btnBsLoadUsers');
+        if (loadBtn) loadBtn.addEventListener('click', () => {
+            _bulkState.usersPage = 1;
+            loadBulkUsers(1);
+        });
+
+        const selectAllBtn = getEl('btnBsSelectAll');
+        if (selectAllBtn) selectAllBtn.addEventListener('click', () => {
+            // Select all on current page
+            document.querySelectorAll('.bs-user-check').forEach(cb => {
+                cb.checked = true;
+                _bulkState.selectedUserIds.add(parseInt(cb.value, 10));
+            });
+            const checkAll = getEl('bsCheckAll');
+            if (checkAll) checkAll.checked = true;
+            updateBulkSendCount();
+        });
+
+        const deselectAllBtn = getEl('btnBsDeselectAll');
+        if (deselectAllBtn) deselectAllBtn.addEventListener('click', () => {
+            _bulkState.selectedUserIds.clear();
+            document.querySelectorAll('.bs-user-check').forEach(cb => { cb.checked = false; });
+            const checkAll = getEl('bsCheckAll');
+            if (checkAll) checkAll.checked = false;
+            updateBulkSendCount();
+        });
+
+        const bulkSendBtn = getEl('btnBulkSend');
+        if (bulkSendBtn) bulkSendBtn.addEventListener('click', executeBulkSend);
+
+        // Enter key on search
+        const bsSearch = getEl('bsFilterSearch');
+        if (bsSearch) bsSearch.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') loadBtn?.click();
+        });
+    }
+
+    /* ──────────────────────────────────────────
        PUBLIC API
     ────────────────────────────────────────── */
     const Notifications = {
         async init() {
             console.log('[Notifications] Initializing...');
             bindEvents();
+            bindBulkSendEvents();
             initLookupHints();
             switchTab('types');
         },

@@ -10,7 +10,8 @@
             "channels": "القنوات",
             "counters": "العدادات",
             "deliveries": "سجل التسليم",
-            "devices": "الأجهزة"
+            "devices": "الأجهزة",
+            "bulk_send": "إرسال جماعي"
         }
     },
     "types": {
@@ -88,7 +89,9 @@
             "device_type": "نوع الجهاز",
             "device_name": "اسم الجهاز",
             "last_seen": "آخر ظهور",
-            "ip": "عنوان IP"
+            "ip": "عنوان IP",
+            "username": "اسم المستخدم",
+            "email": "البريد الإلكتروني"
         },
         "status": {
             "active": "نشط",
@@ -322,5 +325,27 @@
         "no_fcm_token": "لا يوجد رمز FCM",
         "device_inactive": "غير نشط",
         "load_devices_error": "فشل تحميل الأجهزة"
+    },
+    "bulk_send": {
+        "title": "إرسال جماعي",
+        "select_recipients": "اختر المستلمين",
+        "search_users_placeholder": "بحث بالاسم أو البريد الإلكتروني...",
+        "filter_role": "الدور",
+        "all_roles": "جميع الأدوار",
+        "has_device": "نوع الجهاز",
+        "any_device": "الكل",
+        "load_users": "تحميل المستخدمين",
+        "select_all": "تحديد الكل",
+        "deselect_all": "إلغاء التحديد",
+        "selected": "محدد",
+        "click_load": "اضغط \"تحميل المستخدمين\" لتصفح المستلمين.",
+        "send_button": "إرسال للمستلمين المحددين",
+        "loading_users": "جاري تحميل المستخدمين...",
+        "no_users_found": "لم يتم العثور على مستخدمين بالفلاتر الحالية.",
+        "total_users": "إجمالي",
+        "no_recipients_selected": "الرجاء تحديد مستلم واحد على الأقل.",
+        "confirm_send": "إرسال إشعار إلى {count} مستلم؟",
+        "send_complete": "تم الإرسال: {success}/{total}، فشل: {fail}",
+        "send_failed": "فشل الإرسال الجماعي"
     }
 }

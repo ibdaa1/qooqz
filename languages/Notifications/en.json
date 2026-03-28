@@ -10,7 +10,8 @@
             "channels": "Channels",
             "counters": "Counters",
             "deliveries": "Deliveries",
-            "devices": "Devices"
+            "devices": "Devices",
+            "bulk_send": "Bulk Send"
         }
     },
     "types": {
@@ -88,7 +89,9 @@
             "device_type": "Device Type",
             "device_name": "Device Name",
             "last_seen": "Last Seen",
-            "ip": "IP Address"
+            "ip": "IP Address",
+            "username": "Username",
+            "email": "Email"
         },
         "status": {
             "active": "Active",
@@ -322,5 +325,27 @@
         "no_fcm_token": "No FCM token",
         "device_inactive": "Inactive",
         "load_devices_error": "Failed to load devices"
+    },
+    "bulk_send": {
+        "title": "Bulk Send Notification",
+        "select_recipients": "Select Recipients",
+        "search_users_placeholder": "Search by username or email...",
+        "filter_role": "Role",
+        "all_roles": "All Roles",
+        "has_device": "Device Type",
+        "any_device": "Any",
+        "load_users": "Load Users",
+        "select_all": "Select All",
+        "deselect_all": "Deselect All",
+        "selected": "selected",
+        "click_load": "Click \"Load Users\" to browse recipients.",
+        "send_button": "Send to Selected Recipients",
+        "loading_users": "Loading users...",
+        "no_users_found": "No users found with the current filters.",
+        "total_users": "total",
+        "no_recipients_selected": "Please select at least one recipient.",
+        "confirm_send": "Send notification to {count} recipients?",
+        "send_complete": "Sent: {success}/{total}, Failed: {fail}",
+        "send_failed": "Bulk send failed"
     }
 }

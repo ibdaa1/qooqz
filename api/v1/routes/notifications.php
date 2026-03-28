@@ -189,6 +189,69 @@ try {
             exit;
         }
 
+        // ── Bulk send notification to multiple recipients ──
+        if ($lastSegment === 'send-bulk') {
+            require_once dirname(__DIR__, 2) . '/shared/helpers/notification.php';
+            \Notification::setPDO($pdo);
+
+            $userIds       = isset($data['user_ids']) && is_array($data['user_ids']) ? array_map('intval', array_filter($data['user_ids'], 'is_numeric')) : [];
+            $tenantId      = isset($data['tenant_id']) && is_numeric($data['tenant_id']) ? (int)$data['tenant_id'] : 1;
+            $typeCode      = !empty($data['type_code']) ? $data['type_code'] : 'general';
+            $title         = trim($data['title'] ?? '');
+            $message       = trim($data['message'] ?? '');
+            $channels      = isset($data['channels']) && is_array($data['channels']) ? $data['channels'] : ['database'];
+            $priority      = in_array($data['priority'] ?? '', ['low', 'normal', 'high', 'urgent']) ? $data['priority'] : 'normal';
+            $extraData     = [];
+
+            if (empty($userIds)) {
+                ResponseFormatter::error('user_ids array is required and must not be empty', 422);
+                exit;
+            }
+            if (count($userIds) > 5000) {
+                ResponseFormatter::error('Maximum 5000 recipients per bulk send', 422);
+                exit;
+            }
+            if ($title === '') {
+                ResponseFormatter::error('title is required', 422);
+                exit;
+            }
+            if ($message === '') {
+                ResponseFormatter::error('message is required', 422);
+                exit;
+            }
+
+            // Parse extra JSON data
+            if (!empty($data['data'])) {
+                if (is_string($data['data'])) {
+                    $decoded = json_decode($data['data'], true);
+                    $extraData = is_array($decoded) ? $decoded : [];
+                } elseif (is_array($data['data'])) {
+                    $extraData = $data['data'];
+                }
+            }
+
+            // Validate channels
+            $channels = array_filter($channels, fn($ch) => is_string($ch) && $ch !== '');
+            $validChannels = ['database', 'push', 'email', 'sms'];
+            $channels = array_values(array_intersect($channels, $validChannels));
+            if (empty($channels)) {
+                $channels = ['database'];
+            }
+
+            $result = \Notification::sendBulk(
+                $userIds,
+                $typeCode,
+                $title,
+                $message,
+                $extraData,
+                $channels,
+                $tenantId
+            );
+
+            ResponseFormatter::success($result, 'Bulk notification processed', 201);
+            exit;
+        }
+
         $newId = $controller->create($data);
         ResponseFormatter::success(['id' => $newId], 'Created successfully', 201);
         exit;

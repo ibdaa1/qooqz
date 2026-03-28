@@ -699,3 +699,78 @@ select.form-control option {
     font-size: 0.75rem;
     color: var(--text-muted, #94a3b8);
 }
+
+/* ── Bulk Send Panel ── */
+.bulk-send-content {
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+.bulk-send-recipients h4 {
+    margin: 0 0 12px;
+    font-size: 1rem;
+    color: var(--text-primary, var(--text_primary));
+}
+.bulk-send-filters {
+    margin-bottom: 16px;
+}
+.bulk-send-filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+.bulk-send-count {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--primary, #3b82f6);
+    margin-inline-start: auto;
+}
+.bulk-send-user-list {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+.bulk-send-table {
+    margin: 0;
+    font-size: 0.85rem;
+}
+.bulk-send-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--background-secondary, var(--background_secondary, #f8fafc));
+    z-index: 1;
+}
+.bulk-send-table td,
+.bulk-send-table th {
+    padding: 8px 12px;
+}
+.bulk-send-table input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+.bulk-send-empty,
+.bulk-send-loading {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-secondary, #94a3b8);
+}
+.bulk-send-pagination {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+.bulk-send-actions {
+    margin-top: 20px;
+    text-align: center;
+}
+.bulk-send-actions .btn-lg {
+    padding: 12px 32px;
+    font-size: 1rem;
+}

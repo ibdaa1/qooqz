@@ -116,6 +116,12 @@ $apiBase = '/api';
             <i class="fas fa-mobile-alt"></i>
             <span data-i18n="notifications.tabs.devices"><?= __t('notifications.tabs.devices', 'Devices') ?></span>
         </button>
+        <?php if ($canCreate): ?>
+        <button class="notif-tab-btn" data-tab="bulk_send">
+            <i class="fas fa-paper-plane"></i>
+            <span data-i18n="notifications.tabs.bulk_send"><?= __t('notifications.tabs.bulk_send', 'Bulk Send') ?></span>
+        </button>
+        <?php endif; ?>
     </div>
 
     <!-- ── FORM CONTAINER (shared, reused per tab) ── -->
@@ -445,6 +451,138 @@ $apiBase = '/api';
         </div>
     </div>
 
+    <!-- ── BULK SEND PANEL ── -->
+    <?php if ($canCreate): ?>
+    <div id="bulkSendPanel" class="card form-card" style="display:none">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-paper-plane"></i> <span data-i18n="bulk_send.title"><?= __t('bulk_send.title', 'Bulk Send Notification') ?></span></h3>
+        </div>
+        <div class="card-body">
+            <!-- Notification Content -->
+            <div class="bulk-send-content">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="bsTenantId" class="required"><?= __t('form.fields.tenant_id.label','Tenant ID') ?></label>
+                        <input type="number" id="bsTenantId" class="form-control"
+                               value="<?= $tenantId ?>" <?= is_super_admin() ? '' : 'readonly' ?>>
+                    </div>
+                    <div class="form-group">
+                        <label for="bsTypeCode"><?= __t('form.fields.notification_type_id.label','Notification Type') ?></label>
+                        <select id="bsTypeCode" class="form-control">
+                            <option value="general">General</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="bsPriority"><?= __t('form.fields.priority.label','Priority') ?></label>
+                        <select id="bsPriority" class="form-control">
+                            <option value="low"><?= __t('form.fields.priority.low','Low') ?></option>
+                            <option value="normal" selected><?= __t('form.fields.priority.normal','Normal') ?></option>
+                            <option value="high"><?= __t('form.fields.priority.high','High') ?></option>
+                            <option value="urgent"><?= __t('form.fields.priority.urgent','Urgent') ?></option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="bsTitle" class="required"><?= __t('form.fields.title.label','Title') ?></label>
+                    <input type="text" id="bsTitle" class="form-control" placeholder="<?= __t('form.fields.title.placeholder','Enter title') ?>">
+                </div>
+                <div class="form-group">
+                    <label for="bsMessage" class="required"><?= __t('form.fields.message.label','Message') ?></label>
+                    <textarea id="bsMessage" class="form-control" rows="3" placeholder="<?= __t('form.fields.message.placeholder','Enter message') ?>"></textarea>
+                </div>
+                <div class="form-group notif-channels-group">
+                    <label><?= __t('form.fields.channels.label','Delivery Channels') ?></label>
+                    <div class="notif-channels-checkboxes">
+                        <label class="notif-channel-check">
+                            <input type="checkbox" name="bs_channels[]" value="database" checked>
+                            <span><i class="fas fa-database"></i> <?= __t('form.fields.channels.database','Database') ?></span>
+                        </label>
+                        <label class="notif-channel-check">
+                            <input type="checkbox" name="bs_channels[]" value="push">
+                            <span><i class="fab fa-firebase"></i> <?= __t('form.fields.channels.push','Push (Firebase)') ?></span>
+                        </label>
+                        <label class="notif-channel-check">
+                            <input type="checkbox" name="bs_channels[]" value="email">
+                            <span><i class="fas fa-envelope"></i> <?= __t('form.fields.channels.email','Email') ?></span>
+                        </label>
+                        <label class="notif-channel-check">
+                            <input type="checkbox" name="bs_channels[]" value="sms">
+                            <span><i class="fas fa-sms"></i> <?= __t('form.fields.channels.sms','SMS') ?></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Browser / Recipient Selection -->
+            <div class="bulk-send-recipients">
+                <h4><i class="fas fa-users"></i> <span data-i18n="bulk_send.select_recipients"><?= __t('bulk_send.select_recipients', 'Select Recipients') ?></span></h4>
+
+                <!-- Filters -->
+                <div class="bulk-send-filters">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="bsFilterSearch"><?= __t('filters.search','Search') ?></label>
+                            <input type="text" id="bsFilterSearch" class="form-control" placeholder="<?= __t('bulk_send.search_users_placeholder','Search by username or email...') ?>">
+                        </div>
+                        <div class="form-group">
+                            <label for="bsFilterRole"><?= __t('bulk_send.filter_role','Role') ?></label>
+                            <select id="bsFilterRole" class="form-control">
+                                <option value=""><?= __t('bulk_send.all_roles','All Roles') ?></option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="bsFilterActive"><?= __t('filters.status','Status') ?></label>
+                            <select id="bsFilterActive" class="form-control">
+                                <option value=""><?= __t('filters.status_options.all','All') ?></option>
+                                <option value="1" selected><?= __t('filters.status_options.active','Active') ?></option>
+                                <option value="0"><?= __t('filters.status_options.inactive','Inactive') ?></option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="bsFilterDeviceType"><?= __t('bulk_send.has_device','Device Type') ?></label>
+                            <select id="bsFilterDeviceType" class="form-control">
+                                <option value=""><?= __t('bulk_send.any_device','Any') ?></option>
+                                <option value="web">Web</option>
+                                <option value="android">Android</option>
+                                <option value="ios">iOS</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="bulk-send-filter-actions">
+                        <button type="button" class="btn btn-sm btn-primary" id="btnBsLoadUsers">
+                            <i class="fas fa-search"></i> <span data-i18n="bulk_send.load_users"><?= __t('bulk_send.load_users','Load Users') ?></span>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="btnBsSelectAll">
+                            <i class="fas fa-check-double"></i> <span data-i18n="bulk_send.select_all"><?= __t('bulk_send.select_all','Select All') ?></span>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="btnBsDeselectAll">
+                            <i class="fas fa-times"></i> <span data-i18n="bulk_send.deselect_all"><?= __t('bulk_send.deselect_all','Deselect All') ?></span>
+                        </button>
+                        <span class="bulk-send-count" id="bsSelectedCount">0 <?= __t('bulk_send.selected','selected') ?></span>
+                    </div>
+                </div>
+
+                <!-- User List -->
+                <div id="bsUserList" class="bulk-send-user-list">
+                    <p class="bulk-send-empty"><?= __t('bulk_send.click_load','Click "Load Users" to browse recipients.') ?></p>
+                </div>
+
+                <!-- Pagination -->
+                <div id="bsUserPagination" class="bulk-send-pagination" style="display:none"></div>
+            </div>
+
+            <!-- Send Button -->
+            <div class="bulk-send-actions">
+                <button type="button" class="btn btn-success btn-lg" id="btnBulkSend">
+                    <i class="fas fa-paper-plane"></i>
+                    <span data-i18n="bulk_send.send_button"><?= __t('bulk_send.send_button','Send to Selected Recipients') ?></span>
+                    (<span id="bsSendCount">0</span>)
+                </button>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- ── FILTER CARD ── -->
     <div class="card filter-card">
         <div class="card-body">
@@ -596,7 +734,8 @@ window.NOTIFICATIONS_CONFIG = {
         counters:  '<?= $apiBase ?>/notification_counters',
         deliveries:'<?= $apiBase ?>/notification_deliveries',
         devices:   '<?= $apiBase ?>/user_devices',
-        send:      '<?= $apiBase ?>/notifications/send'
+        send:      '<?= $apiBase ?>/notifications/send',
+        sendBulk:  '<?= $apiBase ?>/notifications/send-bulk'
     },
     tenantId:  <?= $tenantId ?>,
     csrfToken: '<?= addslashes($csrf) ?>',
