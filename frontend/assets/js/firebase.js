@@ -43,32 +43,35 @@
                 firebase.initializeApp(FIREBASE_CONFIG);
             }
 
-            const messaging = firebase.messaging();
+            var messaging = firebase.messaging();
 
-            const swRegistration = await navigator.serviceWorker.register(SW_PATH, {
+            var swRegistration = await navigator.serviceWorker.register(SW_PATH, {
                 scope: '/',
             });
 
-            const permission = await Notification.requestPermission();
+            var permission = await Notification.requestPermission();
             if (permission !== 'granted') {
                 return;
             }
 
-            const tokenOpts = { serviceWorkerRegistration: swRegistration };
+            var tokenOpts = { serviceWorkerRegistration: swRegistration };
             if (VAPID_KEY && VAPID_KEY !== 'REPLACE_WITH_YOUR_VAPID_KEY') {
                 tokenOpts.vapidKey = VAPID_KEY;
             }
 
-            const token = await messaging.getToken(tokenOpts);
+            var token = await messaging.getToken(tokenOpts);
             if (!token) {
                 return;
             }
 
-            // حفظ فقط إذا تغيّر التوكن
-            const lastToken = localStorage.getItem(STORAGE_KEY);
-            if (lastToken !== token) {
+            // حفظ فقط إذا تغيّر التوكن أو مرّ أكثر من 24 ساعة
+            var lastToken = localStorage.getItem(STORAGE_KEY);
+            var lastTime  = parseInt(localStorage.getItem(STORAGE_KEY + '_t'), 10) || 0;
+            var dayMs     = 86400000; // 24h
+            if (lastToken !== token || (Date.now() - lastTime) > dayMs) {
                 await registerTokenOnServer(token);
                 localStorage.setItem(STORAGE_KEY, token);
+                localStorage.setItem(STORAGE_KEY + '_t', String(Date.now()));
             }
 
             // استقبال الإشعارات والتطبيق مفتوح (Foreground)
@@ -87,7 +90,7 @@
             var body = {
                 fcm_token:   token,
                 device_type: detectDeviceType(),
-                device_name: navigator.userAgent.substring(0, 100),
+                device_name: parseDeviceName(),
             };
 
             var res = await fetch(API_DEVICES, {
@@ -133,20 +136,40 @@
         return 'web';
     }
 
+    // ── اسم الجهاز المقروء ──────────────────────────────────
+    function parseDeviceName() {
+        var ua = navigator.userAgent;
+        var browser = 'Browser';
+        var os = 'Unknown';
+        if (/Chrome\//.test(ua) && !/Edg\//.test(ua)) browser = 'Chrome';
+        else if (/Edg\//.test(ua))    browser = 'Edge';
+        else if (/Firefox\//.test(ua)) browser = 'Firefox';
+        else if (/Safari\//.test(ua) && !/Chrome\//.test(ua)) browser = 'Safari';
+        if (/Windows/.test(ua))      os = 'Windows';
+        else if (/Mac OS/.test(ua))  os = 'macOS';
+        else if (/Android/.test(ua)) os = 'Android';
+        else if (/iPhone|iPad/.test(ua)) os = 'iOS';
+        else if (/Linux/.test(ua))   os = 'Linux';
+        return browser + ' on ' + os;
+    }
+
     // ── حذف التوكن عند تسجيل الخروج ─────────────────────────
     window.fcmDeregister = async function () {
         var token = localStorage.getItem(STORAGE_KEY);
         if (!token) return;
 
         try {
-            await fetch(API_DEVICES + '?fcm_token=' + encodeURIComponent(token), {
-                method:      'DELETE',
+            await fetch(API_DEVICES + '/deregister', {
+                method:      'POST',
                 credentials: 'same-origin',
                 headers: {
+                    'Content-Type':     'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
                 },
+                body: JSON.stringify({ fcm_token: token }),
             });
             localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(STORAGE_KEY + '_t');
         } catch (err) {
             // silent fail
         }
@@ -155,10 +178,10 @@
     // ── تشغيل بعد تحميل الصفحة ──────────────────────────────
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function () {
-            setTimeout(init, 2000);
+            setTimeout(init, 1500);
         });
     } else {
-        setTimeout(init, 2000);
+        setTimeout(init, 1500);
     }
 
 })();

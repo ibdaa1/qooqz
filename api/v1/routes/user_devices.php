@@ -49,6 +49,11 @@ try {
     $raw = file_get_contents('php://input');
     $data = $raw ? json_decode($raw, true) : [];
 
+    // Detect sub-action from URI (e.g. /user_devices/deregister)
+    $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+    $uriParts = explode('/', trim($uri, '/'));
+    $subAction = $uriParts[count($uriParts) - 1] ?? '';
+
     $page    = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
     $limit   = isset($_GET['limit']) ? min(1000, max(1, (int)$_GET['limit'])) : 25;
     $offset  = ($page - 1) * $limit;
@@ -96,6 +101,19 @@ try {
             break;
 
         case 'POST':
+            // Handle deregister sub-action (POST /user_devices/deregister)
+            if ($subAction === 'deregister') {
+                $fcmToken = $data['fcm_token'] ?? '';
+                if (empty($fcmToken)) {
+                    ResponseFormatter::error('fcm_token is required', 422);
+                }
+                // Deactivate the device token (set is_active = 0)
+                $stmt = $pdo->prepare("UPDATE user_devices SET is_active = 0 WHERE fcm_token = ?");
+                $stmt->execute([$fcmToken]);
+                ResponseFormatter::success(['deregistered' => true], 'Device deregistered successfully');
+                break;
+            }
+
             // Ensure user_id from session if not provided in data
             if (empty($data['user_id']) && $userId !== null) {
                 $data['user_id'] = $userId;
