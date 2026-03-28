@@ -421,24 +421,22 @@ $rootVarsBlock = ob_get_clean();
 }
 
 body {
-    background:  var(--background-main, var(--background_main, #0a0a0a));
+    background:  var(--background-main, var(--background_main, #242323));
     color:       var(--text-primary, var(--text_primary, #ffffff));
-    font-family: var(--body-font-family, var(--body_font-family, system-ui, sans-serif));
+    font-family: var(--body-font-family, var(--body_font-family, 'Cairo', system-ui, sans-serif));
     margin: 0;
     padding: 0;
 }
 
 .admin-header {
-    background:   var(--header-background, var(--header_background,
-                      var(--background-secondary, var(--background_secondary, #1e2533))));
-    color:        var(--header-text, var(--header_text,
-                      var(--text-primary, #ffffff)));
-    border-bottom: 1px solid var(--border-color, var(--border_color, #334155));
+    background:   var(--header-background, var(--header_background, #8f0f29));
+    color:        var(--header-text, var(--header_text, #ffffff));
+    border-bottom: 1px solid var(--border-color, var(--border_color, #7a7a7a));
 }
 
 .admin-sidebar {
-    background: var(--sidebar-background, var(--sidebar_background, #4B0082));
-    color:      var(--sidebar-text,       var(--sidebar_text,       #ffffff));
+    background: var(--sidebar-background, var(--sidebar_background, #3f363f));
+    color:      var(--sidebar-text,       var(--sidebar_text,       #e8e8e8));
 }
     </style>
 

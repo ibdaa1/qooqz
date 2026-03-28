@@ -15,34 +15,46 @@
 
 :root {
     /* ── backgrounds ──────────────────────────────────────── */
-    --background-main:       #0A0A0A;
-    --background-secondary:  #1A1A2E;
-    --surface-color:         #1E1E2E;
+    --background-main:       #242323;
+    --background-secondary:  #383f42;
+    --surface-color:         #383f42;
 
     /* ── text ─────────────────────────────────────────────── */
     --text-primary:          #FFFFFF;
-    --text-secondary:        #94A3B8;
+    --text-secondary:        #94a3b8;
 
     /* ── brand / action ───────────────────────────────────── */
-    --primary-color:         #3B82F6;
-    --primary-hover:         #2563EB;
-    --success-color:         #10B981;
-    --warning-color:         #F59E0B;
+    --primary-color:         #03874e;
+    --primary-hover:         #00ff00;
+    --success-color:         #10b981;
+    --warning-color:         #f59e0b;
     --error-color:           #EF4444;
     --danger-color:          #EF4444;
-    --info-color:            #2563EB;
+    --info-color:            #22C55E;
 
     /* ── borders / layout ─────────────────────────────────── */
-    --border-color:          #2D2D3A;
+    --border-color:          #7a7a7a;
     --border-radius:         8px;
     --card-border-radius:    var(--border-radius);
     --input-bg:              var(--surface-color);
     --card-bg:               var(--surface-color);
     --thead-bg:              var(--background-secondary);
 
+    /* ── header ───────────────────────────────────────────── */
+    --header-background:     #8f0f29;
+    --header-text:           #ffffff;
+
     /* ── sidebar ──────────────────────────────────────────── */
-    --sidebar-background:    #4B0082;
-    --sidebar-text:          #FFFFFF;
+    --sidebar-background:    #3f363f;
+    --sidebar-text:          #e8e8e8;
+
+    /* ── footer ───────────────────────────────────────────── */
+    --footer-background:     #424343;
+    --footer-text:           #B0B0B0;
+
+    /* ── sidebar toggle ──────────────────────────────────── */
+    --sidebar-toggle-bg:     #633b3b;
+    --sidebar-toggle-bg-hover: #c49121;
 
     /* ── misc layout ──────────────────────────────────────── */
     --container-width:       1280px;
@@ -68,7 +80,7 @@ body {
     font-family: var(--body-font-family, 'Inter', sans-serif);
     font-size: 16px;
     line-height: 1.6;
-    background: var(--background-main, #0A0A0A);
+    background: var(--background-main, #242323);
     color: var(--text-primary, #FFF);
     overflow-x: hidden;
 }
@@ -140,7 +152,7 @@ a:hover {
     position: sticky;
     top: 0;
     z-index: 1000;
-    background: var(--sidebar-background, #4B0082);
+    background: var(--sidebar-background, #3f363f);
     color: var(--sidebar-text, #FFF);
     border-bottom: 1px solid var(--border-color, #333);
     padding: 0 1.5rem;
@@ -202,13 +214,13 @@ a:hover {
 }
 
 #sidebarToggle {
-    background: var(--primary-color, #3B82F6);
-    border-color: var(--primary-color, #3B82F6);
+    background: var(--primary-color, #03874e);
+    border-color: var(--primary-color, #03874e);
     color: #fff;
 }
 
 #sidebarToggle:hover {
-    background: var(--primary-hover, #2563EB);
+    background: var(--primary-hover, #00ff00);
 }
 
 /* Search */
@@ -282,7 +294,7 @@ a:hover {
 
 .admin-sidebar {
     width: 280px;
-    background: var(--sidebar-background, #4B0082);
+    background: var(--sidebar-background, #3f363f);
     color: var(--sidebar-text, #FFF);
     border-right: 1px solid var(--border-color, #333);
     padding: 1rem;
@@ -319,7 +331,7 @@ a:hover {
 }
 
 .sidebar-link.active {
-    background: var(--primary-color, #3B82F6);
+    background: var(--primary-color, #03874e);
 }
 
 /* Sidebar Backdrop - FIXED: Only show on mobile when sidebar is open */
@@ -344,7 +356,7 @@ body.sidebar-open .sidebar-backdrop {
    ════════════════════════════════════════════════════════════ */
 
 .admin-footer {
-    background: var(--sidebar-background, #4B0082);
+    background: var(--sidebar-background, #3f363f);
     color: var(--sidebar-text, #FFF);
     border-top: 1px solid var(--border-color, #333);
     padding: 1.5rem;

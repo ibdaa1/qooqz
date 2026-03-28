@@ -170,7 +170,7 @@ $ADMIN_MENU = [
     [
         'id' => 'dashboard',
         'order' => 1,
-        'icon_class' => 'fas fa-home',
+        'icon' => '🏠',
         'i18n' => 'nav.dashboard',
         'url' => 'dashboard.php',
     ],
@@ -181,12 +181,12 @@ $ADMIN_MENU = [
     [
         'id' => 'users_access',
         'order' => 10,
-        'icon_class' => 'fas fa-user-shield',
+        'icon' => '🛡️',
         'i18n' => 'menu.users_access',
         'children' => [
-            ['id'=>'tenant_users','order'=>10,'icon_class'=>'fas fa-users','i18n'=>'nav.tenant_users','url'=>'fragments/tenant_users.php'],
-            ['id'=>'users','order'=>20,'icon_class'=>'fas fa-user','i18n'=>'nav.users','url'=>'fragments/users.php'],
-            ['id'=>'permissions','order'=>30,'icon_class'=>'fas fa-lock','i18n'=>'nav.permissions','url'=>'fragments/permissions.php'],
+            ['id'=>'tenant_users','order'=>10,'icon'=>'👥','i18n'=>'nav.tenant_users','url'=>'fragments/tenant_users.php'],
+            ['id'=>'users','order'=>20,'icon'=>'👤','i18n'=>'nav.users','url'=>'fragments/users.php'],
+            ['id'=>'permissions','order'=>30,'icon'=>'🔒','i18n'=>'nav.permissions','url'=>'fragments/permissions.php'],
         ]
     ],
 
@@ -196,14 +196,14 @@ $ADMIN_MENU = [
     [
         'id' => 'catalog',
         'order' => 20,
-        'icon_class' => 'fas fa-boxes',
+        'icon' => '🛍️',
         'i18n' => 'menu.catalog',
         'children' => [
-            ['id'=>'products','order'=>10,'icon_class'=>'fas fa-box','i18n'=>'nav.products','url'=>'fragments/products.php'],
-            ['id'=>'categories','order'=>20,'icon_class'=>'fas fa-list','i18n'=>'nav.menus','url'=>'fragments/categories.php'],
-            ['id'=>'categories','order'=>20,'icon_class'=>'fas fa-list','i18n'=>'nav.menus','url'=>'fragments/media_studio.php'],
-            ['id'=>'categories','order'=>20,'icon_class'=>'fas fa-list','i18n'=>'nav.menus','url'=>'fragments/tenant_categories.php'],
-            ['id'=>'brands','order'=>30,'icon_class'=>'fas fa-tags','i18n'=>'brands','url'=>'fragments/brands.php'],
+            ['id'=>'products','order'=>10,'icon'=>'📦','i18n'=>'nav.products','url'=>'fragments/products.php'],
+            ['id'=>'categories','order'=>20,'icon'=>'📂','i18n'=>'nav.menus','url'=>'fragments/categories.php'],
+            ['id'=>'media_studio','order'=>25,'icon'=>'🎬','i18n'=>'nav.media_studio','url'=>'fragments/media_studio.php'],
+            ['id'=>'tenant_categories','order'=>26,'icon'=>'🏷️','i18n'=>'nav.tenant_categories','url'=>'fragments/tenant_categories.php'],
+            ['id'=>'brands','order'=>30,'icon'=>'⭐','i18n'=>'brands','url'=>'fragments/brands.php'],
         ]
     ],
 
@@ -213,13 +213,13 @@ $ADMIN_MENU = [
     [
         'id' => 'sales',
         'order' => 30,
-        'icon_class' => 'fas fa-cash-register',
+        'icon' => '💰',
         'i18n' => 'menu.sales',
         'children' => [
-            ['id'=>'pos','order'=>10,'icon_class'=>'fas fa-cash-register','i18n'=>'nav.pos','url'=>'fragments/pos.php'],
-            ['id'=>'discounts','order'=>20,'icon_class'=>'fas fa-percent','i18n'=>'discounts','url'=>'fragments/discounts.php'],
-            ['id'=>'flash_sales','order'=>30,'icon_class'=>'fas fa-bolt','i18n'=>'Flash Sales','url'=>'fragments/flash_sales.php'],
-            ['id'=>'carts','order'=>40,'icon_class'=>'fas fa-shopping-cart','i18n'=>'carts','url'=>'fragments/carts.php'],
+            ['id'=>'pos','order'=>10,'icon'=>'🧾','i18n'=>'nav.pos','url'=>'fragments/pos.php'],
+            ['id'=>'discounts','order'=>20,'icon'=>'🏷️','i18n'=>'discounts','url'=>'fragments/discounts.php'],
+            ['id'=>'flash_sales','order'=>30,'icon'=>'⚡','i18n'=>'Flash Sales','url'=>'fragments/flash_sales.php'],
+            ['id'=>'carts','order'=>40,'icon'=>'🛒','i18n'=>'carts','url'=>'fragments/carts.php'],
         ]
     ],
 
@@ -229,13 +229,13 @@ $ADMIN_MENU = [
     [
         'id' => 'logistics',
         'order' => 40,
-        'icon_class' => 'fas fa-truck',
+        'icon' => '🚚',
         'i18n' => 'menu.logistics',
         'children' => [
-            ['id'=>'delivery','order'=>10,'icon_class'=>'fas fa-truck','i18n'=>'menu.delivery','url'=>'fragments/delivery.php'],
-            ['id'=>'auctions','order'=>20,'icon_class'=>'fas fa-gavel','i18n'=>'menu.auctions','url'=>'fragments/auctions.php'],
-            ['id'=>'stock_movements','order'=>30,'icon_class'=>'fas fa-warehouse','i18n'=>'Stock Movements','url'=>'fragments/stock_movements.php'],
-            ['id'=>'returns','order'=>40,'icon_class'=>'fas fa-undo','i18n'=>'menu.returns','url'=>'fragments/returns.php'],
+            ['id'=>'delivery','order'=>10,'icon'=>'📬','i18n'=>'menu.delivery','url'=>'fragments/delivery.php'],
+            ['id'=>'auctions','order'=>20,'icon'=>'🔨','i18n'=>'menu.auctions','url'=>'fragments/auctions.php'],
+            ['id'=>'stock_movements','order'=>30,'icon'=>'🏭','i18n'=>'Stock Movements','url'=>'fragments/stock_movements.php'],
+            ['id'=>'returns','order'=>40,'icon'=>'↩️','i18n'=>'menu.returns','url'=>'fragments/returns.php'],
         ]
     ],
 
@@ -245,13 +245,13 @@ $ADMIN_MENU = [
     [
         'id' => 'finance',
         'order' => 50,
-        'icon_class' => 'fas fa-money-bill-wave',
+        'icon' => '💳',
         'i18n' => 'menu.finance',
         'children' => [
-            ['id'=>'escrow','order'=>10,'icon_class'=>'fas fa-handshake','i18n'=>'menu.escro','url'=>'fragments/escrow.php'],
-            ['id'=>'commissions','order'=>20,'icon_class'=>'fas fa-percentage','i18n'=>'Commissions','url'=>'fragments/commissions.php'],
-            ['id'=>'subscriptions','order'=>30,'icon_class'=>'fas fa-sync','i18n'=>'Subscriptions','url'=>'fragments/subscriptions.php'],
-            ['id'=>'plan_selection','order'=>40,'icon_class'=>'fas fa-list-check','i18n'=>'plan_selection','url'=>'fragments/plan_selection.php'],
+            ['id'=>'escrow','order'=>10,'icon'=>'🤝','i18n'=>'menu.escro','url'=>'fragments/escrow.php'],
+            ['id'=>'commissions','order'=>20,'icon'=>'💹','i18n'=>'Commissions','url'=>'fragments/commissions.php'],
+            ['id'=>'subscriptions','order'=>30,'icon'=>'🔄','i18n'=>'Subscriptions','url'=>'fragments/subscriptions.php'],
+            ['id'=>'plan_selection','order'=>40,'icon'=>'📋','i18n'=>'plan_selection','url'=>'fragments/plan_selection.php'],
         ]
     ],
 
@@ -261,13 +261,13 @@ $ADMIN_MENU = [
     [
         'id' => 'marketing',
         'order' => 60,
-        'icon_class' => 'fas fa-bullhorn',
+        'icon' => '📢',
         'i18n' => 'menu.marketing',
         'children' => [
-            ['id'=>'ads','order'=>10,'icon_class'=>'fas fa-ad','i18n'=>'ads','url'=>'fragments/ads.php'],
-            ['id'=>'banners','order'=>20,'icon_class'=>'fas fa-image','i18n'=>'menu.banners','url'=>'fragments/banners.php'],
-            ['id'=>'seo_meta','order'=>30,'icon_class'=>'fas fa-search','i18n'=>'Seo Meta','url'=>'fragments/seo_meta.php'],
-            ['id'=>'notifications','order'=>40,'icon_class'=>'fas fa-bell','i18n'=>'menu.notifications','url'=>'fragments/notification.php'],
+            ['id'=>'ads','order'=>10,'icon'=>'📺','i18n'=>'ads','url'=>'fragments/ads.php'],
+            ['id'=>'banners','order'=>20,'icon'=>'🖼️','i18n'=>'menu.banners','url'=>'fragments/banners.php'],
+            ['id'=>'seo_meta','order'=>30,'icon'=>'🔍','i18n'=>'Seo Meta','url'=>'fragments/seo_meta.php'],
+            ['id'=>'notifications','order'=>40,'icon'=>'🔔','i18n'=>'menu.notifications','url'=>'fragments/notification.php'],
         ]
     ],
 
@@ -277,12 +277,12 @@ $ADMIN_MENU = [
     [
         'id' => 'support',
         'order' => 70,
-        'icon_class' => 'fas fa-life-ring',
+        'icon' => '🎫',
         'i18n' => 'menu.support',
         'children' => [
-            ['id'=>'tickets','order'=>10,'icon_class'=>'fas fa-ticket-alt','i18n'=>'menu.tickets','url'=>'fragments/tickets.php'],
-            ['id'=>'ticket_categories','order'=>20,'icon_class'=>'fas fa-tags','i18n'=>'menu.ticket_categories','url'=>'fragments/ticket_categories.php'],
-            ['id'=>'bad_words','order'=>30,'icon_class'=>'fas fa-ban','i18n'=>'bad_words','url'=>'fragments/bad_words.php'],
+            ['id'=>'tickets','order'=>10,'icon'=>'🎟️','i18n'=>'menu.tickets','url'=>'fragments/tickets.php'],
+            ['id'=>'ticket_categories','order'=>20,'icon'=>'🏷️','i18n'=>'menu.ticket_categories','url'=>'fragments/ticket_categories.php'],
+            ['id'=>'bad_words','order'=>30,'icon'=>'🚫','i18n'=>'bad_words','url'=>'fragments/bad_words.php'],
         ]
     ],
 
@@ -292,13 +292,13 @@ $ADMIN_MENU = [
     [
         'id' => 'business',
         'order' => 80,
-        'icon_class' => 'fas fa-building',
+        'icon' => '🏢',
         'i18n' => 'menu.business',
         'children' => [
-            ['id'=>'entities','order'=>10,'icon_class'=>'fas fa-building','i18n'=>'menu.entities','url'=>'fragments/entities.php'],
-            ['id'=>'entities_payment','order'=>20,'icon_class'=>'fas fa-credit-card','i18n'=>'entities_Payment','url'=>'fragments/entities_Payment.php'],
-            ['id'=>'jobs','order'=>30,'icon_class'=>'fas fa-briefcase','i18n'=>'menu.jobs','url'=>'fragments/jobs.php'],
-            ['id'=>'job_categories','order'=>40,'icon_class'=>'fas fa-sitemap','i18n'=>'job_categories','url'=>'fragments/job_categories.php'],
+            ['id'=>'entities','order'=>10,'icon'=>'🏪','i18n'=>'menu.entities','url'=>'fragments/entities.php'],
+            ['id'=>'entities_payment','order'=>20,'icon'=>'💳','i18n'=>'entities_Payment','url'=>'fragments/entities_Payment.php'],
+            ['id'=>'jobs','order'=>30,'icon'=>'💼','i18n'=>'menu.jobs','url'=>'fragments/jobs.php'],
+            ['id'=>'job_categories','order'=>40,'icon'=>'📊','i18n'=>'job_categories','url'=>'fragments/job_categories.php'],
         ]
     ],
 
@@ -308,13 +308,13 @@ $ADMIN_MENU = [
     [
         'id' => 'system',
         'order' => 90,
-        'icon_class' => 'fas fa-cogs',
+        'icon' => '⚙️',
         'i18n' => 'menu.system',
         'children' => [
-            ['id'=>'tenant','order'=>10,'icon_class'=>'fas fa-store','i18n'=>'menu.tenant','url'=>'fragments/tenant.php'],
-            ['id'=>'themes','order'=>20,'icon_class'=>'fas fa-palette','i18n'=>'nav.settings','url'=>'fragments/themes.php'],
-            ['id'=>'addresses','order'=>30,'icon_class'=>'fas fa-map-marker-alt','i18n'=>'nav.addresses','url'=>'fragments/addresses.php'],
-            ['id'=>'queues','order'=>40,'icon_class'=>'fas fa-stream','i18n'=>'queues','url'=>'fragments/queues.php'],
+            ['id'=>'tenant','order'=>10,'icon'=>'🏪','i18n'=>'menu.tenant','url'=>'fragments/tenant.php'],
+            ['id'=>'themes','order'=>20,'icon'=>'🎨','i18n'=>'nav.settings','url'=>'fragments/themes.php'],
+            ['id'=>'addresses','order'=>30,'icon'=>'📍','i18n'=>'nav.addresses','url'=>'fragments/addresses.php'],
+            ['id'=>'queues','order'=>40,'icon'=>'📊','i18n'=>'queues','url'=>'fragments/queues.php'],
         ]
     ],
 

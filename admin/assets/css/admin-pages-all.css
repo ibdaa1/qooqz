@@ -1469,12 +1469,12 @@ textarea.form-control {
 :root {
   /* Use theme colors injected by theme_injector.php, with fallbacks */
   --idrv-bg: var(--color-surface, #1A1A1A);
-  --idrv-bg-light: var(--color-bg, #0A0A0A);
+  --idrv-bg-light: var(--color-bg, #242323);
   --idrv-border: var(--color-border, #333333);
   --idrv-muted: var(--color-muted, #B0B0B0);
   --idrv-text-primary: var(--color-text, #FFFFFF);
   --idrv-accent: var(--color-primary, #FF0000);
-  --idrv-accent-hover: var(--color-primary-dark, #2563EB);
+  --idrv-accent-hover: var(--color-primary-dark, #00ff00);
   --idrv-success: var(--color-success, #10B981);
   --idrv-danger: var(--color-error, #EF4444);
   --idrv-warning: var(--color-warning, #F59E0B);
@@ -16331,12 +16331,12 @@ textarea.form-control {
 */
 
 :root {
-  --rp-bg: var(--theme-background, #0A0A0A);
+  --rp-bg: var(--theme-background, #242323);
   --rp-text: var(--theme-text-primary, #FFFFFF);
   --rp-text-secondary: var(--theme-text-secondary, #B0B0B0);
   --rp-border: var(--theme-border, #333333);
   --rp-primary: var(--theme-primary, #FF0000);
-  --rp-primary-hover: var(--theme-primary-hover, #2563EB);
+  --rp-primary-hover: var(--theme-primary-hover, #00ff00);
   --rp-card: var(--theme-background-secondary, #1A1A1A);
   --rp-error: var(--theme-error, #EF4444);
   --rp-success: var(--theme-success, #10B981);
@@ -16532,12 +16532,12 @@ textarea.form-control {
 */
 
 :root {
-  --roles-bg: var(--theme-background, #0A0A0A);
+  --roles-bg: var(--theme-background, #242323);
   --roles-text: var(--theme-text-primary, #FFFFFF);
   --roles-text-secondary: var(--theme-text-secondary, #B0B0B0);
   --roles-border: var(--theme-border, #333333);
   --roles-primary: var(--theme-primary, #FF0000);
-  --roles-primary-hover: var(--theme-primary-hover, #2563EB);
+  --roles-primary-hover: var(--theme-primary-hover, #00ff00);
   --roles-card: var(--theme-background-secondary, #1A1A1A);
   --roles-error: var(--theme-error, #EF4444);
   --roles-success: var(--theme-success, #10B981);
@@ -22663,10 +22663,10 @@ body {
 /* Table header */
 .vendor-working-hours-fragment .table thead th {
     background: var(--theme-background, rgba(59, 130, 246, 0.1));
-    color: var(--theme-primary, #3B82F6);
+    color: var(--theme-primary, #03874e);
     padding: 15px;
     text-align: start;
-    border-bottom: 2px solid var(--theme-primary, #3B82F6);
+    border-bottom: 2px solid var(--theme-primary, #03874e);
 }
 
 /* Table cells */
@@ -22699,8 +22699,8 @@ body {
 /* Edit button - Uses theme primary color */
 .vendor-working-hours-fragment .btn-edit {
     background: transparent;
-    color: var(--theme-primary, #3B82F6);
-    border: 1px solid var(--theme-primary, #3B82F6);
+    color: var(--theme-primary, #03874e);
+    border: 1px solid var(--theme-primary, #03874e);
     padding: 5px 10px;
     border-radius: var(--theme-btn-radius, 4px);
     cursor: pointer;
@@ -22708,7 +22708,7 @@ body {
 }
 
 .vendor-working-hours-fragment .btn-edit:hover {
-    background: var(--theme-primary, #3B82F6);
+    background: var(--theme-primary, #03874e);
     color: #fff;
 }
 
@@ -22716,7 +22716,7 @@ body {
 .vendor-working-hours-fragment .form-input {
     width: 100%;
     padding: 10px;
-    background: var(--theme-background, #0A0A0A);
+    background: var(--theme-background, #242323);
     border: 1px solid var(--theme-border, #333333);
     color: var(--theme-text-primary, #FFFFFF);
     border-radius: var(--theme-btn-radius, 6px);
@@ -22724,14 +22724,14 @@ body {
 }
 
 .vendor-working-hours-fragment .form-input:focus {
-    border-color: var(--theme-primary, #3B82F6);
+    border-color: var(--theme-primary, #03874e);
     outline: none;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
 /* Buttons using theme button styles */
 .vendor-working-hours-fragment .btn-primary {
-    background: var(--theme-primary, #3B82F6);
+    background: var(--theme-primary, #03874e);
     color: var(--theme-text-primary, #FFFFFF);
     border: none;
     padding: var(--theme-btn-padding, 10px 16px);
@@ -22742,7 +22742,7 @@ body {
 }
 
 .vendor-working-hours-fragment .btn-primary:hover {
-    background: var(--theme-primary-hover, #2563EB);
+    background: var(--theme-primary-hover, #00ff00);
 }
 
 .vendor-working-hours-fragment .btn-secondary {
