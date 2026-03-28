@@ -191,6 +191,19 @@ final class PdoUserDevicesRepository
     }
 
     /**
+     * Find device by user_id and user_agent (for deduplication without FCM token)
+     */
+    public function findByUserAndAgent(int $userId, string $userAgent): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT * FROM user_devices WHERE user_id = :user_id AND user_agent = :user_agent AND is_active = 1 ORDER BY last_seen_at DESC LIMIT 1"
+        );
+        $stmt->execute([':user_id' => $userId, ':user_agent' => $userAgent]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    /**
      * Update last seen timestamp
      */
     public function touch(int $id): bool

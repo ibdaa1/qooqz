@@ -45,16 +45,32 @@ final class UserDevicesService
         return $this->repo->findByUserId($userId);
     }
 
+    public function getByUserAndAgent(int $userId, string $userAgent): ?array
+    {
+        return $this->repo->findByUserAndAgent($userId, $userAgent);
+    }
+
     public function create(array $data): int
     {
         $this->validator->validate($data, false);
 
-        // Ensure token uniqueness (optional: update existing instead of duplicate)
-        $existing = $this->repo->findByToken($data['fcm_token']);
-        if ($existing) {
-            // If token exists, just update its metadata and return existing id
-            $data['id'] = $existing['id'];
-            return $this->update($data);
+        // Deduplicate by FCM token if provided
+        if (!empty($data['fcm_token'])) {
+            $existing = $this->repo->findByToken($data['fcm_token']);
+            if ($existing) {
+                // If token exists, just update its metadata and return existing id
+                $data['id'] = $existing['id'];
+                return $this->update($data);
+            }
+        }
+
+        // Deduplicate by user_id + user_agent if no FCM token (session-based tracking)
+        if (empty($data['fcm_token']) && !empty($data['user_id']) && !empty($data['user_agent'])) {
+            $existing = $this->repo->findByUserAndAgent((int)$data['user_id'], $data['user_agent']);
+            if ($existing) {
+                $data['id'] = $existing['id'];
+                return $this->update($data);
+            }
         }
 
         return $this->repo->save($data);

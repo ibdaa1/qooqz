@@ -50,6 +50,64 @@ if (!$pdo instanceof PDO) {
     exit;
 }
 
+/**
+ * Auto-register device in user_devices table after login.
+ * Captures user_agent, IP, device_type, device_name even without FCM.
+ */
+function _register_login_device(PDO $pdo, int $userId): void
+{
+    try {
+        $ua = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 512);
+        $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+
+        // Detect device type from user agent
+        $uaLower = strtolower($ua);
+        if (str_contains($uaLower, 'android'))       $deviceType = 'android';
+        elseif (str_contains($uaLower, 'iphone') || str_contains($uaLower, 'ipad')) $deviceType = 'ios';
+        elseif ($ua !== '')                           $deviceType = 'web';
+        else                                          $deviceType = 'other';
+
+        // Parse device name (browser + OS)
+        $deviceName = '';
+        if (preg_match('/(?:Chrome|CriOS)\/[\d.]+/', $ua))     $deviceName = 'Chrome';
+        elseif (preg_match('/(?:Edg|Edge)\/[\d.]+/', $ua))     $deviceName = 'Edge';
+        elseif (preg_match('/Firefox\/[\d.]+/', $ua))           $deviceName = 'Firefox';
+        elseif (preg_match('/Safari\/[\d.]+/', $ua) && !str_contains($ua, 'Chrome')) $deviceName = 'Safari';
+        else $deviceName = 'Browser';
+
+        if (str_contains($uaLower, 'windows'))      $deviceName .= ' on Windows';
+        elseif (str_contains($uaLower, 'macintosh')) $deviceName .= ' on macOS';
+        elseif (str_contains($uaLower, 'android'))   $deviceName .= ' on Android';
+        elseif (str_contains($uaLower, 'iphone'))    $deviceName .= ' on iOS';
+        elseif (str_contains($uaLower, 'linux'))     $deviceName .= ' on Linux';
+
+        // Upsert: update existing device by user_id+user_agent, or insert new
+        $existing = $pdo->prepare(
+            "SELECT id FROM user_devices WHERE user_id = ? AND user_agent = ? AND is_active = 1 LIMIT 1"
+        );
+        $existing->execute([$userId, $ua]);
+        $row = $existing->fetch(PDO::FETCH_ASSOC);
+
+        if ($row) {
+            $upd = $pdo->prepare(
+                "UPDATE user_devices SET ip = ?, last_seen_at = NOW(), updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+            );
+            $upd->execute([$ip, $row['id']]);
+        } else {
+            $ins = $pdo->prepare(
+                "INSERT INTO user_devices (user_id, device_type, device_name, user_agent, ip, last_seen_at, is_active, created_at)
+                 VALUES (?, ?, ?, ?, ?, NOW(), 1, CURRENT_TIMESTAMP)"
+            );
+            $ins->execute([$userId, $deviceType, substr($deviceName, 0, 100), $ua, $ip]);
+        }
+    } catch (Throwable $e) {
+        // Silent failure — device registration should never block login
+        if (function_exists('safe_log')) {
+            safe_log('warning', 'auth.device_register', ['error' => $e->getMessage()]);
+        }
+    }
+}
+
 // Read dispatcher segments / action
 $segments = $_GET['segments'] ?? [];
 $firstSeg = strtolower($segments[0] ?? '');
@@ -329,6 +387,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $_SESSION['roles']       = $user['roles'];
             unset($_SESSION['pending_user_id']);
             $GLOBALS['ADMIN_USER']   = $user;
+
+            // Auto-register device on Google login
+            _register_login_device($pdo, (int)$user['id']);
 
             // Redirect to frontend after successful Google login
             header('Location: ' . $appUrl . '/frontend/public/index.php');
@@ -795,6 +856,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['permissions'] = $user['permissions'];
         $_SESSION['roles'] = $user['roles'];
         $GLOBALS['ADMIN_USER'] = $user;
+
+        // Auto-register device on login
+        _register_login_device($pdo, (int)$user['id']);
 
         ResponseFormatter::success(['ok' => true, 'message' => 'Authenticated', 'user' => $user]);
         exit;

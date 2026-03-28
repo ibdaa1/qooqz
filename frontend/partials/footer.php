@@ -104,6 +104,40 @@ $_authPath   = '/frontend';
 
 <?php
 // ════════════════════════════════════════════════════════════
+// Device Registration Fallback (without FCM)
+// Registers device info on every page load for logged-in users.
+// If FCM later provides a token, firebase.js will update the record.
+// ════════════════════════════════════════════════════════════
+$_devRegUserId = 0;
+if (isset($_user) && !empty($_user['id'])) {
+    $_devRegUserId = (int)$_user['id'];
+} elseif (!empty($_SESSION['user_id'])) {
+    $_devRegUserId = (int)$_SESSION['user_id'];
+} elseif (!empty($_SESSION['user']['id'])) {
+    $_devRegUserId = (int)$_SESSION['user']['id'];
+}
+
+if ($_devRegUserId > 0):
+?>
+<script>
+(function(){
+    var K='qz_dev_reg', D=86400000;
+    var t=localStorage.getItem(K);
+    if(t && (Date.now()-parseInt(t,10))<D) return; // already registered today
+    fetch('/api/public/user_devices',{
+        method:'POST',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({})
+    }).then(function(r){
+        if(r.ok) localStorage.setItem(K,''+Date.now());
+    }).catch(function(){});
+})();
+</script>
+<?php endif; // $_devRegUserId check ?>
+
+<?php
+// ════════════════════════════════════════════════════════════
 // Firebase Push Notifications — Device Registration
 // يُحمَّل فقط إذا: FCM مفعّل + المستخدم مسجّل دخول
 // ════════════════════════════════════════════════════════════

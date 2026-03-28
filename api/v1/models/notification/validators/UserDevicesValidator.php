@@ -10,13 +10,10 @@ final class UserDevicesValidator
      */
     public function validate(array $data, bool $isUpdate = false): void
     {
-        // Required fields for create
-        $required = ['user_id', 'fcm_token'];
+        // Required fields for create (fcm_token is optional — allows session-based device tracking)
         if (!$isUpdate) {
-            foreach ($required as $field) {
-                if (!isset($data[$field]) || trim($data[$field]) === '') {
-                    throw new InvalidArgumentException("Field '$field' is required.");
-                }
+            if (!isset($data['user_id']) || trim((string)$data['user_id']) === '') {
+                throw new InvalidArgumentException("Field 'user_id' is required.");
             }
         }
 
@@ -25,9 +22,9 @@ final class UserDevicesValidator
             throw new InvalidArgumentException("user_id must be a positive integer.");
         }
 
-        // Validate fcm_token (non-empty string)
-        if (isset($data['fcm_token']) && trim($data['fcm_token']) === '') {
-            throw new InvalidArgumentException("fcm_token cannot be empty.");
+        // Validate fcm_token (non-empty string if provided)
+        if (isset($data['fcm_token']) && $data['fcm_token'] !== null && trim($data['fcm_token']) === '') {
+            $data['fcm_token'] = null; // treat empty string as null
         }
 
         // Validate device_type (allowed values)
