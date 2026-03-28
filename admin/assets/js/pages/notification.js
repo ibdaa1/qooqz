@@ -1498,9 +1498,12 @@
         if (!confirmDialog(confirmMsg)) return;
 
         const sendBtn = getEl('btnBulkSend');
+        let originalBtnHtml = '';
         if (sendBtn) {
+            originalBtnHtml = sendBtn.innerHTML;
             sendBtn.disabled = true;
-            sendBtn.querySelector('span')?.replaceWith(document.createTextNode(t('form.buttons.sending') || 'Sending...'));
+            const span = sendBtn.querySelector('span');
+            if (span) span.textContent = t('form.buttons.sending') || 'Sending...';
         }
 
         try {
@@ -1541,19 +1544,9 @@
         } finally {
             if (sendBtn) {
                 sendBtn.disabled = false;
-                const span = document.createElement('span');
-                span.textContent = t('bulk_send.send_button') || 'Send to Selected Recipients';
-                const icon = sendBtn.querySelector('i');
-                sendBtn.innerHTML = '';
-                if (icon) sendBtn.appendChild(icon);
-                sendBtn.appendChild(document.createTextNode(' '));
-                sendBtn.appendChild(span);
-                sendBtn.appendChild(document.createTextNode(' ('));
-                const countSpan = document.createElement('span');
-                countSpan.id = 'bsSendCount';
-                countSpan.textContent = _bulkState.selectedUserIds.size;
-                sendBtn.appendChild(countSpan);
-                sendBtn.appendChild(document.createTextNode(')'));
+                sendBtn.innerHTML = originalBtnHtml;
+                const countSpan = getEl('bsSendCount');
+                if (countSpan) countSpan.textContent = _bulkState.selectedUserIds.size;
             }
         }
     }
