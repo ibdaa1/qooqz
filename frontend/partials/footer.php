@@ -156,7 +156,7 @@ if (!$_fcmEnabled) {
             $_eLine = trim($_eLine);
             if ($_eLine === '' || str_starts_with($_eLine, '#') || !str_contains($_eLine, '=')) continue;
             [$_eK, $_eV] = array_map('trim', explode('=', $_eLine, 2));
-            if ($_eK !== '' && !getenv($_eK)) {
+            if ($_eK !== '' && getenv($_eK) === false) {
                 putenv("{$_eK}={$_eV}");
             }
         }
