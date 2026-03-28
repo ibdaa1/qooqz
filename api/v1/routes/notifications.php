@@ -219,11 +219,15 @@ try {
     safe_log('error', 'notifications.runtime', ['error' => $e->getMessage()]);
     ResponseFormatter::error($e->getMessage(), 400);
 } catch (Throwable $e) {
+    $trace = array_map(
+        fn($f) => ($f['file'] ?? '?') . ':' . ($f['line'] ?? '?') . ' ' . ($f['class'] ?? '') . ($f['type'] ?? '') . ($f['function'] ?? ''),
+        array_slice($e->getTrace(), 0, 5)
+    );
     safe_log('critical', 'notifications.fatal', [
         'error' => $e->getMessage(),
         'file'  => $e->getFile(),
         'line'  => $e->getLine(),
-        'trace' => array_slice(array_map(fn($f) => ($f['file'] ?? '?') . ':' . ($f['line'] ?? '?') . ' ' . ($f['class'] ?? '') . ($f['type'] ?? '') . ($f['function'] ?? ''), $e->getTrace()), 0, 5),
+        'trace' => $trace,
         'GET'   => $_GET,
     ]);
     // Surface the actual error in development; hide in production

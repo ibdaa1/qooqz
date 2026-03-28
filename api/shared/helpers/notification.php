@@ -17,7 +17,7 @@ if (!defined('FCM_ENDPOINT'))      define('FCM_ENDPOINT',      'https://fcm.goog
 if (!defined('APP_LOGO_URL'))      define('APP_LOGO_URL',      '/frontend/assets/images/logo.png');
 
 // FCM v1 API settings
-if (!defined('FCM_PROJECT_ID'))    define('FCM_PROJECT_ID',    getenv('FCM_PROJECT_ID')    ?: 'qooqz-2011');
+if (!defined('FCM_PROJECT_ID'))    define('FCM_PROJECT_ID',    getenv('FCM_PROJECT_ID')    ?: '');
 if (!defined('FCM_SERVICE_ACCOUNT_PATH')) {
     $saPath = getenv('FCM_SERVICE_ACCOUNT_PATH') ?: '';
     if (!$saPath) {
@@ -290,6 +290,9 @@ class Notification
         // محاولة FCM v1 API أولاً (الطريقة الحديثة)
         $accessToken = self::getFcmAccessToken();
         if ($accessToken) {
+            if (empty(FCM_PROJECT_ID)) {
+                return ['success' => false, 'message' => 'FCM_PROJECT_ID not configured in .env'];
+            }
             return self::sendViaFcmV1($tokens, $title, $message, $data, $notificationId, $recipientId, $accessToken);
         }
 
@@ -511,7 +514,8 @@ class Notification
 
         try {
             $now = time();
-            $exp = $now + 3600; // 1 ساعة
+            $jwtTtlSeconds = 3600; // JWT valid for 1 hour
+            $exp = $now + $jwtTtlSeconds;
 
             // بناء JWT header + claims
             $header = self::base64UrlEncode(json_encode(['alg' => 'RS256', 'typ' => 'JWT']));
@@ -566,7 +570,8 @@ class Notification
             }
 
             self::$cachedAccessToken = $tokenData['access_token'];
-            self::$tokenExpiresAt    = $now + (int)($tokenData['expires_in'] ?? 3500) - 60; // 60 ثانية هامش
+            $tokenExpiryBuffer = 60; // refresh 60 seconds before actual expiry
+            self::$tokenExpiresAt    = $now + (int)($tokenData['expires_in'] ?? 3500) - $tokenExpiryBuffer;
 
             return self::$cachedAccessToken;
 
