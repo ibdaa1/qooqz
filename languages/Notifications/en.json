@@ -312,6 +312,15 @@
         "recipient_type": "Recipient Type",
         "recipient_id": "Recipient ID",
         "channels_label": "Select delivery channels",
-        "confirm": "Are you sure you want to send this notification?"
+        "confirm": "Are you sure you want to send this notification?",
+        "target_devices": "Target Devices",
+        "device_picker_hint": "Select specific devices or leave all unchecked to send to all devices.",
+        "enter_recipient_first": "Enter a Recipient ID first to load devices.",
+        "load_devices": "Load Devices",
+        "loading_devices": "Loading devices...",
+        "no_devices_found": "No devices found for this user.",
+        "no_fcm_token": "No FCM token",
+        "device_inactive": "Inactive",
+        "load_devices_error": "Failed to load devices"
     }
 }

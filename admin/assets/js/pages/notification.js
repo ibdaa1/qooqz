@@ -532,8 +532,14 @@
         // Show/hide channels and recipient groups
         const channelsGroup = document.querySelector('.notif-channels-group');
         const recipientGroup = document.querySelector('.notif-recipient-group');
+        const devicePickerGroup = getEl('devicePickerGroup');
         if (channelsGroup) channelsGroup.style.display = (tab === 'list' && !editData) ? '' : 'none';
         if (recipientGroup) recipientGroup.style.display = (tab === 'list' && !editData) ? '' : 'none';
+        if (devicePickerGroup) {
+            devicePickerGroup.style.display = 'none'; // hidden by default, shown when push is checked
+            const pickerList = getEl('devicePickerList');
+            if (pickerList) pickerList.innerHTML = '<p class="device-picker-empty">' + esc(t('send_notification.enter_recipient_first')) + '</p>';
+        }
 
         // Reset form
         const form = getEl('notifForm');
@@ -614,6 +620,65 @@
         return data;
     }
 
+    /* ──────────────────────────────────────────
+       DEVICE PICKER (for targeted push)
+    ────────────────────────────────────────── */
+    async function loadDevicesForRecipient() {
+        const riEl = getEl('fSendRecipientId');
+        const pickerList = getEl('devicePickerList');
+        if (!riEl || !pickerList) return;
+
+        const recipientId = parseInt(riEl.value, 10);
+        if (!recipientId || recipientId <= 0) {
+            pickerList.innerHTML = '<p class="device-picker-empty">' + esc(t('send_notification.enter_recipient_first')) + '</p>';
+            return;
+        }
+
+        pickerList.innerHTML = '<p class="device-picker-loading"><i class="fas fa-spinner fa-spin"></i> ' + esc(t('send_notification.loading_devices')) + '</p>';
+
+        try {
+            const result = await apiFetch(cfg().api.devices + '?user_id=' + recipientId);
+            const items = result.data?.items || result.items || [];
+            if (items.length === 0) {
+                pickerList.innerHTML = '<p class="device-picker-empty">' + esc(t('send_notification.no_devices_found')) + '</p>';
+                return;
+            }
+
+            let html = '';
+            items.forEach(dev => {
+                const hasFcm = dev.fcm_token && dev.fcm_token !== 'NULL';
+                const isActive = String(dev.is_active) === '1';
+                const disabledAttr = (!hasFcm || !isActive) ? ' disabled' : '';
+                const statusIcon = isActive ? (hasFcm ? '🟢' : '🟡') : '🔴';
+                const tokenHint = hasFcm ? '' : ' — ' + esc(t('send_notification.no_fcm_token'));
+                const inactiveHint = !isActive ? ' — ' + esc(t('send_notification.device_inactive')) : '';
+                html += '<label class="device-picker-item' + (disabledAttr ? ' disabled' : '') + '">'
+                    + '<input type="checkbox" name="device_ids[]" value="' + esc(dev.id) + '"' + disabledAttr + '>'
+                    + '<span class="device-info">'
+                    + statusIcon + ' '
+                    + '<strong>' + esc(dev.device_name || dev.device_type || 'Unknown') + '</strong>'
+                    + ' <span class="device-type-badge">' + esc(dev.device_type || '') + '</span>'
+                    + tokenHint + inactiveHint
+                    + (dev.last_seen_at ? ' <span class="device-last-seen">' + dateFmt(dev.last_seen_at) + '</span>' : '')
+                    + '</span>'
+                    + '</label>';
+            });
+            pickerList.innerHTML = html;
+        } catch (err) {
+            pickerList.innerHTML = '<p class="device-picker-empty" style="color:var(--danger)">' + esc(err.message || t('send_notification.load_devices_error')) + '</p>';
+        }
+    }
+
+    function toggleDevicePicker() {
+        const pushCb = getEl('chkPushChannel');
+        const group = getEl('devicePickerGroup');
+        if (!pushCb || !group) return;
+        group.style.display = pushCb.checked ? '' : 'none';
+        if (pushCb.checked) {
+            loadDevicesForRecipient();
+        }
+    }
+
     /* Collect send notification data (channels + recipient from list tab) */
     function collectSendData() {
         const form = getEl('notifForm');
@@ -624,7 +689,8 @@
         if (section) {
             section.querySelectorAll('input, textarea, select').forEach(el => {
                 if (!el.name || el.name === 'csrf_token' || el.name === '_tab'
-                    || el.name === 'channels[]' || el.name.startsWith('send_')) return;
+                    || el.name === 'channels[]' || el.name === 'device_ids[]'
+                    || el.name.startsWith('send_')) return;
                 const v = el.value.trim();
                 data[el.name] = v === '' ? null : v;
             });
@@ -636,6 +702,17 @@
             channels.push(cb.value);
         });
         data.channels = channels.length > 0 ? channels : ['database'];
+
+        // Collect selected device IDs for targeted push
+        if (channels.includes('push')) {
+            const deviceIds = [];
+            form.querySelectorAll('input[name="device_ids[]"]:checked').forEach(cb => {
+                deviceIds.push(parseInt(cb.value, 10));
+            });
+            if (deviceIds.length > 0) {
+                data.device_ids = deviceIds;
+            }
+        }
 
         // Collect recipient
         const rtEl = getEl('fSendRecipientType');
@@ -1125,6 +1202,31 @@
         const sendNotifBtn = getEl('btnSendNotification');
         if (sendNotifBtn) {
             sendNotifBtn.addEventListener('click', () => sendNotification());
+        }
+
+        // Push channel checkbox — toggle device picker
+        const pushCb = getEl('chkPushChannel');
+        if (pushCb) {
+            pushCb.addEventListener('change', toggleDevicePicker);
+        }
+
+        // Load devices button
+        const loadDevBtn = getEl('btnLoadDevices');
+        if (loadDevBtn) {
+            loadDevBtn.addEventListener('click', () => loadDevicesForRecipient());
+        }
+
+        // Auto-load devices when recipient ID changes (debounced)
+        const recipientIdEl = getEl('fSendRecipientId');
+        if (recipientIdEl) {
+            let devTimeout;
+            recipientIdEl.addEventListener('input', () => {
+                clearTimeout(devTimeout);
+                devTimeout = setTimeout(() => {
+                    const pushEl = getEl('chkPushChannel');
+                    if (pushEl && pushEl.checked) loadDevicesForRecipient();
+                }, 800);
+            });
         }
 
         // Form submit

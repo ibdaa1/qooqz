@@ -155,6 +155,12 @@ try {
                 }
             }
 
+            // Parse device_ids for targeted push delivery
+            $deviceIds = [];
+            if (!empty($data['device_ids']) && is_array($data['device_ids'])) {
+                $deviceIds = array_map('intval', array_filter($data['device_ids'], 'is_numeric'));
+            }
+
             // Validate channels
             $validChannels = ['database', 'push', 'email', 'sms'];
             $channels = array_values(array_intersect($channels, $validChannels));
@@ -173,7 +179,8 @@ try {
                 $channels,
                 $priority,
                 $expiresAt,
-                $senderEntityId
+                $senderEntityId,
+                $deviceIds
             );
 
             ResponseFormatter::success($result, 'Notification sent successfully', 201);

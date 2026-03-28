@@ -66,7 +66,8 @@ class Notification
         array   $channels      = ['database'],
         string  $priority      = 'normal',
         ?string $expiresAt     = null,
-        ?int    $senderEntityId = null
+        ?int    $senderEntityId = null,
+        array   $deviceIds     = []
     ): array {
         if (!self::$pdo) {
             return ['success' => false, 'message' => 'PDO not initialized'];
@@ -119,7 +120,7 @@ class Notification
                         $user, $message
                     ),
                     'push' => self::handlePushChannel(
-                        $recipientId, $recipientType, $title, $message, $data, $notificationId
+                        $recipientId, $recipientType, $title, $message, $data, $notificationId, $deviceIds
                     ),
                     default => ['success' => false, 'message' => "Unknown channel: {$channel}"]
                 };
@@ -255,10 +256,11 @@ class Notification
         string $title,
         string $message,
         array  $data,
-        int    $notificationId
+        int    $notificationId,
+        array  $deviceIds = []
     ): array {
         // جلب FCM tokens من user_devices
-        $tokens = self::getFcmTokens($recipientId, $recipientType);
+        $tokens = self::getFcmTokens($recipientId, $recipientType, $deviceIds);
 
         if (empty($tokens)) {
             return ['success' => false, 'message' => 'No active FCM tokens found'];
@@ -328,7 +330,7 @@ class Notification
     // 7️⃣  جلب FCM tokens من user_devices
     // -------------------------------------------------------
 
-    private static function getFcmTokens(int $userId, string $recipientType): array
+    private static function getFcmTokens(int $userId, string $recipientType, array $deviceIds = []): array
     {
         if (!self::$pdo) return [];
 
@@ -336,6 +338,19 @@ class Notification
         if ($recipientType !== 'user') return [];
 
         try {
+            // إذا تم تحديد أجهزة معينة، جلب tokens لتلك الأجهزة فقط
+            if (!empty($deviceIds)) {
+                $placeholders = implode(',', array_fill(0, count($deviceIds), '?'));
+                $stmt = self::$pdo->prepare("
+                    SELECT fcm_token FROM user_devices
+                    WHERE user_id = ? AND is_active = 1 AND fcm_token IS NOT NULL
+                      AND id IN ({$placeholders})
+                ");
+                $params = array_merge([$userId], array_map('intval', $deviceIds));
+                $stmt->execute($params);
+                return $stmt->fetchAll(PDO::FETCH_COLUMN);
+            }
+
             $stmt = self::$pdo->prepare("
                 SELECT fcm_token FROM user_devices
                 WHERE user_id = ? AND is_active = 1 AND fcm_token IS NOT NULL

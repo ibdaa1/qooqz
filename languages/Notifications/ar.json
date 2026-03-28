@@ -312,6 +312,15 @@
         "recipient_type": "نوع المستلم",
         "recipient_id": "معرف المستلم",
         "channels_label": "اختر قنوات التسليم",
-        "confirm": "هل أنت متأكد من إرسال هذا الإشعار؟"
+        "confirm": "هل أنت متأكد من إرسال هذا الإشعار؟",
+        "target_devices": "الأجهزة المستهدفة",
+        "device_picker_hint": "اختر أجهزة محددة أو اترك الكل بدون تحديد للإرسال إلى جميع الأجهزة.",
+        "enter_recipient_first": "أدخل معرف المستلم أولاً لتحميل الأجهزة.",
+        "load_devices": "تحميل الأجهزة",
+        "loading_devices": "جاري تحميل الأجهزة...",
+        "no_devices_found": "لا توجد أجهزة لهذا المستخدم.",
+        "no_fcm_token": "لا يوجد رمز FCM",
+        "device_inactive": "غير نشط",
+        "load_devices_error": "فشل تحميل الأجهزة"
     }
 }

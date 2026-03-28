@@ -238,7 +238,7 @@ $apiBase = '/api';
                                 <span><i class="fas fa-database"></i> <span data-i18n="form.fields.channels.database"><?= __t('form.fields.channels.database','Database') ?></span></span>
                             </label>
                             <label class="notif-channel-check">
-                                <input type="checkbox" name="channels[]" value="push">
+                                <input type="checkbox" name="channels[]" value="push" id="chkPushChannel">
                                 <span><i class="fab fa-firebase"></i> <span data-i18n="form.fields.channels.push"><?= __t('form.fields.channels.push','Push (Firebase)') ?></span></span>
                             </label>
                             <label class="notif-channel-check">
@@ -250,6 +250,18 @@ $apiBase = '/api';
                                 <span><i class="fas fa-sms"></i> <span data-i18n="form.fields.channels.sms"><?= __t('form.fields.channels.sms','SMS') ?></span></span>
                             </label>
                         </div>
+                    </div>
+                    <!-- ── Device Picker (shown when push channel is checked) ── -->
+                    <div class="form-group notif-device-picker-group" id="devicePickerGroup" style="display:none">
+                        <label><i class="fas fa-mobile-alt"></i> <span data-i18n="send_notification.target_devices"><?= __t('send_notification.target_devices','Target Devices') ?></span></label>
+                        <p class="device-picker-hint" data-i18n="send_notification.device_picker_hint"><?= __t('send_notification.device_picker_hint','Select specific devices or leave all unchecked to send to all devices.') ?></p>
+                        <div id="devicePickerList" class="device-picker-list">
+                            <p class="device-picker-empty" data-i18n="send_notification.enter_recipient_first"><?= __t('send_notification.enter_recipient_first','Enter a Recipient ID first to load devices.') ?></p>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-secondary" id="btnLoadDevices" style="margin-top:6px">
+                            <i class="fas fa-sync-alt"></i>
+                            <span data-i18n="send_notification.load_devices"><?= __t('send_notification.load_devices','Load Devices') ?></span>
+                        </button>
                     </div>
                     <div class="form-group notif-recipient-group">
                         <div class="form-row">
