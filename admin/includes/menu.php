@@ -202,7 +202,7 @@ $ADMIN_MENU = [
             ['id'=>'products','order'=>10,'icon'=>'📦','i18n'=>'nav.products','url'=>'fragments/products.php'],
             ['id'=>'categories','order'=>20,'icon'=>'📂','i18n'=>'nav.menus','url'=>'fragments/categories.php'],
             ['id'=>'media_studio','order'=>25,'icon'=>'🎬','i18n'=>'nav.media_studio','url'=>'fragments/media_studio.php'],
-            ['id'=>'tenant_categories','order'=>26,'icon'=>'🏷️','i18n'=>'nav.tenant_categories','url'=>'fragments/tenant_categories.php'],
+            ['id'=>'tenant_categories','order'=>26,'icon'=>'📑','i18n'=>'nav.tenant_categories','url'=>'fragments/tenant_categories.php'],
             ['id'=>'brands','order'=>30,'icon'=>'⭐','i18n'=>'brands','url'=>'fragments/brands.php'],
         ]
     ],
@@ -217,7 +217,7 @@ $ADMIN_MENU = [
         'i18n' => 'menu.sales',
         'children' => [
             ['id'=>'pos','order'=>10,'icon'=>'🧾','i18n'=>'nav.pos','url'=>'fragments/pos.php'],
-            ['id'=>'discounts','order'=>20,'icon'=>'🏷️','i18n'=>'discounts','url'=>'fragments/discounts.php'],
+            ['id'=>'discounts','order'=>20,'icon'=>'💲','i18n'=>'discounts','url'=>'fragments/discounts.php'],
             ['id'=>'flash_sales','order'=>30,'icon'=>'⚡','i18n'=>'Flash Sales','url'=>'fragments/flash_sales.php'],
             ['id'=>'carts','order'=>40,'icon'=>'🛒','i18n'=>'carts','url'=>'fragments/carts.php'],
         ]
@@ -281,7 +281,7 @@ $ADMIN_MENU = [
         'i18n' => 'menu.support',
         'children' => [
             ['id'=>'tickets','order'=>10,'icon'=>'🎟️','i18n'=>'menu.tickets','url'=>'fragments/tickets.php'],
-            ['id'=>'ticket_categories','order'=>20,'icon'=>'🏷️','i18n'=>'menu.ticket_categories','url'=>'fragments/ticket_categories.php'],
+            ['id'=>'ticket_categories','order'=>20,'icon'=>'📌','i18n'=>'menu.ticket_categories','url'=>'fragments/ticket_categories.php'],
             ['id'=>'bad_words','order'=>30,'icon'=>'🚫','i18n'=>'bad_words','url'=>'fragments/bad_words.php'],
         ]
     ],
@@ -296,9 +296,9 @@ $ADMIN_MENU = [
         'i18n' => 'menu.business',
         'children' => [
             ['id'=>'entities','order'=>10,'icon'=>'🏪','i18n'=>'menu.entities','url'=>'fragments/entities.php'],
-            ['id'=>'entities_payment','order'=>20,'icon'=>'💳','i18n'=>'entities_Payment','url'=>'fragments/entities_Payment.php'],
+            ['id'=>'entities_payment','order'=>20,'icon'=>'🏦','i18n'=>'entities_Payment','url'=>'fragments/entities_Payment.php'],
             ['id'=>'jobs','order'=>30,'icon'=>'💼','i18n'=>'menu.jobs','url'=>'fragments/jobs.php'],
-            ['id'=>'job_categories','order'=>40,'icon'=>'📊','i18n'=>'job_categories','url'=>'fragments/job_categories.php'],
+            ['id'=>'job_categories','order'=>40,'icon'=>'📁','i18n'=>'job_categories','url'=>'fragments/job_categories.php'],
         ]
     ],
 
@@ -311,7 +311,7 @@ $ADMIN_MENU = [
         'icon' => '⚙️',
         'i18n' => 'menu.system',
         'children' => [
-            ['id'=>'tenant','order'=>10,'icon'=>'🏪','i18n'=>'menu.tenant','url'=>'fragments/tenant.php'],
+            ['id'=>'tenant','order'=>10,'icon'=>'🏬','i18n'=>'menu.tenant','url'=>'fragments/tenant.php'],
             ['id'=>'themes','order'=>20,'icon'=>'🎨','i18n'=>'nav.settings','url'=>'fragments/themes.php'],
             ['id'=>'addresses','order'=>30,'icon'=>'📍','i18n'=>'nav.addresses','url'=>'fragments/addresses.php'],
             ['id'=>'queues','order'=>40,'icon'=>'📊','i18n'=>'queues','url'=>'fragments/queues.php'],
