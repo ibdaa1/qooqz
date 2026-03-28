@@ -413,7 +413,8 @@ if ($pdo) {
                JOIN store_pages sp ON sp.id = ss.page_id
           LEFT JOIN store_section_translations sst ON sst.section_id = ss.id AND sst.language_code = ?
               WHERE sp.entity_id = ? AND sp.is_active = 1 AND ss.is_active = 1
-              ORDER BY ss.position ASC"
+           GROUP BY ss.type
+              ORDER BY MIN(ss.position) ASC"
         );
         $spStmt->execute([$lang, $entity['id'] ?? $entityId]);
         $storeSections = $spStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -484,16 +485,62 @@ $sectionDir = dirname(__DIR__) . '/partials/store_sections';
  * Each content section is rendered as a visible block with a
  * translated section title (from store_section_translations
  * or default language file).
+ *
+ * Deduplication: each section type is rendered at most once.
+ * Styling: background_color, text_color, padding, custom_css
+ *          from section settings JSON are applied inline.
  * ----------------------------------------------------- */
+
+// Safe-style helpers (shared with index.php — guarded by function_exists)
+if (!function_exists('_pub_safe_color')) {
+    function _pub_safe_color(string $v): string {
+        $v = trim($v);
+        if ($v === '') return '';
+        if (preg_match('/^#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{1,5})?$/', $v))         return $v;
+        if (preg_match('/^(?:rgb|rgba|hsl|hsla)\(\s*[\d\s%,.\/ ]+\)$/i', $v))    return $v;
+        if (preg_match('/^[a-zA-Z]{2,30}$/', $v))                                 return $v;
+        if (preg_match('/^var\(--[a-zA-Z0-9_-]{1,80}\)$/', $v))                  return $v;
+        return '';
+    }
+}
+if (!function_exists('_pub_safe_padding')) {
+    function _pub_safe_padding(string $v): string {
+        $v = trim($v);
+        if ($v === '') return '';
+        $unit   = '(?:\d+(?:\.\d+)?(?:px|em|rem|%|vh|vw)?)';
+        $single = $unit . '(?:\s+' . $unit . '){0,3}';
+        return preg_match('/^' . $single . '$/', $v) ? $v : '';
+    }
+}
+if (!function_exists('_pub_safe_css')) {
+    function _pub_safe_css(string $css): string {
+        $css = str_replace(['<', '>'], '', $css);
+        $css = preg_replace('/\bexpression\s*\(/i', '', $css);
+        $css = preg_replace('/\bbehaviour\s*:/i',   '', $css);
+        $css = preg_replace('/@import\b/i',         '', $css);
+        $css = preg_replace('/url\s*\(\s*["\']?\s*(?:data|javascript):/i', 'url(about:', $css);
+        return $css;
+    }
+}
+
 // Sections that need a section-title header & container wrapping
 $titledSections = ['products', 'info', 'hours', 'location', 'offers', 'reviews'];
+
+// Track rendered section types to prevent duplicates
+$renderedSectionTypes = [];
+
 foreach ($storeSections as $section):
     $sectionType     = $section['type'];
-    $sectionSettings = is_string($section['settings'] ?? null) ? (json_decode($section['settings'], true) ?: []) : ($section['settings'] ?? []);
-    $sectionFile     = $sectionDir . '/' . basename($sectionType) . '.php';
 
     // Skip tabs section — sections are now shown directly on the page
     if ($sectionType === 'tabs') continue;
+
+    // ── Deduplication: never render the same section type twice ──
+    if (isset($renderedSectionTypes[$sectionType])) continue;
+    $renderedSectionTypes[$sectionType] = true;
+
+    $sectionSettings = is_string($section['settings'] ?? null) ? (json_decode($section['settings'], true) ?: []) : ($section['settings'] ?? []);
+    $sectionFile     = $sectionDir . '/' . basename($sectionType) . '.php';
 
     // Use partial template if available, otherwise skip unknown types
     if (file_exists($sectionFile)):
@@ -504,10 +551,24 @@ foreach ($storeSections as $section):
         }
         $sectionIcon = $sectionIcons[$sectionType] ?? '';
 
+        // ── Build section inline style from DB settings ──
+        $secBg      = _pub_safe_color((string)($sectionSettings['background_color'] ?? ''));
+        $secText    = _pub_safe_color((string)($sectionSettings['text_color'] ?? ''));
+        $secPadding = _pub_safe_padding((string)($sectionSettings['padding'] ?? ''));
+        $secCss     = _pub_safe_css((string)($sectionSettings['custom_css'] ?? ''));
+
+        $sStyle = '';
+        if ($secBg)      $sStyle .= 'background-color:' . e($secBg) . ';';
+        if ($secText)    $sStyle .= 'color:'             . e($secText) . ';';
+        if ($secPadding) $sStyle .= 'padding:'           . e($secPadding) . ';';
+
         // Content sections are wrapped in a container with a section header
         if (in_array($sectionType, $titledSections)):
 ?>
-<section class="pub-entity-section pub-entity-section--<?= e($sectionType) ?>">
+<section class="pub-entity-section pub-entity-section--<?= e($sectionType) ?>"<?= $sStyle ? ' style="' . $sStyle . '"' : '' ?>>
+<?php if ($secCss !== ''): ?>
+    <style data-section="<?= e($sectionType) ?>"><?= $secCss ?></style>
+<?php endif; ?>
     <div class="pub-container">
         <?php if ($sectionTitle !== ''): ?>
         <div class="pub-section-head pub-entity-section-head">
