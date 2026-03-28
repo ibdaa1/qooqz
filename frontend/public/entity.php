@@ -643,7 +643,7 @@ echo '<style>
 .pub-entity-section-head { margin-bottom:12px; padding-top:8px; }
 .pub-entity-section-head .pub-section-title { display:flex; align-items:center; gap:8px; }
 .pub-entity-section-icon { font-size:1.2rem; }
-.pub-info-card{ background:var(--pub-bg); border:1px solid var(--pub-border); border-radius:var(--pub-radius); overflow:hidden; }
+.pub-info-card { background:var(--pub-bg); border:1px solid var(--pub-border); border-radius:var(--pub-radius); overflow:hidden; }
 .pub-info-card-title { font-size:1rem; font-weight:700; margin:0; padding:12px 16px; border-bottom:1px solid var(--pub-border); color:var(--pub-text); }
 .pub-attr-grid { padding:12px 16px; display:grid; gap:8px; }
 .pub-attr-row { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }

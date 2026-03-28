@@ -17,7 +17,7 @@ if (!$entityShowReviews) return;
 ?>
 
 <div class="pub-entity-section-content" id="sectionReviews">
-    <div style="margin-top:20px;">
+    <div>
         <?php if ($entityRatingAvg !== null): ?>
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
             <div style="font-size:2.8rem;font-weight:900;color:var(--pub-accent,#F59E0B);">

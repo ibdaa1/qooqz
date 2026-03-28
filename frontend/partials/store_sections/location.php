@@ -14,7 +14,7 @@ $showGoogle = ($sectionSettings['show_google'] ?? true);
 
 <div class="pub-entity-section-content" id="sectionLocation">
     <?php if (!empty($entity['addresses'])): ?>
-    <div style="margin-top:20px;display:grid;gap:16px;">
+    <div style="display:grid;gap:16px;">
         <?php foreach ($entity['addresses'] as $addr): ?>
         <div class="pub-info-card">
             <h3 class="pub-info-card-title">

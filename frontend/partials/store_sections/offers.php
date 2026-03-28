@@ -13,7 +13,7 @@
 
 <div class="pub-entity-section-content" id="sectionOffers">
     <?php if (!empty($discounts)): ?>
-    <div style="margin-top:20px;display:grid;gap:14px;">
+    <div style="display:grid;gap:14px;">
         <?php foreach ($discounts as $d): ?>
         <div class="pub-discount-card<?= $_entityDiscountCardClass ? ' ' . $_entityDiscountCardClass : '' ?>"<?= $_entityDiscountCardStyle ? ' style="' . e($_entityDiscountCardStyle) . '"' : '' ?>>
             <?php if (!empty($d['marketing_badge'])): ?>

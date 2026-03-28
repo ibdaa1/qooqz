@@ -15,7 +15,7 @@ $showSettings       = ($sectionSettings['show_settings']        ?? true);
 ?>
 
 <div class="pub-entity-section-content" id="sectionInfo">
-    <div style="margin-top:20px;display:grid;gap:16px;">
+    <div style="display:grid;gap:16px;">
 
         <!-- Attributes -->
         <?php if ($showAttributes && !empty($entity['attributes'])): ?>
