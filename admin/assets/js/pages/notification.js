@@ -549,7 +549,11 @@
             if (section) {
                 section.querySelectorAll('input, textarea, select').forEach(el => {
                     if (el.name === 'csrf_token' || el.name === 'id' || el.name === '_tab') return;
-                    el.value = '';
+                    if (el.type === 'checkbox' || el.type === 'radio') {
+                        el.checked = el.defaultChecked;
+                    } else {
+                        el.value = '';
+                    }
                 });
             }
         }
