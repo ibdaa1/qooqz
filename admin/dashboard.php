@@ -68,7 +68,7 @@ $canViewUsers = in_array('view_users', $user['permissions'] ?? [], true)
 .action-card:hover, .action-card:focus {
     background: var(--primary-color, var(--primary_color));
     border-color: var(--primary-color, var(--primary_color));
-    color: var(--header-text, var(--header_text, #fff));
+    color: var(--header-text, var(--header_text));
     transform: translateY(-2px);
     outline: none;
 }
@@ -76,7 +76,7 @@ $canViewUsers = in_array('view_users', $user['permissions'] ?? [], true)
     width: 44px;
     height: 44px;
     border-radius: 10px;
-    background: color-mix(in srgb, var(--primary-color, var(--primary_color)) 15%, transparent);
+    background: color-mix(in srgb, var(--primary-color, var(--primary_color, currentColor)) 15%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -87,8 +87,8 @@ $canViewUsers = in_array('view_users', $user['permissions'] ?? [], true)
 }
 .action-card:hover .action-icon,
 .action-card:focus .action-icon {
-    background: color-mix(in srgb, var(--text-primary, var(--text_primary)) 20%, transparent);
-    color: var(--header-text, var(--header_text, #fff));
+    background: color-mix(in srgb, var(--text-primary, var(--text_primary, currentColor)) 20%, transparent);
+    color: var(--header-text, var(--header_text));
 }
 .action-content h3 { margin:0 0 0.2rem 0; font-size:1rem; font-weight:600; }
 .action-content p { margin:0; font-size:0.8125rem; opacity:0.8; }
