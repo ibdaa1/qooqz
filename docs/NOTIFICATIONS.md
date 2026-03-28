@@ -639,3 +639,34 @@ Google deprecated the Legacy FCM API. The system falls back to it only if v1 API
 1. Set up a service account JSON file
 2. Set `FCM_PROJECT_ID` in `.env`
 3. Enable "Firebase Cloud Messaging API (V1)" in Google Cloud Console
+
+### Custom Logo / Image in Notifications
+
+The FCM payload supports custom icon and image URLs via the `$data` array:
+
+```php
+Notification::send(
+    recipientId: $userId,
+    data: [
+        'icon_url'  => 'https://example.com/logos/store.png',   // Custom notification icon
+        'image_url' => 'https://example.com/covers/banner.jpg', // Large image in notification
+        'click_url' => '/orders/123',                           // Click destination
+    ],
+    channels: ['database', 'push']
+);
+```
+
+**FCM Payload includes:**
+- `notification.image` → From `$data['image_url']` or `APP_LOGO_URL`
+- `webpush.notification.icon` → From `$data['icon_url']` or `APP_LOGO_URL`
+- `webpush.notification.image` → Large banner image
+- `data.site_name` → App name (from `APP_NAME` constant)
+- `data.site_url` → App URL (from `APP_URL` constant)
+
+The service worker (`firebase-messaging-sw.js`) also checks `data.icon_url` and `data.image_url` as fallbacks.
+
+---
+
+## Related Documentation
+
+- [Store Builder Documentation](STORE_BUILDER.md) — Dynamic store page builder system

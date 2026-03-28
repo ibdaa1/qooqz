@@ -22,23 +22,31 @@ messaging.onBackgroundMessage(function (payload) {
 
     const title = payload.notification?.title || "إشعار جديد";
     const body  = payload.notification?.body  || "";
-    const icon  = payload.notification?.icon  || "/admin/assets/img/default-image.png";
-    const badge = "/admin/assets/img/default-image.png";
     const data  = payload.data || {};
+    // Use icon from notification, then from data payload, then default
+    const icon  = payload.notification?.icon  || data.icon_url || "/admin/assets/img/default-image.png";
+    const badge = "/admin/assets/img/default-image.png";
+    // Support large image display from notification or data
+    const image = payload.notification?.image || data.image_url || "";
 
     // بناء رابط النقر (إذا أُرسل في data)
     const clickUrl = data.click_url || data.url || "/";
 
-    self.registration.showNotification(title, {
-        body,
-        icon,
-        badge,
-        data: { url: clickUrl, ...data },
-        // إظهار الإشعار فوق باقي الإشعارات
+    var options = {
+        body: body,
+        icon: icon,
+        badge: badge,
+        data: Object.assign({ url: clickUrl }, data),
         requireInteraction: false,
-        // تجميع الإشعارات من نفس المصدر
         tag: data.notification_id || "qooqz-notification",
-    });
+    };
+
+    // Add large image if available (shows as banner in notification)
+    if (image) {
+        options.image = image;
+    }
+
+    self.registration.showNotification(title, options);
 });
 
 // عند النقر على الإشعار
