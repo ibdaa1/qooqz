@@ -413,8 +413,7 @@ if ($pdo) {
                JOIN store_pages sp ON sp.id = ss.page_id
           LEFT JOIN store_section_translations sst ON sst.section_id = ss.id AND sst.language_code = ?
               WHERE sp.entity_id = ? AND sp.is_active = 1 AND ss.is_active = 1
-           GROUP BY ss.type
-              ORDER BY MIN(ss.position) ASC"
+              ORDER BY ss.position ASC"
         );
         $spStmt->execute([$lang, $entity['id'] ?? $entityId]);
         $storeSections = $spStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -519,6 +518,8 @@ if (!function_exists('_pub_safe_css')) {
         $css = preg_replace('/\bbehaviour\s*:/i',   '', $css);
         $css = preg_replace('/@import\b/i',         '', $css);
         $css = preg_replace('/url\s*\(\s*["\']?\s*(?:data|javascript):/i', 'url(about:', $css);
+        // Strip any residual </style> or <script> sequences
+        $css = preg_replace('#<\s*/?\s*(?:style|script)\b[^>]*>#i', '', $css);
         return $css;
     }
 }
