@@ -6,7 +6,7 @@
 CREATE TABLE IF NOT EXISTS `user_devices` (
     `id`            BIGINT(20)   UNSIGNED NOT NULL AUTO_INCREMENT,
     `user_id`       INT(11)      NOT NULL,
-    `fcm_token`     TEXT         NOT NULL,
+    `fcm_token`     TEXT         DEFAULT NULL,
     `device_type`   VARCHAR(20)  NOT NULL DEFAULT 'web' COMMENT 'web, android, ios, other',
     `device_name`   VARCHAR(100) DEFAULT NULL COMMENT 'e.g. Chrome on Windows',
     `user_agent`    TEXT         DEFAULT NULL,
