@@ -11,7 +11,7 @@
  */
 ?>
 
-<div class="pub-tab-panel" id="tabDiscounts" style="display:none;">
+<div class="pub-entity-section-content" id="sectionOffers">
     <?php if (!empty($discounts)): ?>
     <div style="margin-top:20px;display:grid;gap:14px;">
         <?php foreach ($discounts as $d): ?>

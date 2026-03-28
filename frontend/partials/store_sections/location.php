@@ -12,7 +12,7 @@ $showOsm    = ($sectionSettings['show_osm']    ?? true);
 $showGoogle = ($sectionSettings['show_google'] ?? true);
 ?>
 
-<div class="pub-tab-panel" id="tabMap" style="display:none;">
+<div class="pub-entity-section-content" id="sectionLocation">
     <?php if (!empty($entity['addresses'])): ?>
     <div style="margin-top:20px;display:grid;gap:16px;">
         <?php foreach ($entity['addresses'] as $addr): ?>

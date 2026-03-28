@@ -407,13 +407,15 @@ $storeSections = [];
 if ($pdo) {
     try {
         $spStmt = $pdo->prepare(
-            "SELECT ss.id, ss.type, ss.position, ss.settings
+            "SELECT ss.id, ss.type, ss.position, ss.settings,
+                    sst.title AS translated_title, sst.content AS translated_content
                FROM store_sections ss
                JOIN store_pages sp ON sp.id = ss.page_id
+          LEFT JOIN store_section_translations sst ON sst.section_id = ss.id AND sst.language_code = ?
               WHERE sp.entity_id = ? AND sp.is_active = 1 AND ss.is_active = 1
               ORDER BY ss.position ASC"
         );
-        $spStmt->execute([$entity['id'] ?? $entityId]);
+        $spStmt->execute([$lang, $entity['id'] ?? $entityId]);
         $storeSections = $spStmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable $_) {
         // Table may not exist yet — fall back to defaults
@@ -421,18 +423,39 @@ if ($pdo) {
     }
 }
 
+// Default section titles per language (used when no DB config or no translation)
+$defaultSectionTitles = [
+    'header'   => '', // header has no title
+    'contact'  => '', // contact has no title
+    'products' => t('entity.products_tab'),
+    'info'     => t('entity.info_tab'),
+    'hours'    => t('entity.hours_tab'),
+    'location' => t('entity.location_tab'),
+    'offers'   => t('entity.discounts_tab'),
+    'reviews'  => t('entity.ratings_tab'),
+];
+
+// Section icons for visual distinction
+$sectionIcons = [
+    'products' => '🛍️',
+    'info'     => 'ℹ️',
+    'hours'    => '🕐',
+    'location' => '🗺️',
+    'offers'   => '🏷️',
+    'reviews'  => '⭐',
+];
+
 // Default section order when no DB config exists
 if (empty($storeSections)) {
     $storeSections = [
-        ['type' => 'header',   'position' => 10, 'settings' => null],
-        ['type' => 'contact',  'position' => 20, 'settings' => null],
-        ['type' => 'tabs',     'position' => 30, 'settings' => null],
-        ['type' => 'products', 'position' => 40, 'settings' => null],
-        ['type' => 'info',     'position' => 50, 'settings' => null],
-        ['type' => 'hours',    'position' => 60, 'settings' => null],
-        ['type' => 'location', 'position' => 70, 'settings' => null],
-        ['type' => 'offers',   'position' => 80, 'settings' => null],
-        ['type' => 'reviews',  'position' => 90, 'settings' => null],
+        ['type' => 'header',   'position' => 10, 'settings' => null, 'translated_title' => null, 'translated_content' => null],
+        ['type' => 'contact',  'position' => 20, 'settings' => null, 'translated_title' => null, 'translated_content' => null],
+        ['type' => 'products', 'position' => 40, 'settings' => null, 'translated_title' => null, 'translated_content' => null],
+        ['type' => 'info',     'position' => 50, 'settings' => null, 'translated_title' => null, 'translated_content' => null],
+        ['type' => 'hours',    'position' => 60, 'settings' => null, 'translated_title' => null, 'translated_content' => null],
+        ['type' => 'location', 'position' => 70, 'settings' => null, 'translated_title' => null, 'translated_content' => null],
+        ['type' => 'offers',   'position' => 80, 'settings' => null, 'translated_title' => null, 'translated_content' => null],
+        ['type' => 'reviews',  'position' => 90, 'settings' => null, 'translated_title' => null, 'translated_content' => null],
     ];
 }
 
@@ -457,56 +480,58 @@ $sectionDir = dirname(__DIR__) . '/partials/store_sections';
 <?php
 /* -------------------------------------------------------
  * Dynamic Section Renderer
- * Loops through active sections and includes partial templates
+ * Loops through active sections and includes partial templates.
+ * Each content section is rendered as a visible block with a
+ * translated section title (from store_section_translations
+ * or default language file).
  * ----------------------------------------------------- */
-$insideContainer = false;  // Track whether we're inside a .pub-container
-// Sections that render inside a shared container (vs header/contact/tabs that manage their own)
-$containerSections = ['products', 'info', 'hours', 'location', 'offers', 'reviews'];
+// Sections that need a section-title header & container wrapping
+$titledSections = ['products', 'info', 'hours', 'location', 'offers', 'reviews'];
 foreach ($storeSections as $section):
     $sectionType     = $section['type'];
     $sectionSettings = is_string($section['settings'] ?? null) ? (json_decode($section['settings'], true) ?: []) : ($section['settings'] ?? []);
     $sectionFile     = $sectionDir . '/' . basename($sectionType) . '.php';
 
+    // Skip tabs section — sections are now shown directly on the page
+    if ($sectionType === 'tabs') continue;
+
     // Use partial template if available, otherwise skip unknown types
     if (file_exists($sectionFile)):
-        // header and contact sections manage their own containers
-        // tabs through reviews are inside a shared container
-        if (in_array($sectionType, $containerSections) && !$insideContainer):
-            echo '<div class="pub-container">';
-            $insideContainer = true;
-        endif;
+        // Resolve section title: DB translation → default translation → type name
+        $sectionTitle = trim($section['translated_title'] ?? '');
+        if ($sectionTitle === '') {
+            $sectionTitle = $defaultSectionTitles[$sectionType] ?? '';
+        }
+        $sectionIcon = $sectionIcons[$sectionType] ?? '';
 
-        include $sectionFile;
+        // Content sections are wrapped in a container with a section header
+        if (in_array($sectionType, $titledSections)):
+?>
+<section class="pub-entity-section pub-entity-section--<?= e($sectionType) ?>">
+    <div class="pub-container">
+        <?php if ($sectionTitle !== ''): ?>
+        <div class="pub-section-head pub-entity-section-head">
+            <h2 class="pub-section-title">
+                <?php if ($sectionIcon !== ''): ?><span class="pub-entity-section-icon"><?= $sectionIcon ?></span><?php endif; ?>
+                <?= e($sectionTitle) ?>
+            </h2>
+        </div>
+        <?php endif; ?>
+        <?php include $sectionFile; ?>
+    </div>
+</section>
+<?php
+        else:
+            // header and contact manage their own wrapping
+            include $sectionFile;
+        endif;
     endif;
 endforeach;
-
-if ($insideContainer):
-    echo '</div><!-- /.pub-container sections -->';
-endif;
 ?>
 
 <?php /* (Legacy inline sections removed — now rendered via partials/store_sections/) */ ?>
 
 <script>
-// Simple tab switcher
-document.querySelectorAll('.pub-tab').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-        var tab = this.dataset.tab;
-        document.querySelectorAll('.pub-tab').forEach(function(b) {
-            b.classList.remove('active');
-            b.setAttribute('aria-selected','false');
-        });
-        document.querySelectorAll('.pub-tab-panel').forEach(function(p) {
-            p.style.display = 'none';
-            p.classList.remove('active');
-        });
-        this.classList.add('active');
-        this.setAttribute('aria-selected','true');
-        var panel = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
-        if (panel) { panel.style.display = ''; panel.classList.add('active'); }
-    });
-});
-
 // Share panel toggle
 function pubShareEntity() {
     var panel = document.getElementById('pubSharePanel');
@@ -611,8 +636,14 @@ echo '<style>
 .pub-entity-social { display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:4px; }
 .pub-entity-social::-webkit-scrollbar { display:none; }
 .pub-social-btn { padding:5px 12px; border-radius:20px; font-size:0.8rem; font-weight:600; border:1px solid var(--pub-border); background:var(--pub-surface); color:var(--pub-text); transition:opacity 0.2s; white-space:nowrap; flex-shrink:0; cursor:pointer; }
-.pub-tab-panel { padding-bottom:40px; }
-.pub-info-card { background:var(--pub-bg); border:1px solid var(--pub-border); border-radius:var(--pub-radius); overflow:hidden; }
+.pub-entity-section-content { padding-bottom:24px; }
+/* Entity section headers */
+.pub-entity-section { padding:12px 0; border-bottom:1px solid var(--pub-border); }
+.pub-entity-section:last-child { border-bottom:none; }
+.pub-entity-section-head { margin-bottom:12px; padding-top:8px; }
+.pub-entity-section-head .pub-section-title { display:flex; align-items:center; gap:8px; }
+.pub-entity-section-icon { font-size:1.2rem; }
+.pub-info-card{ background:var(--pub-bg); border:1px solid var(--pub-border); border-radius:var(--pub-radius); overflow:hidden; }
 .pub-info-card-title { font-size:1rem; font-weight:700; margin:0; padding:12px 16px; border-bottom:1px solid var(--pub-border); color:var(--pub-text); }
 .pub-attr-grid { padding:12px 16px; display:grid; gap:8px; }
 .pub-attr-row { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }

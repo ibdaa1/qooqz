@@ -16,7 +16,7 @@ $limit    = (int)($sectionSettings['limit'] ?? 5);
 if (!$entityShowReviews) return;
 ?>
 
-<div class="pub-tab-panel" id="tabRatings" style="display:none;">
+<div class="pub-entity-section-content" id="sectionReviews">
     <div style="margin-top:20px;">
         <?php if ($entityRatingAvg !== null): ?>
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">

@@ -16,7 +16,7 @@ $showSearch     = ($sectionSettings['show_search']     ?? true);
 $showCart       = ($sectionSettings['show_cart']        ?? true);
 ?>
 
-<div class="pub-tab-panel active" id="tabProducts">
+<div class="pub-entity-section-content" id="sectionProducts">
     <!-- Hierarchical category menus + search -->
     <?php if ($showCategories && !empty($categoryTree)):
         // Pre-compute which parent category (if any) contains the selected category

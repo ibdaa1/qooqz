@@ -14,7 +14,7 @@ $showPaymentMethods = ($sectionSettings['show_payment_methods'] ?? true);
 $showSettings       = ($sectionSettings['show_settings']        ?? true);
 ?>
 
-<div class="pub-tab-panel" id="tabInfo" style="display:none;">
+<div class="pub-entity-section-content" id="sectionInfo">
     <div style="margin-top:20px;display:grid;gap:16px;">
 
         <!-- Attributes -->

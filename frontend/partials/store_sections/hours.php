@@ -10,10 +10,9 @@
  */
 ?>
 
-<div class="pub-tab-panel" id="tabHours" style="display:none;">
+<div class="pub-entity-section-content" id="sectionHours">
     <?php if (!empty($entity['working_hours'])): ?>
-    <div class="pub-info-card" style="margin-top:20px;">
-        <h3 class="pub-info-card-title">🕐 <?= e(t('entity.hours_tab')) ?></h3>
+    <div class="pub-info-card">
         <div class="pub-hours-table">
             <?php foreach ($entity['working_hours'] as $h): ?>
             <div class="pub-hours-row <?= empty($h['is_open']) ? 'pub-hours-row--closed' : '' ?>">
