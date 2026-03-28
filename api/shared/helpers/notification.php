@@ -3,11 +3,11 @@
 // ملف دوال الإشعارات - معدّل حسب هيكل قاعدة البيانات الفعلي
 // يدعم: Database, Email, SMS, Push (Firebase FCM)
 
-require_once __DIR__ . '/../../config/config.php';
-require_once __DIR__ . '/../../config/constants.php';
-require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/../helpers/mail.php';
-require_once __DIR__ . '/../helpers/sms.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../config/constants.php';
+require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/mail.php';
+require_once __DIR__ . '/sms.php';
 
 // ===========================================
 // إعدادات Firebase FCM
