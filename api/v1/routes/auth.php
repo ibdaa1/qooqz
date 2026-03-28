@@ -77,9 +77,9 @@ function _register_login_device(PDO $pdo, int $userId): void
 
         if ($row) {
             $upd = $pdo->prepare(
-                "UPDATE user_devices SET ip = ?, last_seen_at = NOW(), updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+                "UPDATE user_devices SET device_type = ?, device_name = ?, ip = ?, last_seen_at = NOW(), updated_at = CURRENT_TIMESTAMP WHERE id = ?"
             );
-            $upd->execute([$ip, $row['id']]);
+            $upd->execute([$deviceType, substr($deviceName, 0, 100), $ip, $row['id']]);
         } else {
             $ins = $pdo->prepare(
                 "INSERT INTO user_devices (user_id, device_type, device_name, user_agent, ip, last_seen_at, is_active, created_at)

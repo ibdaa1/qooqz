@@ -143,6 +143,25 @@ if ($_devRegUserId > 0):
 // ════════════════════════════════════════════════════════════
 $_fcmEnabled = defined('FCM_ENABLED') ? FCM_ENABLED : false;
 if (!$_fcmEnabled) {
+    // Load .env so getenv() works for FCM keys inside constants.php.
+    // The API bootstrap loads .env via putenv(), but the frontend
+    // bootstrap does not, so constants like FCM_VAPID_KEY would
+    // silently fall back to their placeholder values.
+    $_envPath = dirname(__DIR__, 2) . '/api/.env';
+    if (!file_exists($_envPath)) {
+        $_envPath = dirname(__DIR__, 2) . '/api/shared/config/.env';
+    }
+    if (file_exists($_envPath) && is_readable($_envPath)) {
+        foreach (file($_envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $_eLine) {
+            $_eLine = trim($_eLine);
+            if ($_eLine === '' || str_starts_with($_eLine, '#') || !str_contains($_eLine, '=')) continue;
+            [$_eK, $_eV] = array_map('trim', explode('=', $_eLine, 2));
+            if ($_eK !== '' && !getenv($_eK)) {
+                putenv("{$_eK}={$_eV}");
+            }
+        }
+    }
+
     // Try loading constants if not yet defined
     $_constFile = dirname(__DIR__, 2) . '/api/shared/config/constants.php';
     if (file_exists($_constFile)) {
