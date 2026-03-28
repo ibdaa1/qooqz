@@ -159,6 +159,9 @@ safe_log('info', 'API routing detected', [
 // 3. Load .env (Enhanced with validation)
 // ==============================================
 $envPath = BASE_DIR . '/.env';
+if (!file_exists($envPath)) {
+    $envPath = BASE_DIR . '/shared/config/.env';
+}
 if (file_exists($envPath) && is_readable($envPath)) {
     $envLoaded = 0;
     foreach (file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {

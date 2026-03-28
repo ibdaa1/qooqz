@@ -23,19 +23,29 @@
     // ── نقطة الدخول ─────────────────────────────────────────
     async function init() {
         if (!('serviceWorker' in navigator) || !('Notification' in window)) {
+            console.warn('[FCM] Service Worker or Notification API not supported');
             return;
         }
 
         if (Notification.permission === 'denied') {
+            console.warn('[FCM] Notification permission denied by user');
             return;
         }
 
         if (!FIREBASE_CONFIG.projectId) {
+            console.warn('[FCM] Firebase projectId not configured');
+            return;
+        }
+
+        if (!VAPID_KEY || VAPID_KEY === 'REPLACE_WITH_YOUR_VAPID_KEY') {
+            console.warn('[FCM] ⚠️ VAPID key not configured — set FCM_VAPID_KEY in .env or constants.php');
+            console.warn('[FCM] Get it from: Firebase Console → Project Settings → Cloud Messaging → Web Push certificates');
             return;
         }
 
         try {
             if (typeof firebase === 'undefined') {
+                console.warn('[FCM] Firebase SDK not loaded');
                 return;
             }
 
@@ -55,12 +65,13 @@
             }
 
             var tokenOpts = { serviceWorkerRegistration: swRegistration };
-            if (VAPID_KEY && VAPID_KEY !== 'REPLACE_WITH_YOUR_VAPID_KEY') {
+            if (VAPID_KEY) {
                 tokenOpts.vapidKey = VAPID_KEY;
             }
 
             var token = await messaging.getToken(tokenOpts);
             if (!token) {
+                console.warn('[FCM] Failed to get FCM token');
                 return;
             }
 
@@ -80,7 +91,7 @@
             });
 
         } catch (err) {
-            // silent fail for push notifications
+            console.warn('[FCM] Initialization error:', err.message || err);
         }
     }
 
@@ -103,9 +114,14 @@
                 body: JSON.stringify(body),
             });
 
-            await res.json();
+            var resp = await res.json();
+            if (res.ok) {
+                console.info('[FCM] ✅ Device registered successfully');
+            } else {
+                console.warn('[FCM] Device registration failed:', resp);
+            }
         } catch (err) {
-            // silent fail
+            console.warn('[FCM] Device registration error:', err.message || err);
         }
     }
 
