@@ -22,9 +22,9 @@ final class UserDevicesValidator
             throw new InvalidArgumentException("user_id must be a positive integer.");
         }
 
-        // Validate fcm_token (non-empty string if provided)
+        // Validate fcm_token (allow null; reject empty strings)
         if (isset($data['fcm_token']) && $data['fcm_token'] !== null && trim($data['fcm_token']) === '') {
-            $data['fcm_token'] = null; // treat empty string as null
+            throw new InvalidArgumentException("fcm_token cannot be an empty string; pass null or omit it.");
         }
 
         // Validate device_type (allowed values)

@@ -57,29 +57,16 @@ if (!$pdo instanceof PDO) {
 function _register_login_device(PDO $pdo, int $userId): void
 {
     try {
+        $detectorFile = dirname(__DIR__, 2) . '/shared/helpers/device_detector.php';
+        if (file_exists($detectorFile)) {
+            require_once $detectorFile;
+        }
+
         $ua = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 512);
         $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
 
-        // Detect device type from user agent
-        $uaLower = strtolower($ua);
-        if (str_contains($uaLower, 'android'))       $deviceType = 'android';
-        elseif (str_contains($uaLower, 'iphone') || str_contains($uaLower, 'ipad')) $deviceType = 'ios';
-        elseif ($ua !== '')                           $deviceType = 'web';
-        else                                          $deviceType = 'other';
-
-        // Parse device name (browser + OS)
-        $deviceName = '';
-        if (preg_match('/(?:Chrome|CriOS)\/[\d.]+/', $ua))     $deviceName = 'Chrome';
-        elseif (preg_match('/(?:Edg|Edge)\/[\d.]+/', $ua))     $deviceName = 'Edge';
-        elseif (preg_match('/Firefox\/[\d.]+/', $ua))           $deviceName = 'Firefox';
-        elseif (preg_match('/Safari\/[\d.]+/', $ua) && !str_contains($ua, 'Chrome')) $deviceName = 'Safari';
-        else $deviceName = 'Browser';
-
-        if (str_contains($uaLower, 'windows'))      $deviceName .= ' on Windows';
-        elseif (str_contains($uaLower, 'macintosh')) $deviceName .= ' on macOS';
-        elseif (str_contains($uaLower, 'android'))   $deviceName .= ' on Android';
-        elseif (str_contains($uaLower, 'iphone'))    $deviceName .= ' on iOS';
-        elseif (str_contains($uaLower, 'linux'))     $deviceName .= ' on Linux';
+        $deviceType = class_exists('DeviceDetector') ? DeviceDetector::detectType($ua) : 'web';
+        $deviceName = class_exists('DeviceDetector') ? DeviceDetector::detectName($ua) : 'Browser';
 
         // Upsert: update existing device by user_id+user_agent, or insert new
         $existing = $pdo->prepare(

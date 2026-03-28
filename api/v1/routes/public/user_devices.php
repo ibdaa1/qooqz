@@ -13,6 +13,12 @@ declare(strict_types=1);
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 
+// Load shared device detection helper
+$_detectorFile = dirname(__DIR__, 3) . '/shared/helpers/device_detector.php';
+if (file_exists($_detectorFile)) {
+    require_once $_detectorFile;
+}
+
 // Resolve user_id from session
 $userId = null;
 if (!empty($_SESSION['user']['id'])) {
@@ -56,35 +62,12 @@ try {
                 $deviceType = 'other';
             }
 
-            // Auto-detect device_type from user_agent if not provided
-            if ($deviceType === null && $ua !== '') {
-                $uaLower = strtolower($ua);
-                if (str_contains($uaLower, 'android'))       $deviceType = 'android';
-                elseif (str_contains($uaLower, 'iphone') || str_contains($uaLower, 'ipad')) $deviceType = 'ios';
-                else                                          $deviceType = 'web';
+            // Auto-detect device_type and device_name using shared helper
+            if ($deviceType === null) {
+                $deviceType = class_exists('DeviceDetector') ? DeviceDetector::detectType($ua) : 'web';
             }
-
-            // Auto-detect device_name if not provided
-            if ($deviceName === null && $ua !== '') {
-                $browser = 'Browser';
-                if (preg_match('/(?:Chrome|CriOS)\/[\d.]+/', $ua) && !str_contains($ua, 'Edg'))
-                    $browser = 'Chrome';
-                elseif (preg_match('/(?:Edg|Edge)\/[\d.]+/', $ua))
-                    $browser = 'Edge';
-                elseif (preg_match('/Firefox\/[\d.]+/', $ua))
-                    $browser = 'Firefox';
-                elseif (preg_match('/Safari\/[\d.]+/', $ua) && !str_contains($ua, 'Chrome'))
-                    $browser = 'Safari';
-
-                $uaLower = strtolower($ua);
-                $os = '';
-                if (str_contains($uaLower, 'windows'))      $os = ' on Windows';
-                elseif (str_contains($uaLower, 'macintosh')) $os = ' on macOS';
-                elseif (str_contains($uaLower, 'android'))   $os = ' on Android';
-                elseif (str_contains($uaLower, 'iphone'))    $os = ' on iOS';
-                elseif (str_contains($uaLower, 'linux'))     $os = ' on Linux';
-
-                $deviceName = $browser . $os;
+            if ($deviceName === null) {
+                $deviceName = class_exists('DeviceDetector') ? DeviceDetector::detectName($ua) : 'Browser';
             }
 
             // Handle deregister sub-action

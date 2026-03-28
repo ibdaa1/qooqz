@@ -121,16 +121,16 @@ if ($_devRegUserId > 0):
 ?>
 <script>
 (function(){
-    var K='qz_dev_reg', D=86400000;
-    var t=localStorage.getItem(K);
-    if(t && (Date.now()-parseInt(t,10))<D) return; // already registered today
+    var STORAGE_KEY='qz_dev_reg', DAY_MS=86400000;
+    var lastReg=localStorage.getItem(STORAGE_KEY);
+    if(lastReg && (Date.now()-parseInt(lastReg,10))<DAY_MS) return;
     fetch('/api/public/user_devices',{
         method:'POST',
         credentials:'same-origin',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({})
     }).then(function(r){
-        if(r.ok) localStorage.setItem(K,''+Date.now());
+        if(r.ok) localStorage.setItem(STORAGE_KEY,''+Date.now());
     }).catch(function(){});
 })();
 </script>
