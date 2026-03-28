@@ -107,23 +107,32 @@ try {
                 if (empty($fcmToken)) {
                     ResponseFormatter::error('fcm_token is required', 422);
                 }
-                // Deactivate the device token (set is_active = 0)
-                $stmt = $pdo->prepare("UPDATE user_devices SET is_active = 0 WHERE fcm_token = ?");
-                $stmt->execute([$fcmToken]);
+                // Deactivate the device token (set is_active = 0) — scoped to current user
+                if ($userId === null || $userId <= 0) {
+                    ResponseFormatter::error('Authentication required', 401);
+                    break;
+                }
+                $stmt = $pdo->prepare("UPDATE user_devices SET is_active = 0 WHERE fcm_token = ? AND user_id = ?");
+                $stmt->execute([$fcmToken, $userId]);
                 ResponseFormatter::success(['deregistered' => true], 'Device deregistered successfully');
                 break;
             }
 
-            // Ensure user_id from session if not provided in data
-            if (empty($data['user_id']) && $userId !== null) {
-                $data['user_id'] = $userId;
+            // Use session user_id for POST (prevent spoofing via query param)
+            $sessionUserId = null;
+            if (isset($user['id'])) {
+                $sessionUserId = (int)$user['id'];
+            } elseif (isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
+                $sessionUserId = (int)$_SESSION['user_id'];
             }
-            if (empty($data['user_id'])) {
-                ResponseFormatter::error('user_id is required', 422);
+            if ($sessionUserId === null || $sessionUserId <= 0) {
+                ResponseFormatter::error('Authentication required', 401);
+                break;
             }
+            $data['user_id'] = $sessionUserId;
 
-            // Add request metadata
-            $data['user_agent'] = $_SERVER['HTTP_USER_AGENT'] ?? null;
+            // Add request metadata (truncate UA to 512 chars to match login device registration)
+            $data['user_agent'] = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 512);
             $data['ip'] = $_SERVER['REMOTE_ADDR'] ?? null;
             $data['last_seen_at'] = date('Y-m-d H:i:s');
 

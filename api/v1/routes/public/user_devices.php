@@ -86,8 +86,8 @@ try {
             // Deduplication: check by FCM token first, then by user_agent
             $existing = null;
             if ($fcmToken !== null) {
-                $stmt = $pdo->prepare("SELECT id FROM user_devices WHERE fcm_token = ? LIMIT 1");
-                $stmt->execute([$fcmToken]);
+                $stmt = $pdo->prepare("SELECT id FROM user_devices WHERE fcm_token = ? AND user_id = ? LIMIT 1");
+                $stmt->execute([$fcmToken, $userId]);
                 $existing = $stmt->fetch(PDO::FETCH_ASSOC);
             }
             if (!$existing && $ua !== '') {
