@@ -52,6 +52,124 @@ if ($first === 'entity') {
         exit;
     }
 
+    // Sub-route: entity store_sections — page sections with language-aware translations
+    // GET /api/public/entity/{id}/store_sections
+    if ($sub === 'store_sections') {
+        $entityRow = $pdoOne('SELECT id, tenant_id FROM entities WHERE id = ? AND status NOT IN (\'suspended\',\'rejected\') LIMIT 1', [$entityId]);
+        if (!$entityRow) { ResponseFormatter::notFound('Entity not found'); exit; }
+
+        // Default section order when no DB config exists
+        $defaultSections = [
+            ['type' => 'header',   'position' => 10, 'settings' => '{"show_cover":true,"show_rating":true,"show_verified":true,"show_status":true}'],
+            ['type' => 'contact',  'position' => 20, 'settings' => '{"show_phone":true,"show_email":true,"show_website":true,"show_share":true,"show_social":true}'],
+            ['type' => 'tabs',     'position' => 30, 'settings' => '{"tabs":["products","info","hours","location","offers","reviews"]}'],
+            ['type' => 'products', 'position' => 40, 'settings' => '{"per_page":12,"show_categories":true,"show_search":true,"show_cart":true}'],
+            ['type' => 'info',     'position' => 50, 'settings' => '{"show_description":true,"show_attributes":true,"show_payment_methods":true,"show_settings":true}'],
+            ['type' => 'hours',    'position' => 60, 'settings' => '{}'],
+            ['type' => 'location', 'position' => 70, 'settings' => '{"show_osm":true,"show_google":true}'],
+            ['type' => 'offers',   'position' => 80, 'settings' => '{}'],
+            ['type' => 'reviews',  'position' => 90, 'settings' => '{"show_form":true,"limit":5}'],
+        ];
+
+        $sections = [];
+        try {
+            $sections = $pdoList(
+                "SELECT ss.id, ss.type, ss.position, ss.is_active, ss.settings,
+                        sst.title AS translated_title, sst.content AS translated_content
+                   FROM store_sections ss
+                   JOIN store_pages sp ON sp.id = ss.page_id
+              LEFT JOIN store_section_translations sst ON sst.section_id = ss.id AND sst.language_code = ?
+                  WHERE sp.entity_id = ? AND sp.is_active = 1 AND ss.is_active = 1
+                  ORDER BY ss.position ASC",
+                [$lang, $entityId]
+            );
+        } catch (\Throwable $_) {
+            // Tables may not exist yet — fall back to defaults
+            $sections = [];
+        }
+
+        if (empty($sections)) {
+            // Return default sections with null translations
+            $sections = array_map(function ($s) {
+                return [
+                    'id'                 => null,
+                    'type'               => $s['type'],
+                    'position'           => $s['position'],
+                    'is_active'          => 1,
+                    'settings'           => $s['settings'],
+                    'translated_title'   => null,
+                    'translated_content' => null,
+                ];
+            }, $defaultSections);
+        }
+
+        // Parse settings JSON for each section
+        foreach ($sections as &$sec) {
+            $sec['settings'] = is_string($sec['settings'] ?? null)
+                ? (json_decode($sec['settings'], true) ?: [])
+                : ($sec['settings'] ?? []);
+            $sec['translated_content'] = is_string($sec['translated_content'] ?? null)
+                ? (json_decode($sec['translated_content'], true) ?: null)
+                : ($sec['translated_content'] ?? null);
+        }
+        unset($sec);
+
+        ResponseFormatter::success(['ok' => true, 'data' => $sections]);
+        exit;
+    }
+
+    // Sub-route: entity page_categories — hierarchical categories with language support
+    // GET /api/public/entity/{id}/page_categories
+    if ($sub === 'page_categories') {
+        $entityRow = $pdoOne('SELECT tenant_id FROM entities WHERE id = ? AND status NOT IN (\'suspended\',\'rejected\') LIMIT 1', [$entityId]);
+        if (!$entityRow) { ResponseFormatter::notFound('Entity not found'); exit; }
+        $eTenId = (int)$entityRow['tenant_id'];
+
+        $rows = $pdoList(
+            "SELECT DISTINCT c.id, c.parent_id, COALESCE(ct.name, c.name) AS name, c.slug,
+                    c.sort_order
+               FROM product_categories pc
+               JOIN categories c ON c.id = pc.category_id AND c.is_active = 1
+          LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
+               JOIN products p ON p.id = pc.product_id AND p.tenant_id = ? AND p.is_active = 1
+              ORDER BY c.sort_order ASC, c.id ASC LIMIT 100",
+            [$lang, $eTenId]
+        );
+
+        // Build hierarchical tree
+        $catById = [];
+        foreach ($rows as &$cat) {
+            $cat['children'] = [];
+            $catById[(int)$cat['id']] = &$cat;
+        }
+        unset($cat);
+
+        foreach ($rows as &$cat) {
+            $pid = (int)($cat['parent_id'] ?? 0);
+            if ($pid && isset($catById[$pid])) {
+                $catById[$pid]['children'][] = &$cat;
+            }
+        }
+        unset($cat);
+
+        // Collect root categories (no parent or parent not in results)
+        $tree = [];
+        foreach ($rows as $cat) {
+            $pid = (int)($cat['parent_id'] ?? 0);
+            if (!$pid || !isset($catById[$pid])) {
+                $tree[] = $cat;
+            }
+        }
+
+        // If all are leaf nodes, return flat list
+        if (empty($tree)) {
+            $tree = $rows;
+        }
+
+        ResponseFormatter::success(['ok' => true, 'data' => $tree, 'flat' => $rows]);
+        exit;
+    }
+
     // Sub-route: entity discounts — active discounts for this entity
     if ($sub === 'discounts') {
         $rows = $pdoList(
