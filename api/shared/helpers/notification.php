@@ -147,10 +147,12 @@ class Notification
                 };
 
                 // تحديث حالة التسليم
+                $errorMsg = $channelResult['error'] ?? $channelResult['message'] ?? null;
+                // لا نسجل الرسالة إن كانت عملية الإرسال ناجحة
                 self::updateDeliveryStatus(
                     $deliveryId,
                     $channelResult['success'] ? 'sent' : 'failed',
-                    $channelResult['error'] ?? null
+                    $channelResult['success'] ? null : $errorMsg
                 );
 
                 $results['channels'][$channel] = $channelResult;

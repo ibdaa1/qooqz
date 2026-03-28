@@ -7,7 +7,8 @@
  *
  * الاستخدام:
  *   GET  /api/test_fcm.php              → تشخيص فقط (بدون إرسال)
- *   GET  /api/test_fcm.php?send=1       → تشخيص + إرسال حقيقي لأول token
+ *   GET  /api/test_fcm.php?send=1       → تشخيص + إرسال حقيقي لأول token (مباشر عبر FCM API)
+ *   GET  /api/test_fcm.php?send_class=1 → إرسال عبر Notification::send() (المسار الكامل: DB + push)
  *   GET  /api/test_fcm.php?user_id=1    → فحص tokens لمستخدم محدد
  *   GET  /api/test_fcm.php?send=1&user_id=1 → إرسال فعلي لمستخدم محدد
  *
@@ -421,7 +422,75 @@ if ($doSend) {
 }
 
 // -----------------------------------------------
-// 8. Summary
+// 8. Test via Notification::send() class (?send_class=1)
+// -----------------------------------------------
+$doSendClass = isset($_GET['send_class']) && $_GET['send_class'] === '1';
+
+if ($doSendClass) {
+    if (!$pdo) {
+        $report['class_send_result'] = [
+            'attempted' => false,
+            'reason'    => 'Database connection not available',
+        ];
+    } else {
+        try {
+            require_once __DIR__ . '/shared/helpers/notification.php';
+
+            Notification::setPDO($pdo);
+
+            $classChannels = ['database', 'push'];
+            $classTitle    = '🔔 Class Test — ' . date('H:i:s');
+            $classBody     = 'Test notification sent via Notification::send() class';
+
+            $classResult = Notification::send(
+                recipientId:    $userId,
+                recipientType:  'user',
+                tenantId:       1,
+                typeCode:       'general',
+                title:          $classTitle,
+                message:        $classBody,
+                data:           ['test' => 'true', 'source' => 'test_fcm.php'],
+                channels:       $classChannels,
+                priority:       'high'
+            );
+
+            $report['class_send_result'] = [
+                'attempted'  => true,
+                'channels'   => $classChannels,
+                'user_id'    => $userId,
+                'result'     => $classResult,
+            ];
+
+            // Check deliveries in DB
+            if (!empty($classResult['notification_id'])) {
+                $nid = $classResult['notification_id'];
+                $dStmt = $pdo->prepare("
+                    SELECT nd.id, nc.code AS channel_code, nd.delivery_status, nd.error_message, nd.sent_at, nd.created_at
+                    FROM notification_deliveries nd
+                    LEFT JOIN notification_channels nc ON nc.id = nd.channel_id
+                    WHERE nd.notification_id = ?
+                    ORDER BY nd.id
+                ");
+                $dStmt->execute([$nid]);
+                $report['class_send_result']['deliveries'] = $dStmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+        } catch (Throwable $e) {
+            $report['class_send_result'] = [
+                'attempted' => true,
+                'error'     => $e->getMessage(),
+                'trace'     => $e->getTraceAsString(),
+            ];
+        }
+    }
+} else {
+    $report['class_send_result'] = [
+        'attempted' => false,
+        'reason'    => 'Add ?send_class=1 to test via Notification::send() class (tests full flow with DB + push)',
+    ];
+}
+
+// -----------------------------------------------
+// 9. Summary
 // -----------------------------------------------
 $hasErrors = !empty($report['errors']);
 $report['summary'] = [
@@ -435,8 +504,13 @@ $report['summary'] = [
         '3. Ensure FCM_PROJECT_ID is set in api/shared/config/.env (e.g., your Firebase project ID)',
         '4. Ensure users have registered FCM tokens (check user_devices table)',
         '5. Re-run this test: /api/test_fcm.php',
-        '6. To send a real test: /api/test_fcm.php?send=1&user_id=1',
-    ] : ['All checks passed! Use ?send=1 to test actual FCM delivery.'],
+        '6. To send a real FCM test: /api/test_fcm.php?send=1&user_id=1',
+        '7. To test full Notification::send() flow: /api/test_fcm.php?send_class=1&user_id=1',
+    ] : [
+        'All checks passed!',
+        'Use ?send=1 to test direct FCM delivery.',
+        'Use ?send_class=1 to test via Notification::send() class (full flow with DB + delivery tracking).',
+    ],
 ];
 
 echo json_encode($report, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
