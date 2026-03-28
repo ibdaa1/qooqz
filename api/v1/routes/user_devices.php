@@ -26,20 +26,20 @@ $service = new UserDevicesService($repo);
 $controller = new UserDevicesController($service);
 
 // ================================
-// Auth check (optional, but usually user must be logged in)
+// Auth check
 // ================================
 $user = $_SESSION['user'] ?? [];
-$userId = isset($_GET['user_id']) && is_numeric($_GET['user_id'])
-    ? (int)$_GET['user_id']
-    : (isset($user['id']) ? (int)$user['id'] : null);
 
-// Fallback: check $_SESSION['user_id'] (used by public frontend)
-if ($userId === null && isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
-    $userId = (int)$_SESSION['user_id'];
+// Session-based user_id (safe for write operations — POST, deregister)
+$sessionUserId = isset($user['id']) ? (int)$user['id'] : null;
+if ($sessionUserId === null && isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
+    $sessionUserId = (int)$_SESSION['user_id'];
 }
 
-// Allow public registration (e.g., for push tokens) – you may require auth via token or session
-// Here we assume either the user is logged in OR we have a user_id provided as query param (for backend calls)
+// Filtered user_id for GET/read operations (accepts query param for admin/backend calls)
+$userId = isset($_GET['user_id']) && is_numeric($_GET['user_id'])
+    ? (int)$_GET['user_id']
+    : $sessionUserId;
 
 // ================================
 // Handle request
@@ -108,23 +108,17 @@ try {
                     ResponseFormatter::error('fcm_token is required', 422);
                 }
                 // Deactivate the device token (set is_active = 0) — scoped to current user
-                if ($userId === null || $userId <= 0) {
+                if ($sessionUserId === null || $sessionUserId <= 0) {
                     ResponseFormatter::error('Authentication required', 401);
                     break;
                 }
                 $stmt = $pdo->prepare("UPDATE user_devices SET is_active = 0 WHERE fcm_token = ? AND user_id = ?");
-                $stmt->execute([$fcmToken, $userId]);
+                $stmt->execute([$fcmToken, $sessionUserId]);
                 ResponseFormatter::success(['deregistered' => true], 'Device deregistered successfully');
                 break;
             }
 
-            // Use session user_id for POST (prevent spoofing via query param)
-            $sessionUserId = null;
-            if (isset($user['id'])) {
-                $sessionUserId = (int)$user['id'];
-            } elseif (isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
-                $sessionUserId = (int)$_SESSION['user_id'];
-            }
+            // Require session-based auth for device registration
             if ($sessionUserId === null || $sessionUserId <= 0) {
                 ResponseFormatter::error('Authentication required', 401);
                 break;
