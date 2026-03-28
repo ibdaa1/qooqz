@@ -332,11 +332,10 @@ class Notification
         $invalidTokens = [];
 
         // v1 API يرسل رسالة واحدة لكل جهاز
-        // Allow custom image/icon via $data['icon_url'] or $data['image_url'], fallback to APP_LOGO_URL
-        $notifImageUrl = !empty($data['image_url']) ? $data['image_url'] : APP_LOGO_URL;
-        $notifIconUrl  = !empty($data['icon_url'])  ? $data['icon_url']  : APP_LOGO_URL;
-        // Build click URL from data
-        $clickUrl = !empty($data['click_url']) ? $data['click_url'] : '/';
+        $fcmMeta = self::resolveFcmMeta($data);
+        $notifImageUrl = $fcmMeta['image_url'];
+        $notifIconUrl  = $fcmMeta['icon_url'];
+        $clickUrl      = $fcmMeta['click_url'];
 
         foreach ($tokens as $token) {
             $payload = [
@@ -350,11 +349,7 @@ class Notification
                     'data' => array_map('strval', array_merge($data, [
                         'notification_id' => (string) $notificationId,
                         'click_action'    => 'FLUTTER_NOTIFICATION_CLICK',
-                        'icon_url'        => $notifIconUrl,
-                        'image_url'       => $notifImageUrl,
-                        'site_name'       => defined('APP_NAME') ? APP_NAME : 'QOOQZ',
-                        'site_url'        => defined('APP_URL') ? APP_URL : (getenv('APP_URL') ?: ''),
-                    ])),
+                    ], $fcmMeta)),
                     'android' => [
                         'priority' => 'high',
                         'notification' => [
@@ -438,6 +433,21 @@ class Notification
     }
 
     // -------------------------------------------------------
+    // 6️⃣.1b  FCM — Resolve notification URLs and site data from $data payload
+    // -------------------------------------------------------
+
+    private static function resolveFcmMeta(array $data): array
+    {
+        return [
+            'icon_url'  => !empty($data['icon_url'])  ? $data['icon_url']  : APP_LOGO_URL,
+            'image_url' => !empty($data['image_url']) ? $data['image_url'] : APP_LOGO_URL,
+            'click_url' => !empty($data['click_url']) ? $data['click_url'] : '/',
+            'site_name' => defined('APP_NAME') ? APP_NAME : 'QOOQZ',
+            'site_url'  => defined('APP_URL') ? APP_URL : (getenv('APP_URL') ?: ''),
+        ];
+    }
+
+    // -------------------------------------------------------
     // 6️⃣.2  FCM Legacy API — fallback (deprecated)
     // -------------------------------------------------------
 
@@ -449,28 +459,21 @@ class Notification
         int    $notificationId,
         int    $recipientId
     ): array {
-        // Allow custom icon/image via $data, fallback to APP_LOGO_URL
-        $legacyIconUrl  = !empty($data['icon_url'])  ? $data['icon_url']  : APP_LOGO_URL;
-        $legacyImageUrl = !empty($data['image_url']) ? $data['image_url'] : APP_LOGO_URL;
-        $legacyClickUrl = !empty($data['click_url']) ? $data['click_url'] : '';
+        $fcmMeta = self::resolveFcmMeta($data);
 
         $payload = [
             'registration_ids' => $tokens,
             'notification'     => [
                 'title' => $title,
                 'body'  => $message,
-                'icon'  => $legacyIconUrl,
-                'image' => $legacyImageUrl,
+                'icon'  => $fcmMeta['icon_url'],
+                'image' => $fcmMeta['image_url'],
                 'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
             ],
             'data' => array_merge($data, [
                 'notification_id' => $notificationId,
                 'click_action'    => 'FLUTTER_NOTIFICATION_CLICK',
-                'icon_url'        => $legacyIconUrl,
-                'image_url'       => $legacyImageUrl,
-                'site_name'       => defined('APP_NAME') ? APP_NAME : 'QOOQZ',
-                'site_url'        => defined('APP_URL') ? APP_URL : (getenv('APP_URL') ?: ''),
-            ]),
+            ], $fcmMeta),
             'priority' => 'high',
         ];
 

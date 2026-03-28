@@ -13,47 +13,39 @@
 
 // Determine which tabs to show based on settings and active sections
 $configuredTabs = $sectionSettings['tabs'] ?? ['products', 'info', 'hours', 'location', 'offers', 'reviews'];
+$firstTab = $configuredTabs[0] ?? 'products';
+// Map tab keys to their panel IDs
+$tabPanelMap = [
+    'products' => 'tabProducts', 'info' => 'tabInfo', 'hours' => 'tabHours',
+    'location' => 'tabMap', 'offers' => 'tabDiscounts', 'reviews' => 'tabRatings',
+];
+$isFirstTab = true;
 ?>
 
 <div class="pub-container">
     <div class="pub-tabs" style="margin-top:24px;" role="tablist">
-        <?php if (in_array('products', $configuredTabs)): ?>
-        <button class="pub-tab active" data-tab="products" role="tab"
-                aria-selected="true" aria-controls="tabProducts">
-            🛍️ <?= e(t('entity.products_tab')) ?>
+        <?php
+        $tabDefs = [
+            'products' => ['data' => 'products', 'panel' => 'tabProducts', 'icon' => '🛍️', 'label' => t('entity.products_tab'), 'show' => true, 'count' => null],
+            'info'     => ['data' => 'info',     'panel' => 'tabInfo',     'icon' => 'ℹ️',  'label' => t('entity.info_tab'),     'show' => true, 'count' => null],
+            'hours'    => ['data' => 'hours',    'panel' => 'tabHours',    'icon' => '🕐', 'label' => t('entity.hours_tab'),    'show' => true, 'count' => null],
+            'location' => ['data' => 'map',      'panel' => 'tabMap',      'icon' => '🗺️',  'label' => t('entity.location_tab'), 'show' => true, 'count' => null],
+            'offers'   => ['data' => 'discounts','panel' => 'tabDiscounts','icon' => '🏷️', 'label' => t('entity.discounts_tab'),'show' => !empty($discounts), 'count' => !empty($discounts) ? count($discounts) : null],
+            'reviews'  => ['data' => 'ratings',  'panel' => 'tabRatings',  'icon' => '⭐', 'label' => t('entity.ratings_tab'),  'show' => $entityShowReviews, 'count' => $entityRatingTotal > 0 ? $entityRatingTotal : null],
+        ];
+        $isFirstRendered = true;
+        foreach ($configuredTabs as $tabKey):
+            if (!isset($tabDefs[$tabKey]) || !$tabDefs[$tabKey]['show']) continue;
+            if (!in_array($tabKey, $configuredTabs)) continue;
+            $td = $tabDefs[$tabKey];
+            $active = $isFirstRendered;
+            $isFirstRendered = false;
+        ?>
+        <button class="pub-tab<?= $active ? ' active' : '' ?>" data-tab="<?= e($td['data']) ?>" role="tab"
+                aria-selected="<?= $active ? 'true' : 'false' ?>" aria-controls="<?= e($td['panel']) ?>">
+            <?= $td['icon'] ?> <?= e($td['label']) ?>
+            <?php if ($td['count'] !== null): ?><span class="pub-tab-count"><?= $td['count'] ?></span><?php endif; ?>
         </button>
-        <?php endif; ?>
-        <?php if (in_array('info', $configuredTabs)): ?>
-        <button class="pub-tab" data-tab="info" role="tab"
-                aria-selected="false" aria-controls="tabInfo">
-            ℹ️ <?= e(t('entity.info_tab')) ?>
-        </button>
-        <?php endif; ?>
-        <?php if (in_array('hours', $configuredTabs)): ?>
-        <button class="pub-tab" data-tab="hours" role="tab"
-                aria-selected="false" aria-controls="tabHours">
-            🕐 <?= e(t('entity.hours_tab')) ?>
-        </button>
-        <?php endif; ?>
-        <?php if (in_array('location', $configuredTabs)): ?>
-        <button class="pub-tab" data-tab="map" role="tab"
-                aria-selected="false" aria-controls="tabMap">
-            🗺️ <?= e(t('entity.location_tab')) ?>
-        </button>
-        <?php endif; ?>
-        <?php if (in_array('offers', $configuredTabs) && !empty($discounts)): ?>
-        <button class="pub-tab" data-tab="discounts" role="tab"
-                aria-selected="false" aria-controls="tabDiscounts">
-            🏷️ <?= e(t('entity.discounts_tab')) ?>
-            <span class="pub-tab-count"><?= count($discounts) ?></span>
-        </button>
-        <?php endif; ?>
-        <?php if (in_array('reviews', $configuredTabs) && $entityShowReviews): ?>
-        <button class="pub-tab" data-tab="ratings" role="tab"
-                aria-selected="false" aria-controls="tabRatings">
-            ⭐ <?= e(t('entity.ratings_tab')) ?>
-            <?php if ($entityRatingTotal > 0): ?><span class="pub-tab-count"><?= $entityRatingTotal ?></span><?php endif; ?>
-        </button>
-        <?php endif; ?>
+        <?php endforeach; ?>
     </div>
 </div>

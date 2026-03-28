@@ -460,6 +460,8 @@ $sectionDir = dirname(__DIR__) . '/partials/store_sections';
  * Loops through active sections and includes partial templates
  * ----------------------------------------------------- */
 $insideContainer = false;  // Track whether we're inside a .pub-container
+// Sections that render inside a shared container (vs header/contact/tabs that manage their own)
+$containerSections = ['products', 'info', 'hours', 'location', 'offers', 'reviews'];
 foreach ($storeSections as $section):
     $sectionType     = $section['type'];
     $sectionSettings = is_string($section['settings'] ?? null) ? (json_decode($section['settings'], true) ?: []) : ($section['settings'] ?? []);
@@ -469,7 +471,7 @@ foreach ($storeSections as $section):
     if (file_exists($sectionFile)):
         // header and contact sections manage their own containers
         // tabs through reviews are inside a shared container
-        if (in_array($sectionType, ['products', 'info', 'hours', 'location', 'offers', 'reviews']) && !$insideContainer):
+        if (in_array($sectionType, $containerSections) && !$insideContainer):
             echo '<div class="pub-container">';
             $insideContainer = true;
         endif;
