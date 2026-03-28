@@ -325,8 +325,8 @@ return [
 
     // ⚠️ VAPID Key: اذهب إلى Firebase Console → Project Settings
     //    → Cloud Messaging → Web Push certificates → Generate key pair
-    //    ثم ضع القيمة هنا (تبدأ بـ BK...)
-    'FCM_VAPID_KEY' => getenv('FCM_VAPID_KEY') ?: 'REPLACE_WITH_YOUR_VAPID_KEY',
+    //    ثم ضع القيمة هنا (مفتاح VAPID العام)
+    'FCM_VAPID_KEY' => getenv('FCM_VAPID_KEY') ?: 'BEzn1WFf6r1OSnEEBK1RGlvunNwfDlLgZy6stIgdWpg3mU7QmX2swU4zifu-gpiF_1I0_xcEPNDAyanKw9tZ57o',
 
     // FCM Server Key (للإرسال من السيرفر — Legacy API)
     // Firebase Console → Project Settings → Cloud Messaging → Server key
