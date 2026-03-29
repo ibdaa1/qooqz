@@ -1,8 +1,14 @@
 <?php
 declare(strict_types=1);
 
+/**
+ * Unified Entity Products Validator
+ * Validates both product-level and variant-level records
+ */
 final class EntityProductsValidator
 {
+    private const VALID_STOCK_STATUSES = ['in_stock', 'out_of_stock', 'unlimited'];
+
     /**
      * Validate data for creating a new entity product
      */
@@ -14,6 +20,26 @@ final class EntityProductsValidator
 
         if (empty($data['product_id']) || !is_numeric($data['product_id'])) {
             throw new InvalidArgumentException("Field 'product_id' is required and must be numeric");
+        }
+
+        self::validateCommonFields($data);
+    }
+
+    /**
+     * Validate data for creating a new entity product variant
+     */
+    public static function validateVariantCreate(array $data): void
+    {
+        if (empty($data['entity_id']) || !is_numeric($data['entity_id'])) {
+            throw new InvalidArgumentException("Field 'entity_id' is required and must be numeric");
+        }
+
+        if (empty($data['product_id']) || !is_numeric($data['product_id'])) {
+            throw new InvalidArgumentException("Field 'product_id' is required and must be numeric");
+        }
+
+        if (empty($data['variant_id']) || !is_numeric($data['variant_id'])) {
+            throw new InvalidArgumentException("Field 'variant_id' is required and must be numeric");
         }
 
         self::validateCommonFields($data);
@@ -36,7 +62,7 @@ final class EntityProductsValidator
     }
 
     /**
-     * Validate bulk save data
+     * Validate bulk save data for products
      */
     public static function validateBulkSave(int $entityId, array $products): void
     {
@@ -59,6 +85,29 @@ final class EntityProductsValidator
     }
 
     /**
+     * Validate bulk save data for variants
+     */
+    public static function validateBulkVariantSave(int $entityId, array $variants): void
+    {
+        if ($entityId <= 0) {
+            throw new InvalidArgumentException("Entity ID must be positive");
+        }
+
+        if (empty($variants)) {
+            throw new InvalidArgumentException("No variants provided for bulk save");
+        }
+
+        foreach ($variants as $index => $variantData) {
+            if (!is_array($variantData)) {
+                throw new InvalidArgumentException("Variant at index $index must be an array");
+            }
+
+            $tempData = array_merge(['entity_id' => $entityId], $variantData);
+            self::validateVariantCreate($tempData);
+        }
+    }
+
+    /**
      * Validate common fields
      */
     private static function validateCommonFields(array $data): void
@@ -69,6 +118,10 @@ final class EntityProductsValidator
 
         if (isset($data['product_id']) && !is_numeric($data['product_id'])) {
             throw new InvalidArgumentException("product_id must be numeric");
+        }
+
+        if (isset($data['variant_id']) && $data['variant_id'] !== null && $data['variant_id'] !== '' && !is_numeric($data['variant_id'])) {
+            throw new InvalidArgumentException("variant_id must be numeric");
         }
 
         if (isset($data['tenant_id']) && !is_numeric($data['tenant_id'])) {
@@ -84,6 +137,18 @@ final class EntityProductsValidator
         if (isset($data['low_stock_threshold'])) {
             if (!is_numeric($data['low_stock_threshold']) || (int)$data['low_stock_threshold'] < 0) {
                 throw new InvalidArgumentException("low_stock_threshold must be a non-negative integer");
+            }
+        }
+
+        if (isset($data['stock_status'])) {
+            if (!in_array($data['stock_status'], self::VALID_STOCK_STATUSES, true)) {
+                throw new InvalidArgumentException("stock_status must be one of: " . implode(', ', self::VALID_STOCK_STATUSES));
+            }
+        }
+
+        if (isset($data['manage_stock'])) {
+            if (!in_array($data['manage_stock'], [0, 1, '0', '1', true, false], true)) {
+                throw new InvalidArgumentException("manage_stock must be 0 or 1");
             }
         }
 

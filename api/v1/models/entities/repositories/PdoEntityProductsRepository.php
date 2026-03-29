@@ -1,22 +1,27 @@
 <?php
 declare(strict_types=1);
 
+/**
+ * Unified Entity Products Repository
+ * Handles both product-level (variant_id IS NULL) and variant-level records
+ */
 final class PdoEntityProductsRepository
 {
     private PDO $pdo;
 
     private const ALLOWED_ORDER_BY = [
-        'id', 'entity_id', 'product_id', 'price', 'stock_quantity',
+        'id', 'entity_id', 'product_id', 'variant_id', 'price', 'stock_quantity',
         'is_active', 'is_featured', 'created_at', 'updated_at'
     ];
 
     private const FILTERABLE_COLUMNS = [
-        'entity_id', 'product_id', 'tenant_id', 'is_active', 'is_featured'
+        'entity_id', 'product_id', 'variant_id', 'tenant_id', 'is_active', 'is_featured', 'stock_status'
     ];
 
     private const ENTITY_PRODUCT_COLUMNS = [
-        'tenant_id', 'entity_id', 'product_id',
-        'stock_quantity', 'low_stock_threshold', 'is_active', 'is_featured'
+        'tenant_id', 'entity_id', 'product_id', 'variant_id',
+        'stock_quantity', 'low_stock_threshold', 'manage_stock', 'stock_status',
+        'is_active', 'is_featured'
     ];
 
     public function __construct(PDO $pdo)
@@ -34,11 +39,24 @@ final class PdoEntityProductsRepository
 
         foreach (self::FILTERABLE_COLUMNS as $col) {
             if (isset($filters[$col]) && $filters[$col] !== '') {
-                if (is_numeric($filters[$col])) {
+                if ($col === 'stock_status') {
+                    $sql .= " AND ep.stock_status = :stock_status";
+                    $params[":stock_status"] = $filters[$col];
+                } elseif (is_numeric($filters[$col])) {
                     $sql .= " AND ep.{$col} = :{$col}";
                     $params[":{$col}"] = (int)$filters[$col];
                 }
             }
+        }
+
+        // Filter: products only (variant_id IS NULL)
+        if (isset($filters['products_only']) && $filters['products_only']) {
+            $sql .= " AND ep.variant_id IS NULL";
+        }
+
+        // Filter: variants only (variant_id IS NOT NULL)
+        if (isset($filters['variants_only']) && $filters['variants_only']) {
+            $sql .= " AND ep.variant_id IS NOT NULL";
         }
 
         if (isset($filters['store_name']) && !empty($filters['store_name'])) {
@@ -56,12 +74,18 @@ final class PdoEntityProductsRepository
             $params[":product_sku"] = '%' . $filters['product_sku'] . '%';
         }
 
+        if (isset($filters['variant_sku']) && !empty($filters['variant_sku'])) {
+            $sql .= " AND pv.sku LIKE :variant_sku";
+            $params[":variant_sku"] = '%' . $filters['variant_sku'] . '%';
+        }
+
         if (isset($filters['search']) && !empty($filters['search'])) {
             $searchTerm = '%' . $filters['search'] . '%';
-            $sql .= " AND (pt.name LIKE :search_name OR p.sku LIKE :search_sku OR e.store_name LIKE :search_store)";
+            $sql .= " AND (pt.name LIKE :search_name OR p.sku LIKE :search_sku OR e.store_name LIKE :search_store OR pv.sku LIKE :search_vsku)";
             $params[":search_name"] = $searchTerm;
             $params[":search_sku"] = $searchTerm;
             $params[":search_store"] = $searchTerm;
+            $params[":search_vsku"] = $searchTerm;
         }
 
         return ['sql' => $sql, 'params' => $params];
@@ -84,11 +108,14 @@ final class PdoEntityProductsRepository
                    e.store_name,
                    e.status as entity_status,
                    COALESCE(pt.name, '') as product_name,
-                   p.sku as product_sku
+                   p.sku as product_sku,
+                   pv.sku as variant_sku,
+                   pv.barcode as variant_barcode
             FROM entity_products ep
             LEFT JOIN entities e ON ep.entity_id = e.id
             LEFT JOIN products p ON ep.product_id = p.id
             LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
+            LEFT JOIN product_variants pv ON ep.variant_id = pv.id
             WHERE 1=1
         " . $filterResult['sql'];
         $params = $filterResult['params'];
@@ -126,6 +153,7 @@ final class PdoEntityProductsRepository
             LEFT JOIN entities e ON ep.entity_id = e.id
             LEFT JOIN products p ON ep.product_id = p.id
             LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
+            LEFT JOIN product_variants pv ON ep.variant_id = pv.id
             WHERE 1=1
         " . $filterResult['sql'];
 
@@ -144,11 +172,14 @@ final class PdoEntityProductsRepository
                    e.store_name,
                    e.status as entity_status,
                    COALESCE(pt.name, '') as product_name,
-                   p.sku as product_sku
+                   p.sku as product_sku,
+                   pv.sku as variant_sku,
+                   pv.barcode as variant_barcode
             FROM entity_products ep
             LEFT JOIN entities e ON ep.entity_id = e.id
             LEFT JOIN products p ON ep.product_id = p.id
             LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
+            LEFT JOIN product_variants pv ON ep.variant_id = pv.id
             WHERE ep.id = :id
             LIMIT 1
         ");
@@ -158,7 +189,7 @@ final class PdoEntityProductsRepository
     }
 
     /**
-     * Find by entity and product
+     * Find by entity and product (product-level record, variant_id IS NULL)
      */
     public function findByEntityAndProduct(int $entityId, int $productId): ?array
     {
@@ -172,7 +203,7 @@ final class PdoEntityProductsRepository
             LEFT JOIN entities e ON ep.entity_id = e.id
             LEFT JOIN products p ON ep.product_id = p.id
             LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
-            WHERE ep.entity_id = :entity_id AND ep.product_id = :product_id
+            WHERE ep.entity_id = :entity_id AND ep.product_id = :product_id AND ep.variant_id IS NULL
             LIMIT 1
         ");
         $stmt->execute([':entity_id' => $entityId, ':product_id' => $productId]);
@@ -181,7 +212,33 @@ final class PdoEntityProductsRepository
     }
 
     /**
-     * Get all products for an entity (with pricing from product_pricing)
+     * Find by entity and variant (variant-level record)
+     */
+    public function findByEntityAndVariant(int $entityId, int $variantId): ?array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT ep.*,
+                   e.store_name,
+                   e.status as entity_status,
+                   COALESCE(pt.name, '') as product_name,
+                   p.sku as product_sku,
+                   pv.sku as variant_sku,
+                   pv.barcode as variant_barcode
+            FROM entity_products ep
+            LEFT JOIN entities e ON ep.entity_id = e.id
+            LEFT JOIN products p ON ep.product_id = p.id
+            LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
+            LEFT JOIN product_variants pv ON ep.variant_id = pv.id
+            WHERE ep.entity_id = :entity_id AND ep.variant_id = :variant_id
+            LIMIT 1
+        ");
+        $stmt->execute([':entity_id' => $entityId, ':variant_id' => $variantId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    /**
+     * Get all products for an entity (product-level records, variant_id IS NULL, with pricing)
      */
     public function getEntityProducts(int $entityId): array
     {
@@ -201,10 +258,52 @@ final class PdoEntityProductsRepository
             LEFT JOIN product_pricing pp ON pp.product_id = ep.product_id
                 AND pp.entity_id = ep.entity_id
                 AND pp.is_active = 1
-            WHERE ep.entity_id = :entity_id
+            WHERE ep.entity_id = :entity_id AND ep.variant_id IS NULL
             ORDER BY ep.is_featured DESC, ep.id DESC
         ");
         $stmt->execute([':entity_id' => $entityId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Get all variants for an entity (variant-level records, variant_id IS NOT NULL)
+     */
+    public function getEntityVariants(int $entityId): array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT ep.*,
+                   COALESCE(pt.name, '') as product_name,
+                   pv.sku as variant_sku,
+                   pv.barcode as variant_barcode
+            FROM entity_products ep
+            LEFT JOIN products p ON ep.product_id = p.id
+            LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
+            LEFT JOIN product_variants pv ON ep.variant_id = pv.id
+            WHERE ep.entity_id = :entity_id AND ep.variant_id IS NOT NULL
+            ORDER BY ep.product_id, ep.id DESC
+        ");
+        $stmt->execute([':entity_id' => $entityId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Get variants for a specific entity product
+     */
+    public function getEntityProductVariants(int $entityId, int $productId): array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT ep.*,
+                   COALESCE(pt.name, '') as product_name,
+                   pv.sku as variant_sku,
+                   pv.barcode as variant_barcode
+            FROM entity_products ep
+            LEFT JOIN products p ON ep.product_id = p.id
+            LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
+            LEFT JOIN product_variants pv ON ep.variant_id = pv.id
+            WHERE ep.entity_id = :entity_id AND ep.product_id = :product_id AND ep.variant_id IS NOT NULL
+            ORDER BY ep.id DESC
+        ");
+        $stmt->execute([':entity_id' => $entityId, ':product_id' => $productId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -227,7 +326,8 @@ final class PdoEntityProductsRepository
             throw new InvalidArgumentException("entity_id and product_id are required");
         }
 
-        $this->validateReferences((int)$params[':entity_id'], (int)$params[':product_id']);
+        $variantId = isset($params[':variant_id']) && $params[':variant_id'] !== null ? (int)$params[':variant_id'] : null;
+        $this->validateReferences((int)$params[':entity_id'], (int)$params[':product_id'], $variantId);
 
         if ($isUpdate) {
             $params[':id'] = (int)$data['id'];
@@ -275,7 +375,12 @@ final class PdoEntityProductsRepository
                 $productData['entity_id'] = $entityId;
                 $productData['tenant_id'] = $tenantId;
 
-                $existing = $this->findByEntityAndProduct($entityId, (int)$productData['product_id']);
+                // Product-level records have no variant_id
+                if (!isset($productData['variant_id'])) {
+                    $existing = $this->findByEntityAndProduct($entityId, (int)$productData['product_id']);
+                } else {
+                    $existing = $this->findByEntityAndVariant($entityId, (int)$productData['variant_id']);
+                }
 
                 if ($existing) {
                     $productData['id'] = $existing['id'];
@@ -283,10 +388,40 @@ final class PdoEntityProductsRepository
 
                 $savedIds[] = $this->save($productData);
 
-                // Save entity-specific pricing if price is provided
-                if (isset($productData['price']) && $productData['price'] !== '' && $productData['price'] !== null) {
+                // Save entity-specific pricing if price is provided (product-level only)
+                if (!isset($productData['variant_id']) && isset($productData['price']) && $productData['price'] !== '' && $productData['price'] !== null) {
                     $this->saveEntityProductPricing($entityId, (int)$productData['product_id'], $productData);
                 }
+            }
+
+            $this->pdo->commit();
+            return $savedIds;
+        } catch (\Exception $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Bulk save variants for an entity
+     */
+    public function saveEntityVariants(int $entityId, int $tenantId, array $variants): array
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $savedIds = [];
+
+            foreach ($variants as $variantData) {
+                $variantData['entity_id'] = $entityId;
+                $variantData['tenant_id'] = $tenantId;
+
+                $existing = $this->findByEntityAndVariant($entityId, (int)$variantData['variant_id']);
+
+                if ($existing) {
+                    $variantData['id'] = $existing['id'];
+                }
+
+                $savedIds[] = $this->save($variantData);
             }
 
             $this->pdo->commit();
@@ -342,9 +477,38 @@ final class PdoEntityProductsRepository
     }
 
     /**
-     * Delete all products for an entity
+     * Delete all products for an entity (product-level only)
      */
     public function deleteEntityProducts(int $entityId): bool
+    {
+        $stmt = $this->pdo->prepare("DELETE FROM entity_products WHERE entity_id = :entity_id AND variant_id IS NULL");
+        return $stmt->execute([':entity_id' => $entityId]);
+    }
+
+    /**
+     * Delete all variants for an entity
+     */
+    public function deleteEntityVariants(int $entityId): bool
+    {
+        $stmt = $this->pdo->prepare("DELETE FROM entity_products WHERE entity_id = :entity_id AND variant_id IS NOT NULL");
+        return $stmt->execute([':entity_id' => $entityId]);
+    }
+
+    /**
+     * Delete all variants for a specific entity product
+     */
+    public function deleteEntityProductVariants(int $entityId, int $productId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            "DELETE FROM entity_products WHERE entity_id = :entity_id AND product_id = :product_id AND variant_id IS NOT NULL"
+        );
+        return $stmt->execute([':entity_id' => $entityId, ':product_id' => $productId]);
+    }
+
+    /**
+     * Delete all records (products + variants) for an entity
+     */
+    public function deleteAllForEntity(int $entityId): bool
     {
         $stmt = $this->pdo->prepare("DELETE FROM entity_products WHERE entity_id = :entity_id");
         return $stmt->execute([':entity_id' => $entityId]);
@@ -363,8 +527,11 @@ final class PdoEntityProductsRepository
         $stmt = $this->pdo->query("SELECT COUNT(DISTINCT entity_id) FROM entity_products");
         $stats['entities_with_products'] = (int)$stmt->fetchColumn();
 
-        $stmt = $this->pdo->query("SELECT COUNT(DISTINCT product_id) FROM entity_products");
+        $stmt = $this->pdo->query("SELECT COUNT(DISTINCT product_id) FROM entity_products WHERE variant_id IS NULL");
         $stats['unique_products'] = (int)$stmt->fetchColumn();
+
+        $stmt = $this->pdo->query("SELECT COUNT(DISTINCT variant_id) FROM entity_products WHERE variant_id IS NOT NULL");
+        $stats['unique_variants'] = (int)$stmt->fetchColumn();
 
         $stmt = $this->pdo->query("SELECT COUNT(*) FROM entity_products WHERE is_active = 1");
         $stats['active_records'] = (int)$stmt->fetchColumn();
@@ -376,9 +543,9 @@ final class PdoEntityProductsRepository
     }
 
     /**
-     * Validate entity and product exist
+     * Validate entity, product, and optionally variant exist
      */
-    private function validateReferences(int $entityId, int $productId): void
+    private function validateReferences(int $entityId, int $productId, ?int $variantId = null): void
     {
         $stmt = $this->pdo->prepare("SELECT id FROM entities WHERE id = :id LIMIT 1");
         $stmt->execute([':id' => $entityId]);
@@ -390,6 +557,14 @@ final class PdoEntityProductsRepository
         $stmt->execute([':id' => $productId]);
         if (!$stmt->fetch()) {
             throw new RuntimeException("Product not found");
+        }
+
+        if ($variantId !== null) {
+            $stmt = $this->pdo->prepare("SELECT id FROM product_variants WHERE id = :id LIMIT 1");
+            $stmt->execute([':id' => $variantId]);
+            if (!$stmt->fetch()) {
+                throw new RuntimeException("Variant not found");
+            }
         }
     }
 }

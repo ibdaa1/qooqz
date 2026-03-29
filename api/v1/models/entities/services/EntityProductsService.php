@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
 
+/**
+ * Unified Entity Products Service
+ * Handles both product-level and variant-level operations
+ */
 final class EntityProductsService
 {
     private PdoEntityProductsRepository $repo;
@@ -51,7 +55,15 @@ final class EntityProductsService
     }
 
     /**
-     * Get all products for an entity
+     * Get by entity and variant
+     */
+    public function getByEntityAndVariant(int $entityId, int $variantId): ?array
+    {
+        return $this->repo->findByEntityAndVariant($entityId, $variantId);
+    }
+
+    /**
+     * Get all products for an entity (product-level)
      */
     public function getEntityProducts(int $entityId): array
     {
@@ -59,11 +71,31 @@ final class EntityProductsService
     }
 
     /**
+     * Get all variants for an entity
+     */
+    public function getEntityVariants(int $entityId): array
+    {
+        return $this->repo->getEntityVariants($entityId);
+    }
+
+    /**
+     * Get variants for a specific entity product
+     */
+    public function getEntityProductVariants(int $entityId, int $productId): array
+    {
+        return $this->repo->getEntityProductVariants($entityId, $productId);
+    }
+
+    /**
      * Create a new entity product
      */
     public function create(array $data): int
     {
-        EntityProductsValidator::validateCreate($data);
+        if (!empty($data['variant_id'])) {
+            EntityProductsValidator::validateVariantCreate($data);
+        } else {
+            EntityProductsValidator::validateCreate($data);
+        }
         return $this->repo->save($data);
     }
 
@@ -91,6 +123,15 @@ final class EntityProductsService
     }
 
     /**
+     * Bulk save variants for an entity
+     */
+    public function saveEntityVariants(int $entityId, int $tenantId, array $variants): array
+    {
+        EntityProductsValidator::validateBulkVariantSave($entityId, $variants);
+        return $this->repo->saveEntityVariants($entityId, $tenantId, $variants);
+    }
+
+    /**
      * Delete an entity product
      */
     public function delete(int $id): void
@@ -108,6 +149,22 @@ final class EntityProductsService
     public function deleteEntityProducts(int $entityId): void
     {
         $this->repo->deleteEntityProducts($entityId);
+    }
+
+    /**
+     * Delete all variants for an entity
+     */
+    public function deleteEntityVariants(int $entityId): void
+    {
+        $this->repo->deleteEntityVariants($entityId);
+    }
+
+    /**
+     * Delete all variants for a specific entity product
+     */
+    public function deleteEntityProductVariants(int $entityId, int $productId): void
+    {
+        $this->repo->deleteEntityProductVariants($entityId, $productId);
     }
 
     /**

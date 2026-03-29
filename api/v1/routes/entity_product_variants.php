@@ -1,6 +1,12 @@
 <?php
 declare(strict_types=1);
 
+/**
+ * Entity Product Variants API Route
+ * Now delegates to unified entity_products table via EntityProductsController
+ * Automatically adds variants_only filter for listing operations
+ */
+
 $baseDir = dirname(__DIR__, 2);
 require_once $baseDir . '/bootstrap.php';
 require_once $baseDir . '/shared/core/ResponseFormatter.php';
@@ -8,10 +14,10 @@ require_once $baseDir . '/shared/helpers/safe_helpers.php';
 require_once $baseDir . '/shared/config/db.php';
 
 $modelsPath = API_VERSION_PATH . '/models/entities';
-require_once $modelsPath . '/repositories/PdoEntityProductVariantsRepository.php';
-require_once $modelsPath . '/validators/EntityProductVariantsValidator.php';
-require_once $modelsPath . '/services/EntityProductVariantsService.php';
-require_once $modelsPath . '/controllers/EntityProductVariantsController.php';
+require_once $modelsPath . '/repositories/PdoEntityProductsRepository.php';
+require_once $modelsPath . '/validators/EntityProductsValidator.php';
+require_once $modelsPath . '/services/EntityProductsService.php';
+require_once $modelsPath . '/controllers/EntityProductsController.php';
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 
@@ -21,9 +27,9 @@ if (!$pdo instanceof PDO) {
     exit;
 }
 
-$repo = new PdoEntityProductVariantsRepository($pdo);
-$service = new EntityProductVariantsService($repo);
-$controller = new EntityProductVariantsController($service);
+$repo = new PdoEntityProductsRepository($pdo);
+$service = new EntityProductsService($repo);
+$controller = new EntityProductsController($service);
 
 // ================================
 // Handle request
@@ -39,8 +45,8 @@ try {
     $orderBy  = $_GET['order_by'] ?? 'id';
     $orderDir = $_GET['order_dir'] ?? 'DESC';
 
-    // Collect filters
-    $filters = [];
+    // Collect filters - always filter to variants only
+    $filters = ['variants_only' => true];
 
     if (isset($_GET['entity_id']) && is_numeric($_GET['entity_id'])) {
         $filters['entity_id'] = (int)$_GET['entity_id'];
