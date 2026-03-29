@@ -328,7 +328,13 @@
         "settings_max_daily": "الحد الأقصى للطلبات اليومية",
         "settings_default_payment": "طريقة الدفع الافتراضية",
         "settings_featured": "مميز في التطبيق",
-        "all_in_category": "جميع المنتجات"
+        "all_in_category": "جميع المنتجات",
+        "policies_tab": "السياسات",
+        "policy_refund": "سياسة الإرجاع والاسترداد",
+        "policy_privacy": "سياسة الخصوصية",
+        "policy_shipping": "سياسة الشحن والتوصيل",
+        "policy_terms": "الشروط والأحكام",
+        "no_policies": "لا توجد سياسات متاحة"
     },
     "deals": {
         "title": "عروض ساخنة",

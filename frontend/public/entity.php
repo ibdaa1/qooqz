@@ -6,7 +6,7 @@
  * Renders a fully dynamic, section-based store page similar to Shopify / Google Maps.
  * Sections are loaded from store_pages + store_sections tables (with fallback defaults).
  *
- * Section types: header, contact, tabs, products, info, hours, location, offers, reviews
+ * Section types: header, contact, tabs, products, info, hours, location, offers, reviews, policies
  * Each section is rendered via a partial template in /partials/store_sections/{type}.php
  *
  * Features:
@@ -433,6 +433,7 @@ $defaultSectionTitles = [
     'location' => t('entity.location_tab'),
     'offers'   => t('entity.discounts_tab'),
     'reviews'  => t('entity.ratings_tab'),
+    'policies' => t('entity.policies_tab', 'Policies'),
 ];
 
 // Section icons for visual distinction
@@ -443,6 +444,7 @@ $sectionIcons = [
     'location' => '🗺️',
     'offers'   => '🏷️',
     'reviews'  => '⭐',
+    'policies' => '📋',
 ];
 
 // Default section order when no DB config exists
@@ -456,6 +458,7 @@ if (empty($storeSections)) {
         ['type' => 'location', 'position' => 70, 'settings' => null, 'translated_title' => null, 'translated_content' => null],
         ['type' => 'offers',   'position' => 80, 'settings' => null, 'translated_title' => null, 'translated_content' => null],
         ['type' => 'reviews',  'position' => 90, 'settings' => null, 'translated_title' => null, 'translated_content' => null],
+        ['type' => 'policies', 'position' => 95, 'settings' => '{"types":["refund","privacy","shipping","terms"]}', 'translated_title' => null, 'translated_content' => null],
     ];
 }
 
@@ -525,7 +528,7 @@ if (!function_exists('_pub_safe_css')) {
 }
 
 // Sections that need a section-title header & container wrapping
-$titledSections = ['products', 'info', 'hours', 'location', 'offers', 'reviews'];
+$titledSections = ['products', 'info', 'hours', 'location', 'offers', 'reviews', 'policies'];
 
 // Track rendered section types to prevent duplicates
 $renderedSectionTypes = [];

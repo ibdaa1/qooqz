@@ -327,7 +327,13 @@
         "settings_max_daily": "Max Daily Orders",
         "settings_default_payment": "Default Payment Method",
         "settings_featured": "Featured in App",
-        "all_in_category": "All items"
+        "all_in_category": "All items",
+        "policies_tab": "Policies",
+        "policy_refund": "Return & Refund Policy",
+        "policy_privacy": "Privacy Policy",
+        "policy_shipping": "Shipping & Delivery Policy",
+        "policy_terms": "Terms & Conditions",
+        "no_policies": "No policies available"
     },
     "deals": {
         "title": "Hot Deals",

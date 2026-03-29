@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS store_section_translations (
 --   location     — Map with coordinates, addresses
 --   offers       — Discounts and promotions
 --   reviews      — Ratings list, user comments, submit form
+--   policies     — Entity policies (refund, privacy, shipping, terms)
 -- ============================================================
 
 -- Example: Auto-create a default store page for an entity (run manually or from app code)
@@ -81,10 +82,11 @@ CREATE TABLE IF NOT EXISTS store_section_translations (
 -- INSERT INTO store_sections (page_id, type, position, is_active, settings) VALUES
 --   (1, 'header',   10, 1, '{"show_cover": true, "show_rating": true, "show_verified": true, "show_status": true}'),
 --   (1, 'contact',  20, 1, '{"show_phone": true, "show_email": true, "show_website": true, "show_share": true, "show_social": true}'),
---   (1, 'tabs',     30, 1, '{"tabs": ["products","info","hours","location","offers","reviews"]}'),
+--   (1, 'tabs',     30, 1, '{"tabs": ["products","info","hours","location","offers","reviews","policies"]}'),
 --   (1, 'products', 40, 1, '{"per_page": 12, "show_categories": true, "show_search": true, "show_cart": true}'),
 --   (1, 'info',     50, 1, '{"show_description": true, "show_attributes": true, "show_payment_methods": true, "show_settings": true}'),
 --   (1, 'hours',    60, 1, '{}'),
 --   (1, 'location', 70, 1, '{"show_osm": true, "show_google": true}'),
 --   (1, 'offers',   80, 1, '{}'),
---   (1, 'reviews',  90, 1, '{"show_form": true, "limit": 5}');
+--   (1, 'reviews',  90, 1, '{"show_form": true, "limit": 5}'),
+--   (1, 'policies', 95, 1, '{"types": ["refund", "privacy", "shipping", "terms"]}');

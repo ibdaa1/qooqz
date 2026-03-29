@@ -62,13 +62,14 @@ if ($first === 'entity') {
         $defaultSections = [
             ['type' => 'header',   'position' => 10, 'settings' => '{"show_cover":true,"show_rating":true,"show_verified":true,"show_status":true}'],
             ['type' => 'contact',  'position' => 20, 'settings' => '{"show_phone":true,"show_email":true,"show_website":true,"show_share":true,"show_social":true}'],
-            ['type' => 'tabs',     'position' => 30, 'settings' => '{"tabs":["products","info","hours","location","offers","reviews"]}'],
+            ['type' => 'tabs',     'position' => 30, 'settings' => '{"tabs":["products","info","hours","location","offers","reviews","policies"]}'],
             ['type' => 'products', 'position' => 40, 'settings' => '{"per_page":12,"show_categories":true,"show_search":true,"show_cart":true}'],
             ['type' => 'info',     'position' => 50, 'settings' => '{"show_description":true,"show_attributes":true,"show_payment_methods":true,"show_settings":true}'],
             ['type' => 'hours',    'position' => 60, 'settings' => '{}'],
             ['type' => 'location', 'position' => 70, 'settings' => '{"show_osm":true,"show_google":true}'],
             ['type' => 'offers',   'position' => 80, 'settings' => '{}'],
             ['type' => 'reviews',  'position' => 90, 'settings' => '{"show_form":true,"limit":5}'],
+            ['type' => 'policies', 'position' => 95, 'settings' => '{"types":["refund","privacy","shipping","terms"]}'],
         ];
 
         $sections = [];
@@ -167,6 +168,44 @@ if ($first === 'entity') {
         }
 
         ResponseFormatter::success(['ok' => true, 'data' => $tree, 'flat' => $rows]);
+        exit;
+    }
+
+    // Sub-route: entity policies — refund, privacy, shipping, terms
+    // GET /api/public/entity/{id}/policies?types=refund,privacy,shipping,terms
+    if ($sub === 'policies') {
+        $entityRow = $pdoOne('SELECT id, tenant_id FROM entities WHERE id = ? AND status NOT IN (\'suspended\',\'rejected\') LIMIT 1', [$entityId]);
+        if (!$entityRow) { ResponseFormatter::notFound('Entity not found'); exit; }
+
+        // Optional type filter
+        $typeFilter = trim($_GET['types'] ?? '');
+        $allowedTypes = ['refund', 'privacy', 'shipping', 'terms'];
+        $requestedTypes = $typeFilter ? array_intersect(explode(',', $typeFilter), $allowedTypes) : $allowedTypes;
+
+        if (empty($requestedTypes)) {
+            ResponseFormatter::success(['ok' => true, 'data' => []]);
+            exit;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($requestedTypes), '?'));
+        $params = array_merge([$entityId, $lang], array_values($requestedTypes));
+
+        $rows = [];
+        try {
+            $rows = $pdoList(
+                "SELECT type, title, content, sort_order
+                   FROM entity_policies
+                  WHERE entity_id = ? AND language_code = ? AND is_active = 1
+                    AND type IN ($placeholders)
+                  ORDER BY sort_order ASC, type ASC",
+                $params
+            );
+        } catch (\Throwable $_) {
+            // Table may not exist yet
+            $rows = [];
+        }
+
+        ResponseFormatter::success(['ok' => true, 'data' => $rows]);
         exit;
     }
 
