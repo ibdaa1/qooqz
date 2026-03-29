@@ -49,11 +49,7 @@
                 // For super admin, update the tenant input display
                 if (state.isSuperAdmin && el.tenantIdInput) {
                     el.tenantIdInput.value = state.tenantId;
-                    if (el.tenantNameDisplay) {
-                        el.tenantNameDisplay.style.display = 'block';
-                        el.tenantNameDisplay.textContent = t('filter.tenant_verified', 'Tenant') + ' #' + state.tenantId;
-                        el.tenantNameDisplay.className = 'epv-tenant-verified';
-                    }
+                    showTenantDisplay(state.tenantId);
                 }
                 // Load entities immediately
                 loadEntities().then(function () {
@@ -168,6 +164,17 @@
         return fetch(url, options).then(function (res) { return res.json(); });
     }
 
+    function showTenantDisplay(tenantId, entityCount) {
+        if (!el.tenantNameDisplay) return;
+        el.tenantNameDisplay.style.display = 'block';
+        if (entityCount !== undefined) {
+            el.tenantNameDisplay.textContent = t('filter.tenant_verified', 'Tenant') + ' #' + tenantId + ' (' + entityCount + ' ' + t('filter.entities_found', 'entities') + ')';
+        } else {
+            el.tenantNameDisplay.textContent = t('filter.tenant_verified', 'Tenant') + ' #' + tenantId;
+        }
+        el.tenantNameDisplay.className = 'epv-tenant-verified';
+    }
+
     function showToast(message, type) {
         var toast = document.createElement('div');
         toast.className = 'epv-toast epv-toast-' + (type || 'success');
@@ -254,7 +261,7 @@
         if (state.tenantId > 0) url += '&tenant_id=' + state.tenantId;
         return apiCall(url).then(function (res) {
             var items = (res && res.data && res.data.items) || (res && res.data) || [];
-            if (!Array.isArray(items)) items = [];
+            items = Array.isArray(items) ? items : [];
             state.allEntities = items;
             populateEntityDropdown(items);
         }).catch(function (e) {
@@ -301,10 +308,7 @@
         // Load entities for this tenant to verify it exists
         loadEntities().then(function () {
             if (state.allEntities.length > 0) {
-                if (el.tenantNameDisplay) {
-                    el.tenantNameDisplay.textContent = t('filter.tenant_verified', 'Tenant') + ' #' + tid + ' (' + state.allEntities.length + ' ' + t('filter.entities_found', 'entities') + ')';
-                    el.tenantNameDisplay.className = 'epv-tenant-verified';
-                }
+                showTenantDisplay(tid, state.allEntities.length);
             } else {
                 if (el.tenantNameDisplay) {
                     el.tenantNameDisplay.textContent = t('messages.no_entities_for_tenant', 'No entities found for this tenant');
