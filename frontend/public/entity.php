@@ -472,7 +472,7 @@ $sectionIcons = [
     'offers'   => '🏷️',
     'reviews'  => '⭐',
     'policies'   => '📋',
-    'attributes' => '🏷️',
+    'attributes' => '📝',
 ];
 
 // Default section order when no DB config exists
