@@ -3,21 +3,21 @@
    ═══════════════════════════════════════════════════ */
 
 #epvPageContainer {
-    --_bg-main      : var(--background-main, #0a0a0a);
-    --_bg-card      : var(--background-card, #111111);
-    --_bg-input     : var(--background-input, #1a1a2e);
-    --_text         : var(--text-primary, #f1f5f9);
+    --_bg-main      : var(--background-main, #0a0f1e);
+    --_bg-card      : var(--card-bg, #081127);
+    --_bg-input     : var(--input-bg, #0b1220);
+    --_text         : var(--text-primary, #ffffff);
     --_text-sec     : var(--text-secondary, #94a3b8);
-    --_border       : var(--border-color, #1e293b);
+    --_border       : var(--border-color, #263044);
     --_primary      : var(--primary-color, #3b82f6);
     --_primary-hover: var(--primary-hover, #2563eb);
-    --_success      : var(--success, #22c55e);
-    --_danger       : var(--danger, #ef4444);
-    --_warning      : var(--warning, #f59e0b);
+    --_success      : var(--success-color, #22c55e);
+    --_danger       : var(--danger-color, #ef4444);
+    --_warning      : var(--warning-color, #f59e0b);
     --_radius       : var(--border-radius, 8px);
     --_shadow       : 0 1px 3px rgba(0,0,0,.3);
 
-    font-family: var(--font-family, 'Inter', sans-serif);
+    font-family: var(--body-font-family, 'Cairo', 'Inter', sans-serif);
     color: var(--_text);
     padding: clamp(12px, 2vw, 24px);
     max-width: 1400px;
