@@ -1245,7 +1245,7 @@
         }
 
         listContainer.innerHTML = filtered.map(p => {
-            const pid = String(p.id);
+            const pid = String(parseInt(p.id) || 0);
             const alreadyAdded = existingIds.has(pid);
             const isSelected = _modalSelectedIds.has(pid);
             const pName = esc(p.name || p.product_name || `Product #${p.id}`);
@@ -1270,15 +1270,21 @@
     }
 
     function toggleModalProduct(productId, checked) {
+        const safePid = String(parseInt(productId) || 0);
         if (checked) {
-            _modalSelectedIds.add(productId);
+            _modalSelectedIds.add(safePid);
         } else {
-            _modalSelectedIds.delete(productId);
+            _modalSelectedIds.delete(safePid);
         }
-        // Update item highlight
-        const item = document.querySelector(`.ep-modal-product-item[data-product-id="${productId}"]`);
-        if (item) {
-            item.classList.toggle('ep-selected', checked);
+        // Update item highlight using safe numeric ID
+        const listContainer = document.getElementById('epModalProductsList');
+        if (listContainer) {
+            const items = listContainer.querySelectorAll('.ep-modal-product-item');
+            items.forEach(item => {
+                if (item.dataset.productId === safePid) {
+                    item.classList.toggle('ep-selected', checked);
+                }
+            });
         }
         updateModalSelectedCount();
     }
