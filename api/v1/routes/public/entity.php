@@ -126,6 +126,15 @@ if ($first === 'entity') {
         if (!$entityRow) { ResponseFormatter::notFound('Entity not found'); exit; }
         $eTenId = (int)$entityRow['tenant_id'];
 
+        // Check if entity has category assignments — graceful fallback when none exist
+        $ecCount = (int)$pdoCount('SELECT COUNT(*) FROM entity_categories WHERE entity_id = ? AND is_active = 1', [$entityId]);
+        $ecJoin   = '';
+        $catParams = [$lang, $eTenId];
+        if ($ecCount > 0) {
+            $ecJoin = 'JOIN entity_categories ec ON ec.category_id = c.id AND ec.entity_id = ? AND ec.is_active = 1';
+            $catParams[] = $entityId;
+        }
+
         $rows = $pdoList(
             "SELECT DISTINCT c.id, c.parent_id, COALESCE(ct.name, c.name) AS name, c.slug,
                     c.sort_order
@@ -133,8 +142,9 @@ if ($first === 'entity') {
                JOIN categories c ON c.id = pc.category_id AND c.is_active = 1
           LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
                JOIN products p ON p.id = pc.product_id AND p.tenant_id = ? AND p.is_active = 1
+               $ecJoin
               ORDER BY c.sort_order ASC, c.id ASC LIMIT 100",
-            [$lang, $eTenId]
+            $catParams
         );
 
         // Build hierarchical tree
@@ -311,12 +321,24 @@ if ($first === 'entity') {
 
     // Sub-route: entity products
     // Products have no entity_id column; use entity's tenant_id to scope products
+    // When entity has category assignments (entity_categories), only show products in those categories
     if ($sub === 'products') {
         $entityRow = $pdoOne('SELECT tenant_id FROM entities WHERE id = ? LIMIT 1', [$entityId]);
         if (!$entityRow) { ResponseFormatter::notFound('Entity not found'); exit; }
         $entityTenantId = (int)$entityRow['tenant_id'];
         $where  = 'WHERE p.is_active = 1 AND p.tenant_id = ?';
         $params = [$entityTenantId];
+
+        // Filter by entity_categories if entity has category assignments
+        $ecCount = (int)$pdoCount('SELECT COUNT(*) FROM entity_categories WHERE entity_id = ? AND is_active = 1', [$entityId]);
+        if ($ecCount > 0) {
+            $where .= ' AND EXISTS (
+                SELECT 1 FROM product_categories pc_ec
+                JOIN entity_categories ec ON ec.category_id = pc_ec.category_id
+                WHERE pc_ec.product_id = p.id AND ec.entity_id = ? AND ec.is_active = 1)';
+            $params[] = $entityId;
+        }
+
         if (!empty($_GET['category_id']) && is_numeric($_GET['category_id'])) {
             $where .= ' AND EXISTS (SELECT 1 FROM product_categories pc2 WHERE pc2.product_id = p.id AND pc2.category_id = ?)';
             $params[] = (int)$_GET['category_id'];

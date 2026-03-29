@@ -182,10 +182,27 @@ $products     = [];
 $productMeta  = ['total' => 0, 'total_pages' => 1];
 $entityTenantId = (int)($entity['tenant_id'] ?? $tenantId);
 
+// Check if entity has category assignments — when rows exist, only show those categories' products
+$entityHasCatAssignments = false;
+if ($pdo) {
+    try {
+        $ecStmt = $pdo->prepare('SELECT COUNT(*) FROM entity_categories WHERE entity_id = ? AND is_active = 1');
+        $ecStmt->execute([$entityId]);
+        $entityHasCatAssignments = (int)$ecStmt->fetchColumn() > 0;
+    } catch (Throwable $_) {}
+}
+
 if ($pdo) {
     try {
         $pWhere  = 'WHERE p.is_active = 1 AND p.tenant_id = ?';
         $pParams = [$entityTenantId];
+        if ($entityHasCatAssignments) {
+            $pWhere .= ' AND EXISTS (
+                SELECT 1 FROM product_categories pc_ec
+                JOIN entity_categories ec ON ec.category_id = pc_ec.category_id
+                WHERE pc_ec.product_id = p.id AND ec.entity_id = ? AND ec.is_active = 1)';
+            $pParams[] = $entityId;
+        }
         if ($selectedCat) {
             // Include products in the selected category AND its direct child categories
             $pWhere .= ' AND EXISTS (
@@ -236,7 +253,13 @@ $categories     = [];   // flat list of categories linked to this entity's produ
 $categoryTree   = [];   // parent categories → children
 if ($pdo) {
     try {
-        // Fetch every category (with parent_id) that has active products for this tenant
+        // Fetch every category (with parent_id) that has active products for this entity
+        $catEcJoin   = '';
+        $catParams   = [$lang, $entityTenantId];
+        if ($entityHasCatAssignments) {
+            $catEcJoin = 'JOIN entity_categories ec ON ec.category_id = c.id AND ec.entity_id = ? AND ec.is_active = 1';
+            $catParams[] = $entityId;
+        }
         $catStmt = $pdo->prepare(
             "SELECT DISTINCT c.id, c.parent_id, COALESCE(ct.name, c.name) AS name, c.slug,
                     c.sort_order
@@ -244,9 +267,10 @@ if ($pdo) {
                JOIN categories c ON c.id = pc.category_id AND c.is_active = 1
           LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
                JOIN products p ON p.id = pc.product_id AND p.tenant_id = ? AND p.is_active = 1
+               $catEcJoin
               ORDER BY c.sort_order ASC, c.id ASC LIMIT 100"
         );
-        $catStmt->execute([$lang, $entityTenantId]);
+        $catStmt->execute($catParams);
         $categories = $catStmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Build a map for quick lookup
