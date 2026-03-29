@@ -329,6 +329,15 @@ final class PdoEntityProductsRepository
         $variantId = isset($params[':variant_id']) && $params[':variant_id'] !== null ? (int)$params[':variant_id'] : null;
         $this->validateReferences((int)$params[':entity_id'], (int)$params[':product_id'], $variantId);
 
+        // Enforce uniqueness for product-level records (variant_id IS NULL)
+        // MySQL can't enforce this via UNIQUE constraint when variant_id is NULL
+        if (!$isUpdate && $variantId === null) {
+            $existing = $this->findByEntityAndProduct((int)$params[':entity_id'], (int)$params[':product_id']);
+            if ($existing) {
+                throw new RuntimeException("Product already assigned to this entity");
+            }
+        }
+
         if ($isUpdate) {
             $params[':id'] = (int)$data['id'];
 
@@ -376,7 +385,8 @@ final class PdoEntityProductsRepository
                 $productData['tenant_id'] = $tenantId;
 
                 // Product-level records have no variant_id
-                if (!isset($productData['variant_id'])) {
+                $isProduct = !isset($productData['variant_id']) || $productData['variant_id'] === null || $productData['variant_id'] === '';
+                if ($isProduct) {
                     $existing = $this->findByEntityAndProduct($entityId, (int)$productData['product_id']);
                 } else {
                     $existing = $this->findByEntityAndVariant($entityId, (int)$productData['variant_id']);
@@ -389,7 +399,7 @@ final class PdoEntityProductsRepository
                 $savedIds[] = $this->save($productData);
 
                 // Save entity-specific pricing if price is provided (product-level only)
-                if (!isset($productData['variant_id']) && isset($productData['price']) && $productData['price'] !== '' && $productData['price'] !== null) {
+                if ($isProduct && isset($productData['price']) && $productData['price'] !== '' && $productData['price'] !== null) {
                     $this->saveEntityProductPricing($entityId, (int)$productData['product_id'], $productData);
                 }
             }
