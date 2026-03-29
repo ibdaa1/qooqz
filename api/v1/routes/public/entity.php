@@ -80,9 +80,9 @@ if ($first === 'entity') {
                    FROM store_sections ss
                    JOIN store_pages sp ON sp.id = ss.page_id
               LEFT JOIN store_section_translations sst ON sst.section_id = ss.id AND sst.language_code = ?
-                  WHERE sp.entity_id = ? AND sp.is_active = 1 AND ss.is_active = 1
+                  WHERE sp.tenant_id = ? AND sp.type = 'store' AND sp.is_active = 1 AND ss.is_active = 1
                   ORDER BY ss.position ASC",
-                [$lang, $entityId]
+                [$lang, $entityRow['tenant_id']]
             );
         } catch (\Throwable $_) {
             // Tables may not exist yet — fall back to defaults

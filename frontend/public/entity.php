@@ -4,7 +4,8 @@
  * QOOQZ — Dynamic Store Page Builder (Entity/Vendor Profile)
  *
  * Renders a fully dynamic, section-based store page similar to Shopify / Google Maps.
- * Sections are loaded from store_pages + store_sections tables (with fallback defaults).
+ * Sections are loaded from store_pages + store_sections tables as a GLOBAL template
+ * per tenant (shared by all entities), with fallback defaults.
  *
  * Section types: header, contact, tabs, products, info, hours, location, offers, reviews, policies
  * Each section is rendered via a partial template in /partials/store_sections/{type}.php
@@ -400,8 +401,9 @@ $_entityDiscountCardStyle = pub_card_inline_style('discount');
 $_entityDiscountCardClass = pub_card_css_class('discount');
 
 /* -------------------------------------------------------
- * Dynamic Section System — Load from store_pages / store_sections
- * Falls back to default section order when no DB config exists
+ * Dynamic Section System — Load global template from store_pages / store_sections
+ * Sections are a fixed template per tenant (shared by ALL entities).
+ * Falls back to default section order when no DB config exists.
  * ----------------------------------------------------- */
 $storeSections = [];
 if ($pdo) {
@@ -412,10 +414,10 @@ if ($pdo) {
                FROM store_sections ss
                JOIN store_pages sp ON sp.id = ss.page_id
           LEFT JOIN store_section_translations sst ON sst.section_id = ss.id AND sst.language_code = ?
-              WHERE sp.entity_id = ? AND sp.is_active = 1 AND ss.is_active = 1
+              WHERE sp.tenant_id = ? AND sp.type = 'store' AND sp.is_active = 1 AND ss.is_active = 1
               ORDER BY ss.position ASC"
         );
-        $spStmt->execute([$lang, $entity['id'] ?? $entityId]);
+        $spStmt->execute([$lang, $entityTenantId]);
         $storeSections = $spStmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable $_) {
         // Table may not exist yet — fall back to defaults

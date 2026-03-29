@@ -2,14 +2,14 @@
 -- STORE PAGES & SECTIONS — Dynamic Store Builder
 -- ============================================================
 -- Creates a section-based page builder for entity/vendor pages.
--- Each entity can have a configurable page with ordered sections.
+-- Sections are a GLOBAL template per tenant — the same layout
+-- is shared by ALL entities in a tenant (not per-entity).
 -- ============================================================
 
--- 1. store_pages — one page per entity (the store profile page)
+-- 1. store_pages — one global template page per tenant + type
 CREATE TABLE IF NOT EXISTS store_pages (
     id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     tenant_id     INT UNSIGNED NOT NULL,
-    entity_id     BIGINT UNSIGNED NOT NULL,
     type          VARCHAR(50)  NOT NULL DEFAULT 'store'  COMMENT 'Page type: store, landing, etc.',
     slug          VARCHAR(255) NULL                       COMMENT 'Optional custom slug override',
     is_active     TINYINT(1)   NOT NULL DEFAULT 1,
@@ -17,9 +17,8 @@ CREATE TABLE IF NOT EXISTS store_pages (
     created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-    UNIQUE KEY uq_store_pages_entity (tenant_id, entity_id, type),
-    INDEX idx_store_pages_tenant (tenant_id),
-    INDEX idx_store_pages_entity (entity_id)
+    UNIQUE KEY uq_store_pages_tenant_type (tenant_id, type),
+    INDEX idx_store_pages_tenant (tenant_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -76,8 +75,8 @@ CREATE TABLE IF NOT EXISTS store_section_translations (
 --   policies     — Entity policies (refund, privacy, shipping, terms)
 -- ============================================================
 
--- Example: Auto-create a default store page for an entity (run manually or from app code)
--- INSERT INTO store_pages (tenant_id, entity_id, type) VALUES (1, 1, 'store');
+-- Example: Auto-create a default global store template for tenant 1 (run manually or from app code)
+-- INSERT INTO store_pages (tenant_id, type) VALUES (1, 'store');
 --
 -- INSERT INTO store_sections (page_id, type, position, is_active, settings) VALUES
 --   (1, 'header',   10, 1, '{"show_cover": true, "show_rating": true, "show_verified": true, "show_status": true}'),

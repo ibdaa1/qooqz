@@ -36,13 +36,12 @@
 ## 🗄️ Database Schema
 
 ### Table: `store_pages`
-One page per entity. Links to the entity for which the page is created.
+Global template page per tenant. All entities in a tenant share the same page layout.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | BIGINT PK | Auto-increment |
 | `tenant_id` | INT | Tenant isolation |
-| `entity_id` | BIGINT | Entity (vendor) this page belongs to |
 | `type` | VARCHAR(50) | Page type: `store`, `landing`, etc. |
 | `slug` | VARCHAR(255) | Optional custom URL slug |
 | `is_active` | TINYINT(1) | 1 = active, 0 = disabled |
@@ -50,7 +49,7 @@ One page per entity. Links to the entity for which the page is created.
 | `created_at` | TIMESTAMP | Auto |
 | `updated_at` | TIMESTAMP | Auto |
 
-**Unique Key:** `(tenant_id, entity_id, type)`
+**Unique Key:** `(tenant_id, type)` — one template per tenant + type
 
 ### Table: `store_sections`
 Ordered sections within a page. Each section has a type, position, and JSON settings.
@@ -217,12 +216,12 @@ Rating summary, review list, star picker, submit form (login-gated).
 
 ### How it works
 
-1. **Load sections from DB:**
+1. **Load sections from DB (global template per tenant):**
    ```sql
    SELECT ss.id, ss.type, ss.position, ss.settings
      FROM store_sections ss
      JOIN store_pages sp ON sp.id = ss.page_id
-    WHERE sp.entity_id = ? AND sp.is_active = 1 AND ss.is_active = 1
+    WHERE sp.tenant_id = ? AND sp.type = 'store' AND sp.is_active = 1 AND ss.is_active = 1
     ORDER BY ss.position ASC
    ```
 
@@ -248,28 +247,29 @@ Rating summary, review list, star picker, submit form (login-gated).
 
 1. Create `frontend/partials/store_sections/{type}.php`
 2. Add the type to the default sections array in `entity.php`
-3. Insert a row in `store_sections` for entities that should use it
+3. Insert a row in `store_sections` for the global template page
 
 ---
 
 ## 🔧 Sample SQL — Creating a Store Page
 
 ```sql
--- Create a store page for entity ID 1
-INSERT INTO store_pages (tenant_id, entity_id, type)
-VALUES (1, 1, 'store');
+-- Create a global store template for tenant 1
+INSERT INTO store_pages (tenant_id, type)
+VALUES (1, 'store');
 
--- Add sections (default order)
+-- Add sections (default order) — shared by ALL entities in tenant 1
 INSERT INTO store_sections (page_id, type, position, is_active, settings) VALUES
   (1, 'header',   10, 1, '{"show_cover": true, "show_rating": true, "show_verified": true, "show_status": true}'),
   (1, 'contact',  20, 1, '{"show_phone": true, "show_email": true, "show_website": true, "show_share": true, "show_social": true}'),
-  (1, 'tabs',     30, 1, '{"tabs": ["products","info","hours","location","offers","reviews"]}'),
+  (1, 'tabs',     30, 1, '{"tabs": ["products","info","hours","location","offers","reviews","policies"]}'),
   (1, 'products', 40, 1, '{"per_page": 12, "show_categories": true, "show_search": true, "show_cart": true}'),
   (1, 'info',     50, 1, '{"show_description": true, "show_attributes": true, "show_payment_methods": true, "show_settings": true}'),
   (1, 'hours',    60, 1, '{}'),
   (1, 'location', 70, 1, '{"show_osm": true, "show_google": true}'),
   (1, 'offers',   80, 1, '{}'),
-  (1, 'reviews',  90, 1, '{"show_form": true, "limit": 5}');
+  (1, 'reviews',  90, 1, '{"show_form": true, "limit": 5}'),
+  (1, 'policies', 95, 1, '{"types": ["refund", "privacy", "shipping", "terms"]}');
 ```
 
 ### Disable a section
@@ -321,8 +321,9 @@ All section templates use responsive CSS:
 
 ## 🏢 Multi-Tenant Isolation
 
-- `store_pages.tenant_id` ensures each tenant's pages are isolated
-- Entity queries include `tenant_id` filtering
+- `store_pages.tenant_id` ensures each tenant's page template is isolated
+- Sections are a **global template** per tenant — all entities share the same layout
+- Entity-specific data (products, hours, reviews, policies) is loaded separately per entity
 - Product queries filter by `p.tenant_id`
 - All data is scoped to the entity's tenant
 
