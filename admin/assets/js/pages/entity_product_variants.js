@@ -532,7 +532,7 @@
                     '<div class="epv-item-title">' +
                         '<div class="epv-item-name">' + escHtml(varLabel) + '</div>' +
                         '<div class="epv-item-meta">' +
-                            (vItem.variant_price ? '<span>' + t('products.price', 'Price') + ': ' + escHtml(String(vItem.variant_price)) + '</span>' : '') +
+                            ((vItem.price || vItem.variant_price) ? '<span>' + t('products.price', 'Price') + ': ' + escHtml(String(vItem.price || vItem.variant_price)) + '</span>' : '') +
                             '<span class="epv-badge ' + (vItem.is_active == 1 ? 'epv-badge-success' : 'epv-badge-danger') + '">' +
                                 (vItem.is_active == 1 ? t('filter.active', 'Active') : t('filter.inactive', 'Inactive')) +
                             '</span>' +
