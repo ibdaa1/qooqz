@@ -1,24 +1,11 @@
 /* ═══════════════════════════════════════════════════
-   Entity Product Variants – Standalone CSS (Unified)
+   Entity Product Variants – Two-Tab UI
+   Uses admin theme CSS variables from database
    ═══════════════════════════════════════════════════ */
 
 #epvPageContainer {
-    --_bg-main      : var(--background-main, #0a0f1e);
-    --_bg-card      : var(--card-bg, #081127);
-    --_bg-input     : var(--input-bg, #0b1220);
-    --_text         : var(--text-primary, #ffffff);
-    --_text-sec     : var(--text-secondary, #94a3b8);
-    --_border       : var(--border-color, #263044);
-    --_primary      : var(--primary-color, #3b82f6);
-    --_primary-hover: var(--primary-hover, #2563eb);
-    --_success      : var(--success-color, #22c55e);
-    --_danger       : var(--danger-color, #ef4444);
-    --_warning      : var(--warning-color, #f59e0b);
-    --_radius       : var(--border-radius, 8px);
-    --_shadow       : 0 1px 3px rgba(0,0,0,.3);
-
     font-family: var(--body-font-family, 'Cairo', 'Inter', sans-serif);
-    color: var(--_text);
+    color: var(--text-primary);
     padding: clamp(12px, 2vw, 24px);
     max-width: 1400px;
     margin: 0 auto;
@@ -39,25 +26,82 @@
     margin: 0;
 }
 #epvPageContainer .page-header p {
-    color: var(--_text-sec);
+    color: var(--text-secondary);
     margin: 4px 0 0;
     font-size: 0.9rem;
 }
 
 /* ─── Cards ─── */
-#epvPageContainer .card {
-    background: var(--_bg-card);
-    border: 1px solid var(--_border);
-    border-radius: var(--_radius);
+#epvPageContainer .epv-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius, 8px);
     margin-bottom: 16px;
-    box-shadow: var(--_shadow);
+    box-shadow: 0 1px 3px rgba(0,0,0,.1);
 }
-#epvPageContainer .card-body {
+#epvPageContainer .epv-card-body {
     padding: 16px;
 }
 
+/* ─── Tabs ─── */
+#epvPageContainer .epv-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: 0;
+}
+#epvPageContainer .epv-tab {
+    padding: 10px 20px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all .2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: inherit;
+}
+#epvPageContainer .epv-tab:hover {
+    color: var(--text-primary);
+}
+#epvPageContainer .epv-tab.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+#epvPageContainer .epv-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+#epvPageContainer .epv-tab.active .epv-tab-badge {
+    background: var(--primary-color);
+    color: #fff;
+}
+
+/* ─── Tab content ─── */
+#epvPageContainer .epv-tab-content {
+    display: none;
+    padding: 16px 0;
+}
+#epvPageContainer .epv-tab-content.active {
+    display: block;
+}
+
 /* ─── Section header ─── */
-#epvPageContainer .section-header {
+#epvPageContainer .epv-section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -65,53 +109,54 @@
     margin-bottom: 16px;
     flex-wrap: wrap;
 }
-#epvPageContainer .section-search {
+#epvPageContainer .epv-search-box {
     flex: 1;
     min-width: 200px;
     max-width: 400px;
 }
 
 /* ─── Section footer ─── */
-#epvPageContainer .section-footer {
+#epvPageContainer .epv-section-footer {
     margin-top: 16px;
     padding-top: 16px;
-    border-top: 1px solid var(--_border);
+    border-top: 1px solid var(--border-color);
     display: flex;
     justify-content: flex-end;
     gap: 10px;
 }
 
 /* ─── Form Controls ─── */
-#epvPageContainer .form-control {
+#epvPageContainer .epv-input {
     width: 100%;
     padding: 8px 12px;
-    background: var(--_bg-input);
-    border: 1px solid var(--_border);
-    border-radius: var(--_radius);
-    color: var(--_text);
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius, 8px);
+    color: var(--text-primary);
     font-size: 0.875rem;
     transition: border-color .2s;
+    font-family: inherit;
 }
-#epvPageContainer .form-control:focus {
+#epvPageContainer .epv-input:focus {
     outline: none;
-    border-color: var(--_primary);
+    border-color: var(--primary-color);
     box-shadow: 0 0 0 2px rgba(59,130,246,.15);
 }
-#epvPageContainer select.form-control {
+#epvPageContainer select.epv-input {
     cursor: pointer;
 }
-#epvPageContainer .form-group label {
+#epvPageContainer .epv-form-group label {
     display: block;
     margin-bottom: 4px;
     font-size: 0.8rem;
-    color: var(--_text-sec);
+    color: var(--text-secondary);
     font-weight: 600;
 }
 
 /* ─── Buttons ─── */
-#epvPageContainer .btn {
+#epvPageContainer .epv-btn {
     padding: 8px 16px;
-    border-radius: var(--_radius);
+    border-radius: var(--border-radius, 8px);
     font-size: 0.875rem;
     font-weight: 600;
     cursor: pointer;
@@ -121,394 +166,294 @@
     align-items: center;
     gap: 6px;
     white-space: nowrap;
+    font-family: inherit;
 }
-#epvPageContainer .btn-primary {
-    background: var(--_primary);
+#epvPageContainer .epv-btn-primary {
+    background: var(--primary-color);
     color: #fff;
 }
-#epvPageContainer .btn-primary:hover {
-    background: var(--_primary-hover);
+#epvPageContainer .epv-btn-primary:hover {
+    background: var(--primary-hover);
 }
-#epvPageContainer .btn-secondary {
+#epvPageContainer .epv-btn-secondary {
     background: transparent;
-    color: var(--_text-sec);
-    border-color: var(--_border);
+    color: var(--text-secondary);
+    border-color: var(--border-color);
 }
-#epvPageContainer .btn-secondary:hover {
-    background: rgba(255,255,255,.05);
-    color: var(--_text);
+#epvPageContainer .epv-btn-secondary:hover {
+    background: rgba(128,128,128,.1);
+    color: var(--text-primary);
 }
-#epvPageContainer .btn-success {
-    background: var(--_success);
+#epvPageContainer .epv-btn-success {
+    background: var(--success-color);
     color: #fff;
 }
-#epvPageContainer .btn-success:hover {
+#epvPageContainer .epv-btn-success:hover {
     filter: brightness(1.1);
 }
-#epvPageContainer .btn-danger {
-    background: var(--_danger);
+#epvPageContainer .epv-btn-danger {
+    background: var(--danger-color);
     color: #fff;
 }
-#epvPageContainer .btn-danger:hover {
+#epvPageContainer .epv-btn-danger:hover {
     filter: brightness(1.1);
 }
-#epvPageContainer .btn-sm {
+#epvPageContainer .epv-btn-sm {
     padding: 4px 10px;
     font-size: 0.8rem;
 }
 
 /* ─── Items List ─── */
-#epvPageContainer .items-list {
+#epvPageContainer .epv-items-list {
     display: flex;
     flex-direction: column;
     gap: 12px;
 }
 
-/* ─── Item Field (shared) ─── */
-#epvPageContainer .item-field {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-#epvPageContainer .item-field label {
-    font-size: 0.7rem;
-    color: var(--_text-sec);
-    font-weight: 600;
-    text-transform: uppercase;
-}
-#epvPageContainer .item-field input,
-#epvPageContainer .item-field select {
-    width: 100px;
-    padding: 5px 8px;
-    background: var(--_bg-card);
-    border: 1px solid var(--_border);
-    border-radius: 6px;
-    color: var(--_text);
-    font-size: 0.8rem;
-}
-#epvPageContainer .item-field input[type="number"] {
-    width: 80px;
-}
-#epvPageContainer .item-field input[type="checkbox"] {
-    width: auto;
-    cursor: pointer;
-}
-
-/* ─── Empty State ─── */
-#epvPageContainer .empty-state {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--_text-sec);
-}
-#epvPageContainer .empty-state p {
-    margin: 0;
-    font-size: 0.95rem;
-}
-
-/* ─── Badges ─── */
-#epvPageContainer .badge {
-    padding: 2px 8px;
-    border-radius: 20px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    display: inline-block;
-}
-#epvPageContainer .badge-success {
-    background: rgba(34,197,94,.15);
-    color: var(--_success);
-}
-#epvPageContainer .badge-danger {
-    background: rgba(239,68,68,.15);
-    color: var(--_danger);
-}
-#epvPageContainer .badge-warning {
-    background: rgba(245,158,11,.15);
-    color: var(--_warning);
-}
-
-/* ═══════════════════════════════════════════════════
-   Product Card (unified view)
-   ═══════════════════════════════════════════════════ */
-#epvPageContainer .product-card {
-    background: var(--_bg-card);
-    border: 1px solid var(--_border);
-    border-radius: var(--_radius);
+/* ─── Item Card ─── */
+#epvPageContainer .epv-item-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius, 8px);
     overflow: hidden;
     transition: border-color .2s;
 }
-#epvPageContainer .product-card:hover {
-    border-color: var(--_primary);
+#epvPageContainer .epv-item-card:hover {
+    border-color: var(--primary-color);
 }
 
-/* Product header */
-#epvPageContainer .product-card-header {
+#epvPageContainer .epv-item-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     padding: 14px 16px 8px;
     gap: 12px;
 }
-#epvPageContainer .product-card-title {
+#epvPageContainer .epv-item-title {
     flex: 1;
     min-width: 0;
 }
-#epvPageContainer .product-card-title .item-name {
+#epvPageContainer .epv-item-name {
     font-weight: 700;
     font-size: 1rem;
-    color: var(--_text);
     margin-bottom: 4px;
 }
-#epvPageContainer .product-card-title .item-meta {
+#epvPageContainer .epv-item-meta {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
     font-size: 0.8rem;
-    color: var(--_text-sec);
+    color: var(--text-secondary);
 }
-#epvPageContainer .product-card-header .btn-remove {
+#epvPageContainer .epv-btn-remove {
     background: transparent;
-    border: 1px solid var(--_danger);
-    color: var(--_danger);
+    border: 1px solid var(--danger-color);
+    color: var(--danger-color);
     padding: 4px 10px;
     border-radius: 6px;
     cursor: pointer;
     font-size: 0.8rem;
     transition: all .2s;
     flex-shrink: 0;
+    font-family: inherit;
 }
-#epvPageContainer .product-card-header .btn-remove:hover {
-    background: var(--_danger);
+#epvPageContainer .epv-btn-remove:hover {
+    background: var(--danger-color);
     color: #fff;
 }
 
-/* Product fields (stock row) */
-#epvPageContainer .product-card-fields {
+/* ─── Item fields row ─── */
+#epvPageContainer .epv-item-fields {
     display: flex;
     gap: 10px;
     align-items: center;
     flex-wrap: wrap;
     padding: 8px 16px;
-    background: rgba(255,255,255,.02);
-    border-top: 1px solid var(--_border);
+    border-top: 1px solid var(--border-color);
 }
 
-/* Pricing section */
-#epvPageContainer .product-card-pricing {
-    padding: 8px 16px;
-    border-top: 1px solid var(--_border);
-    background: rgba(59,130,246,.03);
+/* ─── Item Field (shared) ─── */
+#epvPageContainer .epv-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
 }
-#epvPageContainer .pricing-label {
+#epvPageContainer .epv-field label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+}
+#epvPageContainer .epv-field input,
+#epvPageContainer .epv-field select {
+    width: 100px;
+    padding: 5px 8px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    font-family: inherit;
+}
+#epvPageContainer .epv-field input[type="number"] {
+    width: 80px;
+}
+#epvPageContainer .epv-field input[type="checkbox"] {
+    width: auto;
+    cursor: pointer;
+}
+
+/* ─── Pricing section ─── */
+#epvPageContainer .epv-pricing {
+    padding: 8px 16px;
+    border-top: 1px solid var(--border-color);
+}
+#epvPageContainer .epv-pricing-label {
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
-    color: var(--_primary);
+    color: var(--primary-color);
     margin-bottom: 6px;
 }
-#epvPageContainer .pricing-fields {
+#epvPageContainer .epv-pricing-fields {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
     align-items: center;
 }
 
-/* ═══════════════════════════════════════════════════
-   Variants Section (collapsible per product)
-   ═══════════════════════════════════════════════════ */
-#epvPageContainer .product-card-variants {
-    border-top: 1px solid var(--_border);
-}
-
-/* Variants toggle bar */
-#epvPageContainer .variants-toggle {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 16px;
-    cursor: pointer;
-    transition: background .15s;
-    user-select: none;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--_text-sec);
-}
-#epvPageContainer .variants-toggle:hover {
-    background: rgba(255,255,255,.03);
-}
-#epvPageContainer .variant-count-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 20px;
-    height: 20px;
-    padding: 0 6px;
-    border-radius: 10px;
-    background: var(--_primary);
-    color: #fff;
-    font-size: 0.7rem;
-    font-weight: 700;
-    margin-inline-start: 6px;
-}
-#epvPageContainer .toggle-arrow {
-    font-size: 0.75rem;
-    color: var(--_text-sec);
-}
-
-/* Variants content (expanded) */
-#epvPageContainer .variants-content {
-    padding: 0 16px 12px;
-}
-#epvPageContainer .variants-actions {
-    padding: 8px 0;
-}
-#epvPageContainer .variants-empty {
+/* ─── Empty State ─── */
+#epvPageContainer .epv-empty-state {
     text-align: center;
-    padding: 16px;
-    color: var(--_text-sec);
-    font-size: 0.85rem;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+#epvPageContainer .epv-empty-state p {
+    margin: 0;
+    font-size: 0.95rem;
 }
 
-/* Individual variant item */
-#epvPageContainer .variant-item {
-    background: var(--_bg-input);
-    border: 1px solid var(--_border);
-    border-radius: 6px;
-    padding: 10px 12px;
-    margin-bottom: 6px;
-}
-#epvPageContainer .variant-item:last-child {
-    margin-bottom: 0;
-}
-
-#epvPageContainer .variant-item-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 6px;
-}
-#epvPageContainer .variant-item-name {
+/* ─── Badges ─── */
+#epvPageContainer .epv-badge {
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.7rem;
     font-weight: 600;
-    font-size: 0.85rem;
-    color: var(--_text);
+    display: inline-block;
 }
-#epvPageContainer .variant-item-meta {
-    font-size: 0.75rem;
-    color: var(--_text-sec);
-    flex: 1;
+#epvPageContainer .epv-badge-success {
+    background: rgba(34,197,94,.15);
+    color: var(--success-color);
 }
-#epvPageContainer .btn-remove-sm {
-    background: transparent;
-    border: 1px solid var(--_danger);
-    color: var(--_danger);
-    width: 22px;
-    height: 22px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all .2s;
-    flex-shrink: 0;
+#epvPageContainer .epv-badge-danger {
+    background: rgba(239,68,68,.15);
+    color: var(--danger-color);
 }
-#epvPageContainer .btn-remove-sm:hover {
-    background: var(--_danger);
-    color: #fff;
+#epvPageContainer .epv-badge-warning {
+    background: rgba(245,158,11,.15);
+    color: var(--warning-color);
 }
 
-#epvPageContainer .variant-item-fields {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    align-items: center;
+/* ─── Variant group header ─── */
+#epvPageContainer .epv-variant-group {
+    margin-bottom: 12px;
+}
+#epvPageContainer .epv-variant-group-header {
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 8px 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius, 8px) var(--border-radius, 8px) 0 0;
+    color: var(--text-primary);
+}
+#epvPageContainer .epv-variant-group-items {
+    border: 1px solid var(--border-color);
+    border-top: none;
+    border-radius: 0 0 var(--border-radius, 8px) var(--border-radius, 8px);
+    overflow: hidden;
 }
 
 /* ═══════════════════════════════════════════════════
    Modal overlay
    ═══════════════════════════════════════════════════ */
-#epvPageContainer .modal-overlay {
+#epvPageContainer .epv-modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,.7);
+    background: rgba(0,0,0,.55);
     z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 20px;
 }
-#epvPageContainer .modal-content {
-    background: var(--_bg-card);
-    border: 1px solid var(--_border);
-    border-radius: var(--_radius);
+#epvPageContainer .epv-modal {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius, 8px);
     width: 100%;
     max-width: 650px;
     max-height: 85vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    box-shadow: 0 8px 32px rgba(0,0,0,.3);
 }
-#epvPageContainer .modal-header {
+#epvPageContainer .epv-modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--_border);
+    border-bottom: 1px solid var(--border-color);
 }
-#epvPageContainer .modal-header h3 {
+#epvPageContainer .epv-modal-header h3 {
     margin: 0;
     font-size: 1.1rem;
 }
-#epvPageContainer .modal-close {
+#epvPageContainer .epv-modal-close {
     background: none;
     border: none;
-    color: var(--_text-sec);
+    color: var(--text-secondary);
     font-size: 1.5rem;
     cursor: pointer;
     padding: 0;
     line-height: 1;
 }
-#epvPageContainer .modal-close:hover {
-    color: var(--_text);
+#epvPageContainer .epv-modal-close:hover {
+    color: var(--text-primary);
 }
-#epvPageContainer .modal-body {
+#epvPageContainer .epv-modal-body {
     padding: 16px 20px;
     overflow-y: auto;
     flex: 1;
 }
-#epvPageContainer .modal-footer {
+#epvPageContainer .epv-modal-footer {
     padding: 12px 20px;
-    border-top: 1px solid var(--_border);
+    border-top: 1px solid var(--border-color);
     display: flex;
     justify-content: flex-end;
     gap: 8px;
 }
-
-#epvPageContainer .modal-actions-bar {
+#epvPageContainer .epv-modal-actions {
     display: flex;
     align-items: center;
     gap: 8px;
     margin: 10px 0;
 }
-#epvPageContainer .selected-count {
+#epvPageContainer .epv-selected-count {
     font-size: 0.8rem;
-    color: var(--_primary);
-    margin-left: auto;
-}
-[dir="rtl"] #epvPageContainer .selected-count {
-    margin-left: 0;
-    margin-right: auto;
+    color: var(--primary-color);
+    margin-inline-start: auto;
 }
 
 /* ─── Modal Items ─── */
-#epvPageContainer .modal-items-list {
+#epvPageContainer .epv-modal-list {
     max-height: 350px;
     overflow-y: auto;
-    border: 1px solid var(--_border);
-    border-radius: var(--_radius);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius, 8px);
     padding: 4px;
 }
-#epvPageContainer .modal-item {
+#epvPageContainer .epv-modal-item {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -517,73 +462,70 @@
     cursor: pointer;
     transition: background .15s;
 }
-#epvPageContainer .modal-item:hover {
-    background: rgba(255,255,255,.04);
+#epvPageContainer .epv-modal-item:hover {
+    background: rgba(128,128,128,.08);
 }
-#epvPageContainer .modal-item.selected {
+#epvPageContainer .epv-modal-item.selected {
     background: rgba(59,130,246,.1);
     border: 1px solid rgba(59,130,246,.3);
 }
-#epvPageContainer .modal-item.disabled {
+#epvPageContainer .epv-modal-item.disabled {
     opacity: .5;
     cursor: not-allowed;
 }
-#epvPageContainer .modal-item input[type="checkbox"] {
+#epvPageContainer .epv-modal-item input[type="checkbox"] {
     flex-shrink: 0;
     cursor: pointer;
 }
-#epvPageContainer .modal-item-info {
+#epvPageContainer .epv-modal-item-info {
     flex: 1;
     min-width: 0;
 }
-#epvPageContainer .modal-item-name {
+#epvPageContainer .epv-modal-item-name {
     font-weight: 600;
     font-size: 0.875rem;
 }
-#epvPageContainer .modal-item-meta {
+#epvPageContainer .epv-modal-item-meta {
     font-size: 0.75rem;
-    color: var(--_text-sec);
+    color: var(--text-secondary);
 }
-#epvPageContainer .modal-item-badge {
+#epvPageContainer .epv-modal-item-badge {
     font-size: 0.7rem;
     padding: 2px 6px;
     border-radius: 12px;
     background: rgba(245,158,11,.15);
-    color: var(--_warning);
+    color: var(--warning-color);
 }
 
-#epvPageContainer .loading-text {
+#epvPageContainer .epv-loading {
     text-align: center;
     padding: 30px;
-    color: var(--_text-sec);
+    color: var(--text-secondary);
     font-size: 0.9rem;
 }
 
 /* ═══════════════════════════════════════════════════
    Toast Notifications
    ═══════════════════════════════════════════════════ */
-#epvPageContainer .toast {
+#epvPageContainer .epv-toast {
     position: fixed;
     top: 20px;
-    right: 20px;
     z-index: 10000;
     padding: 12px 20px;
-    border-radius: var(--_radius);
+    border-radius: var(--border-radius, 8px);
     font-size: 0.875rem;
     font-weight: 600;
-    box-shadow: 0 4px 12px rgba(0,0,0,.4);
+    box-shadow: 0 4px 12px rgba(0,0,0,.3);
     animation: epvSlideIn .3s ease;
 }
-[dir="rtl"] #epvPageContainer .toast {
-    right: auto;
-    left: 20px;
-}
-#epvPageContainer .toast-success {
-    background: var(--_success);
+[dir="ltr"] #epvPageContainer .epv-toast { right: 20px; }
+[dir="rtl"] #epvPageContainer .epv-toast { left: 20px; }
+#epvPageContainer .epv-toast-success {
+    background: var(--success-color);
     color: #fff;
 }
-#epvPageContainer .toast-error {
-    background: var(--_danger);
+#epvPageContainer .epv-toast-error {
+    background: var(--danger-color);
     color: #fff;
 }
 @keyframes epvSlideIn {
@@ -595,27 +537,29 @@
    Responsive
    ═══════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-    #epvPageContainer .product-card-fields,
-    #epvPageContainer .pricing-fields,
-    #epvPageContainer .variant-item-fields {
+    #epvPageContainer .epv-item-fields,
+    #epvPageContainer .epv-pricing-fields {
         flex-direction: column;
         align-items: stretch;
     }
-    #epvPageContainer .item-field input,
-    #epvPageContainer .item-field select {
+    #epvPageContainer .epv-field input,
+    #epvPageContainer .epv-field select {
         width: 100%;
     }
-    #epvPageContainer .product-card-header {
+    #epvPageContainer .epv-item-header {
         flex-direction: column;
     }
-    #epvPageContainer .section-header {
+    #epvPageContainer .epv-section-header {
         flex-direction: column;
         align-items: stretch;
     }
-    #epvPageContainer .section-search {
+    #epvPageContainer .epv-search-box {
         max-width: 100%;
     }
-    #epvPageContainer .modal-content {
+    #epvPageContainer .epv-modal {
         max-height: 95vh;
+    }
+    #epvPageContainer .epv-tabs {
+        overflow-x: auto;
     }
 }

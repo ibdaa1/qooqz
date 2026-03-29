@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 /**
  * /admin/fragments/entity_product_variants.php
- * Standalone Entity Products & Variants Management
+ * Standalone Entity Products & Variants Management – Two-Tab UI
+ * Tab 1: Entity Products (entity_products table + product_pricing)
+ * Tab 2: Entity Product Variants (entity_product_variants table)
  */
 
 $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
@@ -96,29 +98,29 @@ function _epvt($key, $fallback = '') {
 
     <!-- Page Header -->
     <div class="page-header">
-        <h1 data-i18n="title"><?= htmlspecialchars(_epvt('title', 'Entity Product Variants')) ?></h1>
+        <h1 data-i18n="title"><?= htmlspecialchars(_epvt('title', 'Entity Products & Variants')) ?></h1>
         <p data-i18n="subtitle"><?= htmlspecialchars(_epvt('subtitle', 'Manage entity products and their variants')) ?></p>
     </div>
 
     <!-- Super Admin: Tenant → Entity Cascade -->
     <?php if (is_super_admin()): ?>
-    <div class="card" id="epvEntityFilterCard">
-        <div class="card-body" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
-            <div class="form-group" style="min-width:150px;">
+    <div class="epv-card" id="epvEntityFilterCard">
+        <div class="epv-card-body" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+            <div class="epv-form-group" style="min-width:150px;">
                 <label data-i18n="filter.tenant_id"><?= htmlspecialchars(_epvt('filter.tenant_id', 'Tenant ID')) ?></label>
                 <div style="display:flex;gap:5px;">
-                    <input type="number" id="epvTenantIdInput" class="form-control"
+                    <input type="number" id="epvTenantIdInput" class="epv-input"
                            placeholder="<?= htmlspecialchars(_epvt('filter.enter_tenant_id', 'Enter Tenant ID')) ?>"
                            min="1" style="width:120px;"
                            value="<?= $tenantId ? (int)$tenantId : '' ?>">
-                    <button id="epvBtnVerifyTenant" class="btn btn-secondary" style="white-space:nowrap;"
+                    <button id="epvBtnVerifyTenant" class="epv-btn epv-btn-secondary" style="white-space:nowrap;"
                             data-i18n="filter.verify"><?= htmlspecialchars(_epvt('filter.verify', 'Verify')) ?></button>
                 </div>
                 <small id="epvTenantNameDisplay" style="display:none;margin-top:4px;"></small>
             </div>
-            <div class="form-group" style="flex:1;min-width:250px;">
+            <div class="epv-form-group" style="flex:1;min-width:250px;">
                 <label data-i18n="filter.entity"><?= htmlspecialchars(_epvt('filter.entity', 'Entity')) ?></label>
-                <select id="epvEntityFilter" class="form-control">
+                <select id="epvEntityFilter" class="epv-input">
                     <option value=""><?= htmlspecialchars(_epvt('filter.select_entity', 'Select Entity...')) ?></option>
                 </select>
             </div>
@@ -126,11 +128,11 @@ function _epvt($key, $fallback = '') {
     </div>
     <?php else: ?>
     <!-- Tenant Admin: Entity Selector -->
-    <div class="card">
-        <div class="card-body" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
-            <div class="form-group" style="flex:1;min-width:250px;">
+    <div class="epv-card">
+        <div class="epv-card-body" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+            <div class="epv-form-group" style="flex:1;min-width:250px;">
                 <label data-i18n="filter.entity"><?= htmlspecialchars(_epvt('filter.entity', 'Entity')) ?></label>
-                <select id="epvEntityFilter" class="form-control">
+                <select id="epvEntityFilter" class="epv-input">
                     <option value=""><?= htmlspecialchars(_epvt('filter.select_entity', 'Select Entity...')) ?></option>
                 </select>
             </div>
@@ -139,64 +141,106 @@ function _epvt($key, $fallback = '') {
     <?php endif; ?>
 
     <!-- ═══════════════════════════════════ -->
-    <!-- Unified: Products & Variants       -->
+    <!-- Tab Navigation                      -->
     <!-- ═══════════════════════════════════ -->
-    <div id="epvUnifiedContent" style="display:none;">
-        <div class="section-header">
-            <div class="section-search">
-                <input type="text" id="epvProductSearch" class="form-control"
-                       placeholder="<?= htmlspecialchars(_epvt('search_placeholder', 'Search products or variants...')) ?>">
-            </div>
-            <?php if ($canManage): ?>
-            <button id="epvBtnAddProduct" class="btn btn-primary" data-i18n="products.add_product">
-                <?= htmlspecialchars(_epvt('products.add_product', 'Add Products')) ?>
+    <div id="epvTabsContainer" style="display:none;">
+        <div class="epv-tabs">
+            <button class="epv-tab active" id="epvTabProducts" data-tab="products">
+                <?= htmlspecialchars(_epvt('products.title', 'Entity Products')) ?>
+                <span class="epv-tab-badge" id="epvProductsCount">0</span>
             </button>
+            <button class="epv-tab" id="epvTabVariants" data-tab="variants">
+                <?= htmlspecialchars(_epvt('variants.title', 'Product Variants')) ?>
+                <span class="epv-tab-badge" id="epvVariantsCount">0</span>
+            </button>
+        </div>
+
+        <!-- ═══════════════ Tab 1: Products ═══════════════ -->
+        <div class="epv-tab-content active" id="epvProductsContent" data-tab="products">
+            <div class="epv-section-header">
+                <div class="epv-search-box">
+                    <input type="text" id="epvProductSearch" class="epv-input"
+                           placeholder="<?= htmlspecialchars(_epvt('products.search_products', 'Search products...')) ?>">
+                </div>
+                <?php if ($canManage): ?>
+                <button id="epvBtnAddProduct" class="epv-btn epv-btn-primary" data-i18n="products.add_product">
+                    <?= htmlspecialchars(_epvt('products.add_product', 'Add Products')) ?>
+                </button>
+                <?php endif; ?>
+            </div>
+
+            <div id="epvProductsList" class="epv-items-list"></div>
+            <div id="epvProductsEmpty" class="epv-empty-state" style="display:none;">
+                <p data-i18n="products.no_products"><?= htmlspecialchars(_epvt('products.no_products', 'No entity products yet. Add products to get started.')) ?></p>
+            </div>
+
+            <?php if ($canManage): ?>
+            <div class="epv-section-footer" id="epvProductsFooter" style="display:none;">
+                <button id="epvBtnSaveProducts" class="epv-btn epv-btn-success" data-i18n="products.save_products">
+                    <?= htmlspecialchars(_epvt('products.save_products', 'Save Products')) ?>
+                </button>
+            </div>
             <?php endif; ?>
         </div>
 
-        <div id="epvUnifiedList" class="items-list"></div>
-        <div id="epvUnifiedEmpty" class="empty-state" style="display:none;">
-            <p data-i18n="products.no_products"><?= htmlspecialchars(_epvt('products.no_products', 'No entity products yet. Add products to get started.')) ?></p>
-        </div>
+        <!-- ═══════════════ Tab 2: Variants ═══════════════ -->
+        <div class="epv-tab-content" id="epvVariantsContent" data-tab="variants">
+            <div class="epv-section-header">
+                <div class="epv-search-box">
+                    <input type="text" id="epvVariantSearch" class="epv-input"
+                           placeholder="<?= htmlspecialchars(_epvt('variants.search_variants', 'Search variants...')) ?>">
+                </div>
+                <?php if ($canManage): ?>
+                <button id="epvBtnAddVariant" class="epv-btn epv-btn-primary" data-i18n="variants.add_variant">
+                    <?= htmlspecialchars(_epvt('variants.add_variant', 'Add Variants')) ?>
+                </button>
+                <?php endif; ?>
+            </div>
 
-        <?php if ($canManage): ?>
-        <div class="section-footer" id="epvUnifiedFooter" style="display:none;">
-            <button id="epvBtnSaveAll" class="btn btn-success" data-i18n="save_all">
-                <?= htmlspecialchars(_epvt('save_all', 'Save All')) ?>
-            </button>
+            <div id="epvVariantsList" class="epv-items-list"></div>
+            <div id="epvVariantsEmpty" class="epv-empty-state" style="display:none;">
+                <p data-i18n="variants.no_variants"><?= htmlspecialchars(_epvt('variants.no_variants', 'No variants assigned yet. Add variants from entity products.')) ?></p>
+            </div>
+
+            <?php if ($canManage): ?>
+            <div class="epv-section-footer" id="epvVariantsFooter" style="display:none;">
+                <button id="epvBtnSaveVariants" class="epv-btn epv-btn-success" data-i18n="variants.save_variants">
+                    <?= htmlspecialchars(_epvt('variants.save_variants', 'Save Variants')) ?>
+                </button>
+            </div>
+            <?php endif; ?>
         </div>
-        <?php endif; ?>
     </div>
 
     <!-- ═══════════════════════════════════ -->
     <!-- Modal: Product Selection            -->
     <!-- ═══════════════════════════════════ -->
-    <div class="modal-overlay" id="epvProductsModal" style="display:none;">
-        <div class="modal-content">
-            <div class="modal-header">
+    <div class="epv-modal-overlay" id="epvProductsModal" style="display:none;">
+        <div class="epv-modal">
+            <div class="epv-modal-header">
                 <h3 data-i18n="products.select_products"><?= htmlspecialchars(_epvt('products.select_products', 'Select Products')) ?></h3>
-                <button class="modal-close" id="epvCloseProductsModal">&times;</button>
+                <button class="epv-modal-close" id="epvCloseProductsModal">&times;</button>
             </div>
-            <div class="modal-body">
-                <input type="text" id="epvModalProductSearch" class="form-control"
+            <div class="epv-modal-body">
+                <input type="text" id="epvModalProductSearch" class="epv-input"
                        placeholder="<?= htmlspecialchars(_epvt('products.search_products', 'Search products...')) ?>">
-                <div class="modal-actions-bar">
-                    <button class="btn btn-sm btn-secondary" id="epvSelectAllProducts"
+                <div class="epv-modal-actions">
+                    <button class="epv-btn epv-btn-sm epv-btn-secondary" id="epvSelectAllProducts"
                             data-i18n="products.select_all"><?= htmlspecialchars(_epvt('products.select_all', 'Select All')) ?></button>
-                    <button class="btn btn-sm btn-secondary" id="epvDeselectAllProducts"
+                    <button class="epv-btn epv-btn-sm epv-btn-secondary" id="epvDeselectAllProducts"
                             data-i18n="products.deselect_all"><?= htmlspecialchars(_epvt('products.deselect_all', 'Deselect All')) ?></button>
-                    <span id="epvProductSelectedCount" class="selected-count">0 <?= htmlspecialchars(_epvt('products.selected_count', 'selected')) ?></span>
+                    <span id="epvProductSelectedCount" class="epv-selected-count">0 <?= htmlspecialchars(_epvt('products.selected_count', 'selected')) ?></span>
                 </div>
-                <div id="epvModalProductsList" class="modal-items-list">
-                    <div class="loading-text" data-i18n="products.loading_products">
+                <div id="epvModalProductsList" class="epv-modal-list">
+                    <div class="epv-loading" data-i18n="products.loading_products">
                         <?= htmlspecialchars(_epvt('products.loading_products', 'Loading products...')) ?>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-primary" id="epvConfirmProductSelection"
+            <div class="epv-modal-footer">
+                <button class="epv-btn epv-btn-primary" id="epvConfirmProductSelection"
                         data-i18n="products.add_selected"><?= htmlspecialchars(_epvt('products.add_selected', 'Add Selected')) ?></button>
-                <button class="btn btn-secondary" id="epvCancelProductSelection"
+                <button class="epv-btn epv-btn-secondary" id="epvCancelProductSelection"
                         data-i18n="cancel"><?= htmlspecialchars(_epvt('cancel', 'Cancel')) ?></button>
             </div>
         </div>
@@ -205,36 +249,36 @@ function _epvt($key, $fallback = '') {
     <!-- ═══════════════════════════════════ -->
     <!-- Modal: Variant Selection            -->
     <!-- ═══════════════════════════════════ -->
-    <div class="modal-overlay" id="epvVariantsModal" style="display:none;">
-        <div class="modal-content">
-            <div class="modal-header">
+    <div class="epv-modal-overlay" id="epvVariantsModal" style="display:none;">
+        <div class="epv-modal">
+            <div class="epv-modal-header">
                 <h3 data-i18n="variants.select_variants"><?= htmlspecialchars(_epvt('variants.select_variants', 'Select Variants')) ?></h3>
-                <button class="modal-close" id="epvCloseVariantsModal">&times;</button>
+                <button class="epv-modal-close" id="epvCloseVariantsModal">&times;</button>
             </div>
-            <div class="modal-body">
-                <div class="form-group" style="margin-bottom:10px;">
+            <div class="epv-modal-body">
+                <div class="epv-form-group" style="margin-bottom:10px;">
                     <label data-i18n="filter.product"><?= htmlspecialchars(_epvt('filter.product', 'Product')) ?></label>
-                    <select id="epvModalVariantProductFilter" class="form-control">
+                    <select id="epvModalVariantProductFilter" class="epv-input">
                         <option value=""><?= htmlspecialchars(_epvt('variants.select_product_first', 'Select a product first')) ?></option>
                     </select>
                 </div>
-                <div class="modal-actions-bar">
-                    <button class="btn btn-sm btn-secondary" id="epvSelectAllVariants"
+                <div class="epv-modal-actions">
+                    <button class="epv-btn epv-btn-sm epv-btn-secondary" id="epvSelectAllVariants"
                             data-i18n="products.select_all"><?= htmlspecialchars(_epvt('products.select_all', 'Select All')) ?></button>
-                    <button class="btn btn-sm btn-secondary" id="epvDeselectAllVariants"
+                    <button class="epv-btn epv-btn-sm epv-btn-secondary" id="epvDeselectAllVariants"
                             data-i18n="products.deselect_all"><?= htmlspecialchars(_epvt('products.deselect_all', 'Deselect All')) ?></button>
-                    <span id="epvVariantSelectedCount" class="selected-count">0 <?= htmlspecialchars(_epvt('variants.selected_count', 'selected')) ?></span>
+                    <span id="epvVariantSelectedCount" class="epv-selected-count">0 <?= htmlspecialchars(_epvt('variants.selected_count', 'selected')) ?></span>
                 </div>
-                <div id="epvModalVariantsList" class="modal-items-list">
-                    <div class="loading-text" data-i18n="variants.select_product_to_see_variants">
+                <div id="epvModalVariantsList" class="epv-modal-list">
+                    <div class="epv-loading" data-i18n="variants.select_product_to_see_variants">
                         <?= htmlspecialchars(_epvt('variants.select_product_to_see_variants', 'Select a product to see its variants')) ?>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-primary" id="epvConfirmVariantSelection"
+            <div class="epv-modal-footer">
+                <button class="epv-btn epv-btn-primary" id="epvConfirmVariantSelection"
                         data-i18n="variants.add_selected"><?= htmlspecialchars(_epvt('variants.add_selected', 'Add Selected')) ?></button>
-                <button class="btn btn-secondary" id="epvCancelVariantSelection"
+                <button class="epv-btn epv-btn-secondary" id="epvCancelVariantSelection"
                         data-i18n="cancel"><?= htmlspecialchars(_epvt('cancel', 'Cancel')) ?></button>
             </div>
         </div>
