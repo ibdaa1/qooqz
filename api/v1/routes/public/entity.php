@@ -69,7 +69,8 @@ if ($first === 'entity') {
             ['type' => 'location', 'position' => 70, 'settings' => '{"show_osm":true,"show_google":true}'],
             ['type' => 'offers',   'position' => 80, 'settings' => '{}'],
             ['type' => 'reviews',  'position' => 90, 'settings' => '{"show_form":true,"limit":5}'],
-            ['type' => 'policies', 'position' => 95, 'settings' => '{"types":["refund","privacy","shipping","terms"]}'],
+            ['type' => 'policies',   'position' => 95, 'settings' => '{"types":["refund","privacy","shipping","terms"]}'],
+            ['type' => 'attributes', 'position' => 55, 'settings' => '{}'],
         ];
 
         $sections = [];
@@ -212,6 +213,36 @@ if ($first === 'entity') {
             );
         } catch (\Throwable $_) {
             // Table may not exist yet
+            $rows = [];
+        }
+
+        ResponseFormatter::success(['ok' => true, 'data' => $rows]);
+        exit;
+    }
+
+    // Sub-route: entity attributes — merchant attributes/details
+    // GET /api/public/entity/{id}/attributes
+    if ($sub === 'attributes') {
+        $entityRow = $pdoOne('SELECT id, tenant_id FROM entities WHERE id = ? AND status NOT IN (\'suspended\',\'rejected\') LIMIT 1', [$entityId]);
+        if (!$entityRow) { ResponseFormatter::notFound('Entity not found'); exit; }
+
+        $rows = [];
+        try {
+            $rows = $pdoList(
+                "SELECT COALESCE(eat.name, ea.slug) AS attribute_name,
+                        eat.description AS attribute_description,
+                        ea.attribute_type,
+                        ea.slug,
+                        eav.value
+                   FROM entities_attribute_values eav
+              LEFT JOIN entities_attributes ea ON ea.id = eav.attribute_id
+              LEFT JOIN entities_attribute_translations eat ON eat.attribute_id = ea.id AND eat.language_code = ?
+                  WHERE eav.entity_id = ? AND eav.value IS NOT NULL AND eav.value != ''
+                  ORDER BY ea.sort_order ASC, ea.id ASC
+                  LIMIT 50",
+                [$lang, $entityId]
+            );
+        } catch (\Throwable $_) {
             $rows = [];
         }
 

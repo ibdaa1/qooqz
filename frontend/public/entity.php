@@ -459,7 +459,8 @@ $defaultSectionTitles = [
     'location' => t('entity.location_tab'),
     'offers'   => t('entity.discounts_tab'),
     'reviews'  => t('entity.ratings_tab'),
-    'policies' => t('entity.policies_tab', 'Policies'),
+    'policies'   => t('entity.policies_tab', 'Policies'),
+    'attributes' => t('entity.attributes_tab', 'Merchant Attributes'),
 ];
 
 // Section icons for visual distinction
@@ -470,7 +471,8 @@ $sectionIcons = [
     'location' => '🗺️',
     'offers'   => '🏷️',
     'reviews'  => '⭐',
-    'policies' => '📋',
+    'policies'   => '📋',
+    'attributes' => '🏷️',
 ];
 
 // Default section order when no DB config exists
@@ -484,7 +486,8 @@ if (empty($storeSections)) {
         ['type' => 'location', 'position' => 70, 'settings' => null, 'translated_title' => null, 'translated_content' => null],
         ['type' => 'offers',   'position' => 80, 'settings' => null, 'translated_title' => null, 'translated_content' => null],
         ['type' => 'reviews',  'position' => 90, 'settings' => null, 'translated_title' => null, 'translated_content' => null],
-        ['type' => 'policies', 'position' => 95, 'settings' => '{"types":["refund","privacy","shipping","terms"]}', 'translated_title' => null, 'translated_content' => null],
+        ['type' => 'policies',   'position' => 95,  'settings' => '{"types":["refund","privacy","shipping","terms"]}', 'translated_title' => null, 'translated_content' => null],
+        ['type' => 'attributes', 'position' => 55,  'settings' => null, 'translated_title' => null, 'translated_content' => null],
     ];
 }
 
@@ -554,7 +557,7 @@ if (!function_exists('_pub_safe_css')) {
 }
 
 // Sections that need a section-title header & container wrapping
-$titledSections = ['products', 'info', 'hours', 'location', 'offers', 'reviews', 'policies'];
+$titledSections = ['products', 'info', 'hours', 'location', 'offers', 'reviews', 'policies', 'attributes'];
 
 // Track rendered section types to prevent duplicates
 $renderedSectionTypes = [];
