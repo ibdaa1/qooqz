@@ -567,11 +567,11 @@
                 low_stock_threshold: parseInt(p.low_stock_threshold) || 5,
                 is_active:           p.is_active == 1 ? 1 : 0,
                 is_featured:         p.is_featured == 1 ? 1 : 0,
-                price:               p.price || null,
-                compare_at_price:    p.compare_at_price || null,
-                cost_price:          p.cost_price || null,
-                currency_code:       p.currency_code || null,
-                tax_rate:            p.tax_rate || null
+                price:               p.price !== undefined && p.price !== '' ? p.price : null,
+                compare_at_price:    p.compare_at_price !== undefined && p.compare_at_price !== '' ? p.compare_at_price : null,
+                cost_price:          p.cost_price !== undefined && p.cost_price !== '' ? p.cost_price : null,
+                currency_code:       p.currency_code !== undefined && p.currency_code !== '' ? p.currency_code : null,
+                tax_rate:            p.tax_rate !== undefined && p.tax_rate !== '' ? p.tax_rate : null
             };
         });
 
@@ -613,11 +613,11 @@
                         stock_status:        v.stock_status || 'in_stock',
                         is_active:           v.is_active == 1 ? 1 : 0,
                         is_featured:         v.is_featured == 1 ? 1 : 0,
-                        price:               v.price || null,
-                        compare_at_price:    v.compare_at_price || null,
-                        cost_price:          v.cost_price || null,
-                        currency_code:       v.currency_code || null,
-                        tax_rate:            v.tax_rate || null
+                        price:               v.price !== undefined && v.price !== '' ? v.price : null,
+                        compare_at_price:    v.compare_at_price !== undefined && v.compare_at_price !== '' ? v.compare_at_price : null,
+                        cost_price:          v.cost_price !== undefined && v.cost_price !== '' ? v.cost_price : null,
+                        currency_code:       v.currency_code !== undefined && v.currency_code !== '' ? v.currency_code : null,
+                        tax_rate:            v.tax_rate !== undefined && v.tax_rate !== '' ? v.tax_rate : null
                     };
                 });
 
