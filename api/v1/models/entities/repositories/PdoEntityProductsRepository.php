@@ -177,16 +177,25 @@ final class PdoEntityProductsRepository
     }
 
     /**
-     * Get all products for an entity
+     * Get all products for an entity (with pricing from product_pricing)
      */
     public function getEntityProducts(int $entityId): array
     {
         $stmt = $this->pdo->prepare("
             SELECT ep.*,
                    p.name as product_name,
-                   p.sku as product_sku
+                   p.sku as product_sku,
+                   pp.id as pricing_id,
+                   pp.price,
+                   pp.compare_at_price,
+                   pp.cost_price,
+                   pp.currency_code,
+                   pp.tax_rate
             FROM entity_products ep
             LEFT JOIN products p ON ep.product_id = p.id
+            LEFT JOIN product_pricing pp ON pp.product_id = ep.product_id
+                AND pp.entity_id = ep.entity_id
+                AND pp.is_active = 1
             WHERE ep.entity_id = :entity_id
             ORDER BY ep.is_featured DESC, ep.id DESC
         ");
@@ -249,7 +258,7 @@ final class PdoEntityProductsRepository
     }
 
     /**
-     * Bulk save products for an entity
+     * Bulk save products for an entity (with optional pricing)
      */
     public function saveEntityProducts(int $entityId, int $tenantId, array $products): array
     {
@@ -268,6 +277,11 @@ final class PdoEntityProductsRepository
                 }
 
                 $savedIds[] = $this->save($productData);
+
+                // Save entity-specific pricing if price is provided
+                if (isset($productData['price']) && $productData['price'] !== '' && $productData['price'] !== null) {
+                    $this->saveEntityProductPricing($entityId, (int)$productData['product_id'], $productData);
+                }
             }
 
             $this->pdo->commit();
@@ -275,6 +289,41 @@ final class PdoEntityProductsRepository
         } catch (\Exception $e) {
             $this->pdo->rollBack();
             throw $e;
+        }
+    }
+
+    /**
+     * Save or update entity-specific pricing in product_pricing table
+     */
+    private function saveEntityProductPricing(int $entityId, int $productId, array $data): void
+    {
+        // Check if entity-specific pricing already exists
+        $stmt = $this->pdo->prepare(
+            "SELECT id FROM product_pricing WHERE product_id = :product_id AND entity_id = :entity_id LIMIT 1"
+        );
+        $stmt->execute([':product_id' => $productId, ':entity_id' => $entityId]);
+        $existingPricing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        $price = $data['price'] ?? 0;
+        $compareAtPrice = (isset($data['compare_at_price']) && $data['compare_at_price'] !== '') ? $data['compare_at_price'] : null;
+        $costPrice = (isset($data['cost_price']) && $data['cost_price'] !== '') ? $data['cost_price'] : null;
+        $currencyCode = $data['currency_code'] ?? 'SAR';
+        $taxRate = (isset($data['tax_rate']) && $data['tax_rate'] !== '') ? $data['tax_rate'] : null;
+
+        if ($existingPricing) {
+            $stmt = $this->pdo->prepare(
+                "UPDATE product_pricing SET price = ?, compare_at_price = ?, cost_price = ?,
+                 currency_code = ?, tax_rate = ?, is_active = 1, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?"
+            );
+            $stmt->execute([$price, $compareAtPrice, $costPrice, $currencyCode, $taxRate, $existingPricing['id']]);
+        } else {
+            $stmt = $this->pdo->prepare(
+                "INSERT INTO product_pricing (product_id, entity_id, price, compare_at_price, cost_price,
+                 currency_code, tax_rate, pricing_type, is_active)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'fixed', 1)"
+            );
+            $stmt->execute([$productId, $entityId, $price, $compareAtPrice, $costPrice, $currencyCode, $taxRate]);
         }
     }
 

@@ -779,6 +779,12 @@ select.form-control option {
     gap: 10px;
     align-items: end;
 }
+.ep-fields-pricing {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+.ep-field select.form-control {
+    width: 100%;
+}
 .ep-field label {
     display: block;
     font-size: 0.78rem;

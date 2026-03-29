@@ -225,8 +225,16 @@ if ($pdo) {
         $pStmt = $pdo->prepare(
             "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.sku, p.slug,
                     p.is_featured, p.stock_quantity, p.stock_status, p.rating_average, p.rating_count,
-                    (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
-                    (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
+                    COALESCE(
+                        (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id AND pp.entity_id = ? AND pp.is_active = 1 ORDER BY pp.id ASC LIMIT 1),
+                        (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id AND pp.entity_id IS NULL AND pp.is_active = 1 ORDER BY pp.id ASC LIMIT 1),
+                        (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id AND pp.is_active = 1 ORDER BY pp.id ASC LIMIT 1)
+                    ) AS price,
+                    COALESCE(
+                        (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id AND pp.entity_id = ? AND pp.is_active = 1 ORDER BY pp.id ASC LIMIT 1),
+                        (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id AND pp.entity_id IS NULL AND pp.is_active = 1 ORDER BY pp.id ASC LIMIT 1),
+                        (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id AND pp.is_active = 1 ORDER BY pp.id ASC LIMIT 1)
+                    ) AS currency_code,
                     (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url,
                     (SELECT GROUP_CONCAT(i.url ORDER BY i.id ASC SEPARATOR '|') FROM images i WHERE i.owner_id = p.id) AS image_urls
                FROM products p
@@ -234,7 +242,7 @@ if ($pdo) {
               $pWhere ORDER BY p.is_featured DESC, p.id DESC
               LIMIT $productLimit OFFSET $pOffset"
         );
-        $pStmt->execute(array_merge([$lang], $pParams));
+        $pStmt->execute(array_merge([$entityId, $entityId, $lang], $pParams));
         $products = $pStmt->fetchAll(PDO::FETCH_ASSOC);
         $productMeta = ['total' => $pTotal, 'total_pages' => max(1, (int)ceil($pTotal / $productLimit))];
     } catch (Throwable $_) {}

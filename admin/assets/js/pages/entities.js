@@ -1134,7 +1134,12 @@
                 stock_quantity: parseInt(ep.stock_quantity) || 0,
                 low_stock_threshold: parseInt(ep.low_stock_threshold) || 5,
                 is_active: ep.is_active ? 1 : 0,
-                is_featured: ep.is_featured ? 1 : 0
+                is_featured: ep.is_featured ? 1 : 0,
+                price: ep.price !== '' && ep.price !== null && ep.price !== undefined ? parseFloat(ep.price) : null,
+                compare_at_price: ep.compare_at_price !== '' && ep.compare_at_price !== null ? parseFloat(ep.compare_at_price) : null,
+                cost_price: ep.cost_price !== '' && ep.cost_price !== null ? parseFloat(ep.cost_price) : null,
+                currency_code: ep.currency_code || 'SAR',
+                tax_rate: ep.tax_rate !== '' && ep.tax_rate !== null ? parseFloat(ep.tax_rate) : null
             }));
 
             await apiCall(`${API.entityProducts}?action=bulk&entity_id=${entityId}&tenant_id=${state.tenantId}`, {
@@ -1168,7 +1173,12 @@
                     stock_quantity: item.stock_quantity || 0,
                     low_stock_threshold: item.low_stock_threshold || 5,
                     is_active: parseInt(item.is_active) === 1,
-                    is_featured: parseInt(item.is_featured) === 1
+                    is_featured: parseInt(item.is_featured) === 1,
+                    price: item.price || '',
+                    compare_at_price: item.compare_at_price || '',
+                    cost_price: item.cost_price || '',
+                    currency_code: item.currency_code || 'SAR',
+                    tax_rate: item.tax_rate || ''
                 }));
 
                 renderEntityProducts();
@@ -1342,7 +1352,12 @@
                 stock_quantity: 0,
                 low_stock_threshold: 5,
                 is_active: true,
-                is_featured: false
+                is_featured: false,
+                price: '',
+                compare_at_price: '',
+                cost_price: '',
+                currency_code: 'SAR',
+                tax_rate: ''
             });
         });
 
@@ -1357,7 +1372,7 @@
         _modalTenantProducts = [];
     }
 
-    function renderEntityProducts(filterText) {
+function renderEntityProducts(filterText) {
         if (!el.entityProductsList) return;
 
         const items = filterText
@@ -1379,7 +1394,47 @@
                             </button>
                         </div>
                     </div>
-                    <div class="ep-fields">
+                    <div class="ep-fields ep-fields-pricing">
+                        <div class="ep-field">
+                            <label>${t('entity_products.price', 'Price')}</label>
+                            <input type="number" min="0" step="0.01" class="form-control" value="${ep.price || ''}"
+                                   placeholder="0.00"
+                                   onchange="Entities.updateEntityProduct(${realIdx}, 'price', this.value)">
+                        </div>
+                        <div class="ep-field">
+                            <label>${t('entity_products.currency_code', 'Currency')}</label>
+                            <select class="form-control" onchange="Entities.updateEntityProduct(${realIdx}, 'currency_code', this.value)">
+                                <option value="SAR" ${(ep.currency_code || 'SAR') === 'SAR' ? 'selected' : ''}>SAR</option>
+                                <option value="USD" ${ep.currency_code === 'USD' ? 'selected' : ''}>USD</option>
+                                <option value="EUR" ${ep.currency_code === 'EUR' ? 'selected' : ''}>EUR</option>
+                                <option value="GBP" ${ep.currency_code === 'GBP' ? 'selected' : ''}>GBP</option>
+                                <option value="AED" ${ep.currency_code === 'AED' ? 'selected' : ''}>AED</option>
+                                <option value="KWD" ${ep.currency_code === 'KWD' ? 'selected' : ''}>KWD</option>
+                                <option value="BHD" ${ep.currency_code === 'BHD' ? 'selected' : ''}>BHD</option>
+                                <option value="QAR" ${ep.currency_code === 'QAR' ? 'selected' : ''}>QAR</option>
+                                <option value="OMR" ${ep.currency_code === 'OMR' ? 'selected' : ''}>OMR</option>
+                                <option value="EGP" ${ep.currency_code === 'EGP' ? 'selected' : ''}>EGP</option>
+                                <option value="JOD" ${ep.currency_code === 'JOD' ? 'selected' : ''}>JOD</option>
+                            </select>
+                        </div>
+                        <div class="ep-field">
+                            <label>${t('entity_products.compare_at_price', 'Compare Price')}</label>
+                            <input type="number" min="0" step="0.01" class="form-control" value="${ep.compare_at_price || ''}"
+                                   placeholder="0.00"
+                                   onchange="Entities.updateEntityProduct(${realIdx}, 'compare_at_price', this.value)">
+                        </div>
+                        <div class="ep-field">
+                            <label>${t('entity_products.cost_price', 'Cost Price')}</label>
+                            <input type="number" min="0" step="0.01" class="form-control" value="${ep.cost_price || ''}"
+                                   placeholder="0.00"
+                                   onchange="Entities.updateEntityProduct(${realIdx}, 'cost_price', this.value)">
+                        </div>
+                        <div class="ep-field">
+                            <label>${t('entity_products.tax_rate', 'Tax Rate %')}</label>
+                            <input type="number" min="0" max="100" step="0.01" class="form-control" value="${ep.tax_rate || ''}"
+                                   placeholder="0.00"
+                                   onchange="Entities.updateEntityProduct(${realIdx}, 'tax_rate', this.value)">
+                        </div>
                         <div class="ep-field">
                             <label>${t('entity_products.stock_quantity', 'Stock')}</label>
                             <input type="number" min="0" class="form-control" value="${ep.stock_quantity || 0}"

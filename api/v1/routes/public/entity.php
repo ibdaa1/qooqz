@@ -378,14 +378,22 @@ if ($first === 'entity') {
         $rows  = $pdoList(
             "SELECT p.id, COALESCE(pt.name, p.slug) AS name, p.sku, p.slug,
                     p.is_featured, p.stock_quantity, p.stock_status, p.rating_average, p.rating_count,
-                    (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS price,
-                    (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id ORDER BY pp.id ASC LIMIT 1) AS currency_code,
+                    COALESCE(
+                        (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id AND pp.entity_id = ? AND pp.is_active = 1 ORDER BY pp.id ASC LIMIT 1),
+                        (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id AND pp.entity_id IS NULL AND pp.is_active = 1 ORDER BY pp.id ASC LIMIT 1),
+                        (SELECT pp.price FROM product_pricing pp WHERE pp.product_id = p.id AND pp.is_active = 1 ORDER BY pp.id ASC LIMIT 1)
+                    ) AS price,
+                    COALESCE(
+                        (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id AND pp.entity_id = ? AND pp.is_active = 1 ORDER BY pp.id ASC LIMIT 1),
+                        (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id AND pp.entity_id IS NULL AND pp.is_active = 1 ORDER BY pp.id ASC LIMIT 1),
+                        (SELECT pp.currency_code FROM product_pricing pp WHERE pp.product_id = p.id AND pp.is_active = 1 ORDER BY pp.id ASC LIMIT 1)
+                    ) AS currency_code,
                     (SELECT i.url FROM images i WHERE i.owner_id = p.id ORDER BY i.id ASC LIMIT 1) AS image_url,
                     NULL AS image_thumb_url
                FROM products p
           LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = ?
               $where ORDER BY p.is_featured DESC, p.id DESC LIMIT ? OFFSET ?",
-            array_merge([$lang], $params, [$per, $offset])
+            array_merge([$entityId, $entityId, $lang], $params, [$per, $offset])
         );
         ResponseFormatter::success(['ok'=>true,'data'=>$rows,'meta'=>[
             'total'=>$total,'page'=>$page,'per_page'=>$per,

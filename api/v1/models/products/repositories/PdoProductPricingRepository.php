@@ -13,7 +13,7 @@ final class PdoProductPricingRepository
     ];
 
     private const FILTERABLE_COLUMNS = [
-        'product_id','variant_id','currency_code','pricing_type',
+        'product_id','variant_id','entity_id','currency_code','pricing_type',
         'country_id','city_id','is_active'
     ];
 
@@ -127,6 +127,7 @@ final class PdoProductPricingRepository
         $params = [
             ':product_id'       => $data['product_id'] ?? null,
             ':variant_id'       => $data['variant_id'] ?? null,
+            ':entity_id'        => $data['entity_id'] ?? null,
             ':price'            => $data['price'] ?? 0,
             ':tax_rate'         => $data['tax_rate'] ?? null,
             ':cost_price'       => $data['cost_price'] ?? null,
@@ -146,6 +147,7 @@ final class PdoProductPricingRepository
                 UPDATE product_pricing SET
                     product_id = :product_id,
                     variant_id = :variant_id,
+                    entity_id = :entity_id,
                     price = :price,
                     tax_rate = :tax_rate,
                     cost_price = :cost_price,
@@ -167,12 +169,12 @@ final class PdoProductPricingRepository
 
         $stmt = $this->pdo->prepare("
             INSERT INTO product_pricing (
-                product_id, variant_id, price, tax_rate,
+                product_id, variant_id, entity_id, price, tax_rate,
                 cost_price, compare_at_price, currency_code,
                 pricing_type, start_at, end_at,
                 country_id, city_id, is_active
             ) VALUES (
-                :product_id, :variant_id, :price, :tax_rate,
+                :product_id, :variant_id, :entity_id, :price, :tax_rate,
                 :cost_price, :compare_at_price, :currency_code,
                 :pricing_type, :start_at, :end_at,
                 :country_id, :city_id, :is_active
