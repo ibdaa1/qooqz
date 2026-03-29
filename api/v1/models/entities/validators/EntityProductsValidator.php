@@ -75,18 +75,6 @@ final class EntityProductsValidator
             throw new InvalidArgumentException("tenant_id must be numeric");
         }
 
-        if (isset($data['price']) && $data['price'] !== null && $data['price'] !== '') {
-            if (!is_numeric($data['price']) || (float)$data['price'] < 0) {
-                throw new InvalidArgumentException("price must be a non-negative number");
-            }
-        }
-
-        if (isset($data['compare_at_price']) && $data['compare_at_price'] !== null && $data['compare_at_price'] !== '') {
-            if (!is_numeric($data['compare_at_price']) || (float)$data['compare_at_price'] < 0) {
-                throw new InvalidArgumentException("compare_at_price must be a non-negative number");
-            }
-        }
-
         if (isset($data['stock_quantity'])) {
             if (!is_numeric($data['stock_quantity']) || (int)$data['stock_quantity'] < 0) {
                 throw new InvalidArgumentException("stock_quantity must be a non-negative integer");

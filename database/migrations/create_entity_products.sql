@@ -1,6 +1,7 @@
 -- =====================================================
 -- Entity Products Table
--- Allows per-entity product overrides (price, stock, etc.)
+-- Allows per-entity product overrides (stock, active, featured)
+-- Pricing is managed via the unified product_pricing table
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS entity_products (
@@ -10,10 +11,8 @@ CREATE TABLE IF NOT EXISTS entity_products (
     entity_id            BIGINT UNSIGNED NOT NULL,
     product_id           BIGINT UNSIGNED NOT NULL,
 
-    price                DECIMAL(15,2) NULL,
-    compare_at_price     DECIMAL(15,2) NULL,
     stock_quantity       INT NOT NULL DEFAULT 0,
-    low_stock_threshold  INT NOT NULL DEFAULT 5,
+    low_stock_threshold  INT DEFAULT 5,
 
     is_active            TINYINT(1) NOT NULL DEFAULT 1,
     is_featured          TINYINT(1) NOT NULL DEFAULT 0,
@@ -22,7 +21,7 @@ CREATE TABLE IF NOT EXISTS entity_products (
     updated_at           DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     UNIQUE KEY uq_entity_product (entity_id, product_id),
-    KEY idx_tenant_entity (tenant_id, entity_id),
+    KEY idx_tenant_entity_product (tenant_id, entity_id, product_id),
     KEY idx_product (product_id),
 
     FOREIGN KEY (tenant_id)  REFERENCES tenants(id) ON DELETE CASCADE,

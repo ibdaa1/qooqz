@@ -107,8 +107,6 @@
             "no_tenant_products": "لم يتم العثور على منتجات",
             "already_added": "مضاف مسبقاً",
             "selected_count": "{count} محدد",
-            "price": "السعر",
-            "compare_at_price": "سعر المقارنة",
             "stock_quantity": "كمية المخزون",
             "low_stock_threshold": "حد المخزون المنخفض",
             "is_active": "نشط",

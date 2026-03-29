@@ -15,7 +15,7 @@ final class PdoEntityProductsRepository
     ];
 
     private const ENTITY_PRODUCT_COLUMNS = [
-        'tenant_id', 'entity_id', 'product_id', 'price', 'compare_at_price',
+        'tenant_id', 'entity_id', 'product_id',
         'stock_quantity', 'low_stock_threshold', 'is_active', 'is_featured'
     ];
 

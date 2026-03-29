@@ -1131,8 +1131,6 @@
             // Use bulk save endpoint
             const products = state.entityProducts.map(ep => ({
                 product_id: parseInt(ep.product_id),
-                price: ep.price !== '' && ep.price !== null && ep.price !== undefined ? parseFloat(ep.price) : null,
-                compare_at_price: ep.compare_at_price !== '' && ep.compare_at_price !== null && ep.compare_at_price !== undefined ? parseFloat(ep.compare_at_price) : null,
                 stock_quantity: parseInt(ep.stock_quantity) || 0,
                 low_stock_threshold: parseInt(ep.low_stock_threshold) || 5,
                 is_active: ep.is_active ? 1 : 0,
@@ -1167,8 +1165,6 @@
                     product_id: item.product_id,
                     product_name: item.product_name || `Product #${item.product_id}`,
                     product_sku: item.product_sku || '',
-                    price: item.price,
-                    compare_at_price: item.compare_at_price,
                     stock_quantity: item.stock_quantity || 0,
                     low_stock_threshold: item.low_stock_threshold || 5,
                     is_active: parseInt(item.is_active) === 1,
@@ -1343,8 +1339,6 @@
                 product_id: p.id,
                 product_name: p.name || p.product_name || `Product #${p.id}`,
                 product_sku: p.sku || p.product_sku || '',
-                price: '',
-                compare_at_price: '',
                 stock_quantity: 0,
                 low_stock_threshold: 5,
                 is_active: true,
@@ -1386,18 +1380,6 @@
                         </div>
                     </div>
                     <div class="ep-fields">
-                        <div class="ep-field">
-                            <label>${t('entity_products.price', 'Price')}</label>
-                            <input type="number" step="0.01" min="0" class="form-control" value="${ep.price ?? ''}"
-                                   onchange="Entities.updateEntityProduct(${realIdx}, 'price', this.value)"
-                                   placeholder="${t('entity_products.price', 'Price')}">
-                        </div>
-                        <div class="ep-field">
-                            <label>${t('entity_products.compare_at_price', 'Compare at Price')}</label>
-                            <input type="number" step="0.01" min="0" class="form-control" value="${ep.compare_at_price ?? ''}"
-                                   onchange="Entities.updateEntityProduct(${realIdx}, 'compare_at_price', this.value)"
-                                   placeholder="${t('entity_products.compare_at_price', 'Compare')}">
-                        </div>
                         <div class="ep-field">
                             <label>${t('entity_products.stock_quantity', 'Stock')}</label>
                             <input type="number" min="0" class="form-control" value="${ep.stock_quantity || 0}"

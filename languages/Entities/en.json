@@ -107,8 +107,6 @@
             "no_tenant_products": "No products found",
             "already_added": "Already added",
             "selected_count": "{count} selected",
-            "price": "Price",
-            "compare_at_price": "Compare at Price",
             "stock_quantity": "Stock Quantity",
             "low_stock_threshold": "Low Stock Threshold",
             "is_active": "Active",
