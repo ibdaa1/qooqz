@@ -67,7 +67,8 @@
             "save_products": "Save Products",
             "products_saved": "Products saved successfully",
             "product_removed": "Product removed",
-            "confirm_remove": "Remove this product and all its variants from entity?"
+            "confirm_remove": "Remove this product and all its variants from entity?",
+            "select_currency": "-- Currency --"
         },
         "variants": {
             "title": "Product Variants",

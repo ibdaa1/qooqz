@@ -67,7 +67,8 @@
             "save_products": "حفظ المنتجات",
             "products_saved": "تم حفظ المنتجات بنجاح",
             "product_removed": "تم إزالة المنتج",
-            "confirm_remove": "إزالة هذا المنتج وجميع متغيراته من الكيان؟"
+            "confirm_remove": "إزالة هذا المنتج وجميع متغيراته من الكيان؟",
+            "select_currency": "-- العملة --"
         },
         "variants": {
             "title": "متغيرات المنتجات",

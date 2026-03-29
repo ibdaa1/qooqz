@@ -71,11 +71,15 @@ final class PdoEntityProductVariantsRepository
             SELECT epv.*,
                    COALESCE(pt.name, '') as product_name,
                    pv.sku as variant_sku,
-                   pv.price as variant_price
+                   pp_v.price as variant_price
             FROM entity_product_variants epv
             LEFT JOIN products p ON epv.product_id = p.id
             LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
             LEFT JOIN product_variants pv ON epv.variant_id = pv.id
+            LEFT JOIN product_pricing pp_v ON pp_v.product_id = epv.product_id
+                AND pp_v.variant_id = epv.variant_id
+                AND pp_v.entity_id IS NULL
+                AND pp_v.is_active = 1
             WHERE 1=1
         " . $filterResult['sql'];
         $params = $filterResult['params'];
@@ -113,6 +117,10 @@ final class PdoEntityProductVariantsRepository
             LEFT JOIN products p ON epv.product_id = p.id
             LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
             LEFT JOIN product_variants pv ON epv.variant_id = pv.id
+            LEFT JOIN product_pricing pp_v ON pp_v.product_id = epv.product_id
+                AND pp_v.variant_id = epv.variant_id
+                AND pp_v.entity_id IS NULL
+                AND pp_v.is_active = 1
             WHERE 1=1
         " . $filterResult['sql'];
 
@@ -130,11 +138,15 @@ final class PdoEntityProductVariantsRepository
             SELECT epv.*,
                    COALESCE(pt.name, '') as product_name,
                    pv.sku as variant_sku,
-                   pv.price as variant_price
+                   pp_v.price as variant_price
             FROM entity_product_variants epv
             LEFT JOIN products p ON epv.product_id = p.id
             LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
             LEFT JOIN product_variants pv ON epv.variant_id = pv.id
+            LEFT JOIN product_pricing pp_v ON pp_v.product_id = epv.product_id
+                AND pp_v.variant_id = epv.variant_id
+                AND pp_v.entity_id IS NULL
+                AND pp_v.is_active = 1
             WHERE epv.id = :id
             LIMIT 1
         ");
@@ -152,11 +164,15 @@ final class PdoEntityProductVariantsRepository
             SELECT epv.*,
                    COALESCE(pt.name, '') as product_name,
                    pv.sku as variant_sku,
-                   pv.price as variant_price
+                   pp_v.price as variant_price
             FROM entity_product_variants epv
             LEFT JOIN products p ON epv.product_id = p.id
             LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
             LEFT JOIN product_variants pv ON epv.variant_id = pv.id
+            LEFT JOIN product_pricing pp_v ON pp_v.product_id = epv.product_id
+                AND pp_v.variant_id = epv.variant_id
+                AND pp_v.entity_id IS NULL
+                AND pp_v.is_active = 1
             WHERE epv.entity_id = :entity_id AND epv.variant_id = :variant_id
             LIMIT 1
         ");
@@ -174,7 +190,6 @@ final class PdoEntityProductVariantsRepository
             SELECT epv.*,
                    COALESCE(pt.name, '') as product_name,
                    pv.sku as variant_sku,
-                   pv.price as variant_price,
                    pp.id as pricing_id,
                    pp.price,
                    pp.compare_at_price,
@@ -205,11 +220,15 @@ final class PdoEntityProductVariantsRepository
             SELECT epv.*,
                    COALESCE(pt.name, '') as product_name,
                    pv.sku as variant_sku,
-                   pv.price as variant_price
+                   pp_v.price as variant_price
             FROM entity_product_variants epv
             LEFT JOIN products p ON epv.product_id = p.id
             LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
             LEFT JOIN product_variants pv ON epv.variant_id = pv.id
+            LEFT JOIN product_pricing pp_v ON pp_v.product_id = epv.product_id
+                AND pp_v.variant_id = epv.variant_id
+                AND pp_v.entity_id IS NULL
+                AND pp_v.is_active = 1
             WHERE epv.entity_id = :entity_id AND epv.product_id = :product_id
             ORDER BY epv.id DESC
         ");

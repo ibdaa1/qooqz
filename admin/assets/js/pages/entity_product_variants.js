@@ -12,7 +12,8 @@
         entityProducts:        '/api/entity_products',
         entityProductVariants: '/api/entity_product_variants',
         products:              '/api/products',
-        productVariants:       '/api/product_variants'
+        productVariants:       '/api/product_variants',
+        currencies:            '/api/currencies'
     };
 
     var state = {
@@ -24,7 +25,8 @@
         activeTab:      'products',
         entityProducts: [],
         entityVariants: [],
-        allEntities:    []
+        allEntities:    [],
+        currencies:     []
     };
 
     var el = {};
@@ -43,6 +45,7 @@
 
         loadTranslations(state.language).then(function () {
             initEventListeners();
+            loadCurrencies();
 
             // Auto-detect tenant: if tenantId is already set from session, use it directly
             if (state.tenantId > 0) {
@@ -287,6 +290,33 @@
         }
     }
 
+    // ════════════════════════════════════════
+    // CURRENCIES
+    // ════════════════════════════════════════
+    function loadCurrencies() {
+        return apiCall(API.currencies).then(function (res) {
+            var items = (res && res.data && res.data.items) || (res && res.data) || [];
+            state.currencies = Array.isArray(items) ? items : [];
+        }).catch(function (e) {
+            console.error('Failed to load currencies:', e);
+            state.currencies = [];
+        });
+    }
+
+    function buildCurrencySelect(selectedCode, onchangeAttr) {
+        var html = '<select ' + onchangeAttr + '>';
+        html += '<option value="">' + t('products.select_currency', '-- Currency --') + '</option>';
+        for (var i = 0; i < state.currencies.length; i++) {
+            var c = state.currencies[i];
+            var code = c.code || c.currency_code || '';
+            var name = c.name || c.currency_name || code;
+            var sel = (code === selectedCode) ? ' selected' : '';
+            html += '<option value="' + escHtml(code) + '"' + sel + '>' + escHtml(code) + ' - ' + escHtml(name) + '</option>';
+        }
+        html += '</select>';
+        return html;
+    }
+
     function verifyTenant() {
         var tid = parseInt(el.tenantIdInput ? el.tenantIdInput.value : 0) || 0;
         if (tid <= 0) {
@@ -414,7 +444,7 @@
                     '<div class="epv-field"><label>' + t('products.cost_price', 'Cost Price') + '</label>' +
                         '<input type="number" step="0.01" value="' + escHtml(costPrice) + '" min="0" onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'cost_price\',this.value)"></div>' +
                     '<div class="epv-field"><label>' + t('products.currency_code', 'Currency') + '</label>' +
-                        '<input type="text" maxlength="3" value="' + escHtml(currencyCode) + '" onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'currency_code\',this.value)"></div>' +
+                        buildCurrencySelect(currencyCode, 'onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'currency_code\',this.value)"') + '</div>' +
                     '<div class="epv-field"><label>' + t('products.tax_rate', 'Tax %') + '</label>' +
                         '<input type="number" step="0.01" value="' + escHtml(taxRate) + '" min="0" max="100" onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'tax_rate\',this.value)"></div>' +
                 '</div></div>';
@@ -545,7 +575,7 @@
                         '<div class="epv-field"><label>' + t('products.cost_price', 'Cost Price') + '</label>' +
                             '<input type="number" step="0.01" value="' + escHtml(vCostPrice) + '" min="0" onchange="EntityProductVariants._updateVariant(' + safeVIdx + ',\'cost_price\',this.value)"></div>' +
                         '<div class="epv-field"><label>' + t('products.currency_code', 'Currency') + '</label>' +
-                            '<input type="text" maxlength="3" value="' + escHtml(vCurrencyCode) + '" onchange="EntityProductVariants._updateVariant(' + safeVIdx + ',\'currency_code\',this.value)"></div>' +
+                            buildCurrencySelect(vCurrencyCode, 'onchange="EntityProductVariants._updateVariant(' + safeVIdx + ',\'currency_code\',this.value)"') + '</div>' +
                         '<div class="epv-field"><label>' + t('products.tax_rate', 'Tax %') + '</label>' +
                             '<input type="number" step="0.01" value="' + escHtml(vTaxRate) + '" min="0" max="100" onchange="EntityProductVariants._updateVariant(' + safeVIdx + ',\'tax_rate\',this.value)"></div>' +
                     '</div></div>';
