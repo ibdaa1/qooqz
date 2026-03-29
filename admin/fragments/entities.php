@@ -575,11 +575,12 @@ $apiBase = '/api';
 
                 <!-- Tab: Entity Products -->
                 <div class="tab-content" id="tab-entity_products" style="display:none">
-                    <div class="entity-products-toolbar" style="display:flex; gap:10px; margin-bottom:15px; align-items:center; flex-wrap:wrap;">
+                    <div class="entity-products-toolbar">
                         <input type="text" id="entityProductSearch" class="form-control" style="flex:1; min-width:200px;"
                                placeholder="<?= __t('entity_products.search_placeholder', 'Search products...') ?>"
                                data-i18n-placeholder="entity_products.search_placeholder">
                         <button type="button" id="btnAddEntityProduct" class="btn btn-primary" data-i18n="entity_products.add_product">
+                            <i class="fas fa-plus"></i>
                             <?= __t('entity_products.add_product', 'Add Product') ?>
                         </button>
                     </div>
@@ -587,6 +588,42 @@ $apiBase = '/api';
                     <div id="entityProductsEmpty" style="display:none; text-align:center; padding:40px 20px; color:var(--text-muted, #94a3b8);">
                         <i class="fas fa-box-open" style="font-size:2.5rem; margin-bottom:10px; opacity:0.5;"></i>
                         <p data-i18n="entity_products.no_products"><?= __t('entity_products.no_products', 'No entity products yet') ?></p>
+                    </div>
+                </div>
+
+                <!-- Modal: Select Tenant Products -->
+                <div id="entityProductsModal" class="ep-modal-overlay" style="display:none;">
+                    <div class="ep-modal">
+                        <div class="ep-modal-header">
+                            <h4 data-i18n="entity_products.select_products"><?= __t('entity_products.select_products', 'Select Products') ?></h4>
+                            <button type="button" class="ep-modal-close" id="btnCloseProductsModal">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="ep-modal-toolbar">
+                            <input type="text" id="epModalSearch" class="form-control" style="flex:1; min-width:200px;"
+                                   placeholder="<?= __t('entity_products.search_tenant_products', 'Search tenant products...') ?>"
+                                   data-i18n-placeholder="entity_products.search_tenant_products">
+                            <button type="button" id="btnSelectAll" class="btn btn-secondary btn-sm" data-i18n="entity_products.select_all">
+                                <?= __t('entity_products.select_all', 'Select All') ?>
+                            </button>
+                            <button type="button" id="btnDeselectAll" class="btn btn-secondary btn-sm" data-i18n="entity_products.deselect_all">
+                                <?= __t('entity_products.deselect_all', 'Deselect All') ?>
+                            </button>
+                        </div>
+                        <div class="ep-modal-body" id="epModalProductsList">
+                            <div class="ep-modal-loading" data-i18n="entity_products.loading"><?= __t('entity_products.loading', 'Loading products...') ?></div>
+                        </div>
+                        <div class="ep-modal-footer">
+                            <span id="epModalSelectedCount" class="ep-selected-count"></span>
+                            <button type="button" id="btnConfirmProducts" class="btn btn-primary" data-i18n="entity_products.add_selected">
+                                <i class="fas fa-check"></i>
+                                <?= __t('entity_products.add_selected', 'Add Selected') ?>
+                            </button>
+                            <button type="button" id="btnCancelProducts" class="btn btn-secondary" data-i18n="common.cancel">
+                                <?= __t('common.cancel', 'Cancel') ?>
+                            </button>
+                        </div>
                     </div>
                 </div>
 

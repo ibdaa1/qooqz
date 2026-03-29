@@ -1105,7 +1105,6 @@
     async function saveEntityProducts(entityId, isEdit = false) {
         try {
             if (!state.entityProducts || state.entityProducts.length === 0) {
-                // If editing and no products, clear existing
                 if (isEdit) {
                     try {
                         await apiCall(`${API.entityProducts}?entity_id=${entityId}`, {
@@ -1118,7 +1117,7 @@
                 return;
             }
 
-            // Delete existing entity products first when editing
+            // Delete existing first when editing (to remove products that were removed from the list)
             if (isEdit) {
                 try {
                     await apiCall(`${API.entityProducts}?entity_id=${entityId}`, {
@@ -1129,28 +1128,22 @@
                 }
             }
 
-            // Save each product
-            for (const ep of state.entityProducts) {
-                if (!ep.product_id) continue;
+            // Use bulk save endpoint
+            const products = state.entityProducts.map(ep => ({
+                product_id: parseInt(ep.product_id),
+                price: ep.price !== '' && ep.price !== null && ep.price !== undefined ? parseFloat(ep.price) : null,
+                compare_at_price: ep.compare_at_price !== '' && ep.compare_at_price !== null && ep.compare_at_price !== undefined ? parseFloat(ep.compare_at_price) : null,
+                stock_quantity: parseInt(ep.stock_quantity) || 0,
+                low_stock_threshold: parseInt(ep.low_stock_threshold) || 5,
+                is_active: ep.is_active ? 1 : 0,
+                is_featured: ep.is_featured ? 1 : 0
+            }));
 
-                const epData = {
-                    tenant_id: parseInt(state.tenantId),
-                    entity_id: parseInt(entityId),
-                    product_id: parseInt(ep.product_id),
-                    price: ep.price !== '' && ep.price !== null && ep.price !== undefined ? parseFloat(ep.price) : null,
-                    compare_at_price: ep.compare_at_price !== '' && ep.compare_at_price !== null && ep.compare_at_price !== undefined ? parseFloat(ep.compare_at_price) : null,
-                    stock_quantity: parseInt(ep.stock_quantity) || 0,
-                    low_stock_threshold: parseInt(ep.low_stock_threshold) || 5,
-                    is_active: ep.is_active ? 1 : 0,
-                    is_featured: ep.is_featured ? 1 : 0
-                };
-
-                await apiCall(API.entityProducts, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(epData)
-                });
-            }
+            await apiCall(`${API.entityProducts}?action=bulk&entity_id=${entityId}&tenant_id=${state.tenantId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(products)
+            });
         } catch (err) {
             console.warn('[Entities] Failed to save entity products:', err);
         }
@@ -1189,48 +1182,161 @@
         }
     }
 
+    // ── Product Selection Modal ──────────────────────
+    let _modalTenantProducts = [];
+    let _modalSelectedIds = new Set();
+
     async function addEntityProduct() {
-        // Prompt for product ID search
-        const searchTerm = prompt(t('entity_products.select_product', 'Enter product ID or search term:'));
-        if (!searchTerm) return;
+        // Show modal
+        const modal = document.getElementById('entityProductsModal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+
+        const listContainer = document.getElementById('epModalProductsList');
+        const searchInput = document.getElementById('epModalSearch');
+        if (searchInput) searchInput.value = '';
+
+        _modalSelectedIds = new Set();
+        _modalTenantProducts = [];
+
+        if (listContainer) listContainer.innerHTML = `<div class="ep-modal-loading">${t('entity_products.loading', 'Loading products...')}</div>`;
 
         try {
-            let product = null;
-
-            // Try numeric ID first
-            if (/^\d+$/.test(searchTerm.trim())) {
-                const result = await apiCall(`${API.products}?id=${searchTerm.trim()}&format=json`);
-                if (result.success && result.data) {
-                    product = result.data;
+            const result = await apiCall(`${API.products}?limit=1000&format=json`);
+            if (result.success) {
+                let items = [];
+                if (Array.isArray(result.data)) {
+                    items = result.data;
+                } else if (result.data && Array.isArray(result.data.items)) {
+                    items = result.data.items;
+                } else if (result.data && Array.isArray(result.data.data)) {
+                    items = result.data.data;
                 }
+                _modalTenantProducts = items;
             }
+        } catch (err) {
+            console.warn('[Entities] Failed to load tenant products:', err);
+        }
 
-            // Fallback to search
-            if (!product) {
-                const result = await apiCall(`${API.products}?search=${encodeURIComponent(searchTerm)}&limit=1&format=json`);
-                if (result.success) {
-                    const items = result.data?.items || result.data?.data || (Array.isArray(result.data) ? result.data : []);
-                    if (items.length > 0) {
-                        product = items[0];
-                    }
-                }
-            }
+        renderModalProducts();
+        updateModalSelectedCount();
+    }
 
-            if (!product) {
-                showNotification(t('messages.error.load_failed', 'Product not found'), 'error');
-                return;
-            }
+    function renderModalProducts(filterText) {
+        const listContainer = document.getElementById('epModalProductsList');
+        if (!listContainer) return;
 
-            // Check if already added
-            if (state.entityProducts.some(ep => String(ep.product_id) === String(product.id))) {
-                showNotification(t('entity_products.product_exists', 'Product already added'), 'warning');
-                return;
+        const existingIds = new Set(state.entityProducts.map(ep => String(ep.product_id)));
+        const filter = (filterText || '').toLowerCase();
+
+        const filtered = _modalTenantProducts.filter(p => {
+            if (filter) {
+                const name = (p.name || p.product_name || '').toLowerCase();
+                const sku = (p.sku || p.product_sku || '').toLowerCase();
+                const id = String(p.id);
+                return name.includes(filter) || sku.includes(filter) || id.includes(filter);
             }
+            return true;
+        });
+
+        if (filtered.length === 0) {
+            listContainer.innerHTML = `<div class="ep-modal-empty">${t('entity_products.no_tenant_products', 'No products found')}</div>`;
+            return;
+        }
+
+        listContainer.innerHTML = filtered.map(p => {
+            const pid = String(p.id);
+            const alreadyAdded = existingIds.has(pid);
+            const isSelected = _modalSelectedIds.has(pid);
+            const pName = esc(p.name || p.product_name || `Product #${p.id}`);
+            const pSku = p.sku || p.product_sku || '';
+
+            return `
+                <div class="ep-modal-product-item ${alreadyAdded ? 'ep-already-added' : ''} ${isSelected ? 'ep-selected' : ''}" data-product-id="${pid}">
+                    <label class="ep-modal-checkbox-label">
+                        <input type="checkbox" class="ep-modal-checkbox" value="${pid}"
+                               ${isSelected ? 'checked' : ''}
+                               ${alreadyAdded ? 'disabled' : ''}
+                               onchange="Entities.toggleModalProduct('${pid}', this.checked)">
+                        <div class="ep-modal-product-info">
+                            <strong>${pName}</strong>
+                            ${pSku ? `<span class="ep-sku">${esc(pSku)}</span>` : ''}
+                            ${alreadyAdded ? `<span class="ep-badge-added">${t('entity_products.already_added', 'Already added')}</span>` : ''}
+                        </div>
+                    </label>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function toggleModalProduct(productId, checked) {
+        if (checked) {
+            _modalSelectedIds.add(productId);
+        } else {
+            _modalSelectedIds.delete(productId);
+        }
+        // Update item highlight
+        const item = document.querySelector(`.ep-modal-product-item[data-product-id="${productId}"]`);
+        if (item) {
+            item.classList.toggle('ep-selected', checked);
+        }
+        updateModalSelectedCount();
+    }
+
+    function selectAllModalProducts() {
+        const existingIds = new Set(state.entityProducts.map(ep => String(ep.product_id)));
+        const checkboxes = document.querySelectorAll('.ep-modal-checkbox:not(:disabled)');
+        checkboxes.forEach(cb => {
+            const pid = cb.value;
+            if (!existingIds.has(pid)) {
+                cb.checked = true;
+                _modalSelectedIds.add(pid);
+                const item = cb.closest('.ep-modal-product-item');
+                if (item) item.classList.add('ep-selected');
+            }
+        });
+        updateModalSelectedCount();
+    }
+
+    function deselectAllModalProducts() {
+        const checkboxes = document.querySelectorAll('.ep-modal-checkbox:not(:disabled)');
+        checkboxes.forEach(cb => {
+            cb.checked = false;
+            const item = cb.closest('.ep-modal-product-item');
+            if (item) item.classList.remove('ep-selected');
+        });
+        _modalSelectedIds.clear();
+        updateModalSelectedCount();
+    }
+
+    function updateModalSelectedCount() {
+        const countEl = document.getElementById('epModalSelectedCount');
+        if (countEl) {
+            const count = _modalSelectedIds.size;
+            countEl.textContent = count > 0
+                ? t('entity_products.selected_count', '{count} selected').replace('{count}', count)
+                : '';
+        }
+    }
+
+    function confirmModalProducts() {
+        if (_modalSelectedIds.size === 0) {
+            closeProductsModal();
+            return;
+        }
+
+        const productMap = {};
+        _modalTenantProducts.forEach(p => { productMap[String(p.id)] = p; });
+
+        _modalSelectedIds.forEach(pid => {
+            if (state.entityProducts.some(ep => String(ep.product_id) === pid)) return;
+            const p = productMap[pid];
+            if (!p) return;
 
             state.entityProducts.push({
-                product_id: product.id,
-                product_name: product.name || product.product_name || `Product #${product.id}`,
-                product_sku: product.sku || product.product_sku || '',
+                product_id: p.id,
+                product_name: p.name || p.product_name || `Product #${p.id}`,
+                product_sku: p.sku || p.product_sku || '',
                 price: '',
                 compare_at_price: '',
                 stock_quantity: 0,
@@ -1238,12 +1344,17 @@
                 is_active: true,
                 is_featured: false
             });
+        });
 
-            renderEntityProducts();
-        } catch (err) {
-            console.warn('[Entities] Failed to add entity product:', err);
-            showNotification(t('messages.error.load_failed', 'Failed to search product'), 'error');
-        }
+        renderEntityProducts();
+        closeProductsModal();
+    }
+
+    function closeProductsModal() {
+        const modal = document.getElementById('entityProductsModal');
+        if (modal) modal.style.display = 'none';
+        _modalSelectedIds.clear();
+        _modalTenantProducts = [];
     }
 
     function renderEntityProducts(filterText) {
@@ -1262,9 +1373,11 @@
                             <strong>${esc(ep.product_name)}</strong>
                             ${ep.product_sku ? `<span class="ep-sku">${esc(ep.product_sku)}</span>` : ''}
                         </div>
-                        <button type="button" class="btn btn-sm btn-danger" onclick="Entities.removeEntityProduct(${realIdx})" title="${t('entity_products.remove', 'Remove')}">
-                            <i class="fas fa-times"></i>
-                        </button>
+                        <div class="ep-actions">
+                            <button type="button" class="btn btn-sm btn-danger" onclick="Entities.removeEntityProduct(${realIdx})" title="${t('entity_products.remove', 'Remove')}">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="ep-fields">
                         <div class="ep-field">
@@ -2588,6 +2701,24 @@
             };
         }
 
+        // Entity Products Modal
+        const btnCloseProductsModal = document.getElementById('btnCloseProductsModal');
+        const btnCancelProducts = document.getElementById('btnCancelProducts');
+        const btnConfirmProducts = document.getElementById('btnConfirmProducts');
+        const btnSelectAll = document.getElementById('btnSelectAll');
+        const btnDeselectAll = document.getElementById('btnDeselectAll');
+        const epModalSearch = document.getElementById('epModalSearch');
+        if (btnCloseProductsModal) btnCloseProductsModal.onclick = closeProductsModal;
+        if (btnCancelProducts) btnCancelProducts.onclick = closeProductsModal;
+        if (btnConfirmProducts) btnConfirmProducts.onclick = confirmModalProducts;
+        if (btnSelectAll) btnSelectAll.onclick = selectAllModalProducts;
+        if (btnDeselectAll) btnDeselectAll.onclick = deselectAllModalProducts;
+        if (epModalSearch) {
+            epModalSearch.oninput = function() {
+                renderModalProducts(this.value.toLowerCase());
+            };
+        }
+
         // Media buttons
         document.querySelectorAll('.btnSelectMedia').forEach(btn => {
             btn.onclick = function () {
@@ -2650,6 +2781,7 @@
         removeAttribute,
         updateEntityProduct,
         removeEntityProduct,
+        toggleModalProduct,
         toggleWorkingDay,
         updateWorkingTime,
         setAllDay,
