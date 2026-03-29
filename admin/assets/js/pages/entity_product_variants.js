@@ -662,7 +662,7 @@
 
     function updateProductSelectedCount() {
         var count = el.modalProductsList?.querySelectorAll('.modal-item:not(.disabled) input:checked').length || 0;
-        if (el.productSelectedCount) el.productSelectedCount.textContent = count + ' ' + t('products.selected_count', 'selected');
+        if (el.productSelectedCount) el.productSelectedCount.textContent = t('products.selected_count', count + ' selected').replace('{count}', count);
     }
 
     function confirmProductSelection() {
@@ -818,7 +818,7 @@
 
     function updateVariantSelectedCount() {
         var count = el.modalVariantsList?.querySelectorAll('.modal-item:not(.disabled) input:checked').length || 0;
-        if (el.variantSelectedCount) el.variantSelectedCount.textContent = count + ' ' + t('variants.selected_count', 'selected');
+        if (el.variantSelectedCount) el.variantSelectedCount.textContent = t('variants.selected_count', count + ' selected').replace('{count}', count);
     }
 
     function confirmVariantSelection() {
