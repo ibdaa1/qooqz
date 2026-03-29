@@ -138,24 +138,14 @@ function _epvt($key, $fallback = '') {
     </div>
     <?php endif; ?>
 
-    <!-- Tabs: Products & Variants -->
-    <div class="content-tabs" id="epvTabs" style="display:none;">
-        <button class="tab-btn active" data-tab="epv-products" data-i18n="products.title">
-            <?= htmlspecialchars(_epvt('products.title', 'Entity Products')) ?>
-        </button>
-        <button class="tab-btn" data-tab="epv-variants" data-i18n="variants.title">
-            <?= htmlspecialchars(_epvt('variants.title', 'Product Variants')) ?>
-        </button>
-    </div>
-
     <!-- ═══════════════════════════════════ -->
-    <!-- TAB: Entity Products                -->
+    <!-- Unified: Products & Variants       -->
     <!-- ═══════════════════════════════════ -->
-    <div class="tab-content active" id="tab-epv-products" style="display:none;">
+    <div id="epvUnifiedContent" style="display:none;">
         <div class="section-header">
             <div class="section-search">
                 <input type="text" id="epvProductSearch" class="form-control"
-                       placeholder="<?= htmlspecialchars(_epvt('products.search_products', 'Search products...')) ?>">
+                       placeholder="<?= htmlspecialchars(_epvt('search_placeholder', 'Search products or variants...')) ?>">
             </div>
             <?php if ($canManage): ?>
             <button id="epvBtnAddProduct" class="btn btn-primary" data-i18n="products.add_product">
@@ -164,48 +154,15 @@ function _epvt($key, $fallback = '') {
             <?php endif; ?>
         </div>
 
-        <div id="epvProductsList" class="items-list"></div>
-        <div id="epvProductsEmpty" class="empty-state" style="display:none;">
-            <p data-i18n="products.no_products"><?= htmlspecialchars(_epvt('products.no_products', 'No entity products yet.')) ?></p>
+        <div id="epvUnifiedList" class="items-list"></div>
+        <div id="epvUnifiedEmpty" class="empty-state" style="display:none;">
+            <p data-i18n="products.no_products"><?= htmlspecialchars(_epvt('products.no_products', 'No entity products yet. Add products to get started.')) ?></p>
         </div>
 
         <?php if ($canManage): ?>
-        <div class="section-footer" id="epvProductsFooter" style="display:none;">
-            <button id="epvBtnSaveProducts" class="btn btn-success" data-i18n="products.save_products">
-                <?= htmlspecialchars(_epvt('products.save_products', 'Save Products')) ?>
-            </button>
-        </div>
-        <?php endif; ?>
-    </div>
-
-    <!-- ═══════════════════════════════════ -->
-    <!-- TAB: Product Variants               -->
-    <!-- ═══════════════════════════════════ -->
-    <div class="tab-content" id="tab-epv-variants" style="display:none;">
-        <div class="section-header">
-            <div class="section-filters">
-                <select id="epvVariantProductFilter" class="form-control" style="min-width:200px;">
-                    <option value=""><?= htmlspecialchars(_epvt('filter.all_products', 'All Products')) ?></option>
-                </select>
-                <input type="text" id="epvVariantSearch" class="form-control"
-                       placeholder="<?= htmlspecialchars(_epvt('variants.search_variants', 'Search variants...')) ?>">
-            </div>
-            <?php if ($canManage): ?>
-            <button id="epvBtnAddVariant" class="btn btn-primary" data-i18n="variants.add_variant">
-                <?= htmlspecialchars(_epvt('variants.add_variant', 'Add Variants')) ?>
-            </button>
-            <?php endif; ?>
-        </div>
-
-        <div id="epvVariantsList" class="items-list"></div>
-        <div id="epvVariantsEmpty" class="empty-state" style="display:none;">
-            <p data-i18n="variants.no_variants"><?= htmlspecialchars(_epvt('variants.no_variants', 'No variants yet.')) ?></p>
-        </div>
-
-        <?php if ($canManage): ?>
-        <div class="section-footer" id="epvVariantsFooter" style="display:none;">
-            <button id="epvBtnSaveVariants" class="btn btn-success" data-i18n="variants.save_variants">
-                <?= htmlspecialchars(_epvt('variants.save_variants', 'Save Variants')) ?>
+        <div class="section-footer" id="epvUnifiedFooter" style="display:none;">
+            <button id="epvBtnSaveAll" class="btn btn-success" data-i18n="save_all">
+                <?= htmlspecialchars(_epvt('save_all', 'Save All')) ?>
             </button>
         </div>
         <?php endif; ?>

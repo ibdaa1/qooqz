@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════
-   Entity Product Variants – Standalone CSS
+   Entity Product Variants – Standalone CSS (Unified)
    ═══════════════════════════════════════════════════ */
 
 #epvPageContainer {
@@ -56,44 +56,6 @@
     padding: 16px;
 }
 
-/* ─── Tabs ─── */
-#epvPageContainer .content-tabs {
-    display: flex;
-    gap: 4px;
-    margin-bottom: 0;
-    border-bottom: 2px solid var(--_border);
-    padding-bottom: 0;
-}
-#epvPageContainer .tab-btn {
-    padding: 10px 20px;
-    background: transparent;
-    color: var(--_text-sec);
-    border: none;
-    border-bottom: 3px solid transparent;
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 600;
-    transition: all .2s;
-    white-space: nowrap;
-}
-#epvPageContainer .tab-btn:hover {
-    color: var(--_text);
-    background: rgba(255,255,255,.03);
-}
-#epvPageContainer .tab-btn.active {
-    color: var(--_primary);
-    border-bottom-color: var(--_primary);
-}
-
-/* ─── Tab Content ─── */
-#epvPageContainer .tab-content {
-    background: var(--_bg-card);
-    border: 1px solid var(--_border);
-    border-top: none;
-    border-radius: 0 0 var(--_radius) var(--_radius);
-    padding: 20px;
-}
-
 /* ─── Section header ─── */
 #epvPageContainer .section-header {
     display: flex;
@@ -107,13 +69,6 @@
     flex: 1;
     min-width: 200px;
     max-width: 400px;
-}
-#epvPageContainer .section-filters {
-    display: flex;
-    gap: 8px;
-    flex: 1;
-    min-width: 200px;
-    flex-wrap: wrap;
 }
 
 /* ─── Section footer ─── */
@@ -206,52 +161,10 @@
 #epvPageContainer .items-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-}
-
-#epvPageContainer .item-card {
-    background: var(--_bg-input);
-    border: 1px solid var(--_border);
-    border-radius: var(--_radius);
-    padding: 14px 16px;
-    display: flex;
-    align-items: flex-start;
-    gap: 16px;
-    transition: border-color .2s;
-}
-#epvPageContainer .item-card:hover {
-    border-color: var(--_primary);
-}
-
-#epvPageContainer .item-info {
-    flex: 1;
-    min-width: 0;
-}
-#epvPageContainer .item-info .item-name {
-    font-weight: 600;
-    font-size: 0.95rem;
-    margin-bottom: 4px;
-    color: var(--_text);
-}
-#epvPageContainer .item-info .item-meta {
-    display: flex;
     gap: 12px;
-    flex-wrap: wrap;
-    font-size: 0.8rem;
-    color: var(--_text-sec);
-}
-#epvPageContainer .item-info .item-meta span {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
 }
 
-#epvPageContainer .item-fields {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
-}
+/* ─── Item Field (shared) ─── */
 #epvPageContainer .item-field {
     display: flex;
     flex-direction: column;
@@ -279,25 +192,6 @@
 #epvPageContainer .item-field input[type="checkbox"] {
     width: auto;
     cursor: pointer;
-}
-
-#epvPageContainer .item-actions {
-    display: flex;
-    align-items: center;
-}
-#epvPageContainer .item-actions .btn-remove {
-    background: transparent;
-    border: 1px solid var(--_danger);
-    color: var(--_danger);
-    padding: 4px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.8rem;
-    transition: all .2s;
-}
-#epvPageContainer .item-actions .btn-remove:hover {
-    background: var(--_danger);
-    color: #fff;
 }
 
 /* ─── Empty State ─── */
@@ -330,6 +224,204 @@
 #epvPageContainer .badge-warning {
     background: rgba(245,158,11,.15);
     color: var(--_warning);
+}
+
+/* ═══════════════════════════════════════════════════
+   Product Card (unified view)
+   ═══════════════════════════════════════════════════ */
+#epvPageContainer .product-card {
+    background: var(--_bg-card);
+    border: 1px solid var(--_border);
+    border-radius: var(--_radius);
+    overflow: hidden;
+    transition: border-color .2s;
+}
+#epvPageContainer .product-card:hover {
+    border-color: var(--_primary);
+}
+
+/* Product header */
+#epvPageContainer .product-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 14px 16px 8px;
+    gap: 12px;
+}
+#epvPageContainer .product-card-title {
+    flex: 1;
+    min-width: 0;
+}
+#epvPageContainer .product-card-title .item-name {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--_text);
+    margin-bottom: 4px;
+}
+#epvPageContainer .product-card-title .item-meta {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+    color: var(--_text-sec);
+}
+#epvPageContainer .product-card-header .btn-remove {
+    background: transparent;
+    border: 1px solid var(--_danger);
+    color: var(--_danger);
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all .2s;
+    flex-shrink: 0;
+}
+#epvPageContainer .product-card-header .btn-remove:hover {
+    background: var(--_danger);
+    color: #fff;
+}
+
+/* Product fields (stock row) */
+#epvPageContainer .product-card-fields {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 8px 16px;
+    background: rgba(255,255,255,.02);
+    border-top: 1px solid var(--_border);
+}
+
+/* Pricing section */
+#epvPageContainer .product-card-pricing {
+    padding: 8px 16px;
+    border-top: 1px solid var(--_border);
+    background: rgba(59,130,246,.03);
+}
+#epvPageContainer .pricing-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--_primary);
+    margin-bottom: 6px;
+}
+#epvPageContainer .pricing-fields {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* ═══════════════════════════════════════════════════
+   Variants Section (collapsible per product)
+   ═══════════════════════════════════════════════════ */
+#epvPageContainer .product-card-variants {
+    border-top: 1px solid var(--_border);
+}
+
+/* Variants toggle bar */
+#epvPageContainer .variants-toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background .15s;
+    user-select: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--_text-sec);
+}
+#epvPageContainer .variants-toggle:hover {
+    background: rgba(255,255,255,.03);
+}
+#epvPageContainer .variant-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: var(--_primary);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    margin-inline-start: 6px;
+}
+#epvPageContainer .toggle-arrow {
+    font-size: 0.75rem;
+    color: var(--_text-sec);
+}
+
+/* Variants content (expanded) */
+#epvPageContainer .variants-content {
+    padding: 0 16px 12px;
+}
+#epvPageContainer .variants-actions {
+    padding: 8px 0;
+}
+#epvPageContainer .variants-empty {
+    text-align: center;
+    padding: 16px;
+    color: var(--_text-sec);
+    font-size: 0.85rem;
+}
+
+/* Individual variant item */
+#epvPageContainer .variant-item {
+    background: var(--_bg-input);
+    border: 1px solid var(--_border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+}
+#epvPageContainer .variant-item:last-child {
+    margin-bottom: 0;
+}
+
+#epvPageContainer .variant-item-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+#epvPageContainer .variant-item-name {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--_text);
+}
+#epvPageContainer .variant-item-meta {
+    font-size: 0.75rem;
+    color: var(--_text-sec);
+    flex: 1;
+}
+#epvPageContainer .btn-remove-sm {
+    background: transparent;
+    border: 1px solid var(--_danger);
+    color: var(--_danger);
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .2s;
+    flex-shrink: 0;
+}
+#epvPageContainer .btn-remove-sm:hover {
+    background: var(--_danger);
+    color: #fff;
+}
+
+#epvPageContainer .variant-item-fields {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -503,15 +595,18 @@
    Responsive
    ═══════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-    #epvPageContainer .item-card {
+    #epvPageContainer .product-card-fields,
+    #epvPageContainer .pricing-fields,
+    #epvPageContainer .variant-item-fields {
         flex-direction: column;
-    }
-    #epvPageContainer .item-fields {
-        width: 100%;
+        align-items: stretch;
     }
     #epvPageContainer .item-field input,
     #epvPageContainer .item-field select {
         width: 100%;
+    }
+    #epvPageContainer .product-card-header {
+        flex-direction: column;
     }
     #epvPageContainer .section-header {
         flex-direction: column;
@@ -523,28 +618,4 @@
     #epvPageContainer .modal-content {
         max-height: 95vh;
     }
-    #epvPageContainer .content-tabs {
-        overflow-x: auto;
-    }
-}
-
-/* ─── Variant group header ─── */
-#epvPageContainer .variant-group-header {
-    background: rgba(59,130,246,.08);
-    border: 1px solid rgba(59,130,246,.2);
-    border-radius: var(--_radius);
-    padding: 10px 16px;
-    margin-top: 12px;
-    margin-bottom: 4px;
-    font-weight: 700;
-    font-size: 0.9rem;
-    color: var(--_primary);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-#epvPageContainer .variant-group-header .variant-count {
-    font-size: 0.8rem;
-    color: var(--_text-sec);
-    font-weight: 400;
 }

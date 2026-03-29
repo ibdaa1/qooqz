@@ -1,11 +1,12 @@
 {
     "direction": "ltr",
     "strings": {
-        "title": "Entity Product Variants",
+        "title": "Entity Products & Variants",
         "subtitle": "Manage entity products and their variants with stock and pricing",
         "loading": "Loading...",
         "saving": "Saving...",
         "save": "Save",
+        "save_all": "Save All",
         "cancel": "Cancel",
         "delete": "Delete",
         "edit": "Edit",
@@ -16,6 +17,7 @@
         "search_placeholder": "Search products or variants...",
         "no_data": "No data found",
         "confirm_delete": "Are you sure you want to delete this?",
+        "toggle_variants": "Variants",
 
         "filter": {
             "entity": "Entity",
@@ -37,6 +39,7 @@
 
         "products": {
             "title": "Entity Products",
+            "pricing": "Pricing",
             "add_product": "Add Products",
             "no_products": "No entity products yet. Add products to get started.",
             "select_products": "Select Products",
@@ -111,6 +114,7 @@
 
         "messages": {
             "select_entity_first": "Please select an entity first",
+            "all_saved": "All changes saved successfully",
             "products_saved": "Entity products saved successfully",
             "variants_saved": "Entity variants saved successfully",
             "product_deleted": "Product removed from entity",

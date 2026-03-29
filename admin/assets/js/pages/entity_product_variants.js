@@ -1,6 +1,8 @@
 /**
- * Entity Product Variants – Standalone Module
- * Manages entity products and their variants independently
+ * Entity Product Variants – Standalone Module (Unified View)
+ * Manages entity products and their variants together in a single view.
+ * Each product card shows stock/pricing fields and collapsible variants section.
+ * One "Save All" button saves both products (with pricing) and variants.
  */
 (function () {
     'use strict';
@@ -19,10 +21,10 @@
         entityId:       0,
         isSuperAdmin:   false,
         canManage:      false,
-        entityProducts: [],
-        entityVariants: [],
+        entityProducts: [],   // product-level records
+        entityVariants: [],   // variant-level records
         allEntities:    [],
-        activeTab:      'epv-products'
+        expandedProducts: {}  // track which product variant sections are expanded
     };
 
     let el = {};
@@ -40,12 +42,11 @@
         state.canManage    = el.canManage?.value === '1';
 
         loadTranslations(state.language).then(() => {
-            initTabs();
             initEventListeners();
             loadEntities();
             if (state.entityId > 0) {
                 showEntityContent();
-                loadEntityProducts();
+                loadEntityData();
             }
         });
     }
@@ -66,18 +67,14 @@
             btnVerifyTenant:      document.getElementById('epvBtnVerifyTenant'),
             tenantNameDisplay:    document.getElementById('epvTenantNameDisplay'),
 
-            // Tabs
-            tabs:                 document.getElementById('epvTabs'),
-            tabProducts:          document.getElementById('tab-epv-products'),
-            tabVariants:          document.getElementById('tab-epv-variants'),
-
-            // Products
+            // Unified content
+            unifiedContent:       document.getElementById('epvUnifiedContent'),
             productSearch:        document.getElementById('epvProductSearch'),
             btnAddProduct:        document.getElementById('epvBtnAddProduct'),
-            productsList:         document.getElementById('epvProductsList'),
-            productsEmpty:        document.getElementById('epvProductsEmpty'),
-            productsFooter:       document.getElementById('epvProductsFooter'),
-            btnSaveProducts:      document.getElementById('epvBtnSaveProducts'),
+            unifiedList:          document.getElementById('epvUnifiedList'),
+            unifiedEmpty:         document.getElementById('epvUnifiedEmpty'),
+            unifiedFooter:        document.getElementById('epvUnifiedFooter'),
+            btnSaveAll:           document.getElementById('epvBtnSaveAll'),
 
             // Products Modal
             productsModal:         document.getElementById('epvProductsModal'),
@@ -89,15 +86,6 @@
             modalProductsList:     document.getElementById('epvModalProductsList'),
             confirmProductSel:     document.getElementById('epvConfirmProductSelection'),
             cancelProductSel:      document.getElementById('epvCancelProductSelection'),
-
-            // Variants
-            variantProductFilter:  document.getElementById('epvVariantProductFilter'),
-            variantSearch:         document.getElementById('epvVariantSearch'),
-            btnAddVariant:         document.getElementById('epvBtnAddVariant'),
-            variantsList:          document.getElementById('epvVariantsList'),
-            variantsEmpty:         document.getElementById('epvVariantsEmpty'),
-            variantsFooter:        document.getElementById('epvVariantsFooter'),
-            btnSaveVariants:       document.getElementById('epvBtnSaveVariants'),
 
             // Variants Modal
             variantsModal:          document.getElementById('epvVariantsModal'),
@@ -164,36 +152,14 @@
     }
 
     // ════════════════════════════════════════
-    // TABS
+    // SHOW / HIDE CONTENT
     // ════════════════════════════════════════
-    function initTabs() {
-        const tabBtns = el.container?.querySelectorAll('.tab-btn');
-        if (!tabBtns) return;
-        tabBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const tabId = btn.dataset.tab;
-                tabBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                if (el.tabProducts) el.tabProducts.style.display = tabId === 'epv-products' ? '' : 'none';
-                if (el.tabVariants) el.tabVariants.style.display = tabId === 'epv-variants' ? '' : 'none';
-                state.activeTab = tabId;
-                if (tabId === 'epv-variants' && state.entityId) {
-                    loadEntityVariants();
-                }
-            });
-        });
-    }
-
     function showEntityContent() {
-        if (el.tabs) el.tabs.style.display = '';
-        if (el.tabProducts) el.tabProducts.style.display = state.activeTab === 'epv-products' ? '' : 'none';
-        if (el.tabVariants) el.tabVariants.style.display = state.activeTab === 'epv-variants' ? '' : 'none';
+        if (el.unifiedContent) el.unifiedContent.style.display = '';
     }
 
     function hideEntityContent() {
-        if (el.tabs) el.tabs.style.display = 'none';
-        if (el.tabProducts) el.tabProducts.style.display = 'none';
-        if (el.tabVariants) el.tabVariants.style.display = 'none';
+        if (el.unifiedContent) el.unifiedContent.style.display = 'none';
     }
 
     // ════════════════════════════════════════
@@ -206,9 +172,7 @@
                 state.entityId = parseInt(this.value) || 0;
                 if (state.entityId > 0) {
                     showEntityContent();
-                    loadEntityProducts();
-                    state.entityVariants = [];
-                    renderEntityVariants();
+                    loadEntityData();
                 } else {
                     hideEntityContent();
                     state.entityProducts = [];
@@ -222,9 +186,11 @@
             el.btnVerifyTenant.addEventListener('click', verifyTenant);
         }
 
-        // Product CRUD
+        // Add products
         if (el.btnAddProduct) el.btnAddProduct.addEventListener('click', openProductsModal);
-        if (el.btnSaveProducts) el.btnSaveProducts.addEventListener('click', saveEntityProducts);
+
+        // Save All
+        if (el.btnSaveAll) el.btnSaveAll.addEventListener('click', saveAll);
 
         // Products Modal
         if (el.closeProductsModal) el.closeProductsModal.addEventListener('click', closeProductsModal);
@@ -234,10 +200,6 @@
         if (el.deselectAllProducts) el.deselectAllProducts.addEventListener('click', () => toggleAllModalProducts(false));
         if (el.modalProductSearch) el.modalProductSearch.addEventListener('input', filterModalProducts);
 
-        // Variant CRUD
-        if (el.btnAddVariant) el.btnAddVariant.addEventListener('click', openVariantsModal);
-        if (el.btnSaveVariants) el.btnSaveVariants.addEventListener('click', saveEntityVariants);
-
         // Variants Modal
         if (el.closeVariantsModal) el.closeVariantsModal.addEventListener('click', closeVariantsModal);
         if (el.cancelVariantSel) el.cancelVariantSel.addEventListener('click', closeVariantsModal);
@@ -246,12 +208,8 @@
         if (el.deselectAllVariants) el.deselectAllVariants.addEventListener('click', () => toggleAllModalVariants(false));
         if (el.modalVarProductFilter) el.modalVarProductFilter.addEventListener('change', loadModalVariants);
 
-        // Variant product filter (main)
-        if (el.variantProductFilter) el.variantProductFilter.addEventListener('change', filterVariantsByProduct);
-
         // Search
-        if (el.productSearch) el.productSearch.addEventListener('input', renderEntityProducts);
-        if (el.variantSearch) el.variantSearch.addEventListener('input', renderEntityVariants);
+        if (el.productSearch) el.productSearch.addEventListener('input', renderUnifiedList);
     }
 
     // ════════════════════════════════════════
@@ -272,13 +230,12 @@
 
     function populateEntityDropdown(entities) {
         if (!el.entityFilter) return;
-        const currentVal = el.entityFilter.value;
         el.entityFilter.innerHTML = '<option value="">' + t('filter.select_entity', 'Select Entity...') + '</option>';
-        entities.forEach(e => {
-            const name = e.name || e.store_name || ('Entity #' + e.id);
-            const opt = document.createElement('option');
-            opt.value = e.id;
-            opt.textContent = name + (e.branch_code ? ' (' + e.branch_code + ')' : '');
+        entities.forEach(function (ent) {
+            var name = ent.name || ent.store_name || ('Entity #' + ent.id);
+            var opt = document.createElement('option');
+            opt.value = ent.id;
+            opt.textContent = name + (ent.branch_code ? ' (' + ent.branch_code + ')' : '');
             el.entityFilter.appendChild(opt);
         });
         if (state.entityId > 0) {
@@ -300,88 +257,231 @@
     }
 
     // ════════════════════════════════════════
-    // ENTITY PRODUCTS
+    // LOAD ENTITY DATA (Products + Variants)
     // ════════════════════════════════════════
-    async function loadEntityProducts() {
+    async function loadEntityData() {
         if (!state.entityId) return;
         try {
-            const res = await apiCall(API.entityProducts + '?action=entity&entity_id=' + state.entityId);
-            state.entityProducts = res?.data || [];
-            renderEntityProducts();
-            populateVariantProductFilters();
+            // Load products and variants in parallel
+            const [prodRes, varRes] = await Promise.all([
+                apiCall(API.entityProducts + '?action=entity&entity_id=' + state.entityId),
+                apiCall(API.entityProductVariants + '?action=entity&entity_id=' + state.entityId)
+            ]);
+            state.entityProducts = prodRes?.data || [];
+            state.entityVariants = varRes?.data || [];
+            renderUnifiedList();
         } catch (e) {
-            console.error('Failed to load entity products:', e);
-            showToast(t('messages.load_failed', 'Failed to load'), 'error');
+            console.error('Failed to load entity data:', e);
+            showToast(t('messages.load_failed', 'Failed to load data'), 'error');
         }
     }
 
-    function renderEntityProducts() {
-        if (!el.productsList) return;
-        const searchVal = (el.productSearch?.value || '').toLowerCase();
-        let items = state.entityProducts;
+    // ════════════════════════════════════════
+    // RENDER UNIFIED LIST
+    // ════════════════════════════════════════
+    function renderUnifiedList() {
+        if (!el.unifiedList) return;
+        var searchVal = (el.productSearch?.value || '').toLowerCase();
+        var items = state.entityProducts;
+
         if (searchVal) {
-            items = items.filter(p =>
-                (p.product_name || '').toLowerCase().includes(searchVal) ||
-                (p.sku || '').toLowerCase().includes(searchVal)
-            );
+            items = items.filter(function (p) {
+                var nameMatch = (p.product_name || '').toLowerCase().indexOf(searchVal) >= 0;
+                var skuMatch = (p.sku || '').toLowerCase().indexOf(searchVal) >= 0;
+                // Also match variants
+                var pid = parseInt(p.product_id);
+                var variantMatch = state.entityVariants.some(function (v) {
+                    return parseInt(v.product_id) === pid &&
+                        ((v.variant_sku || v.sku || '').toLowerCase().indexOf(searchVal) >= 0 ||
+                         (v.variant_barcode || v.barcode || '').toLowerCase().indexOf(searchVal) >= 0);
+                });
+                return nameMatch || skuMatch || variantMatch;
+            });
         }
 
         if (items.length === 0) {
-            el.productsList.innerHTML = '';
-            if (el.productsEmpty) el.productsEmpty.style.display = '';
-            if (el.productsFooter) el.productsFooter.style.display = 'none';
+            el.unifiedList.innerHTML = '';
+            if (el.unifiedEmpty) el.unifiedEmpty.style.display = '';
+            if (el.unifiedFooter) el.unifiedFooter.style.display = 'none';
             return;
         }
 
-        if (el.productsEmpty) el.productsEmpty.style.display = 'none';
-        if (el.productsFooter) el.productsFooter.style.display = '';
+        if (el.unifiedEmpty) el.unifiedEmpty.style.display = 'none';
+        if (el.unifiedFooter) el.unifiedFooter.style.display = '';
 
-        el.productsList.innerHTML = items.map((p, i) => {
-            const name = p.product_name || p.name || ('Product #' + p.product_id);
-            const safeIdx = parseInt(i);
-            const pid = parseInt(p.product_id);
-            return '<div class="item-card" data-product-id="' + pid + '">' +
-                '<div class="item-info">' +
+        var html = '';
+        items.forEach(function (p, i) {
+            var name = p.product_name || p.name || ('Product #' + p.product_id);
+            var pid = parseInt(p.product_id);
+            var safeIdx = parseInt(i);
+
+            // Get variants for this product
+            var productVariants = state.entityVariants.filter(function (v) {
+                return parseInt(v.product_id) === pid;
+            });
+            var variantCount = productVariants.length;
+            var isExpanded = !!state.expandedProducts[pid];
+
+            // Pricing data
+            var price = p.price || '';
+            var comparePrice = p.compare_at_price || '';
+            var costPrice = p.cost_price || '';
+            var currencyCode = p.currency_code || '';
+            var taxRate = p.tax_rate || '';
+
+            html += '<div class="product-card" data-product-id="' + pid + '">';
+
+            // Product header
+            html += '<div class="product-card-header">' +
+                '<div class="product-card-title">' +
                     '<div class="item-name">' + escHtml(name) + '</div>' +
                     '<div class="item-meta">' +
                         (p.sku ? '<span>SKU: ' + escHtml(p.sku) + '</span>' : '') +
-                        '<span>' + t('products.stock_quantity', 'Stock') + ': ' + (p.stock_quantity ?? 0) + '</span>' +
                         '<span class="badge ' + (p.is_active == 1 ? 'badge-success' : 'badge-danger') + '">' +
                             (p.is_active == 1 ? t('filter.active', 'Active') : t('filter.inactive', 'Inactive')) +
                         '</span>' +
                     '</div>' +
                 '</div>' +
-                '<div class="item-fields">' +
+                (state.canManage ? '<button class="btn-remove" onclick="EntityProductVariants._removeProduct(' + safeIdx + ')">' +
+                    t('products.remove', 'Remove') + '</button>' : '') +
+            '</div>';
+
+            // Product fields (stock)
+            html += '<div class="product-card-fields">' +
+                '<div class="item-field">' +
+                    '<label>' + t('products.stock_quantity', 'Stock') + '</label>' +
+                    '<input type="number" value="' + (p.stock_quantity ?? 0) + '" min="0"' +
+                        ' onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'stock_quantity\',this.value)">' +
+                '</div>' +
+                '<div class="item-field">' +
+                    '<label>' + t('products.low_stock_threshold', 'Low Stock') + '</label>' +
+                    '<input type="number" value="' + (p.low_stock_threshold ?? 5) + '" min="0"' +
+                        ' onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'low_stock_threshold\',this.value)">' +
+                '</div>' +
+                '<div class="item-field">' +
+                    '<label>' + t('products.is_active', 'Active') + '</label>' +
+                    '<input type="checkbox"' + (p.is_active == 1 ? ' checked' : '') +
+                        ' onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'is_active\',this.checked?1:0)">' +
+                '</div>' +
+                '<div class="item-field">' +
+                    '<label>' + t('products.is_featured', 'Featured') + '</label>' +
+                    '<input type="checkbox"' + (p.is_featured == 1 ? ' checked' : '') +
+                        ' onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'is_featured\',this.checked?1:0)">' +
+                '</div>' +
+            '</div>';
+
+            // Pricing fields
+            html += '<div class="product-card-pricing">' +
+                '<div class="pricing-label">' + t('products.pricing', 'Pricing') + '</div>' +
+                '<div class="pricing-fields">' +
                     '<div class="item-field">' +
-                        '<label>' + t('products.stock_quantity', 'Stock') + '</label>' +
-                        '<input type="number" value="' + (p.stock_quantity ?? 0) + '" min="0"' +
-                            ' onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'stock_quantity\',this.value)">' +
+                        '<label>' + t('products.price', 'Price') + '</label>' +
+                        '<input type="number" step="0.01" value="' + escHtml(price) + '" min="0"' +
+                            ' onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'price\',this.value)">' +
                     '</div>' +
                     '<div class="item-field">' +
-                        '<label>' + t('products.low_stock_threshold', 'Low Stock') + '</label>' +
-                        '<input type="number" value="' + (p.low_stock_threshold ?? 5) + '" min="0"' +
-                            ' onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'low_stock_threshold\',this.value)">' +
+                        '<label>' + t('products.compare_at_price', 'Compare Price') + '</label>' +
+                        '<input type="number" step="0.01" value="' + escHtml(comparePrice) + '" min="0"' +
+                            ' onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'compare_at_price\',this.value)">' +
                     '</div>' +
                     '<div class="item-field">' +
-                        '<label>' + t('products.is_active', 'Active') + '</label>' +
-                        '<input type="checkbox"' + (p.is_active == 1 ? ' checked' : '') +
-                            ' onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'is_active\',this.checked?1:0)">' +
+                        '<label>' + t('products.cost_price', 'Cost Price') + '</label>' +
+                        '<input type="number" step="0.01" value="' + escHtml(costPrice) + '" min="0"' +
+                            ' onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'cost_price\',this.value)">' +
                     '</div>' +
                     '<div class="item-field">' +
-                        '<label>' + t('products.is_featured', 'Featured') + '</label>' +
-                        '<input type="checkbox"' + (p.is_featured == 1 ? ' checked' : '') +
-                            ' onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'is_featured\',this.checked?1:0)">' +
+                        '<label>' + t('products.currency_code', 'Currency') + '</label>' +
+                        '<input type="text" maxlength="3" value="' + escHtml(currencyCode) + '"' +
+                            ' onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'currency_code\',this.value)">' +
+                    '</div>' +
+                    '<div class="item-field">' +
+                        '<label>' + t('products.tax_rate', 'Tax %') + '</label>' +
+                        '<input type="number" step="0.01" value="' + escHtml(taxRate) + '" min="0" max="100"' +
+                            ' onchange="EntityProductVariants._updateProduct(' + safeIdx + ',\'tax_rate\',this.value)">' +
                     '</div>' +
                 '</div>' +
-                (state.canManage ? '<div class="item-actions">' +
-                    '<button class="btn-remove" onclick="EntityProductVariants._removeProduct(' + safeIdx + ')">' +
-                        t('products.remove', 'Remove') +
-                    '</button>' +
-                '</div>' : '') +
             '</div>';
-        }).join('');
+
+            // Variants section (collapsible)
+            html += '<div class="product-card-variants">' +
+                '<div class="variants-toggle" onclick="EntityProductVariants._toggleVariants(' + pid + ')">' +
+                    '<span>' + t('toggle_variants', 'Variants') +
+                        ' <span class="variant-count-badge">' + variantCount + '</span>' +
+                    '</span>' +
+                    '<span class="toggle-arrow">' + (isExpanded ? '▼' : '▶') + '</span>' +
+                '</div>';
+
+            if (isExpanded) {
+                html += '<div class="variants-content">';
+
+                if (state.canManage) {
+                    html += '<div class="variants-actions">' +
+                        '<button class="btn btn-sm btn-secondary" onclick="EntityProductVariants._openVariantsForProduct(' + pid + ')">' +
+                            t('variants.add_variant', 'Add Variants') +
+                        '</button>' +
+                    '</div>';
+                }
+
+                if (variantCount === 0) {
+                    html += '<div class="variants-empty">' + t('variants.no_variants', 'No variants for this product yet.') + '</div>';
+                } else {
+                    productVariants.forEach(function (v) {
+                        var realIdx = state.entityVariants.indexOf(v);
+                        var safeVIdx = parseInt(realIdx);
+                        var stockStatusOpts = ['in_stock', 'out_of_stock', 'unlimited'];
+
+                        html += '<div class="variant-item" data-variant-id="' + parseInt(v.variant_id) + '">' +
+                            '<div class="variant-item-header">' +
+                                '<span class="variant-item-name">' + escHtml(v.variant_sku || v.sku || 'Variant #' + v.variant_id) + '</span>' +
+                                (v.variant_barcode || v.barcode ? '<span class="variant-item-meta">Barcode: ' + escHtml(v.variant_barcode || v.barcode) + '</span>' : '') +
+                                (state.canManage ? '<button class="btn-remove-sm" onclick="EntityProductVariants._removeVariant(' + safeVIdx + ')">&times;</button>' : '') +
+                            '</div>' +
+                            '<div class="variant-item-fields">' +
+                                '<div class="item-field">' +
+                                    '<label>' + t('variants.stock_quantity', 'Stock') + '</label>' +
+                                    '<input type="number" value="' + (v.stock_quantity ?? 0) + '" min="0"' +
+                                        ' onchange="EntityProductVariants._updateVariant(' + safeVIdx + ',\'stock_quantity\',this.value)">' +
+                                '</div>' +
+                                '<div class="item-field">' +
+                                    '<label>' + t('variants.low_stock_threshold', 'Low Stock') + '</label>' +
+                                    '<input type="number" value="' + (v.low_stock_threshold ?? 5) + '" min="0"' +
+                                        ' onchange="EntityProductVariants._updateVariant(' + safeVIdx + ',\'low_stock_threshold\',this.value)">' +
+                                '</div>' +
+                                '<div class="item-field">' +
+                                    '<label>' + t('variants.stock_status', 'Status') + '</label>' +
+                                    '<select onchange="EntityProductVariants._updateVariant(' + safeVIdx + ',\'stock_status\',this.value)">' +
+                                        stockStatusOpts.map(function (s) {
+                                            return '<option value="' + s + '"' + (v.stock_status === s ? ' selected' : '') + '>' + t('variants.' + s, s) + '</option>';
+                                        }).join('') +
+                                    '</select>' +
+                                '</div>' +
+                                '<div class="item-field">' +
+                                    '<label>' + t('variants.manage_stock', 'Manage') + '</label>' +
+                                    '<input type="checkbox"' + (v.manage_stock == 1 ? ' checked' : '') +
+                                        ' onchange="EntityProductVariants._updateVariant(' + safeVIdx + ',\'manage_stock\',this.checked?1:0)">' +
+                                '</div>' +
+                                '<div class="item-field">' +
+                                    '<label>' + t('variants.is_active', 'Active') + '</label>' +
+                                    '<input type="checkbox"' + (v.is_active == 1 ? ' checked' : '') +
+                                        ' onchange="EntityProductVariants._updateVariant(' + safeVIdx + ',\'is_active\',this.checked?1:0)">' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>';
+                    });
+                }
+                html += '</div>'; // variants-content
+            }
+
+            html += '</div>'; // product-card-variants
+            html += '</div>'; // product-card
+        });
+
+        el.unifiedList.innerHTML = html;
     }
 
+    // ════════════════════════════════════════
+    // PRODUCT CRUD
+    // ════════════════════════════════════════
     function updateProduct(index, field, value) {
         if (state.entityProducts[index]) {
             state.entityProducts[index][field] = value;
@@ -389,40 +489,95 @@
     }
 
     function removeProduct(index) {
-        if (!confirm(t('products.confirm_remove', 'Remove this product?'))) return;
-        const product = state.entityProducts[index];
+        if (!confirm(t('products.confirm_remove', 'Remove this product and all its variants?'))) return;
+        var product = state.entityProducts[index];
         state.entityProducts.splice(index, 1);
-        // Also remove all variants for this product
         if (product) {
-            state.entityVariants = state.entityVariants.filter(v =>
-                parseInt(v.product_id) !== parseInt(product.product_id)
-            );
+            var pid = parseInt(product.product_id);
+            state.entityVariants = state.entityVariants.filter(function (v) {
+                return parseInt(v.product_id) !== pid;
+            });
+            delete state.expandedProducts[pid];
         }
-        renderEntityProducts();
-        populateVariantProductFilters();
+        renderUnifiedList();
         showToast(t('products.product_removed', 'Product removed'), 'success');
     }
 
-    async function saveEntityProducts() {
+    // ════════════════════════════════════════
+    // VARIANT CRUD
+    // ════════════════════════════════════════
+    function updateVariant(index, field, value) {
+        if (state.entityVariants[index]) {
+            state.entityVariants[index][field] = value;
+        }
+    }
+
+    function removeVariant(index) {
+        if (!confirm(t('variants.confirm_remove', 'Remove this variant?'))) return;
+        state.entityVariants.splice(index, 1);
+        renderUnifiedList();
+        showToast(t('variants.variant_removed', 'Variant removed'), 'success');
+    }
+
+    function toggleVariants(productId) {
+        state.expandedProducts[productId] = !state.expandedProducts[productId];
+        renderUnifiedList();
+    }
+
+    // ════════════════════════════════════════
+    // SAVE ALL (Products + Pricing + Variants)
+    // ════════════════════════════════════════
+    async function saveAll() {
         if (!state.entityId || !state.tenantId) {
             showToast(t('messages.select_entity_first', 'Select entity first'), 'error');
             return;
         }
-        try {
-            const payload = state.entityProducts.map(p => ({
-                product_id:          parseInt(p.product_id),
-                stock_quantity:      parseInt(p.stock_quantity) || 0,
-                low_stock_threshold: parseInt(p.low_stock_threshold) || 5,
-                is_active:           p.is_active == 1 ? 1 : 0,
-                is_featured:         p.is_featured == 1 ? 1 : 0
-            }));
 
-            const url = API.entityProducts + '?action=bulk&entity_id=' + state.entityId + '&tenant_id=' + state.tenantId;
-            await apiCall(url, { method: 'POST', body: payload });
-            showToast(t('messages.products_saved', 'Products saved'), 'success');
-            await loadEntityProducts();
+        try {
+            // 1. Save products with pricing
+            var productPayload = state.entityProducts.map(function (p) {
+                return {
+                    product_id:          parseInt(p.product_id),
+                    stock_quantity:      parseInt(p.stock_quantity) || 0,
+                    low_stock_threshold: parseInt(p.low_stock_threshold) || 5,
+                    is_active:           p.is_active == 1 ? 1 : 0,
+                    is_featured:         p.is_featured == 1 ? 1 : 0,
+                    price:               p.price || null,
+                    compare_at_price:    p.compare_at_price || null,
+                    cost_price:          p.cost_price || null,
+                    currency_code:       p.currency_code || null,
+                    tax_rate:            p.tax_rate || null
+                };
+            });
+
+            var prodUrl = API.entityProducts + '?action=bulk&entity_id=' + state.entityId + '&tenant_id=' + state.tenantId;
+            await apiCall(prodUrl, { method: 'POST', body: productPayload });
+
+            // 2. Save variants (delete existing then bulk save)
+            await apiCall(API.entityProductVariants + '?action=entity&entity_id=' + state.entityId, { method: 'DELETE' });
+
+            if (state.entityVariants.length > 0) {
+                var variantPayload = state.entityVariants.map(function (v) {
+                    return {
+                        product_id:          parseInt(v.product_id),
+                        variant_id:          parseInt(v.variant_id),
+                        stock_quantity:      parseInt(v.stock_quantity) || 0,
+                        low_stock_threshold: parseInt(v.low_stock_threshold) || 5,
+                        manage_stock:        v.manage_stock == 1 ? 1 : 0,
+                        stock_status:        v.stock_status || 'in_stock',
+                        is_active:           v.is_active == 1 ? 1 : 0,
+                        is_featured:         v.is_featured == 1 ? 1 : 0
+                    };
+                });
+
+                var varUrl = API.entityProductVariants + '?action=bulk&entity_id=' + state.entityId + '&tenant_id=' + state.tenantId;
+                await apiCall(varUrl, { method: 'POST', body: variantPayload });
+            }
+
+            showToast(t('messages.all_saved', 'All changes saved successfully'), 'success');
+            await loadEntityData();
         } catch (e) {
-            console.error('Save products failed:', e);
+            console.error('Save all failed:', e);
             showToast(t('messages.save_failed', 'Save failed'), 'error');
         }
     }
@@ -440,21 +595,21 @@
         if (el.modalProductsList) el.modalProductsList.innerHTML = '<div class="loading-text">' + t('products.loading_products', 'Loading...') + '</div>';
 
         try {
-            let url = API.products + '?limit=1000';
+            var url = API.products + '?limit=1000';
             if (state.tenantId) url += '&tenant_id=' + state.tenantId;
-            const res = await apiCall(url);
-            const products = res?.data?.items || res?.data || [];
-            const existingIds = state.entityProducts.map(p => parseInt(p.product_id));
+            var res = await apiCall(url);
+            var products = res?.data?.items || res?.data || [];
+            var existingIds = state.entityProducts.map(function (p) { return parseInt(p.product_id); });
 
             if (products.length === 0) {
                 el.modalProductsList.innerHTML = '<div class="loading-text">' + t('products.no_products_found', 'No products found') + '</div>';
                 return;
             }
 
-            el.modalProductsList.innerHTML = products.map(p => {
-                const pid = parseInt(p.id);
-                const isAdded = existingIds.includes(pid);
-                const name = p.name || p.product_name || ('Product #' + pid);
+            el.modalProductsList.innerHTML = products.map(function (p) {
+                var pid = parseInt(p.id);
+                var isAdded = existingIds.indexOf(pid) >= 0;
+                var name = p.name || p.product_name || ('Product #' + pid);
                 return '<div class="modal-item' + (isAdded ? ' disabled' : '') + '" data-id="' + pid + '">' +
                     '<input type="checkbox"' + (isAdded ? ' disabled checked' : '') + '>' +
                     '<div class="modal-item-info">' +
@@ -465,16 +620,15 @@
                 '</div>';
             }).join('');
 
-            // Click handler
-            el.modalProductsList.querySelectorAll('.modal-item:not(.disabled)').forEach(item => {
+            el.modalProductsList.querySelectorAll('.modal-item:not(.disabled)').forEach(function (item) {
                 item.addEventListener('click', function (e) {
                     if (e.target.tagName === 'INPUT') return;
-                    const cb = this.querySelector('input[type="checkbox"]');
+                    var cb = this.querySelector('input[type="checkbox"]');
                     if (cb) cb.checked = !cb.checked;
                     this.classList.toggle('selected', cb.checked);
                     updateProductSelectedCount();
                 });
-                const cb = item.querySelector('input[type="checkbox"]');
+                var cb = item.querySelector('input[type="checkbox"]');
                 if (cb) cb.addEventListener('change', function () {
                     item.classList.toggle('selected', this.checked);
                     updateProductSelectedCount();
@@ -490,16 +644,16 @@
     }
 
     function filterModalProducts() {
-        const q = (el.modalProductSearch?.value || '').toLowerCase();
-        el.modalProductsList?.querySelectorAll('.modal-item').forEach(item => {
-            const name = (item.querySelector('.modal-item-name')?.textContent || '').toLowerCase();
-            const meta = (item.querySelector('.modal-item-meta')?.textContent || '').toLowerCase();
-            item.style.display = (name.includes(q) || meta.includes(q)) ? '' : 'none';
+        var q = (el.modalProductSearch?.value || '').toLowerCase();
+        el.modalProductsList?.querySelectorAll('.modal-item').forEach(function (item) {
+            var name = (item.querySelector('.modal-item-name')?.textContent || '').toLowerCase();
+            var meta = (item.querySelector('.modal-item-meta')?.textContent || '').toLowerCase();
+            item.style.display = (name.indexOf(q) >= 0 || meta.indexOf(q) >= 0) ? '' : 'none';
         });
     }
 
     function toggleAllModalProducts(checked) {
-        el.modalProductsList?.querySelectorAll('.modal-item:not(.disabled) input[type="checkbox"]').forEach(cb => {
+        el.modalProductsList?.querySelectorAll('.modal-item:not(.disabled) input[type="checkbox"]').forEach(function (cb) {
             cb.checked = checked;
             cb.closest('.modal-item').classList.toggle('selected', checked);
         });
@@ -507,17 +661,17 @@
     }
 
     function updateProductSelectedCount() {
-        const count = el.modalProductsList?.querySelectorAll('.modal-item:not(.disabled) input:checked').length || 0;
-        if (el.productSelectedCount) el.productSelectedCount.textContent = count + ' ' + t('products.selected_count', 'selected').replace('{count}', count);
+        var count = el.modalProductsList?.querySelectorAll('.modal-item:not(.disabled) input:checked').length || 0;
+        if (el.productSelectedCount) el.productSelectedCount.textContent = count + ' ' + t('products.selected_count', 'selected');
     }
 
     function confirmProductSelection() {
-        const selected = [];
-        el.modalProductsList?.querySelectorAll('.modal-item:not(.disabled) input:checked').forEach(cb => {
-            const item = cb.closest('.modal-item');
-            const pid = parseInt(item.dataset.id);
-            const name = item.querySelector('.modal-item-name')?.textContent || '';
-            const meta = item.querySelector('.modal-item-meta')?.textContent || '';
+        var selected = [];
+        el.modalProductsList?.querySelectorAll('.modal-item:not(.disabled) input:checked').forEach(function (cb) {
+            var item = cb.closest('.modal-item');
+            var pid = parseInt(item.dataset.id);
+            var name = item.querySelector('.modal-item-name')?.textContent || '';
+            var meta = item.querySelector('.modal-item-meta')?.textContent || '';
             selected.push({
                 product_id: pid,
                 product_name: name,
@@ -525,201 +679,36 @@
                 stock_quantity: 0,
                 low_stock_threshold: 5,
                 is_active: 1,
-                is_featured: 0
+                is_featured: 0,
+                price: '',
+                compare_at_price: '',
+                cost_price: '',
+                currency_code: '',
+                tax_rate: ''
             });
         });
         state.entityProducts = state.entityProducts.concat(selected);
         closeProductsModal();
-        renderEntityProducts();
-        populateVariantProductFilters();
+        renderUnifiedList();
         if (selected.length > 0) {
             showToast(selected.length + ' ' + t('products.add_selected', 'products added'), 'success');
         }
     }
 
     // ════════════════════════════════════════
-    // ENTITY VARIANTS
+    // VARIANTS MODAL
     // ════════════════════════════════════════
-    async function loadEntityVariants() {
-        if (!state.entityId) return;
-        try {
-            const res = await apiCall(API.entityProductVariants + '?action=entity&entity_id=' + state.entityId);
-            state.entityVariants = res?.data || [];
-            renderEntityVariants();
-        } catch (e) {
-            console.error('Failed to load entity variants:', e);
-        }
-    }
-
-    function renderEntityVariants() {
-        if (!el.variantsList) return;
-        const searchVal = (el.variantSearch?.value || '').toLowerCase();
-        const filterProduct = el.variantProductFilter?.value || '';
-        let items = state.entityVariants;
-
-        if (filterProduct) {
-            items = items.filter(v => parseInt(v.product_id) === parseInt(filterProduct));
-        }
-        if (searchVal) {
-            items = items.filter(v =>
-                (v.product_name || '').toLowerCase().includes(searchVal) ||
-                (v.variant_sku || v.sku || '').toLowerCase().includes(searchVal)
-            );
-        }
-
-        if (items.length === 0) {
-            el.variantsList.innerHTML = '';
-            if (el.variantsEmpty) el.variantsEmpty.style.display = '';
-            if (el.variantsFooter) el.variantsFooter.style.display = 'none';
-            return;
-        }
-
-        if (el.variantsEmpty) el.variantsEmpty.style.display = 'none';
-        if (el.variantsFooter) el.variantsFooter.style.display = '';
-
-        // Group variants by product
-        const groups = {};
-        items.forEach((v, origIdx) => {
-            // Find the original index in state.entityVariants
-            const realIdx = state.entityVariants.indexOf(v);
-            const pid = parseInt(v.product_id);
-            if (!groups[pid]) groups[pid] = { name: v.product_name || ('Product #' + pid), variants: [] };
-            groups[pid].variants.push({ ...v, _idx: realIdx });
-        });
-
-        let html = '';
-        Object.keys(groups).forEach(pid => {
-            const g = groups[pid];
-            html += '<div class="variant-group-header">' +
-                '<span>' + escHtml(g.name) + '</span>' +
-                '<span class="variant-count">' + g.variants.length + ' ' + t('variants.title', 'variants') + '</span>' +
-            '</div>';
-            g.variants.forEach(v => {
-                const safeIdx = parseInt(v._idx);
-                const stockStatusOpts = ['in_stock', 'out_of_stock', 'unlimited'];
-                html += '<div class="item-card" data-variant-id="' + parseInt(v.variant_id) + '">' +
-                    '<div class="item-info">' +
-                        '<div class="item-name">' + escHtml(v.variant_sku || v.sku || 'Variant #' + v.variant_id) + '</div>' +
-                        '<div class="item-meta">' +
-                            (v.variant_barcode || v.barcode ? '<span>Barcode: ' + escHtml(v.variant_barcode || v.barcode) + '</span>' : '') +
-                        '</div>' +
-                    '</div>' +
-                    '<div class="item-fields">' +
-                        '<div class="item-field">' +
-                            '<label>' + t('variants.stock_quantity', 'Stock') + '</label>' +
-                            '<input type="number" value="' + (v.stock_quantity ?? 0) + '" min="0"' +
-                                ' onchange="EntityProductVariants._updateVariant(' + safeIdx + ',\'stock_quantity\',this.value)">' +
-                        '</div>' +
-                        '<div class="item-field">' +
-                            '<label>' + t('variants.low_stock_threshold', 'Low Stock') + '</label>' +
-                            '<input type="number" value="' + (v.low_stock_threshold ?? 5) + '" min="0"' +
-                                ' onchange="EntityProductVariants._updateVariant(' + safeIdx + ',\'low_stock_threshold\',this.value)">' +
-                        '</div>' +
-                        '<div class="item-field">' +
-                            '<label>' + t('variants.stock_status', 'Status') + '</label>' +
-                            '<select onchange="EntityProductVariants._updateVariant(' + safeIdx + ',\'stock_status\',this.value)">' +
-                                stockStatusOpts.map(s =>
-                                    '<option value="' + s + '"' + (v.stock_status === s ? ' selected' : '') + '>' + t('variants.' + s, s) + '</option>'
-                                ).join('') +
-                            '</select>' +
-                        '</div>' +
-                        '<div class="item-field">' +
-                            '<label>' + t('variants.manage_stock', 'Manage') + '</label>' +
-                            '<input type="checkbox"' + (v.manage_stock == 1 ? ' checked' : '') +
-                                ' onchange="EntityProductVariants._updateVariant(' + safeIdx + ',\'manage_stock\',this.checked?1:0)">' +
-                        '</div>' +
-                        '<div class="item-field">' +
-                            '<label>' + t('variants.is_active', 'Active') + '</label>' +
-                            '<input type="checkbox"' + (v.is_active == 1 ? ' checked' : '') +
-                                ' onchange="EntityProductVariants._updateVariant(' + safeIdx + ',\'is_active\',this.checked?1:0)">' +
-                        '</div>' +
-                    '</div>' +
-                    (state.canManage ? '<div class="item-actions">' +
-                        '<button class="btn-remove" onclick="EntityProductVariants._removeVariant(' + safeIdx + ')">' +
-                            t('variants.remove', 'Remove') +
-                        '</button>' +
-                    '</div>' : '') +
-                '</div>';
-            });
-        });
-
-        el.variantsList.innerHTML = html;
-    }
-
-    function updateVariant(index, field, value) {
-        if (state.entityVariants[index]) {
-            state.entityVariants[index][field] = value;
-        }
-    }
-
-    function removeVariant(index) {
-        if (!confirm(t('variants.confirm_remove', 'Remove this variant?'))) return;
-        state.entityVariants.splice(index, 1);
-        renderEntityVariants();
-        showToast(t('variants.variant_removed', 'Variant removed'), 'success');
-    }
-
-    async function saveEntityVariants() {
-        if (!state.entityId || !state.tenantId) {
+    function openVariantsForProduct(productId) {
+        if (!state.entityId) {
             showToast(t('messages.select_entity_first', 'Select entity first'), 'error');
             return;
         }
-        try {
-            // Delete existing then bulk save
-            await apiCall(API.entityProductVariants + '?action=entity&entity_id=' + state.entityId, { method: 'DELETE' });
-
-            if (state.entityVariants.length > 0) {
-                const payload = state.entityVariants.map(v => ({
-                    product_id:          parseInt(v.product_id),
-                    variant_id:          parseInt(v.variant_id),
-                    stock_quantity:      parseInt(v.stock_quantity) || 0,
-                    low_stock_threshold: parseInt(v.low_stock_threshold) || 5,
-                    manage_stock:        v.manage_stock == 1 ? 1 : 0,
-                    stock_status:        v.stock_status || 'in_stock',
-                    is_active:           v.is_active == 1 ? 1 : 0,
-                    is_featured:         v.is_featured == 1 ? 1 : 0
-                }));
-
-                const url = API.entityProductVariants + '?action=bulk&entity_id=' + state.entityId + '&tenant_id=' + state.tenantId;
-                await apiCall(url, { method: 'POST', body: payload });
-            }
-
-            showToast(t('messages.variants_saved', 'Variants saved'), 'success');
-            await loadEntityVariants();
-        } catch (e) {
-            console.error('Save variants failed:', e);
-            showToast(t('messages.save_failed', 'Save failed'), 'error');
-        }
+        if (el.variantsModal) el.variantsModal.style.display = '';
+        populateVariantProductFilter();
+        if (el.modalVarProductFilter) el.modalVarProductFilter.value = String(productId);
+        loadModalVariants();
     }
 
-    // ════════════════════════════════════════
-    // VARIANT PRODUCT FILTERS
-    // ════════════════════════════════════════
-    function populateVariantProductFilters() {
-        const dropdowns = [el.variantProductFilter, el.modalVarProductFilter].filter(Boolean);
-        dropdowns.forEach(dd => {
-            const val = dd.value;
-            dd.innerHTML = '<option value="">' + (dd === el.modalVarProductFilter
-                ? t('variants.select_product_first', 'Select product...')
-                : t('filter.all_products', 'All Products')) + '</option>';
-            state.entityProducts.forEach(p => {
-                const name = p.product_name || p.name || ('Product #' + p.product_id);
-                const opt = document.createElement('option');
-                opt.value = p.product_id;
-                opt.textContent = name;
-                dd.appendChild(opt);
-            });
-            if (val) dd.value = val;
-        });
-    }
-
-    function filterVariantsByProduct() {
-        renderEntityVariants();
-    }
-
-    // ════════════════════════════════════════
-    // VARIANTS MODAL
-    // ════════════════════════════════════════
     function openVariantsModal() {
         if (!state.entityId) {
             showToast(t('messages.select_entity_first', 'Select entity first'), 'error');
@@ -730,7 +719,7 @@
             return;
         }
         if (el.variantsModal) el.variantsModal.style.display = '';
-        populateVariantProductFilters();
+        populateVariantProductFilter();
         if (el.modalVarProductFilter) el.modalVarProductFilter.value = '';
         if (el.modalVariantsList) {
             el.modalVariantsList.innerHTML = '<div class="loading-text">' + t('variants.select_product_to_see_variants', 'Select a product to see variants') + '</div>';
@@ -741,8 +730,23 @@
         if (el.variantsModal) el.variantsModal.style.display = 'none';
     }
 
+    function populateVariantProductFilter() {
+        var dd = el.modalVarProductFilter;
+        if (!dd) return;
+        var val = dd.value;
+        dd.innerHTML = '<option value="">' + t('variants.select_product_first', 'Select product...') + '</option>';
+        state.entityProducts.forEach(function (p) {
+            var name = p.product_name || p.name || ('Product #' + p.product_id);
+            var opt = document.createElement('option');
+            opt.value = p.product_id;
+            opt.textContent = name;
+            dd.appendChild(opt);
+        });
+        if (val) dd.value = val;
+    }
+
     async function loadModalVariants() {
-        const productId = parseInt(el.modalVarProductFilter?.value) || 0;
+        var productId = parseInt(el.modalVarProductFilter?.value) || 0;
         if (!productId) {
             if (el.modalVariantsList) {
                 el.modalVariantsList.innerHTML = '<div class="loading-text">' + t('variants.select_product_to_see_variants', 'Select a product') + '</div>';
@@ -755,19 +759,19 @@
         }
 
         try {
-            const res = await apiCall(API.productVariants + '?product_id=' + productId + '&limit=500');
-            const variants = res?.data?.items || res?.data || [];
-            const existingIds = state.entityVariants.map(v => parseInt(v.variant_id));
+            var res = await apiCall(API.productVariants + '?product_id=' + productId + '&limit=500');
+            var variants = res?.data?.items || res?.data || [];
+            var existingIds = state.entityVariants.map(function (v) { return parseInt(v.variant_id); });
 
             if (variants.length === 0) {
                 el.modalVariantsList.innerHTML = '<div class="loading-text">' + t('variants.no_variants_found', 'No variants found') + '</div>';
                 return;
             }
 
-            el.modalVariantsList.innerHTML = variants.map(v => {
-                const vid = parseInt(v.id);
-                const isAdded = existingIds.includes(vid);
-                const label = v.sku || v.barcode || ('Variant #' + vid);
+            el.modalVariantsList.innerHTML = variants.map(function (v) {
+                var vid = parseInt(v.id);
+                var isAdded = existingIds.indexOf(vid) >= 0;
+                var label = v.sku || v.barcode || ('Variant #' + vid);
                 return '<div class="modal-item' + (isAdded ? ' disabled' : '') + '" data-id="' + vid + '" data-product-id="' + productId + '">' +
                     '<input type="checkbox"' + (isAdded ? ' disabled checked' : '') + '>' +
                     '<div class="modal-item-info">' +
@@ -781,16 +785,15 @@
                 '</div>';
             }).join('');
 
-            // Click handlers
-            el.modalVariantsList.querySelectorAll('.modal-item:not(.disabled)').forEach(item => {
+            el.modalVariantsList.querySelectorAll('.modal-item:not(.disabled)').forEach(function (item) {
                 item.addEventListener('click', function (e) {
                     if (e.target.tagName === 'INPUT') return;
-                    const cb = this.querySelector('input[type="checkbox"]');
+                    var cb = this.querySelector('input[type="checkbox"]');
                     if (cb) cb.checked = !cb.checked;
                     this.classList.toggle('selected', cb.checked);
                     updateVariantSelectedCount();
                 });
-                const cb = item.querySelector('input[type="checkbox"]');
+                var cb = item.querySelector('input[type="checkbox"]');
                 if (cb) cb.addEventListener('change', function () {
                     item.classList.toggle('selected', this.checked);
                     updateVariantSelectedCount();
@@ -806,7 +809,7 @@
     }
 
     function toggleAllModalVariants(checked) {
-        el.modalVariantsList?.querySelectorAll('.modal-item:not(.disabled) input[type="checkbox"]').forEach(cb => {
+        el.modalVariantsList?.querySelectorAll('.modal-item:not(.disabled) input[type="checkbox"]').forEach(function (cb) {
             cb.checked = checked;
             cb.closest('.modal-item').classList.toggle('selected', checked);
         });
@@ -814,24 +817,23 @@
     }
 
     function updateVariantSelectedCount() {
-        const count = el.modalVariantsList?.querySelectorAll('.modal-item:not(.disabled) input:checked').length || 0;
-        if (el.variantSelectedCount) el.variantSelectedCount.textContent = count + ' ' + t('variants.selected_count', 'selected').replace('{count}', count);
+        var count = el.modalVariantsList?.querySelectorAll('.modal-item:not(.disabled) input:checked').length || 0;
+        if (el.variantSelectedCount) el.variantSelectedCount.textContent = count + ' ' + t('variants.selected_count', 'selected');
     }
 
     function confirmVariantSelection() {
-        const productId = parseInt(el.modalVarProductFilter?.value) || 0;
+        var productId = parseInt(el.modalVarProductFilter?.value) || 0;
         if (!productId) return;
 
-        // Find the product name
-        const product = state.entityProducts.find(p => parseInt(p.product_id) === productId);
-        const productName = product ? (product.product_name || product.name || '') : '';
+        var product = state.entityProducts.find(function (p) { return parseInt(p.product_id) === productId; });
+        var productName = product ? (product.product_name || product.name || '') : '';
 
-        const selected = [];
-        el.modalVariantsList?.querySelectorAll('.modal-item:not(.disabled) input:checked').forEach(cb => {
-            const item = cb.closest('.modal-item');
-            const vid = parseInt(item.dataset.id);
-            const name = item.querySelector('.modal-item-name')?.textContent || '';
-            const meta = item.querySelector('.modal-item-meta')?.textContent || '';
+        var selected = [];
+        el.modalVariantsList?.querySelectorAll('.modal-item:not(.disabled) input:checked').forEach(function (cb) {
+            var item = cb.closest('.modal-item');
+            var vid = parseInt(item.dataset.id);
+            var name = item.querySelector('.modal-item-name')?.textContent || '';
+            var meta = item.querySelector('.modal-item-meta')?.textContent || '';
             selected.push({
                 product_id:          productId,
                 product_name:        productName,
@@ -848,8 +850,10 @@
         });
 
         state.entityVariants = state.entityVariants.concat(selected);
+        // Auto-expand the product's variants section
+        state.expandedProducts[productId] = true;
         closeVariantsModal();
-        renderEntityVariants();
+        renderUnifiedList();
         if (selected.length > 0) {
             showToast(selected.length + ' ' + t('variants.add_selected', 'variants added'), 'success');
         }
@@ -860,7 +864,7 @@
     // ════════════════════════════════════════
     function escHtml(str) {
         if (!str) return '';
-        const div = document.createElement('div');
+        var div = document.createElement('div');
         div.textContent = String(str);
         return div.innerHTML;
     }
@@ -869,11 +873,13 @@
     // PUBLIC API
     // ════════════════════════════════════════
     window.EntityProductVariants = {
-        init:             init,
-        _updateProduct:   updateProduct,
-        _removeProduct:   removeProduct,
-        _updateVariant:   updateVariant,
-        _removeVariant:   removeVariant
+        init:                    init,
+        _updateProduct:          updateProduct,
+        _removeProduct:          removeProduct,
+        _updateVariant:          updateVariant,
+        _removeVariant:          removeVariant,
+        _toggleVariants:         toggleVariants,
+        _openVariantsForProduct: openVariantsForProduct
     };
 
 })();
