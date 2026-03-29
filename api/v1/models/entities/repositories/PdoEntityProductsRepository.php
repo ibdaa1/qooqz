@@ -1,0 +1,357 @@
+<?php
+declare(strict_types=1);
+
+final class PdoEntityProductsRepository
+{
+    private PDO $pdo;
+
+    private const ALLOWED_ORDER_BY = [
+        'id', 'entity_id', 'product_id', 'price', 'stock_quantity',
+        'is_active', 'is_featured', 'created_at', 'updated_at'
+    ];
+
+    private const FILTERABLE_COLUMNS = [
+        'entity_id', 'product_id', 'tenant_id', 'is_active', 'is_featured'
+    ];
+
+    private const ENTITY_PRODUCT_COLUMNS = [
+        'tenant_id', 'entity_id', 'product_id', 'price', 'compare_at_price',
+        'stock_quantity', 'low_stock_threshold', 'is_active', 'is_featured'
+    ];
+
+    public function __construct(PDO $pdo)
+    {
+        $this->pdo = $pdo;
+    }
+
+    /**
+     * List with dynamic filters, search, ordering, pagination
+     */
+    public function all(
+        ?int $limit = null,
+        ?int $offset = null,
+        array $filters = [],
+        string $orderBy = 'id',
+        string $orderDir = 'DESC'
+    ): array {
+        $sql = "
+            SELECT ep.*,
+                   e.store_name,
+                   e.status as entity_status,
+                   p.name as product_name,
+                   p.sku as product_sku
+            FROM entity_products ep
+            LEFT JOIN entities e ON ep.entity_id = e.id
+            LEFT JOIN products p ON ep.product_id = p.id
+            WHERE 1=1
+        ";
+        $params = [];
+
+        foreach (self::FILTERABLE_COLUMNS as $col) {
+            if (isset($filters[$col]) && $filters[$col] !== '') {
+                if (is_numeric($filters[$col])) {
+                    $sql .= " AND ep.{$col} = :{$col}";
+                    $params[":{$col}"] = (int)$filters[$col];
+                }
+            }
+        }
+
+        if (isset($filters['store_name']) && !empty($filters['store_name'])) {
+            $sql .= " AND e.store_name LIKE :store_name";
+            $params[":store_name"] = '%' . $filters['store_name'] . '%';
+        }
+
+        if (isset($filters['product_name']) && !empty($filters['product_name'])) {
+            $sql .= " AND p.name LIKE :product_name";
+            $params[":product_name"] = '%' . $filters['product_name'] . '%';
+        }
+
+        if (isset($filters['product_sku']) && !empty($filters['product_sku'])) {
+            $sql .= " AND p.sku LIKE :product_sku";
+            $params[":product_sku"] = '%' . $filters['product_sku'] . '%';
+        }
+
+        if (isset($filters['search']) && !empty($filters['search'])) {
+            $sql .= " AND (p.name LIKE :search OR p.sku LIKE :search2 OR e.store_name LIKE :search3)";
+            $params[":search"] = '%' . $filters['search'] . '%';
+            $params[":search2"] = '%' . $filters['search'] . '%';
+            $params[":search3"] = '%' . $filters['search'] . '%';
+        }
+
+        $orderBy = in_array($orderBy, self::ALLOWED_ORDER_BY, true) ? $orderBy : 'id';
+        $orderDir = strtoupper($orderDir) === 'ASC' ? 'ASC' : 'DESC';
+        $sql .= " ORDER BY ep.{$orderBy} {$orderDir}";
+
+        if ($limit !== null) $sql .= " LIMIT :limit";
+        if ($offset !== null) $sql .= " OFFSET :offset";
+
+        $stmt = $this->pdo->prepare($sql);
+
+        foreach ($params as $key => $value) {
+            $type = is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR;
+            $stmt->bindValue($key, $value, $type);
+        }
+        if ($limit !== null) $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+        if ($offset !== null) $stmt->bindValue(':offset', (int)$offset, PDO::PARAM_INT);
+
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Count for pagination
+     */
+    public function count(array $filters = []): int
+    {
+        $sql = "
+            SELECT COUNT(*)
+            FROM entity_products ep
+            LEFT JOIN entities e ON ep.entity_id = e.id
+            LEFT JOIN products p ON ep.product_id = p.id
+            WHERE 1=1
+        ";
+        $params = [];
+
+        foreach (self::FILTERABLE_COLUMNS as $col) {
+            if (isset($filters[$col]) && $filters[$col] !== '') {
+                if (is_numeric($filters[$col])) {
+                    $sql .= " AND ep.{$col} = :{$col}";
+                    $params[":{$col}"] = (int)$filters[$col];
+                }
+            }
+        }
+
+        if (isset($filters['store_name']) && !empty($filters['store_name'])) {
+            $sql .= " AND e.store_name LIKE :store_name";
+            $params[":store_name"] = '%' . $filters['store_name'] . '%';
+        }
+
+        if (isset($filters['product_name']) && !empty($filters['product_name'])) {
+            $sql .= " AND p.name LIKE :product_name";
+            $params[":product_name"] = '%' . $filters['product_name'] . '%';
+        }
+
+        if (isset($filters['product_sku']) && !empty($filters['product_sku'])) {
+            $sql .= " AND p.sku LIKE :product_sku";
+            $params[":product_sku"] = '%' . $filters['product_sku'] . '%';
+        }
+
+        if (isset($filters['search']) && !empty($filters['search'])) {
+            $sql .= " AND (p.name LIKE :search OR p.sku LIKE :search2 OR e.store_name LIKE :search3)";
+            $params[":search"] = '%' . $filters['search'] . '%';
+            $params[":search2"] = '%' . $filters['search'] . '%';
+            $params[":search3"] = '%' . $filters['search'] . '%';
+        }
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn();
+    }
+
+    /**
+     * Find by ID
+     */
+    public function find(int $id): ?array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT ep.*,
+                   e.store_name,
+                   e.status as entity_status,
+                   p.name as product_name,
+                   p.sku as product_sku
+            FROM entity_products ep
+            LEFT JOIN entities e ON ep.entity_id = e.id
+            LEFT JOIN products p ON ep.product_id = p.id
+            WHERE ep.id = :id
+            LIMIT 1
+        ");
+        $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    /**
+     * Find by entity and product
+     */
+    public function findByEntityAndProduct(int $entityId, int $productId): ?array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT ep.*,
+                   e.store_name,
+                   e.status as entity_status,
+                   p.name as product_name,
+                   p.sku as product_sku
+            FROM entity_products ep
+            LEFT JOIN entities e ON ep.entity_id = e.id
+            LEFT JOIN products p ON ep.product_id = p.id
+            WHERE ep.entity_id = :entity_id AND ep.product_id = :product_id
+            LIMIT 1
+        ");
+        $stmt->execute([':entity_id' => $entityId, ':product_id' => $productId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    /**
+     * Get all products for an entity
+     */
+    public function getEntityProducts(int $entityId): array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT ep.*,
+                   p.name as product_name,
+                   p.sku as product_sku
+            FROM entity_products ep
+            LEFT JOIN products p ON ep.product_id = p.id
+            WHERE ep.entity_id = :entity_id
+            ORDER BY ep.is_featured DESC, ep.id DESC
+        ");
+        $stmt->execute([':entity_id' => $entityId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Create or Update
+     */
+    public function save(array $data): int
+    {
+        $isUpdate = !empty($data['id']);
+
+        $params = [];
+        foreach (self::ENTITY_PRODUCT_COLUMNS as $col) {
+            if (array_key_exists($col, $data)) {
+                $val = $data[$col];
+                $params[':' . $col] = ($val === '' || $val === null) ? null : $val;
+            }
+        }
+
+        if (empty($params[':entity_id']) || empty($params[':product_id'])) {
+            throw new InvalidArgumentException("entity_id and product_id are required");
+        }
+
+        $this->validateReferences((int)$params[':entity_id'], (int)$params[':product_id']);
+
+        if ($isUpdate) {
+            $params[':id'] = (int)$data['id'];
+
+            $setClauses = [];
+            foreach (self::ENTITY_PRODUCT_COLUMNS as $col) {
+                if (array_key_exists(':' . $col, $params)) {
+                    $setClauses[] = "{$col} = :{$col}";
+                }
+            }
+
+            $stmt = $this->pdo->prepare(
+                "UPDATE entity_products SET " . implode(', ', $setClauses) . " WHERE id = :id"
+            );
+            $stmt->execute($params);
+            return (int)$data['id'];
+        }
+
+        $columns = [];
+        $placeholders = [];
+        foreach (self::ENTITY_PRODUCT_COLUMNS as $col) {
+            if (array_key_exists(':' . $col, $params)) {
+                $columns[] = $col;
+                $placeholders[] = ':' . $col;
+            }
+        }
+
+        $stmt = $this->pdo->prepare(
+            "INSERT INTO entity_products (" . implode(', ', $columns) . ") VALUES (" . implode(', ', $placeholders) . ")"
+        );
+        $stmt->execute($params);
+        return (int)$this->pdo->lastInsertId();
+    }
+
+    /**
+     * Bulk save products for an entity
+     */
+    public function saveEntityProducts(int $entityId, int $tenantId, array $products): array
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $savedIds = [];
+
+            foreach ($products as $productData) {
+                $productData['entity_id'] = $entityId;
+                $productData['tenant_id'] = $tenantId;
+
+                $existing = $this->findByEntityAndProduct($entityId, (int)$productData['product_id']);
+
+                if ($existing) {
+                    $productData['id'] = $existing['id'];
+                }
+
+                $savedIds[] = $this->save($productData);
+            }
+
+            $this->pdo->commit();
+            return $savedIds;
+        } catch (\Exception $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Delete
+     */
+    public function delete(int $id): bool
+    {
+        $stmt = $this->pdo->prepare("DELETE FROM entity_products WHERE id = :id");
+        return $stmt->execute([':id' => $id]);
+    }
+
+    /**
+     * Delete all products for an entity
+     */
+    public function deleteEntityProducts(int $entityId): bool
+    {
+        $stmt = $this->pdo->prepare("DELETE FROM entity_products WHERE entity_id = :entity_id");
+        return $stmt->execute([':entity_id' => $entityId]);
+    }
+
+    /**
+     * Get statistics
+     */
+    public function getStatistics(): array
+    {
+        $stats = [];
+
+        $stmt = $this->pdo->query("SELECT COUNT(*) FROM entity_products");
+        $stats['total_records'] = (int)$stmt->fetchColumn();
+
+        $stmt = $this->pdo->query("SELECT COUNT(DISTINCT entity_id) FROM entity_products");
+        $stats['entities_with_products'] = (int)$stmt->fetchColumn();
+
+        $stmt = $this->pdo->query("SELECT COUNT(DISTINCT product_id) FROM entity_products");
+        $stats['unique_products'] = (int)$stmt->fetchColumn();
+
+        $stmt = $this->pdo->query("SELECT COUNT(*) FROM entity_products WHERE is_active = 1");
+        $stats['active_records'] = (int)$stmt->fetchColumn();
+
+        $stmt = $this->pdo->query("SELECT COUNT(*) FROM entity_products WHERE is_featured = 1");
+        $stats['featured_records'] = (int)$stmt->fetchColumn();
+
+        return $stats;
+    }
+
+    /**
+     * Validate entity and product exist
+     */
+    private function validateReferences(int $entityId, int $productId): void
+    {
+        $stmt = $this->pdo->prepare("SELECT id FROM entities WHERE id = :id LIMIT 1");
+        $stmt->execute([':id' => $entityId]);
+        if (!$stmt->fetch()) {
+            throw new RuntimeException("Entity not found");
+        }
+
+        $stmt = $this->pdo->prepare("SELECT id FROM products WHERE id = :id LIMIT 1");
+        $stmt->execute([':id' => $productId]);
+        if (!$stmt->fetch()) {
+            throw new RuntimeException("Product not found");
+        }
+    }
+}

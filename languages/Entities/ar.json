@@ -91,6 +91,23 @@
             "add_attribute": "إضافة سمة",
             "select": "اختر سمة"
         },
+        "entity_products": {
+            "entity_products": "منتجات الكيان",
+            "add_product": "إضافة منتج",
+            "search_placeholder": "بحث في المنتجات...",
+            "no_products": "لا توجد منتجات للكيان بعد",
+            "product": "المنتج",
+            "select_product": "اختر منتج",
+            "price": "السعر",
+            "compare_at_price": "سعر المقارنة",
+            "stock_quantity": "كمية المخزون",
+            "low_stock_threshold": "حد المخزون المنخفض",
+            "is_active": "نشط",
+            "is_featured": "مميز",
+            "remove": "إزالة",
+            "product_exists": "المنتج مضاف مسبقاً",
+            "save_first": "يرجى حفظ الكيان أولاً"
+        },
         "media": {
             "media": "وسائط",
             "logo": "الشعار",

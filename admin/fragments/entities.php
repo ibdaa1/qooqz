@@ -181,6 +181,10 @@ $apiBase = '/api';
                         <i class="fas fa-list-alt"></i>
                         <span data-i18n="tabs.attributes"><?= __t('tabs.attributes', 'Attributes') ?></span>
                     </button>
+                    <button type="button" class="tab-btn" data-tab="entity_products">
+                        <i class="fas fa-box"></i>
+                        <span data-i18n="tabs.entity_products"><?= __t('tabs.entity_products', 'Entity Products') ?></span>
+                    </button>
                     <button type="button" class="tab-btn" data-tab="media">
                         <i class="fas fa-images"></i>
                         <span data-i18n="tabs.media"><?= __t('tabs.media', 'Media') ?></span>
@@ -567,6 +571,23 @@ $apiBase = '/api';
                         </button>
                     </div>
                     <div id="entityAttributesList"></div>
+                </div>
+
+                <!-- Tab: Entity Products -->
+                <div class="tab-content" id="tab-entity_products" style="display:none">
+                    <div class="entity-products-toolbar" style="display:flex; gap:10px; margin-bottom:15px; align-items:center; flex-wrap:wrap;">
+                        <input type="text" id="entityProductSearch" class="form-control" style="flex:1; min-width:200px;"
+                               placeholder="<?= __t('entity_products.search_placeholder', 'Search products...') ?>"
+                               data-i18n-placeholder="entity_products.search_placeholder">
+                        <button type="button" id="btnAddEntityProduct" class="btn btn-primary" data-i18n="entity_products.add_product">
+                            <?= __t('entity_products.add_product', 'Add Product') ?>
+                        </button>
+                    </div>
+                    <div id="entityProductsList"></div>
+                    <div id="entityProductsEmpty" style="display:none; text-align:center; padding:40px 20px; color:var(--text-muted, #94a3b8);">
+                        <i class="fas fa-box-open" style="font-size:2.5rem; margin-bottom:10px; opacity:0.5;"></i>
+                        <p data-i18n="entity_products.no_products"><?= __t('entity_products.no_products', 'No entity products yet') ?></p>
+                    </div>
                 </div>
 
                 <!-- Tab: Media -->
