@@ -477,6 +477,27 @@
                     '<input type="checkbox"' + (vItem.is_featured == 1 ? ' checked' : '') + ' onchange="EntityProductVariants._updateVariant(' + safeVIdx + ',\'is_featured\',this.checked?1:0)"></div>';
                 html += '</div>';
 
+                // Variant pricing section
+                var vPrice = vItem.price || '';
+                var vComparePrice = vItem.compare_at_price || '';
+                var vCostPrice = vItem.cost_price || '';
+                var vCurrencyCode = vItem.currency_code || '';
+                var vTaxRate = vItem.tax_rate || '';
+
+                html += '<div class="epv-pricing"><div class="epv-pricing-label">' + t('products.pricing', 'Pricing') + '</div>' +
+                    '<div class="epv-pricing-fields">' +
+                        '<div class="epv-field"><label>' + t('products.price', 'Price') + '</label>' +
+                            '<input type="number" step="0.01" value="' + escHtml(vPrice) + '" min="0" onchange="EntityProductVariants._updateVariant(' + safeVIdx + ',\'price\',this.value)"></div>' +
+                        '<div class="epv-field"><label>' + t('products.compare_at_price', 'Compare Price') + '</label>' +
+                            '<input type="number" step="0.01" value="' + escHtml(vComparePrice) + '" min="0" onchange="EntityProductVariants._updateVariant(' + safeVIdx + ',\'compare_at_price\',this.value)"></div>' +
+                        '<div class="epv-field"><label>' + t('products.cost_price', 'Cost Price') + '</label>' +
+                            '<input type="number" step="0.01" value="' + escHtml(vCostPrice) + '" min="0" onchange="EntityProductVariants._updateVariant(' + safeVIdx + ',\'cost_price\',this.value)"></div>' +
+                        '<div class="epv-field"><label>' + t('products.currency_code', 'Currency') + '</label>' +
+                            '<input type="text" maxlength="3" value="' + escHtml(vCurrencyCode) + '" onchange="EntityProductVariants._updateVariant(' + safeVIdx + ',\'currency_code\',this.value)"></div>' +
+                        '<div class="epv-field"><label>' + t('products.tax_rate', 'Tax %') + '</label>' +
+                            '<input type="number" step="0.01" value="' + escHtml(vTaxRate) + '" min="0" max="100" onchange="EntityProductVariants._updateVariant(' + safeVIdx + ',\'tax_rate\',this.value)"></div>' +
+                    '</div></div>';
+
                 html += '</div>';
             }
 
@@ -591,7 +612,12 @@
                         manage_stock:        v.manage_stock == 1 ? 1 : 0,
                         stock_status:        v.stock_status || 'in_stock',
                         is_active:           v.is_active == 1 ? 1 : 0,
-                        is_featured:         v.is_featured == 1 ? 1 : 0
+                        is_featured:         v.is_featured == 1 ? 1 : 0,
+                        price:               v.price || null,
+                        compare_at_price:    v.compare_at_price || null,
+                        cost_price:          v.cost_price || null,
+                        currency_code:       v.currency_code || null,
+                        tax_rate:            v.tax_rate || null
                     };
                 });
 
@@ -901,5 +927,12 @@
         _updateVariant:  updateVariant,
         _removeVariant:  removeVariant
     };
+
+    // REGISTER — supports fragment navigation & direct load
+    window.page = { run: init };
+
+    if (window.Admin && window.Admin.page && window.Admin.page.register) {
+        window.Admin.page.register('entity_product_variants', init);
+    }
 
 })();

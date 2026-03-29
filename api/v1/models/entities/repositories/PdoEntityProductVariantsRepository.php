@@ -166,7 +166,7 @@ final class PdoEntityProductVariantsRepository
     }
 
     /**
-     * Get all variants for an entity
+     * Get all variants for an entity (with pricing)
      */
     public function getEntityVariants(int $entityId): array
     {
@@ -174,11 +174,21 @@ final class PdoEntityProductVariantsRepository
             SELECT epv.*,
                    COALESCE(pt.name, '') as product_name,
                    pv.sku as variant_sku,
-                   pv.price as variant_price
+                   pv.price as variant_price,
+                   pp.id as pricing_id,
+                   pp.price,
+                   pp.compare_at_price,
+                   pp.cost_price,
+                   pp.currency_code,
+                   pp.tax_rate
             FROM entity_product_variants epv
             LEFT JOIN products p ON epv.product_id = p.id
             LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
             LEFT JOIN product_variants pv ON epv.variant_id = pv.id
+            LEFT JOIN product_pricing pp ON pp.product_id = epv.product_id
+                AND pp.variant_id = epv.variant_id
+                AND pp.entity_id = epv.entity_id
+                AND pp.is_active = 1
             WHERE epv.entity_id = :entity_id
             ORDER BY epv.product_id, epv.id DESC
         ");
@@ -266,7 +276,7 @@ final class PdoEntityProductVariantsRepository
     }
 
     /**
-     * Bulk save variants for an entity
+     * Bulk save variants for an entity (with optional pricing)
      */
     public function saveEntityVariants(int $entityId, int $tenantId, array $variants): array
     {
@@ -285,6 +295,16 @@ final class PdoEntityProductVariantsRepository
                 }
 
                 $savedIds[] = $this->save($variantData);
+
+                // Save entity-specific variant pricing if price is provided
+                if (isset($variantData['price']) && $variantData['price'] !== '' && $variantData['price'] !== null) {
+                    $this->saveEntityVariantPricing(
+                        $entityId,
+                        (int)$variantData['product_id'],
+                        (int)$variantData['variant_id'],
+                        $variantData
+                    );
+                }
             }
 
             $this->pdo->commit();
@@ -292,6 +312,40 @@ final class PdoEntityProductVariantsRepository
         } catch (\Exception $e) {
             $this->pdo->rollBack();
             throw $e;
+        }
+    }
+
+    /**
+     * Save or update entity-specific variant pricing in product_pricing table
+     */
+    private function saveEntityVariantPricing(int $entityId, int $productId, int $variantId, array $data): void
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id FROM product_pricing WHERE product_id = :product_id AND variant_id = :variant_id AND entity_id = :entity_id LIMIT 1"
+        );
+        $stmt->execute([':product_id' => $productId, ':variant_id' => $variantId, ':entity_id' => $entityId]);
+        $existingPricing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        $price = $data['price'] ?? 0;
+        $compareAtPrice = (isset($data['compare_at_price']) && $data['compare_at_price'] !== '') ? $data['compare_at_price'] : null;
+        $costPrice = (isset($data['cost_price']) && $data['cost_price'] !== '') ? $data['cost_price'] : null;
+        $currencyCode = $data['currency_code'] ?? 'SAR';
+        $taxRate = (isset($data['tax_rate']) && $data['tax_rate'] !== '') ? $data['tax_rate'] : null;
+
+        if ($existingPricing) {
+            $stmt = $this->pdo->prepare(
+                "UPDATE product_pricing SET price = ?, compare_at_price = ?, cost_price = ?,
+                 currency_code = ?, tax_rate = ?, is_active = 1, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?"
+            );
+            $stmt->execute([$price, $compareAtPrice, $costPrice, $currencyCode, $taxRate, $existingPricing['id']]);
+        } else {
+            $stmt = $this->pdo->prepare(
+                "INSERT INTO product_pricing (product_id, variant_id, entity_id, price, compare_at_price, cost_price,
+                 currency_code, tax_rate, pricing_type, is_active)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'fixed', 1)"
+            );
+            $stmt->execute([$productId, $variantId, $entityId, $price, $compareAtPrice, $costPrice, $currencyCode, $taxRate]);
         }
     }
 

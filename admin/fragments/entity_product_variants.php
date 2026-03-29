@@ -294,14 +294,40 @@ function _epvt($key, $fallback = '') {
 <input type="hidden" id="epvCanManage" value="<?= $canManage ? '1' : '0' ?>">
 <input type="hidden" id="epvIsSuperAdmin" value="<?= is_super_admin() ? '1' : '0' ?>">
 
+<?php if ($isFragment): ?>
 <script src="/admin/assets/js/pages/entity_product_variants.js?v=<?= time() ?>"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    if (typeof window.EntityProductVariants !== 'undefined') {
-        window.EntityProductVariants.init();
-    }
-});
+(function(){
+    var attempts = 0, maxAttempts = 50;
+    var interval = setInterval(function(){
+        attempts++;
+        if (window.EntityProductVariants && typeof window.EntityProductVariants.init === 'function') {
+            clearInterval(interval);
+            window.EntityProductVariants.init();
+        } else if (attempts > maxAttempts) {
+            clearInterval(interval);
+            console.error('[EntityProductVariants] Timeout waiting for module');
+        }
+    }, 100);
+})();
 </script>
+<?php else: ?>
+<script src="/admin/assets/js/pages/entity_product_variants.js?v=<?= time() ?>"></script>
+<script>
+(function(){
+    function tryInit() {
+        if (window.EntityProductVariants && typeof window.EntityProductVariants.init === 'function') {
+            window.EntityProductVariants.init();
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', tryInit);
+    } else {
+        tryInit();
+    }
+})();
+</script>
+<?php endif; ?>
 
 <?php if (!$isFragment): ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
