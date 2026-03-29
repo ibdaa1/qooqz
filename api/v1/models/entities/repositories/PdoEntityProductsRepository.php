@@ -25,26 +25,11 @@ final class PdoEntityProductsRepository
     }
 
     /**
-     * List with dynamic filters, search, ordering, pagination
+     * Build shared WHERE clause and params for filters
      */
-    public function all(
-        ?int $limit = null,
-        ?int $offset = null,
-        array $filters = [],
-        string $orderBy = 'id',
-        string $orderDir = 'DESC'
-    ): array {
-        $sql = "
-            SELECT ep.*,
-                   e.store_name,
-                   e.status as entity_status,
-                   p.name as product_name,
-                   p.sku as product_sku
-            FROM entity_products ep
-            LEFT JOIN entities e ON ep.entity_id = e.id
-            LEFT JOIN products p ON ep.product_id = p.id
-            WHERE 1=1
-        ";
+    private function buildFilterClauses(array $filters): array
+    {
+        $sql = '';
         $params = [];
 
         foreach (self::FILTERABLE_COLUMNS as $col) {
@@ -72,11 +57,40 @@ final class PdoEntityProductsRepository
         }
 
         if (isset($filters['search']) && !empty($filters['search'])) {
-            $sql .= " AND (p.name LIKE :search OR p.sku LIKE :search2 OR e.store_name LIKE :search3)";
-            $params[":search"] = '%' . $filters['search'] . '%';
-            $params[":search2"] = '%' . $filters['search'] . '%';
-            $params[":search3"] = '%' . $filters['search'] . '%';
+            $searchTerm = '%' . $filters['search'] . '%';
+            $sql .= " AND (p.name LIKE :search_name OR p.sku LIKE :search_sku OR e.store_name LIKE :search_store)";
+            $params[":search_name"] = $searchTerm;
+            $params[":search_sku"] = $searchTerm;
+            $params[":search_store"] = $searchTerm;
         }
+
+        return ['sql' => $sql, 'params' => $params];
+    }
+
+    /**
+     * List with dynamic filters, search, ordering, pagination
+     */
+    public function all(
+        ?int $limit = null,
+        ?int $offset = null,
+        array $filters = [],
+        string $orderBy = 'id',
+        string $orderDir = 'DESC'
+    ): array {
+        $filterResult = $this->buildFilterClauses($filters);
+
+        $sql = "
+            SELECT ep.*,
+                   e.store_name,
+                   e.status as entity_status,
+                   p.name as product_name,
+                   p.sku as product_sku
+            FROM entity_products ep
+            LEFT JOIN entities e ON ep.entity_id = e.id
+            LEFT JOIN products p ON ep.product_id = p.id
+            WHERE 1=1
+        " . $filterResult['sql'];
+        $params = $filterResult['params'];
 
         $orderBy = in_array($orderBy, self::ALLOWED_ORDER_BY, true) ? $orderBy : 'id';
         $orderDir = strtoupper($orderDir) === 'ASC' ? 'ASC' : 'DESC';
@@ -103,48 +117,18 @@ final class PdoEntityProductsRepository
      */
     public function count(array $filters = []): int
     {
+        $filterResult = $this->buildFilterClauses($filters);
+
         $sql = "
             SELECT COUNT(*)
             FROM entity_products ep
             LEFT JOIN entities e ON ep.entity_id = e.id
             LEFT JOIN products p ON ep.product_id = p.id
             WHERE 1=1
-        ";
-        $params = [];
-
-        foreach (self::FILTERABLE_COLUMNS as $col) {
-            if (isset($filters[$col]) && $filters[$col] !== '') {
-                if (is_numeric($filters[$col])) {
-                    $sql .= " AND ep.{$col} = :{$col}";
-                    $params[":{$col}"] = (int)$filters[$col];
-                }
-            }
-        }
-
-        if (isset($filters['store_name']) && !empty($filters['store_name'])) {
-            $sql .= " AND e.store_name LIKE :store_name";
-            $params[":store_name"] = '%' . $filters['store_name'] . '%';
-        }
-
-        if (isset($filters['product_name']) && !empty($filters['product_name'])) {
-            $sql .= " AND p.name LIKE :product_name";
-            $params[":product_name"] = '%' . $filters['product_name'] . '%';
-        }
-
-        if (isset($filters['product_sku']) && !empty($filters['product_sku'])) {
-            $sql .= " AND p.sku LIKE :product_sku";
-            $params[":product_sku"] = '%' . $filters['product_sku'] . '%';
-        }
-
-        if (isset($filters['search']) && !empty($filters['search'])) {
-            $sql .= " AND (p.name LIKE :search OR p.sku LIKE :search2 OR e.store_name LIKE :search3)";
-            $params[":search"] = '%' . $filters['search'] . '%';
-            $params[":search2"] = '%' . $filters['search'] . '%';
-            $params[":search3"] = '%' . $filters['search'] . '%';
-        }
+        " . $filterResult['sql'];
 
         $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
+        $stmt->execute($filterResult['params']);
         return (int)$stmt->fetchColumn();
     }
 
