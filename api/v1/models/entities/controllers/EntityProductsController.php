@@ -2,8 +2,8 @@
 declare(strict_types=1);
 
 /**
- * Unified Entity Products Controller
- * Handles both product-level and variant-level operations
+ * Entity Products Controller
+ * Handles product-level operations for entity_products table
  */
 final class EntityProductsController
 {
@@ -34,24 +34,9 @@ final class EntityProductsController
         return $this->service->getByEntityAndProduct($entityId, $productId);
     }
 
-    public function getByEntityAndVariant(int $entityId, int $variantId): ?array
-    {
-        return $this->service->getByEntityAndVariant($entityId, $variantId);
-    }
-
     public function getEntityProducts(int $entityId): array
     {
         return $this->service->getEntityProducts($entityId);
-    }
-
-    public function getEntityVariants(int $entityId): array
-    {
-        return $this->service->getEntityVariants($entityId);
-    }
-
-    public function getEntityProductVariants(int $entityId, int $productId): array
-    {
-        return $this->service->getEntityProductVariants($entityId, $productId);
     }
 
     public function create(array $data): int
@@ -69,11 +54,6 @@ final class EntityProductsController
         return $this->service->saveEntityProducts($entityId, $tenantId, $products);
     }
 
-    public function saveEntityVariants(int $entityId, int $tenantId, array $variants): array
-    {
-        return $this->service->saveEntityVariants($entityId, $tenantId, $variants);
-    }
-
     public function delete(int $id): void
     {
         $this->service->delete($id);
@@ -82,16 +62,6 @@ final class EntityProductsController
     public function deleteEntityProducts(int $entityId): void
     {
         $this->service->deleteEntityProducts($entityId);
-    }
-
-    public function deleteEntityVariants(int $entityId): void
-    {
-        $this->service->deleteEntityVariants($entityId);
-    }
-
-    public function deleteEntityProductVariants(int $entityId, int $productId): void
-    {
-        $this->service->deleteEntityProductVariants($entityId, $productId);
     }
 
     public function getStatistics(): array
