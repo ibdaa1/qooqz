@@ -47,7 +47,7 @@ final class PdoEntityProductsRepository
         }
 
         if (isset($filters['product_name']) && !empty($filters['product_name'])) {
-            $sql .= " AND p.name LIKE :product_name";
+            $sql .= " AND pt.name LIKE :product_name";
             $params[":product_name"] = '%' . $filters['product_name'] . '%';
         }
 
@@ -58,7 +58,7 @@ final class PdoEntityProductsRepository
 
         if (isset($filters['search']) && !empty($filters['search'])) {
             $searchTerm = '%' . $filters['search'] . '%';
-            $sql .= " AND (p.name LIKE :search_name OR p.sku LIKE :search_sku OR e.store_name LIKE :search_store)";
+            $sql .= " AND (pt.name LIKE :search_name OR p.sku LIKE :search_sku OR e.store_name LIKE :search_store)";
             $params[":search_name"] = $searchTerm;
             $params[":search_sku"] = $searchTerm;
             $params[":search_store"] = $searchTerm;
@@ -83,11 +83,12 @@ final class PdoEntityProductsRepository
             SELECT ep.*,
                    e.store_name,
                    e.status as entity_status,
-                   p.name as product_name,
+                   COALESCE(pt.name, '') as product_name,
                    p.sku as product_sku
             FROM entity_products ep
             LEFT JOIN entities e ON ep.entity_id = e.id
             LEFT JOIN products p ON ep.product_id = p.id
+            LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
             WHERE 1=1
         " . $filterResult['sql'];
         $params = $filterResult['params'];
@@ -124,6 +125,7 @@ final class PdoEntityProductsRepository
             FROM entity_products ep
             LEFT JOIN entities e ON ep.entity_id = e.id
             LEFT JOIN products p ON ep.product_id = p.id
+            LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
             WHERE 1=1
         " . $filterResult['sql'];
 
@@ -141,11 +143,12 @@ final class PdoEntityProductsRepository
             SELECT ep.*,
                    e.store_name,
                    e.status as entity_status,
-                   p.name as product_name,
+                   COALESCE(pt.name, '') as product_name,
                    p.sku as product_sku
             FROM entity_products ep
             LEFT JOIN entities e ON ep.entity_id = e.id
             LEFT JOIN products p ON ep.product_id = p.id
+            LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
             WHERE ep.id = :id
             LIMIT 1
         ");
@@ -163,11 +166,12 @@ final class PdoEntityProductsRepository
             SELECT ep.*,
                    e.store_name,
                    e.status as entity_status,
-                   p.name as product_name,
+                   COALESCE(pt.name, '') as product_name,
                    p.sku as product_sku
             FROM entity_products ep
             LEFT JOIN entities e ON ep.entity_id = e.id
             LEFT JOIN products p ON ep.product_id = p.id
+            LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
             WHERE ep.entity_id = :entity_id AND ep.product_id = :product_id
             LIMIT 1
         ");
@@ -183,7 +187,7 @@ final class PdoEntityProductsRepository
     {
         $stmt = $this->pdo->prepare("
             SELECT ep.*,
-                   p.name as product_name,
+                   COALESCE(pt.name, '') as product_name,
                    p.sku as product_sku,
                    pp.id as pricing_id,
                    pp.price,
@@ -193,6 +197,7 @@ final class PdoEntityProductsRepository
                    pp.tax_rate
             FROM entity_products ep
             LEFT JOIN products p ON ep.product_id = p.id
+            LEFT JOIN product_translations pt ON pt.product_id = p.id AND pt.language_code = 'ar'
             LEFT JOIN product_pricing pp ON pp.product_id = ep.product_id
                 AND pp.entity_id = ep.entity_id
                 AND pp.is_active = 1
