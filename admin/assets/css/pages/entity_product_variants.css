@@ -31,6 +31,16 @@
     font-size: 0.9rem;
 }
 
+/* ─── Tenant Verification ─── */
+#epvPageContainer .epv-tenant-verified {
+    color: var(--success-color, #28a745);
+    font-weight: 600;
+}
+#epvPageContainer .epv-tenant-error {
+    color: var(--danger-color, #dc3545);
+    font-weight: 600;
+}
+
 /* ─── Cards ─── */
 #epvPageContainer .epv-card {
     background: var(--card-bg);

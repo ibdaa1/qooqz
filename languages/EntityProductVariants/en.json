@@ -18,7 +18,6 @@
         "no_data": "No data found",
         "confirm_delete": "Are you sure you want to delete this?",
         "toggle_variants": "Variants",
-
         "filter": {
             "entity": "Entity",
             "select_entity": "Select Entity...",
@@ -34,9 +33,11 @@
             "clear": "Clear",
             "tenant_id": "Tenant ID",
             "enter_tenant_id": "Enter Tenant ID",
-            "verify": "Verify"
+            "verify": "Verify",
+            "tenant_verified": "Tenant",
+            "loading": "Loading...",
+            "entities_found": "entities"
         },
-
         "products": {
             "title": "Entity Products",
             "pricing": "Pricing",
@@ -68,7 +69,6 @@
             "product_removed": "Product removed",
             "confirm_remove": "Remove this product and all its variants from entity?"
         },
-
         "variants": {
             "title": "Product Variants",
             "add_variant": "Add Variants",
@@ -99,7 +99,6 @@
             "variant_removed": "Variant removed",
             "confirm_remove": "Remove this variant from entity?"
         },
-
         "table": {
             "id": "ID",
             "entity": "Entity",
@@ -111,7 +110,6 @@
             "active": "Active",
             "actions": "Actions"
         },
-
         "messages": {
             "select_entity_first": "Please select an entity first",
             "all_saved": "All changes saved successfully",
@@ -122,9 +120,11 @@
             "save_failed": "Failed to save",
             "delete_failed": "Failed to delete",
             "load_failed": "Failed to load data",
-            "no_entity_selected": "No entity selected"
+            "no_entity_selected": "No entity selected",
+            "invalid_tenant": "Please enter a valid Tenant ID",
+            "no_entities_for_tenant": "No entities found for this tenant",
+            "tenant_verify_failed": "Failed to verify tenant"
         },
-
         "pagination": {
             "showing": "Showing",
             "of": "of",

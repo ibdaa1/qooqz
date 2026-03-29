@@ -18,7 +18,6 @@
         "no_data": "لا توجد بيانات",
         "confirm_delete": "هل أنت متأكد من الحذف؟",
         "toggle_variants": "المتغيرات",
-
         "filter": {
             "entity": "الكيان",
             "select_entity": "اختر كيان...",
@@ -34,9 +33,11 @@
             "clear": "مسح",
             "tenant_id": "معرف المستأجر",
             "enter_tenant_id": "أدخل معرف المستأجر",
-            "verify": "تحقق"
+            "verify": "تحقق",
+            "tenant_verified": "المستأجر",
+            "loading": "جاري التحميل...",
+            "entities_found": "كيانات"
         },
-
         "products": {
             "title": "منتجات الكيان",
             "pricing": "التسعير",
@@ -68,7 +69,6 @@
             "product_removed": "تم إزالة المنتج",
             "confirm_remove": "إزالة هذا المنتج وجميع متغيراته من الكيان؟"
         },
-
         "variants": {
             "title": "متغيرات المنتجات",
             "add_variant": "إضافة متغيرات",
@@ -99,7 +99,6 @@
             "variant_removed": "تم إزالة المتغير",
             "confirm_remove": "إزالة هذا المتغير من الكيان؟"
         },
-
         "table": {
             "id": "المعرف",
             "entity": "الكيان",
@@ -111,7 +110,6 @@
             "active": "نشط",
             "actions": "إجراءات"
         },
-
         "messages": {
             "select_entity_first": "يرجى اختيار كيان أولاً",
             "all_saved": "تم حفظ جميع التغييرات بنجاح",
@@ -122,9 +120,11 @@
             "save_failed": "فشل الحفظ",
             "delete_failed": "فشل الحذف",
             "load_failed": "فشل تحميل البيانات",
-            "no_entity_selected": "لم يتم اختيار كيان"
+            "no_entity_selected": "لم يتم اختيار كيان",
+            "invalid_tenant": "يرجى إدخال معرف مستأجر صالح",
+            "no_entities_for_tenant": "لا توجد كيانات لهذا المستأجر",
+            "tenant_verify_failed": "فشل التحقق من المستأجر"
         },
-
         "pagination": {
             "showing": "عرض",
             "of": "من",

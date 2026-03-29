@@ -43,11 +43,30 @@
 
         loadTranslations(state.language).then(function () {
             initEventListeners();
-            loadEntities();
-            if (state.entityId > 0) {
-                showTabs();
-                loadEntityProducts();
-                loadEntityVariants();
+
+            // Auto-detect tenant: if tenantId is already set from session, use it directly
+            if (state.tenantId > 0) {
+                // For super admin, update the tenant input display
+                if (state.isSuperAdmin && el.tenantIdInput) {
+                    el.tenantIdInput.value = state.tenantId;
+                    if (el.tenantNameDisplay) {
+                        el.tenantNameDisplay.style.display = 'block';
+                        el.tenantNameDisplay.textContent = t('filter.tenant_verified', 'Tenant') + ' #' + state.tenantId;
+                        el.tenantNameDisplay.className = 'epv-tenant-verified';
+                    }
+                }
+                // Load entities immediately
+                loadEntities().then(function () {
+                    if (state.entityId > 0) {
+                        if (el.entityFilter) el.entityFilter.value = state.entityId;
+                        showTabs();
+                        loadEntityProducts();
+                        loadEntityVariants();
+                    }
+                });
+            } else if (state.isSuperAdmin) {
+                // Super admin without tenant - wait for manual input
+                // Do nothing, user will enter tenant ID
             }
         });
     }
@@ -231,14 +250,17 @@
     // ENTITY LOADING
     // ════════════════════════════════════════
     function loadEntities() {
-        var url = API.entities + '?limit=500';
+        var url = API.entities + '?limit=500&lang=' + encodeURIComponent(state.language);
         if (state.tenantId > 0) url += '&tenant_id=' + state.tenantId;
         return apiCall(url).then(function (res) {
             var items = (res && res.data && res.data.items) || (res && res.data) || [];
+            if (!Array.isArray(items)) items = [];
             state.allEntities = items;
             populateEntityDropdown(items);
         }).catch(function (e) {
             console.error('Failed to load entities:', e);
+            state.allEntities = [];
+            populateEntityDropdown([]);
         });
     }
 
@@ -247,7 +269,7 @@
         el.entityFilter.innerHTML = '<option value="">' + t('filter.select_entity', 'Select Entity...') + '</option>';
         for (var i = 0; i < entities.length; i++) {
             var ent = entities[i];
-            var name = ent.name || ent.store_name || ('Entity #' + ent.id);
+            var name = ent.store_name || ent.name || ('Entity #' + ent.id);
             var opt = document.createElement('option');
             opt.value = ent.id;
             opt.textContent = name + (ent.branch_code ? ' (' + ent.branch_code + ')' : '');
@@ -260,15 +282,41 @@
 
     function verifyTenant() {
         var tid = parseInt(el.tenantIdInput ? el.tenantIdInput.value : 0) || 0;
-        if (tid <= 0) return;
+        if (tid <= 0) {
+            showToast(t('messages.invalid_tenant', 'Please enter a valid Tenant ID'), 'error');
+            return;
+        }
         state.tenantId = tid;
+        // Update hidden field so save operations use the correct tenant
+        if (el.tenantId) el.tenantId.value = tid;
+
         if (el.tenantNameDisplay) {
             el.tenantNameDisplay.style.display = 'block';
-            el.tenantNameDisplay.textContent = 'Tenant #' + tid;
+            el.tenantNameDisplay.textContent = t('filter.loading', 'Loading...');
+            el.tenantNameDisplay.className = '';
         }
         state.entityId = 0;
         hideTabs();
-        loadEntities();
+
+        // Load entities for this tenant to verify it exists
+        loadEntities().then(function () {
+            if (state.allEntities.length > 0) {
+                if (el.tenantNameDisplay) {
+                    el.tenantNameDisplay.textContent = t('filter.tenant_verified', 'Tenant') + ' #' + tid + ' (' + state.allEntities.length + ' ' + t('filter.entities_found', 'entities') + ')';
+                    el.tenantNameDisplay.className = 'epv-tenant-verified';
+                }
+            } else {
+                if (el.tenantNameDisplay) {
+                    el.tenantNameDisplay.textContent = t('messages.no_entities_for_tenant', 'No entities found for this tenant');
+                    el.tenantNameDisplay.className = 'epv-tenant-error';
+                }
+            }
+        }).catch(function () {
+            if (el.tenantNameDisplay) {
+                el.tenantNameDisplay.textContent = t('messages.tenant_verify_failed', 'Failed to verify tenant');
+                el.tenantNameDisplay.className = 'epv-tenant-error';
+            }
+        });
     }
 
     // ════════════════════════════════════════
