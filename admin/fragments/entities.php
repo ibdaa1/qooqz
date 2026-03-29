@@ -185,6 +185,10 @@ $apiBase = '/api';
                         <i class="fas fa-box"></i>
                         <span data-i18n="tabs.entity_products"><?= __t('tabs.entity_products', 'Entity Products') ?></span>
                     </button>
+                    <button type="button" class="tab-btn" data-tab="entity_product_variants">
+                        <i class="fas fa-cubes"></i>
+                        <span data-i18n="tabs.entity_product_variants"><?= __t('tabs.entity_product_variants', 'Product Variants') ?></span>
+                    </button>
                     <button type="button" class="tab-btn" data-tab="media">
                         <i class="fas fa-images"></i>
                         <span data-i18n="tabs.media"><?= __t('tabs.media', 'Media') ?></span>
@@ -621,6 +625,57 @@ $apiBase = '/api';
                                 <?= __t('entity_products.add_selected', 'Add Selected') ?>
                             </button>
                             <button type="button" id="btnCancelProducts" class="btn btn-secondary" data-i18n="common.cancel">
+                                <?= __t('common.cancel', 'Cancel') ?>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Entity Product Variants -->
+                <div class="tab-content" id="tab-entity_product_variants" style="display:none">
+                    <div class="entity-products-toolbar">
+                        <select id="epvProductFilter" class="form-control" style="flex:1; min-width:200px;"
+                                onchange="Entities.filterVariantsByProduct(this.value)">
+                            <option value="" data-i18n="entity_product_variants.all_products"><?= __t('entity_product_variants.all_products', 'All Products') ?></option>
+                        </select>
+                        <button type="button" id="btnAddEntityVariant" class="btn btn-primary" data-i18n="entity_product_variants.add_variant">
+                            <i class="fas fa-plus"></i>
+                            <?= __t('entity_product_variants.add_variant', 'Add Variant') ?>
+                        </button>
+                    </div>
+                    <div id="entityVariantsList"></div>
+                    <div id="entityVariantsEmpty" style="display:none; text-align:center; padding:40px 20px; color:var(--text-muted, #94a3b8);">
+                        <i class="fas fa-cubes" style="font-size:2.5rem; margin-bottom:10px; opacity:0.5;"></i>
+                        <p data-i18n="entity_product_variants.no_variants"><?= __t('entity_product_variants.no_variants', 'No entity product variants yet') ?></p>
+                    </div>
+                </div>
+
+                <!-- Modal: Select Variants -->
+                <div id="entityVariantsModal" class="ep-modal-overlay" style="display:none;">
+                    <div class="ep-modal">
+                        <div class="ep-modal-header">
+                            <h4 data-i18n="entity_product_variants.select_variants"><?= __t('entity_product_variants.select_variants', 'Select Variants') ?></h4>
+                            <button type="button" class="ep-modal-close" id="btnCloseVariantsModal">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="ep-modal-toolbar">
+                            <select id="evModalProductFilter" class="form-control" style="flex:1; min-width:200px;">
+                                <option value="" data-i18n="entity_product_variants.select_product_first"><?= __t('entity_product_variants.select_product_first', 'Select a product...') ?></option>
+                            </select>
+                        </div>
+                        <div class="ep-modal-body" id="evModalVariantsList">
+                            <div class="ep-modal-loading" data-i18n="entity_product_variants.select_product_to_see_variants">
+                                <?= __t('entity_product_variants.select_product_to_see_variants', 'Select a product to see its variants') ?>
+                            </div>
+                        </div>
+                        <div class="ep-modal-footer">
+                            <span id="evModalSelectedCount" class="ep-selected-count"></span>
+                            <button type="button" id="btnConfirmVariants" class="btn btn-primary" data-i18n="entity_product_variants.add_selected">
+                                <i class="fas fa-check"></i>
+                                <?= __t('entity_product_variants.add_selected', 'Add Selected') ?>
+                            </button>
+                            <button type="button" id="btnCancelVariants" class="btn btn-secondary" data-i18n="common.cancel">
                                 <?= __t('common.cancel', 'Cancel') ?>
                             </button>
                         </div>

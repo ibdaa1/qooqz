@@ -27,6 +27,8 @@
         addresses: CONFIG.addressesApi || '/api/addresses',
         images: '/api/images',
         entityProducts: CONFIG.entityProductsApi || '/api/entity_products',
+        entityProductVariants: CONFIG.entityProductVariantsApi || '/api/entity_product_variants',
+        productVariants: CONFIG.productVariantsApi || '/api/product_variants',
         products: CONFIG.productsApi || '/api/products'
     };
 
@@ -45,6 +47,7 @@
         currentEntity: null,
         entityAttributes: [],
         entityProducts: [],
+        entityProductVariants: [],
         entitySettings: {},
         entityWorkingHours: [],
         addressData: null,
@@ -736,6 +739,7 @@
             if (entity.id) {
                 loadEntityAttributes(entity.id);
                 loadEntityProducts(entity.id);
+                loadEntityProductVariants(entity.id);
                 loadEntitySettings(entity.id);
                 loadEntityWorkingHours(entity.id);
                 loadEntityTranslations(entity.id);
@@ -750,8 +754,11 @@
 
             if (el.entityAttributesList) el.entityAttributesList.innerHTML = '';
             if (el.entityProductsList) el.entityProductsList.innerHTML = '';
+            if (el.entityVariantsList) el.entityVariantsList.innerHTML = '';
             state.entityProducts = [];
+            state.entityProductVariants = [];
             updateEntityProductsEmpty();
+            updateEntityVariantsEmpty();
             if (el.entityTranslations) el.entityTranslations.innerHTML = '';
             // Clear English inline fields
             if (el.enEntityName) el.enEntityName.value = '';
@@ -971,6 +978,7 @@
                 await saveEntityWorkingHours(savedEntityId, isEdit);
                 await saveEntityAttributes(savedEntityId, isEdit);
                 await saveEntityProducts(savedEntityId, isEdit);
+                await saveEntityProductVariants(savedEntityId, isEdit);
 
                 const translations = collectTranslations();
                 if (Object.keys(translations).length > 0 || state.deletedTranslationIds.length > 0) {
@@ -1485,6 +1493,378 @@ function renderEntityProducts(filterText) {
     function updateEntityProductsEmpty() {
         if (el.entityProductsEmpty) {
             el.entityProductsEmpty.style.display = state.entityProducts.length === 0 ? 'block' : 'none';
+        }
+    }
+
+    // ================================
+    // Entity Product Variants Management
+    // ================================
+
+    async function saveEntityProductVariants(entityId, isEdit = false) {
+        try {
+            if (!state.entityProductVariants || state.entityProductVariants.length === 0) {
+                if (isEdit) {
+                    try {
+                        await apiCall(`${API.entityProductVariants}?action=entity&entity_id=${entityId}`, {
+                            method: 'DELETE'
+                        });
+                    } catch (err) {
+                        console.warn('[Entities] Failed to clear old entity variants:', err);
+                    }
+                }
+                return;
+            }
+
+            if (isEdit) {
+                try {
+                    await apiCall(`${API.entityProductVariants}?action=entity&entity_id=${entityId}`, {
+                        method: 'DELETE'
+                    });
+                } catch (err) {
+                    console.warn('[Entities] Failed to clear old entity variants:', err);
+                }
+            }
+
+            const variants = state.entityProductVariants.map(ev => ({
+                product_id: parseInt(ev.product_id),
+                variant_id: parseInt(ev.variant_id),
+                stock_quantity: parseInt(ev.stock_quantity) || 0,
+                low_stock_threshold: parseInt(ev.low_stock_threshold) || 5,
+                manage_stock: ev.manage_stock ? 1 : 0,
+                stock_status: ev.stock_status || 'in_stock',
+                is_active: ev.is_active ? 1 : 0,
+                is_featured: ev.is_featured ? 1 : 0
+            }));
+
+            await apiCall(`${API.entityProductVariants}?action=bulk&entity_id=${entityId}&tenant_id=${state.tenantId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(variants)
+            });
+        } catch (err) {
+            console.warn('[Entities] Failed to save entity product variants:', err);
+        }
+    }
+
+    async function loadEntityProductVariants(entityId) {
+        try {
+            const result = await apiCall(`${API.entityProductVariants}?action=entity&entity_id=${entityId}&format=json`);
+            if (result.success) {
+                let items = [];
+                if (Array.isArray(result.data)) {
+                    items = result.data;
+                } else if (result.data && Array.isArray(result.data.items)) {
+                    items = result.data.items;
+                } else if (result.data && Array.isArray(result.data.data)) {
+                    items = result.data.data;
+                }
+
+                state.entityProductVariants = items.map(item => ({
+                    id: item.id,
+                    product_id: item.product_id,
+                    variant_id: item.variant_id,
+                    product_name: item.product_name || `Product #${item.product_id}`,
+                    variant_sku: item.variant_sku || '',
+                    variant_price: item.variant_price || '',
+                    stock_quantity: item.stock_quantity || 0,
+                    low_stock_threshold: item.low_stock_threshold || 5,
+                    manage_stock: parseInt(item.manage_stock) === 1,
+                    stock_status: item.stock_status || 'in_stock',
+                    is_active: parseInt(item.is_active) === 1,
+                    is_featured: parseInt(item.is_featured) === 1
+                }));
+
+                renderEntityProductVariants();
+                populateVariantProductFilter();
+            }
+        } catch (err) {
+            console.warn('[Entities] Failed to load entity product variants:', err);
+        }
+    }
+
+    function populateVariantProductFilter() {
+        const select = el.epvProductFilter;
+        if (!select) return;
+
+        // Get unique products from entity products (only show entity's products)
+        const productMap = {};
+        state.entityProducts.forEach(ep => {
+            productMap[ep.product_id] = ep.product_name || `Product #${ep.product_id}`;
+        });
+        // Also include products already in variants
+        state.entityProductVariants.forEach(ev => {
+            if (!productMap[ev.product_id]) {
+                productMap[ev.product_id] = ev.product_name || `Product #${ev.product_id}`;
+            }
+        });
+
+        select.innerHTML = `<option value="">${t('entity_product_variants.all_products', 'All Products')}</option>`;
+        Object.entries(productMap).forEach(([id, name]) => {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = name;
+            select.appendChild(opt);
+        });
+    }
+
+    function filterVariantsByProduct(productId) {
+        renderEntityProductVariants(null, productId ? parseInt(productId) : null);
+    }
+
+    // ── Variant Selection Modal ──────────────────────
+    let _variantModalProductVariants = [];
+    let _variantModalSelectedIds = new Set();
+
+    async function addEntityVariant() {
+        const modal = document.getElementById('entityVariantsModal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+
+        _variantModalSelectedIds.clear();
+        _variantModalProductVariants = [];
+
+        // Populate product dropdown from entity products only
+        const productSelect = document.getElementById('evModalProductFilter');
+        if (productSelect) {
+            productSelect.innerHTML = `<option value="">${t('entity_product_variants.select_product_first', 'Select a product...')}</option>`;
+
+            state.entityProducts.forEach(ep => {
+                const opt = document.createElement('option');
+                opt.value = parseInt(ep.product_id);
+                opt.textContent = ep.product_name || `Product #${ep.product_id}`;
+                productSelect.appendChild(opt);
+            });
+        }
+
+        const listContainer = document.getElementById('evModalVariantsList');
+        if (listContainer) {
+            listContainer.innerHTML = `<div class="ep-modal-loading">${t('entity_product_variants.select_product_to_see_variants', 'Select a product to see its variants')}</div>`;
+        }
+
+        updateVariantModalCount();
+    }
+
+    async function loadModalVariantsForProduct(productId) {
+        const listContainer = document.getElementById('evModalVariantsList');
+        if (!listContainer) return;
+
+        listContainer.innerHTML = `<div class="ep-modal-loading">${t('entity_product_variants.loading', 'Loading variants...')}</div>`;
+
+        try {
+            const result = await apiCall(`${API.productVariants}?product_id=${productId}&limit=500`);
+            let variants = [];
+            if (result.success) {
+                if (Array.isArray(result.data)) {
+                    variants = result.data;
+                } else if (result.data && Array.isArray(result.data.items)) {
+                    variants = result.data.items;
+                } else if (result.data && Array.isArray(result.data.data)) {
+                    variants = result.data.data;
+                }
+            }
+
+            _variantModalProductVariants = variants.map(v => ({
+                ...v,
+                _product_id: productId
+            }));
+
+            renderModalVariants();
+        } catch (err) {
+            console.warn('[Entities] Failed to load variants:', err);
+            listContainer.innerHTML = `<div class="ep-modal-empty">${t('entity_product_variants.no_variants_found', 'No variants found')}</div>`;
+        }
+    }
+
+    function renderModalVariants() {
+        const listContainer = document.getElementById('evModalVariantsList');
+        if (!listContainer) return;
+
+        if (_variantModalProductVariants.length === 0) {
+            listContainer.innerHTML = `<div class="ep-modal-empty">${t('entity_product_variants.no_variants_found', 'No variants found')}</div>`;
+            return;
+        }
+
+        listContainer.innerHTML = _variantModalProductVariants.map(v => {
+            const vid = String(v.id);
+            const isChecked = _variantModalSelectedIds.has(vid);
+            const alreadyAdded = state.entityProductVariants.some(ev => String(ev.variant_id) === vid);
+            return `
+                <div class="ep-modal-item ${isChecked ? 'selected' : ''} ${alreadyAdded ? 'ep-already-added' : ''}"
+                     onclick="Entities.toggleModalVariant('${vid}')">
+                    <div class="ep-modal-item-check">
+                        <input type="checkbox" ${isChecked ? 'checked' : ''} ${alreadyAdded ? 'disabled' : ''} tabindex="-1">
+                    </div>
+                    <div class="ep-modal-item-info">
+                        <strong>${esc(v.sku || v.variant_sku || 'Variant #' + v.id)}</strong>
+                        ${v.price ? `<span class="ep-sku">${v.price}</span>` : ''}
+                        ${alreadyAdded ? `<span class="ep-badge-added">${t('entity_product_variants.already_added', 'Already added')}</span>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function toggleModalVariant(variantId) {
+        const vid = String(variantId);
+        if (state.entityProductVariants.some(ev => String(ev.variant_id) === vid)) return;
+
+        if (_variantModalSelectedIds.has(vid)) {
+            _variantModalSelectedIds.delete(vid);
+        } else {
+            _variantModalSelectedIds.add(vid);
+        }
+        renderModalVariants();
+        updateVariantModalCount();
+    }
+
+    function updateVariantModalCount() {
+        const countEl = document.getElementById('evModalSelectedCount');
+        if (countEl) {
+            const count = _variantModalSelectedIds.size;
+            countEl.textContent = count > 0
+                ? t('entity_product_variants.selected_count', '{count} selected').replace('{count}', count)
+                : '';
+        }
+    }
+
+    function confirmModalVariants() {
+        if (_variantModalSelectedIds.size === 0) {
+            closeVariantsModal();
+            return;
+        }
+
+        const variantMap = {};
+        _variantModalProductVariants.forEach(v => { variantMap[String(v.id)] = v; });
+
+        _variantModalSelectedIds.forEach(vid => {
+            if (state.entityProductVariants.some(ev => String(ev.variant_id) === vid)) return;
+            const v = variantMap[vid];
+            if (!v) return;
+
+            state.entityProductVariants.push({
+                product_id: v._product_id || v.product_id,
+                variant_id: v.id,
+                product_name: v.product_name || '',
+                variant_sku: v.sku || v.variant_sku || '',
+                variant_price: v.price || '',
+                stock_quantity: 0,
+                low_stock_threshold: 5,
+                manage_stock: true,
+                stock_status: 'in_stock',
+                is_active: true,
+                is_featured: false
+            });
+        });
+
+        renderEntityProductVariants();
+        populateVariantProductFilter();
+        closeVariantsModal();
+    }
+
+    function closeVariantsModal() {
+        const modal = document.getElementById('entityVariantsModal');
+        if (modal) modal.style.display = 'none';
+        _variantModalSelectedIds.clear();
+        _variantModalProductVariants = [];
+    }
+
+    function renderEntityProductVariants(filterText, filterProductId) {
+        if (!el.entityVariantsList) return;
+
+        let items = state.entityProductVariants;
+        if (filterProductId) {
+            items = items.filter(ev => parseInt(ev.product_id) === filterProductId);
+        }
+        if (filterText) {
+            items = items.filter(ev =>
+                (ev.variant_sku || '').toLowerCase().includes(filterText) ||
+                (ev.product_name || '').toLowerCase().includes(filterText)
+            );
+        }
+
+        el.entityVariantsList.innerHTML = items.map((ev, idx) => {
+            const realIdx = state.entityProductVariants.indexOf(ev);
+            return `
+                <div class="entity-product-item" data-index="${realIdx}">
+                    <div class="ep-header">
+                        <div class="ep-product-info">
+                            <strong>${esc(ev.product_name || 'Product #' + ev.product_id)}</strong>
+                            <span class="ep-sku">${esc(ev.variant_sku || 'Variant #' + ev.variant_id)}</span>
+                            ${ev.variant_price ? `<span class="ep-sku">${ev.variant_price}</span>` : ''}
+                        </div>
+                        <div class="ep-actions">
+                            <button type="button" class="btn btn-sm btn-danger" onclick="Entities.removeEntityVariant(${realIdx})" title="${t('entity_product_variants.remove', 'Remove')}">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="ep-fields ep-fields-pricing">
+                        <div class="ep-field">
+                            <label>${t('entity_product_variants.stock_quantity', 'Stock')}</label>
+                            <input type="number" min="0" class="form-control" value="${ev.stock_quantity || 0}"
+                                   onchange="Entities.updateEntityVariant(${realIdx}, 'stock_quantity', this.value)">
+                        </div>
+                        <div class="ep-field">
+                            <label>${t('entity_product_variants.low_stock_threshold', 'Low Stock')}</label>
+                            <input type="number" min="0" class="form-control" value="${ev.low_stock_threshold || 5}"
+                                   onchange="Entities.updateEntityVariant(${realIdx}, 'low_stock_threshold', this.value)">
+                        </div>
+                        <div class="ep-field">
+                            <label>${t('entity_product_variants.stock_status', 'Stock Status')}</label>
+                            <select class="form-control" onchange="Entities.updateEntityVariant(${realIdx}, 'stock_status', this.value)">
+                                <option value="in_stock" ${ev.stock_status === 'in_stock' ? 'selected' : ''}>${t('entity_product_variants.in_stock', 'In Stock')}</option>
+                                <option value="out_of_stock" ${ev.stock_status === 'out_of_stock' ? 'selected' : ''}>${t('entity_product_variants.out_of_stock', 'Out of Stock')}</option>
+                                <option value="unlimited" ${ev.stock_status === 'unlimited' ? 'selected' : ''}>${t('entity_product_variants.unlimited', 'Unlimited')}</option>
+                            </select>
+                        </div>
+                        <div class="ep-field ep-toggle">
+                            <label>
+                                <input type="checkbox" ${ev.manage_stock ? 'checked' : ''}
+                                       onchange="Entities.updateEntityVariant(${realIdx}, 'manage_stock', this.checked)">
+                                ${t('entity_product_variants.manage_stock', 'Manage Stock')}
+                            </label>
+                        </div>
+                        <div class="ep-field ep-toggle">
+                            <label>
+                                <input type="checkbox" ${ev.is_active ? 'checked' : ''}
+                                       onchange="Entities.updateEntityVariant(${realIdx}, 'is_active', this.checked)">
+                                ${t('entity_product_variants.is_active', 'Active')}
+                            </label>
+                        </div>
+                        <div class="ep-field ep-toggle">
+                            <label>
+                                <input type="checkbox" ${ev.is_featured ? 'checked' : ''}
+                                       onchange="Entities.updateEntityVariant(${realIdx}, 'is_featured', this.checked)">
+                                ${t('entity_product_variants.is_featured', 'Featured')}
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        updateEntityVariantsEmpty();
+    }
+
+    function updateEntityVariant(index, field, value) {
+        if (state.entityProductVariants[index]) {
+            if (field === 'is_active' || field === 'is_featured' || field === 'manage_stock') {
+                state.entityProductVariants[index][field] = !!value;
+            } else {
+                state.entityProductVariants[index][field] = value;
+            }
+        }
+    }
+
+    function removeEntityVariant(index) {
+        state.entityProductVariants.splice(index, 1);
+        renderEntityProductVariants();
+        populateVariantProductFilter();
+    }
+
+    function updateEntityVariantsEmpty() {
+        if (el.entityVariantsEmpty) {
+            el.entityVariantsEmpty.style.display = state.entityProductVariants.length === 0 ? 'block' : 'none';
         }
     }
 
@@ -2636,6 +3016,12 @@ function renderEntityProducts(filterText) {
             entityProductsList: $id('entityProductsList'),
             entityProductsEmpty: $id('entityProductsEmpty'),
 
+            // Entity Product Variants
+            btnAddEntityVariant: $id('btnAddEntityVariant'),
+            entityVariantsList: $id('entityVariantsList'),
+            entityVariantsEmpty: $id('entityVariantsEmpty'),
+            epvProductFilter: $id('epvProductFilter'),
+
             // Media
             mediaModal: $id('mediaStudioModal'),
             mediaFrame: $id('mediaStudioFrame'),
@@ -2762,6 +3148,27 @@ function renderEntityProducts(filterText) {
             };
         }
 
+        // Entity Product Variants
+        if (el.btnAddEntityVariant) el.btnAddEntityVariant.onclick = addEntityVariant;
+
+        // Entity Variants Modal
+        const btnCloseVariantsModal = document.getElementById('btnCloseVariantsModal');
+        const btnCancelVariants = document.getElementById('btnCancelVariants');
+        const btnConfirmVariants = document.getElementById('btnConfirmVariants');
+        const evModalProductFilter = document.getElementById('evModalProductFilter');
+        if (btnCloseVariantsModal) btnCloseVariantsModal.onclick = closeVariantsModal;
+        if (btnCancelVariants) btnCancelVariants.onclick = closeVariantsModal;
+        if (btnConfirmVariants) btnConfirmVariants.onclick = confirmModalVariants;
+        if (evModalProductFilter) {
+            evModalProductFilter.onchange = function() {
+                if (this.value) loadModalVariantsForProduct(parseInt(this.value));
+                else {
+                    const listContainer = document.getElementById('evModalVariantsList');
+                    if (listContainer) listContainer.innerHTML = `<div class="ep-modal-loading">${t('entity_product_variants.select_product_to_see_variants', 'Select a product to see its variants')}</div>`;
+                }
+            };
+        }
+
         // Media buttons
         document.querySelectorAll('.btnSelectMedia').forEach(btn => {
             btn.onclick = function () {
@@ -2825,6 +3232,10 @@ function renderEntityProducts(filterText) {
         updateEntityProduct,
         removeEntityProduct,
         toggleModalProduct,
+        updateEntityVariant,
+        removeEntityVariant,
+        toggleModalVariant,
+        filterVariantsByProduct,
         toggleWorkingDay,
         updateWorkingTime,
         setAllDay,
