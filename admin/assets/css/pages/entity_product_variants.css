@@ -1,0 +1,550 @@
+/* ═══════════════════════════════════════════════════
+   Entity Product Variants – Standalone CSS
+   ═══════════════════════════════════════════════════ */
+
+#epvPageContainer {
+    --_bg-main      : var(--background-main, #0a0a0a);
+    --_bg-card      : var(--background-card, #111111);
+    --_bg-input     : var(--background-input, #1a1a2e);
+    --_text         : var(--text-primary, #f1f5f9);
+    --_text-sec     : var(--text-secondary, #94a3b8);
+    --_border       : var(--border-color, #1e293b);
+    --_primary      : var(--primary-color, #3b82f6);
+    --_primary-hover: var(--primary-hover, #2563eb);
+    --_success      : var(--success, #22c55e);
+    --_danger       : var(--danger, #ef4444);
+    --_warning      : var(--warning, #f59e0b);
+    --_radius       : var(--border-radius, 8px);
+    --_shadow       : 0 1px 3px rgba(0,0,0,.3);
+
+    font-family: var(--font-family, 'Inter', sans-serif);
+    color: var(--_text);
+    padding: clamp(12px, 2vw, 24px);
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* ─── Page header ─── */
+#epvPageContainer .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+#epvPageContainer .page-header h1 {
+    font-size: clamp(1.2rem, 2.5vw, 1.75rem);
+    font-weight: 700;
+    margin: 0;
+}
+#epvPageContainer .page-header p {
+    color: var(--_text-sec);
+    margin: 4px 0 0;
+    font-size: 0.9rem;
+}
+
+/* ─── Cards ─── */
+#epvPageContainer .card {
+    background: var(--_bg-card);
+    border: 1px solid var(--_border);
+    border-radius: var(--_radius);
+    margin-bottom: 16px;
+    box-shadow: var(--_shadow);
+}
+#epvPageContainer .card-body {
+    padding: 16px;
+}
+
+/* ─── Tabs ─── */
+#epvPageContainer .content-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 0;
+    border-bottom: 2px solid var(--_border);
+    padding-bottom: 0;
+}
+#epvPageContainer .tab-btn {
+    padding: 10px 20px;
+    background: transparent;
+    color: var(--_text-sec);
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all .2s;
+    white-space: nowrap;
+}
+#epvPageContainer .tab-btn:hover {
+    color: var(--_text);
+    background: rgba(255,255,255,.03);
+}
+#epvPageContainer .tab-btn.active {
+    color: var(--_primary);
+    border-bottom-color: var(--_primary);
+}
+
+/* ─── Tab Content ─── */
+#epvPageContainer .tab-content {
+    background: var(--_bg-card);
+    border: 1px solid var(--_border);
+    border-top: none;
+    border-radius: 0 0 var(--_radius) var(--_radius);
+    padding: 20px;
+}
+
+/* ─── Section header ─── */
+#epvPageContainer .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+#epvPageContainer .section-search {
+    flex: 1;
+    min-width: 200px;
+    max-width: 400px;
+}
+#epvPageContainer .section-filters {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+    min-width: 200px;
+    flex-wrap: wrap;
+}
+
+/* ─── Section footer ─── */
+#epvPageContainer .section-footer {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--_border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* ─── Form Controls ─── */
+#epvPageContainer .form-control {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--_bg-input);
+    border: 1px solid var(--_border);
+    border-radius: var(--_radius);
+    color: var(--_text);
+    font-size: 0.875rem;
+    transition: border-color .2s;
+}
+#epvPageContainer .form-control:focus {
+    outline: none;
+    border-color: var(--_primary);
+    box-shadow: 0 0 0 2px rgba(59,130,246,.15);
+}
+#epvPageContainer select.form-control {
+    cursor: pointer;
+}
+#epvPageContainer .form-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.8rem;
+    color: var(--_text-sec);
+    font-weight: 600;
+}
+
+/* ─── Buttons ─── */
+#epvPageContainer .btn {
+    padding: 8px 16px;
+    border-radius: var(--_radius);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all .2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+#epvPageContainer .btn-primary {
+    background: var(--_primary);
+    color: #fff;
+}
+#epvPageContainer .btn-primary:hover {
+    background: var(--_primary-hover);
+}
+#epvPageContainer .btn-secondary {
+    background: transparent;
+    color: var(--_text-sec);
+    border-color: var(--_border);
+}
+#epvPageContainer .btn-secondary:hover {
+    background: rgba(255,255,255,.05);
+    color: var(--_text);
+}
+#epvPageContainer .btn-success {
+    background: var(--_success);
+    color: #fff;
+}
+#epvPageContainer .btn-success:hover {
+    filter: brightness(1.1);
+}
+#epvPageContainer .btn-danger {
+    background: var(--_danger);
+    color: #fff;
+}
+#epvPageContainer .btn-danger:hover {
+    filter: brightness(1.1);
+}
+#epvPageContainer .btn-sm {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+}
+
+/* ─── Items List ─── */
+#epvPageContainer .items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#epvPageContainer .item-card {
+    background: var(--_bg-input);
+    border: 1px solid var(--_border);
+    border-radius: var(--_radius);
+    padding: 14px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    transition: border-color .2s;
+}
+#epvPageContainer .item-card:hover {
+    border-color: var(--_primary);
+}
+
+#epvPageContainer .item-info {
+    flex: 1;
+    min-width: 0;
+}
+#epvPageContainer .item-info .item-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+    color: var(--_text);
+}
+#epvPageContainer .item-info .item-meta {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+    color: var(--_text-sec);
+}
+#epvPageContainer .item-info .item-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+#epvPageContainer .item-fields {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+#epvPageContainer .item-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+#epvPageContainer .item-field label {
+    font-size: 0.7rem;
+    color: var(--_text-sec);
+    font-weight: 600;
+    text-transform: uppercase;
+}
+#epvPageContainer .item-field input,
+#epvPageContainer .item-field select {
+    width: 100px;
+    padding: 5px 8px;
+    background: var(--_bg-card);
+    border: 1px solid var(--_border);
+    border-radius: 6px;
+    color: var(--_text);
+    font-size: 0.8rem;
+}
+#epvPageContainer .item-field input[type="number"] {
+    width: 80px;
+}
+#epvPageContainer .item-field input[type="checkbox"] {
+    width: auto;
+    cursor: pointer;
+}
+
+#epvPageContainer .item-actions {
+    display: flex;
+    align-items: center;
+}
+#epvPageContainer .item-actions .btn-remove {
+    background: transparent;
+    border: 1px solid var(--_danger);
+    color: var(--_danger);
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all .2s;
+}
+#epvPageContainer .item-actions .btn-remove:hover {
+    background: var(--_danger);
+    color: #fff;
+}
+
+/* ─── Empty State ─── */
+#epvPageContainer .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--_text-sec);
+}
+#epvPageContainer .empty-state p {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+/* ─── Badges ─── */
+#epvPageContainer .badge {
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: inline-block;
+}
+#epvPageContainer .badge-success {
+    background: rgba(34,197,94,.15);
+    color: var(--_success);
+}
+#epvPageContainer .badge-danger {
+    background: rgba(239,68,68,.15);
+    color: var(--_danger);
+}
+#epvPageContainer .badge-warning {
+    background: rgba(245,158,11,.15);
+    color: var(--_warning);
+}
+
+/* ═══════════════════════════════════════════════════
+   Modal overlay
+   ═══════════════════════════════════════════════════ */
+#epvPageContainer .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.7);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+#epvPageContainer .modal-content {
+    background: var(--_bg-card);
+    border: 1px solid var(--_border);
+    border-radius: var(--_radius);
+    width: 100%;
+    max-width: 650px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+}
+#epvPageContainer .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--_border);
+}
+#epvPageContainer .modal-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+#epvPageContainer .modal-close {
+    background: none;
+    border: none;
+    color: var(--_text-sec);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+#epvPageContainer .modal-close:hover {
+    color: var(--_text);
+}
+#epvPageContainer .modal-body {
+    padding: 16px 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+#epvPageContainer .modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--_border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+#epvPageContainer .modal-actions-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0;
+}
+#epvPageContainer .selected-count {
+    font-size: 0.8rem;
+    color: var(--_primary);
+    margin-left: auto;
+}
+[dir="rtl"] #epvPageContainer .selected-count {
+    margin-left: 0;
+    margin-right: auto;
+}
+
+/* ─── Modal Items ─── */
+#epvPageContainer .modal-items-list {
+    max-height: 350px;
+    overflow-y: auto;
+    border: 1px solid var(--_border);
+    border-radius: var(--_radius);
+    padding: 4px;
+}
+#epvPageContainer .modal-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background .15s;
+}
+#epvPageContainer .modal-item:hover {
+    background: rgba(255,255,255,.04);
+}
+#epvPageContainer .modal-item.selected {
+    background: rgba(59,130,246,.1);
+    border: 1px solid rgba(59,130,246,.3);
+}
+#epvPageContainer .modal-item.disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+#epvPageContainer .modal-item input[type="checkbox"] {
+    flex-shrink: 0;
+    cursor: pointer;
+}
+#epvPageContainer .modal-item-info {
+    flex: 1;
+    min-width: 0;
+}
+#epvPageContainer .modal-item-name {
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+#epvPageContainer .modal-item-meta {
+    font-size: 0.75rem;
+    color: var(--_text-sec);
+}
+#epvPageContainer .modal-item-badge {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 12px;
+    background: rgba(245,158,11,.15);
+    color: var(--_warning);
+}
+
+#epvPageContainer .loading-text {
+    text-align: center;
+    padding: 30px;
+    color: var(--_text-sec);
+    font-size: 0.9rem;
+}
+
+/* ═══════════════════════════════════════════════════
+   Toast Notifications
+   ═══════════════════════════════════════════════════ */
+#epvPageContainer .toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    padding: 12px 20px;
+    border-radius: var(--_radius);
+    font-size: 0.875rem;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0,0,0,.4);
+    animation: epvSlideIn .3s ease;
+}
+[dir="rtl"] #epvPageContainer .toast {
+    right: auto;
+    left: 20px;
+}
+#epvPageContainer .toast-success {
+    background: var(--_success);
+    color: #fff;
+}
+#epvPageContainer .toast-error {
+    background: var(--_danger);
+    color: #fff;
+}
+@keyframes epvSlideIn {
+    from { transform: translateY(-20px); opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    #epvPageContainer .item-card {
+        flex-direction: column;
+    }
+    #epvPageContainer .item-fields {
+        width: 100%;
+    }
+    #epvPageContainer .item-field input,
+    #epvPageContainer .item-field select {
+        width: 100%;
+    }
+    #epvPageContainer .section-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    #epvPageContainer .section-search {
+        max-width: 100%;
+    }
+    #epvPageContainer .modal-content {
+        max-height: 95vh;
+    }
+    #epvPageContainer .content-tabs {
+        overflow-x: auto;
+    }
+}
+
+/* ─── Variant group header ─── */
+#epvPageContainer .variant-group-header {
+    background: rgba(59,130,246,.08);
+    border: 1px solid rgba(59,130,246,.2);
+    border-radius: var(--_radius);
+    padding: 10px 16px;
+    margin-top: 12px;
+    margin-bottom: 4px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--_primary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+#epvPageContainer .variant-group-header .variant-count {
+    font-size: 0.8rem;
+    color: var(--_text-sec);
+    font-weight: 400;
+}

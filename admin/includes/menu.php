@@ -296,6 +296,7 @@ $ADMIN_MENU = [
         'i18n' => 'menu.business',
         'children' => [
             ['id'=>'entities','order'=>10,'icon'=>'🏪','i18n'=>'menu.entities','url'=>'fragments/entities.php'],
+            ['id'=>'entity_product_variants','order'=>15,'icon'=>'🔀','i18n'=>'nav.entity_product_variants','url'=>'fragments/entity_product_variants.php'],
             ['id'=>'entities_payment','order'=>20,'icon'=>'🏦','i18n'=>'entities_Payment','url'=>'fragments/entities_Payment.php'],
             ['id'=>'jobs','order'=>30,'icon'=>'💼','i18n'=>'menu.jobs','url'=>'fragments/jobs.php'],
             ['id'=>'job_categories','order'=>40,'icon'=>'📁','i18n'=>'job_categories','url'=>'fragments/job_categories.php'],
