@@ -254,10 +254,10 @@ $categoryTree   = [];   // parent categories → children
 if ($pdo) {
     try {
         // Fetch every category (with parent_id) that has active products for this entity
-        $catEcJoin   = '';
-        $catParams   = [$lang, $entityTenantId];
+        $entityCategoryJoin = '';
+        $catParams          = [$lang, $entityTenantId];
         if ($entityHasCatAssignments) {
-            $catEcJoin = 'JOIN entity_categories ec ON ec.category_id = c.id AND ec.entity_id = ? AND ec.is_active = 1';
+            $entityCategoryJoin = 'JOIN entity_categories ec ON ec.category_id = c.id AND ec.entity_id = ? AND ec.is_active = 1';
             $catParams[] = $entityId;
         }
         $catStmt = $pdo->prepare(
@@ -267,7 +267,7 @@ if ($pdo) {
                JOIN categories c ON c.id = pc.category_id AND c.is_active = 1
           LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
                JOIN products p ON p.id = pc.product_id AND p.tenant_id = ? AND p.is_active = 1
-               $catEcJoin
+               $entityCategoryJoin
               ORDER BY c.sort_order ASC, c.id ASC LIMIT 100"
         );
         $catStmt->execute($catParams);

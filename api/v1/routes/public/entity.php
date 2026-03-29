@@ -128,10 +128,10 @@ if ($first === 'entity') {
 
         // Check if entity has category assignments — graceful fallback when none exist
         $ecCount = (int)$pdoCount('SELECT COUNT(*) FROM entity_categories WHERE entity_id = ? AND is_active = 1', [$entityId]);
-        $ecJoin   = '';
+        $entityCategoryJoin = '';
         $catParams = [$lang, $eTenId];
         if ($ecCount > 0) {
-            $ecJoin = 'JOIN entity_categories ec ON ec.category_id = c.id AND ec.entity_id = ? AND ec.is_active = 1';
+            $entityCategoryJoin = 'JOIN entity_categories ec ON ec.category_id = c.id AND ec.entity_id = ? AND ec.is_active = 1';
             $catParams[] = $entityId;
         }
 
@@ -142,7 +142,7 @@ if ($first === 'entity') {
                JOIN categories c ON c.id = pc.category_id AND c.is_active = 1
           LEFT JOIN category_translations ct ON ct.category_id = c.id AND ct.language_code = ?
                JOIN products p ON p.id = pc.product_id AND p.tenant_id = ? AND p.is_active = 1
-               $ecJoin
+               $entityCategoryJoin
               ORDER BY c.sort_order ASC, c.id ASC LIMIT 100",
             $catParams
         );
