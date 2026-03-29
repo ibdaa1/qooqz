@@ -25,7 +25,9 @@
         tenants: CONFIG.tenantsApi || '/api/tenants',
         entityTypes: CONFIG.entityTypesApi || '/api/entity_types',
         addresses: CONFIG.addressesApi || '/api/addresses',
-        images: '/api/images'
+        images: '/api/images',
+        entityProducts: CONFIG.entityProductsApi || '/api/entity_products',
+        products: CONFIG.productsApi || '/api/products'
     };
 
     const state = {
@@ -42,6 +44,7 @@
         filters: {},
         currentEntity: null,
         entityAttributes: [],
+        entityProducts: [],
         entitySettings: {},
         entityWorkingHours: [],
         addressData: null,
@@ -732,6 +735,7 @@
 
             if (entity.id) {
                 loadEntityAttributes(entity.id);
+                loadEntityProducts(entity.id);
                 loadEntitySettings(entity.id);
                 loadEntityWorkingHours(entity.id);
                 loadEntityTranslations(entity.id);
@@ -745,6 +749,9 @@
             if (el.entityUserId && state.userId) el.entityUserId.value = state.userId;
 
             if (el.entityAttributesList) el.entityAttributesList.innerHTML = '';
+            if (el.entityProductsList) el.entityProductsList.innerHTML = '';
+            state.entityProducts = [];
+            updateEntityProductsEmpty();
             if (el.entityTranslations) el.entityTranslations.innerHTML = '';
             // Clear English inline fields
             if (el.enEntityName) el.enEntityName.value = '';
@@ -963,6 +970,7 @@
                 await saveEntitySettings(savedEntityId, isEdit);
                 await saveEntityWorkingHours(savedEntityId, isEdit);
                 await saveEntityAttributes(savedEntityId, isEdit);
+                await saveEntityProducts(savedEntityId, isEdit);
 
                 const translations = collectTranslations();
                 if (Object.keys(translations).length > 0 || state.deletedTranslationIds.length > 0) {
@@ -1087,6 +1095,240 @@
             }
         } catch (err) {
             console.warn('[Entities] Failed to save attributes:', err);
+        }
+    }
+
+    // ================================
+    // Entity Products Management
+    // ================================
+
+    async function saveEntityProducts(entityId, isEdit = false) {
+        try {
+            if (!state.entityProducts || state.entityProducts.length === 0) {
+                // If editing and no products, clear existing
+                if (isEdit) {
+                    try {
+                        await apiCall(`${API.entityProducts}?entity_id=${entityId}`, {
+                            method: 'DELETE'
+                        });
+                    } catch (err) {
+                        console.warn('[Entities] Failed to clear old entity products:', err);
+                    }
+                }
+                return;
+            }
+
+            // Delete existing entity products first when editing
+            if (isEdit) {
+                try {
+                    await apiCall(`${API.entityProducts}?entity_id=${entityId}`, {
+                        method: 'DELETE'
+                    });
+                } catch (err) {
+                    console.warn('[Entities] Failed to clear old entity products:', err);
+                }
+            }
+
+            // Save each product
+            for (const ep of state.entityProducts) {
+                if (!ep.product_id) continue;
+
+                const epData = {
+                    tenant_id: parseInt(state.tenantId),
+                    entity_id: parseInt(entityId),
+                    product_id: parseInt(ep.product_id),
+                    price: ep.price !== '' && ep.price !== null && ep.price !== undefined ? parseFloat(ep.price) : null,
+                    compare_at_price: ep.compare_at_price !== '' && ep.compare_at_price !== null && ep.compare_at_price !== undefined ? parseFloat(ep.compare_at_price) : null,
+                    stock_quantity: parseInt(ep.stock_quantity) || 0,
+                    low_stock_threshold: parseInt(ep.low_stock_threshold) || 5,
+                    is_active: ep.is_active ? 1 : 0,
+                    is_featured: ep.is_featured ? 1 : 0
+                };
+
+                await apiCall(API.entityProducts, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(epData)
+                });
+            }
+        } catch (err) {
+            console.warn('[Entities] Failed to save entity products:', err);
+        }
+    }
+
+    async function loadEntityProducts(entityId) {
+        try {
+            const result = await apiCall(`${API.entityProducts}?action=entity&entity_id=${entityId}&format=json`);
+            if (result.success) {
+                let items = [];
+                if (Array.isArray(result.data)) {
+                    items = result.data;
+                } else if (result.data && Array.isArray(result.data.items)) {
+                    items = result.data.items;
+                } else if (result.data && Array.isArray(result.data.data)) {
+                    items = result.data.data;
+                }
+
+                state.entityProducts = items.map(item => ({
+                    id: item.id,
+                    product_id: item.product_id,
+                    product_name: item.product_name || `Product #${item.product_id}`,
+                    product_sku: item.product_sku || '',
+                    price: item.price,
+                    compare_at_price: item.compare_at_price,
+                    stock_quantity: item.stock_quantity || 0,
+                    low_stock_threshold: item.low_stock_threshold || 5,
+                    is_active: parseInt(item.is_active) === 1,
+                    is_featured: parseInt(item.is_featured) === 1
+                }));
+
+                renderEntityProducts();
+            }
+        } catch (err) {
+            console.warn('[Entities] Failed to load entity products:', err);
+        }
+    }
+
+    async function addEntityProduct() {
+        // Prompt for product ID search
+        const searchTerm = prompt(t('entity_products.select_product', 'Enter product ID or search term:'));
+        if (!searchTerm) return;
+
+        try {
+            let product = null;
+
+            // Try numeric ID first
+            if (/^\d+$/.test(searchTerm.trim())) {
+                const result = await apiCall(`${API.products}?id=${searchTerm.trim()}&format=json`);
+                if (result.success && result.data) {
+                    product = result.data;
+                }
+            }
+
+            // Fallback to search
+            if (!product) {
+                const result = await apiCall(`${API.products}?search=${encodeURIComponent(searchTerm)}&limit=1&format=json`);
+                if (result.success) {
+                    const items = result.data?.items || result.data?.data || (Array.isArray(result.data) ? result.data : []);
+                    if (items.length > 0) {
+                        product = items[0];
+                    }
+                }
+            }
+
+            if (!product) {
+                showNotification(t('messages.error.load_failed', 'Product not found'), 'error');
+                return;
+            }
+
+            // Check if already added
+            if (state.entityProducts.some(ep => String(ep.product_id) === String(product.id))) {
+                showNotification(t('entity_products.product_exists', 'Product already added'), 'warning');
+                return;
+            }
+
+            state.entityProducts.push({
+                product_id: product.id,
+                product_name: product.name || product.product_name || `Product #${product.id}`,
+                product_sku: product.sku || product.product_sku || '',
+                price: '',
+                compare_at_price: '',
+                stock_quantity: 0,
+                low_stock_threshold: 5,
+                is_active: true,
+                is_featured: false
+            });
+
+            renderEntityProducts();
+        } catch (err) {
+            console.warn('[Entities] Failed to add entity product:', err);
+            showNotification(t('messages.error.load_failed', 'Failed to search product'), 'error');
+        }
+    }
+
+    function renderEntityProducts(filterText) {
+        if (!el.entityProductsList) return;
+
+        const items = filterText
+            ? state.entityProducts.filter(ep => (ep.product_name || '').toLowerCase().includes(filterText) || (ep.product_sku || '').toLowerCase().includes(filterText))
+            : state.entityProducts;
+
+        el.entityProductsList.innerHTML = items.map((ep, idx) => {
+            const realIdx = filterText ? state.entityProducts.indexOf(ep) : idx;
+            return `
+                <div class="entity-product-item" data-index="${realIdx}">
+                    <div class="ep-header">
+                        <div class="ep-product-info">
+                            <strong>${esc(ep.product_name)}</strong>
+                            ${ep.product_sku ? `<span class="ep-sku">${esc(ep.product_sku)}</span>` : ''}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="Entities.removeEntityProduct(${realIdx})" title="${t('entity_products.remove', 'Remove')}">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="ep-fields">
+                        <div class="ep-field">
+                            <label>${t('entity_products.price', 'Price')}</label>
+                            <input type="number" step="0.01" min="0" class="form-control" value="${ep.price ?? ''}"
+                                   onchange="Entities.updateEntityProduct(${realIdx}, 'price', this.value)"
+                                   placeholder="${t('entity_products.price', 'Price')}">
+                        </div>
+                        <div class="ep-field">
+                            <label>${t('entity_products.compare_at_price', 'Compare at Price')}</label>
+                            <input type="number" step="0.01" min="0" class="form-control" value="${ep.compare_at_price ?? ''}"
+                                   onchange="Entities.updateEntityProduct(${realIdx}, 'compare_at_price', this.value)"
+                                   placeholder="${t('entity_products.compare_at_price', 'Compare')}">
+                        </div>
+                        <div class="ep-field">
+                            <label>${t('entity_products.stock_quantity', 'Stock')}</label>
+                            <input type="number" min="0" class="form-control" value="${ep.stock_quantity || 0}"
+                                   onchange="Entities.updateEntityProduct(${realIdx}, 'stock_quantity', this.value)">
+                        </div>
+                        <div class="ep-field">
+                            <label>${t('entity_products.low_stock_threshold', 'Low Stock')}</label>
+                            <input type="number" min="0" class="form-control" value="${ep.low_stock_threshold || 5}"
+                                   onchange="Entities.updateEntityProduct(${realIdx}, 'low_stock_threshold', this.value)">
+                        </div>
+                        <div class="ep-field ep-toggle">
+                            <label>
+                                <input type="checkbox" ${ep.is_active ? 'checked' : ''}
+                                       onchange="Entities.updateEntityProduct(${realIdx}, 'is_active', this.checked)">
+                                ${t('entity_products.is_active', 'Active')}
+                            </label>
+                        </div>
+                        <div class="ep-field ep-toggle">
+                            <label>
+                                <input type="checkbox" ${ep.is_featured ? 'checked' : ''}
+                                       onchange="Entities.updateEntityProduct(${realIdx}, 'is_featured', this.checked)">
+                                ${t('entity_products.is_featured', 'Featured')}
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        updateEntityProductsEmpty();
+    }
+
+    function updateEntityProduct(index, field, value) {
+        if (state.entityProducts[index]) {
+            if (field === 'is_active' || field === 'is_featured') {
+                state.entityProducts[index][field] = !!value;
+            } else {
+                state.entityProducts[index][field] = value;
+            }
+        }
+    }
+
+    function removeEntityProduct(index) {
+        state.entityProducts.splice(index, 1);
+        renderEntityProducts();
+    }
+
+    function updateEntityProductsEmpty() {
+        if (el.entityProductsEmpty) {
+            el.entityProductsEmpty.style.display = state.entityProducts.length === 0 ? 'block' : 'none';
         }
     }
 
@@ -2232,6 +2474,12 @@
             btnAddEntityAttribute: $id('btnAddEntityAttribute'),
             entityAttributesList: $id('entityAttributesList'),
 
+            // Entity Products
+            entityProductSearch: $id('entityProductSearch'),
+            btnAddEntityProduct: $id('btnAddEntityProduct'),
+            entityProductsList: $id('entityProductsList'),
+            entityProductsEmpty: $id('entityProductsEmpty'),
+
             // Media
             mediaModal: $id('mediaStudioModal'),
             mediaFrame: $id('mediaStudioFrame'),
@@ -2332,6 +2580,14 @@
         // Attributes
         if (el.btnAddEntityAttribute) el.btnAddEntityAttribute.onclick = addAttribute;
 
+        // Entity Products
+        if (el.btnAddEntityProduct) el.btnAddEntityProduct.onclick = addEntityProduct;
+        if (el.entityProductSearch) {
+            el.entityProductSearch.oninput = function() {
+                renderEntityProducts(this.value.toLowerCase());
+            };
+        }
+
         // Media buttons
         document.querySelectorAll('.btnSelectMedia').forEach(btn => {
             btn.onclick = function () {
@@ -2392,6 +2648,8 @@
         remove: deleteEntity,
         updateAttributeValue,
         removeAttribute,
+        updateEntityProduct,
+        removeEntityProduct,
         toggleWorkingDay,
         updateWorkingTime,
         setAllDay,
