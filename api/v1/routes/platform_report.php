@@ -67,6 +67,7 @@ try {
                     'start_date'  => $_GET['start_date'] ?? '',
                     'end_date'    => $_GET['end_date'] ?? '',
                     'tenant_id'   => $_GET['tenant_id'] ?? '',
+                    'entity_id'   => $_GET['entity_id'] ?? '',
                     'period_type' => $_GET['period_type'] ?? 'daily',
                     'group_by'    => $_GET['group_by'] ?? 'day',
                 ];

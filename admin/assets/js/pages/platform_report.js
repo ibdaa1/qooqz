@@ -132,6 +132,9 @@
         if (CFG.isSuperAdmin) {
             loadTenants();
         }
+
+        // Load entities for filter
+        loadEntities();
     }
 
     // ═══════════════════════════════════════════
@@ -189,6 +192,34 @@
     }
 
     // ═══════════════════════════════════════════
+    // LOAD ENTITIES (for entity filter)
+    // ═══════════════════════════════════════════
+    async function loadEntities() {
+        try {
+            const params = {};
+            if (CFG.tenantId) params.tenant_id = CFG.tenantId;
+            const url = new URL('/api/entities', window.location.origin);
+            url.searchParams.set('limit', '200');
+            if (params.tenant_id) url.searchParams.set('tenant_id', params.tenant_id);
+            const resp = await fetch(url.toString(), {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await resp.json();
+            const sel = $('#prEntityId');
+            if (!sel) return;
+            const items = data?.data?.items || data?.data || [];
+            items.forEach(e => {
+                const opt = document.createElement('option');
+                opt.value = e.id;
+                opt.textContent = e.store_name || e.name || ('Entity #' + e.id);
+                sel.appendChild(opt);
+            });
+        } catch (e) {
+            console.error('Failed to load entities:', e);
+        }
+    }
+
+    // ═══════════════════════════════════════════
     // GENERATE REPORT
     // ═══════════════════════════════════════════
     async function generateReport() {
@@ -198,6 +229,8 @@
         const groupBy = $('#prGroupBy')?.value || 'day';
         const tenantIdEl = $('#prTenantId');
         const tenantId = tenantIdEl ? tenantIdEl.value : (CFG.tenantId || '');
+        const entityIdEl = $('#prEntityId');
+        const entityId = entityIdEl ? entityIdEl.value : '';
 
         if (!reportType) {
             alert(t('select_report', 'Please select a report type'));
@@ -217,7 +250,8 @@
                 start_date: startDate,
                 end_date: endDate,
                 group_by: groupBy,
-                tenant_id: tenantId
+                tenant_id: tenantId,
+                entity_id: entityId
             });
 
             if (resp.success && resp.data?.success) {
@@ -308,6 +342,10 @@
                     { icon: '📉', label: t('low_stock'), value: fmt(m.low_stock), color: 'pr-yellow' },
                     { icon: '🛍️', label: t('products_sold'), value: fmt(m.products_sold_count), color: 'pr-purple' },
                     { icon: '📊', label: t('units_sold'), value: fmt(m.total_units_sold), color: 'pr-orange' },
+                    { icon: '👁️', label: t('product_views'), value: fmt(m.product_views), color: 'pr-blue' },
+                    { icon: '👆', label: t('product_clicks'), value: fmt(m.product_clicks), color: 'pr-green' },
+                    { icon: '🛒', label: t('add_to_cart_events'), value: fmt(m.add_to_cart_events), color: 'pr-purple' },
+                    { icon: '❤️', label: t('product_favorites'), value: fmt(m.product_favorites), color: 'pr-red' },
                 ];
 
             case 'ads_performance':
@@ -316,7 +354,7 @@
                     { icon: '👁️', label: t('total_impressions'), value: fmt(m.total_impressions), color: 'pr-purple' },
                     { icon: '👆', label: t('total_clicks'), value: fmt(m.total_clicks), color: 'pr-green' },
                     { icon: '📈', label: t('ctr'), value: fmt(m.ctr) + '%', color: 'pr-orange' },
-                    { icon: '💵', label: t('total_spend'), value: fmtCurrency(m.total_spend), color: 'pr-red' },
+                    { icon: '🔗', label: t('total_interactions'), value: fmt(m.total_interactions), color: 'pr-red' },
                 ];
 
             case 'returns_complaints':
@@ -393,76 +431,203 @@
         canvas.parentElement.style.display = 'block';
 
         const labels = timeSeries.map(d => d.period);
-        const orderData = timeSeries.map(d => parseFloat(d.order_count) || 0);
-        const revenueData = timeSeries.map(d => parseFloat(d.revenue) || 0);
 
         const primaryColor = getComputedStyle(document.documentElement)
             .getPropertyValue('--primary-color').trim() || '#4F46E5';
         const successColor = getComputedStyle(document.documentElement)
             .getPropertyValue('--success-color').trim() || '#10B981';
 
-        mainChart = new Chart(canvas.getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: t('orders', 'Orders'),
-                        data: orderData,
-                        backgroundColor: primaryColor + '80',
-                        borderColor: primaryColor,
-                        borderWidth: 1,
-                        yAxisID: 'y',
-                        order: 2,
+        // Build datasets based on report type
+        const chartConfig = getChartConfig(type, timeSeries, labels, primaryColor, successColor);
+
+        mainChart = new Chart(canvas.getContext('2d'), chartConfig);
+    }
+
+    function getChartConfig(type, timeSeries, labels, primaryColor, successColor) {
+        switch (type) {
+            case 'ads_performance':
+                return {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                label: t('total_impressions', 'Views'),
+                                data: timeSeries.map(d => parseFloat(d.views) || 0),
+                                backgroundColor: primaryColor + '80',
+                                borderColor: primaryColor,
+                                borderWidth: 1,
+                                yAxisID: 'y',
+                                order: 2,
+                            },
+                            {
+                                label: t('total_clicks', 'Clicks'),
+                                data: timeSeries.map(d => parseFloat(d.clicks) || 0),
+                                type: 'line',
+                                borderColor: successColor,
+                                backgroundColor: successColor + '20',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.3,
+                                yAxisID: 'y1',
+                                order: 1,
+                            },
+                        ]
                     },
-                    {
-                        label: t('revenue', 'Revenue'),
-                        data: revenueData,
-                        type: 'line',
-                        borderColor: successColor,
-                        backgroundColor: successColor + '20',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.3,
-                        yAxisID: 'y1',
-                        order: 1,
+                    options: buildChartOptions(t('total_impressions', 'Views'), t('total_clicks', 'Clicks'), false)
+                };
+
+            case 'products_performance':
+                return {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                label: t('units_sold', 'Units Sold'),
+                                data: timeSeries.map(d => parseFloat(d.units_sold) || 0),
+                                backgroundColor: primaryColor + '80',
+                                borderColor: primaryColor,
+                                borderWidth: 1,
+                                yAxisID: 'y',
+                                order: 2,
+                            },
+                            {
+                                label: t('revenue', 'Revenue'),
+                                data: timeSeries.map(d => parseFloat(d.revenue) || 0),
+                                type: 'line',
+                                borderColor: successColor,
+                                backgroundColor: successColor + '20',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.3,
+                                yAxisID: 'y1',
+                                order: 1,
+                            },
+                        ]
                     },
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: { intersect: false, mode: 'index' },
-                plugins: {
-                    legend: { position: 'top' },
-                    tooltip: {
-                        callbacks: {
-                            label: function (ctx) {
-                                if (ctx.datasetIndex === 1) {
-                                    return ctx.dataset.label + ': ' + fmtCurrency(ctx.raw);
-                                }
-                                return ctx.dataset.label + ': ' + fmt(ctx.raw);
-                            }
+                    options: buildChartOptions(t('units_sold', 'Units Sold'), t('revenue', 'Revenue'), true)
+                };
+
+            case 'returns_complaints':
+                return {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                label: t('total_returns', 'Returns'),
+                                data: timeSeries.map(d => parseFloat(d.return_count) || 0),
+                                backgroundColor: '#EF4444' + '80',
+                                borderColor: '#EF4444',
+                                borderWidth: 1,
+                            },
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'top' } },
+                        scales: {
+                            y: { beginAtZero: true, position: CFG.dir === 'rtl' ? 'right' : 'left' }
                         }
                     }
-                },
-                scales: {
-                    y: {
-                        type: 'linear',
-                        position: CFG.dir === 'rtl' ? 'right' : 'left',
-                        title: { display: true, text: t('orders', 'Orders') },
-                        beginAtZero: true,
+                };
+
+            case 'customer_behavior':
+                return {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                label: t('new_users', 'New Users'),
+                                data: timeSeries.map(d => parseFloat(d.new_users) || 0),
+                                backgroundColor: primaryColor + '80',
+                                borderColor: primaryColor,
+                                borderWidth: 1,
+                            },
+                        ]
                     },
-                    y1: {
-                        type: 'linear',
-                        position: CFG.dir === 'rtl' ? 'left' : 'right',
-                        title: { display: true, text: t('revenue', 'Revenue') },
-                        beginAtZero: true,
-                        grid: { drawOnChartArea: false },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'top' } },
+                        scales: {
+                            y: { beginAtZero: true, position: CFG.dir === 'rtl' ? 'right' : 'left' }
+                        }
+                    }
+                };
+
+            default:
+                // Default: orders + revenue (for sales, orders, entities, platform)
+                return {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                label: t('orders', 'Orders'),
+                                data: timeSeries.map(d => parseFloat(d.order_count) || 0),
+                                backgroundColor: primaryColor + '80',
+                                borderColor: primaryColor,
+                                borderWidth: 1,
+                                yAxisID: 'y',
+                                order: 2,
+                            },
+                            {
+                                label: t('revenue', 'Revenue'),
+                                data: timeSeries.map(d => parseFloat(d.revenue) || 0),
+                                type: 'line',
+                                borderColor: successColor,
+                                backgroundColor: successColor + '20',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.3,
+                                yAxisID: 'y1',
+                                order: 1,
+                            },
+                        ]
                     },
+                    options: buildChartOptions(t('orders', 'Orders'), t('revenue', 'Revenue'), true)
+                };
+        }
+    }
+
+    function buildChartOptions(leftLabel, rightLabel, rightIsCurrency) {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { position: 'top' },
+                tooltip: {
+                    callbacks: {
+                        label: function (ctx) {
+                            if (ctx.datasetIndex === 1 && rightIsCurrency) {
+                                return ctx.dataset.label + ': ' + fmtCurrency(ctx.raw);
+                            }
+                            return ctx.dataset.label + ': ' + fmt(ctx.raw);
+                        }
+                    }
                 }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    position: CFG.dir === 'rtl' ? 'right' : 'left',
+                    title: { display: true, text: leftLabel },
+                    beginAtZero: true,
+                },
+                y1: {
+                    type: 'linear',
+                    position: CFG.dir === 'rtl' ? 'left' : 'right',
+                    title: { display: true, text: rightLabel },
+                    beginAtZero: true,
+                    grid: { drawOnChartArea: false },
+                },
             }
-        });
+        };
     }
 
     // ═══════════════════════════════════════════
@@ -507,6 +672,26 @@
                     <td>${fmtCurrency(e.total_revenue)}</td>
                 </tr>`
             ).join('') || `<tr><td colspan="4">${h(t('no_data'))}</td></tr>`;
+            return;
+        }
+
+        if (type === 'ads_performance' && metrics.top_ads) {
+            thead.innerHTML = `<tr>
+                <th>#</th>
+                <th>${h(t('ad_type', 'Ad Type'))}</th>
+                <th>${h(t('ad_target', 'Target'))}</th>
+                <th>${h(t('total_impressions', 'Views'))}</th>
+                <th>${h(t('total_clicks', 'Clicks'))}</th>
+            </tr>`;
+            tbody.innerHTML = metrics.top_ads.map((a, i) =>
+                `<tr>
+                    <td>${i + 1}</td>
+                    <td>${h(a.ad_type || '-')}</td>
+                    <td>${h(a.ad_target || '-')}</td>
+                    <td>${fmt(a.total_views)}</td>
+                    <td>${fmt(a.total_clicks)}</td>
+                </tr>`
+            ).join('') || `<tr><td colspan="5">${h(t('no_data'))}</td></tr>`;
             return;
         }
 

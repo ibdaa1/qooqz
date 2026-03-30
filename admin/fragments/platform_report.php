@@ -168,6 +168,13 @@ if (file_exists($langFile)) {
             </div>
             <?php endif; ?>
 
+            <div class="pr-filter-group">
+                <label for="prEntityId"><?= __t('entity', 'Entity / Store') ?></label>
+                <select id="prEntityId" class="pr-input">
+                    <option value=""><?= __t('all_entities', 'All Entities') ?></option>
+                </select>
+            </div>
+
             <div class="pr-filter-group pr-filter-actions">
                 <button type="button" id="prGenerateBtn" class="pr-btn pr-btn-primary">
                     <?= __t('generate_report', 'Generate Report') ?>

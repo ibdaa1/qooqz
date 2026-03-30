@@ -37,7 +37,8 @@ final class PdoPlatformReportRepository
         string $periodType,
         string $startDate,
         string $endDate,
-        ?int $tenantId = null
+        ?int $tenantId = null,
+        ?int $entityId = null
     ): array {
         $sql = 'SELECT * FROM platform_report_stats
                 WHERE report_type = :rt
@@ -55,6 +56,12 @@ final class PdoPlatformReportRepository
         } else {
             $sql .= ' AND tenant_id IS NULL';
         }
+        if ($entityId !== null) {
+            $sql .= ' AND entity_id = :eid';
+            $params[':eid'] = $entityId;
+        } else {
+            $sql .= ' AND entity_id IS NULL';
+        }
         $sql .= ' ORDER BY period_date ASC';
 
         $stmt = $this->pdo->prepare($sql);
@@ -65,8 +72,8 @@ final class PdoPlatformReportRepository
     public function saveStats(array $data): int
     {
         $sql = 'INSERT INTO platform_report_stats
-                (tenant_id, report_type, period_type, period_date, period_start, period_end, metrics, generated_at)
-                VALUES (:tid, :rt, :pt, :pd, :ps, :pe, :m, NOW())
+                (tenant_id, entity_id, report_type, period_type, period_date, period_start, period_end, metrics, generated_at)
+                VALUES (:tid, :eid, :rt, :pt, :pd, :ps, :pe, :m, NOW())
                 ON DUPLICATE KEY UPDATE
                     metrics = VALUES(metrics),
                     generated_at = NOW(),
@@ -75,6 +82,7 @@ final class PdoPlatformReportRepository
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             ':tid' => $data['tenant_id'] ?? null,
+            ':eid' => $data['entity_id'] ?? null,
             ':rt'  => $data['report_type'],
             ':pt'  => $data['period_type'],
             ':pd'  => $data['period_date'],
@@ -216,7 +224,25 @@ final class PdoPlatformReportRepository
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $productStats = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        // Core events for product analytics (views, clicks, add_to_cart, favorites)
+        $evParams = [':s' => $start, ':e' => $end];
+        $evSql = "SELECT
+                    SUM(CASE WHEN ce.event_type = 'view' THEN 1 ELSE 0 END) AS product_views,
+                    SUM(CASE WHEN ce.event_type = 'click' THEN 1 ELSE 0 END) AS product_clicks,
+                    SUM(CASE WHEN ce.event_type = 'add_to_cart' THEN 1 ELSE 0 END) AS add_to_cart_events,
+                    SUM(CASE WHEN ce.event_type = 'favorite' THEN 1 ELSE 0 END) AS product_favorites,
+                    SUM(CASE WHEN ce.event_type = 'purchase' THEN 1 ELSE 0 END) AS product_purchases
+                 FROM core_events ce
+                 WHERE ce.entity_type = 'product'
+                   AND ce.created_at BETWEEN :s AND :e";
+
+        $evStmt = $this->pdo->prepare($evSql);
+        $evStmt->execute($evParams);
+        $eventStats = $evStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        return array_merge($productStats, $eventStats);
     }
 
     public function getTopProducts(string $start, string $end, ?int $tenantId = null, int $limit = 10): array
@@ -260,21 +286,40 @@ final class PdoPlatformReportRepository
 
         $sql = "SELECT
                     (SELECT COUNT(*) FROM ad_campaigns ac WHERE ac.status = 'active' {$tWhere}) AS active_campaigns,
-                    COALESCE(SUM(ast.impressions), 0) AS total_impressions,
+                    COALESCE(SUM(ast.views), 0) AS total_impressions,
                     COALESCE(SUM(ast.clicks), 0) AS total_clicks,
-                    CASE WHEN SUM(ast.impressions) > 0
-                         THEN ROUND(SUM(ast.clicks) * 100.0 / SUM(ast.impressions), 2)
+                    CASE WHEN SUM(ast.views) > 0
+                         THEN ROUND(SUM(ast.clicks) * 100.0 / SUM(ast.views), 2)
                          ELSE 0 END AS ctr,
-                    COALESCE(SUM(ast.spend), 0) AS total_spend
+                    COALESCE(SUM(ast.views + ast.clicks), 0) AS total_interactions
                 FROM ad_stats ast
                 LEFT JOIN ads a ON a.id = ast.ad_id
                 LEFT JOIN ad_campaigns ac ON ac.id = a.campaign_id
-                WHERE ast.stat_date BETWEEN :s AND :e
-                {$tWhere}";
+                WHERE ast.date BETWEEN :s AND :e";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $adsData = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        // Top ads by views
+        $params2 = [':s' => $start, ':e' => $end];
+        $sql2 = "SELECT ast.ad_id,
+                    COALESCE(a.target_type, '') AS ad_type,
+                    COALESCE(a.target_value, '') AS ad_target,
+                    SUM(ast.views) AS total_views,
+                    SUM(ast.clicks) AS total_clicks
+                 FROM ad_stats ast
+                 LEFT JOIN ads a ON a.id = ast.ad_id
+                 WHERE ast.date BETWEEN :s AND :e
+                 GROUP BY ast.ad_id, a.target_type, a.target_value
+                 ORDER BY total_views DESC
+                 LIMIT 10";
+
+        $stmt2 = $this->pdo->prepare($sql2);
+        $stmt2->execute($params2);
+        $adsData['top_ads'] = $stmt2->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        return $adsData;
     }
 
     // ════════════════════════════════════════════════════════════
@@ -489,6 +534,135 @@ final class PdoPlatformReportRepository
     public function getRevenueTimeSeries(string $start, string $end, ?int $tenantId = null, string $groupBy = 'day'): array
     {
         return $this->getOrdersTimeSeries($start, $end, $tenantId, $groupBy);
+    }
+
+    public function getAdsTimeSeries(string $start, string $end, ?int $tenantId = null, string $groupBy = 'day'): array
+    {
+        $params = [':s' => $start, ':e' => $end];
+
+        $dateFormat = match($groupBy) {
+            'month' => '%Y-%m',
+            'week'  => '%x-W%v',
+            default => '%Y-%m-%d',
+        };
+
+        $sql = "SELECT
+                    DATE_FORMAT(ast.date, '{$dateFormat}') AS period,
+                    COALESCE(SUM(ast.views), 0) AS views,
+                    COALESCE(SUM(ast.clicks), 0) AS clicks
+                FROM ad_stats ast
+                WHERE ast.date BETWEEN :s AND :e
+                GROUP BY period
+                ORDER BY period ASC";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function getProductsTimeSeries(string $start, string $end, ?int $tenantId = null, string $groupBy = 'day'): array
+    {
+        $where = 'WHERE oi.created_at BETWEEN :s AND :e';
+        $params = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $where .= ' AND oi.tenant_id = :tid';
+            $params[':tid'] = $tenantId;
+        }
+
+        $dateFormat = match($groupBy) {
+            'month' => '%Y-%m',
+            'week'  => '%x-W%v',
+            default => '%Y-%m-%d',
+        };
+
+        $sql = "SELECT
+                    DATE_FORMAT(oi.created_at, '{$dateFormat}') AS period,
+                    COALESCE(SUM(oi.quantity), 0) AS units_sold,
+                    COALESCE(SUM(oi.total), 0) AS revenue
+                FROM order_items oi
+                {$where}
+                GROUP BY period
+                ORDER BY period ASC";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function getCoreEventsTimeSeries(string $start, string $end, string $entityType = 'product', string $groupBy = 'day'): array
+    {
+        $params = [':s' => $start, ':e' => $end, ':et' => $entityType];
+
+        $dateFormat = match($groupBy) {
+            'month' => '%Y-%m',
+            'week'  => '%x-W%v',
+            default => '%Y-%m-%d',
+        };
+
+        $sql = "SELECT
+                    DATE_FORMAT(ce.created_at, '{$dateFormat}') AS period,
+                    SUM(CASE WHEN ce.event_type = 'view' THEN 1 ELSE 0 END) AS views,
+                    SUM(CASE WHEN ce.event_type = 'click' THEN 1 ELSE 0 END) AS clicks
+                FROM core_events ce
+                WHERE ce.entity_type = :et
+                  AND ce.created_at BETWEEN :s AND :e
+                GROUP BY period
+                ORDER BY period ASC";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function getReturnsTimeSeries(string $start, string $end, ?int $tenantId = null, string $groupBy = 'day'): array
+    {
+        $where = 'WHERE r.created_at BETWEEN :s AND :e';
+        $params = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $where .= ' AND r.tenant_id = :tid';
+            $params[':tid'] = $tenantId;
+        }
+
+        $dateFormat = match($groupBy) {
+            'month' => '%Y-%m',
+            'week'  => '%x-W%v',
+            default => '%Y-%m-%d',
+        };
+
+        $sql = "SELECT
+                    DATE_FORMAT(r.created_at, '{$dateFormat}') AS period,
+                    COUNT(r.id) AS return_count
+                FROM returns r
+                {$where}
+                GROUP BY period
+                ORDER BY period ASC";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function getCustomerTimeSeries(string $start, string $end, string $groupBy = 'day'): array
+    {
+        $params = [':s' => $start, ':e' => $end];
+
+        $dateFormat = match($groupBy) {
+            'month' => '%Y-%m',
+            'week'  => '%x-W%v',
+            default => '%Y-%m-%d',
+        };
+
+        $sql = "SELECT
+                    DATE_FORMAT(u.created_at, '{$dateFormat}') AS period,
+                    COUNT(u.id) AS new_users
+                FROM users u
+                WHERE u.created_at BETWEEN :s AND :e
+                GROUP BY period
+                ORDER BY period ASC";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     // ════════════════════════════════════════════════════════════

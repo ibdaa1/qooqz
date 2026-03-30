@@ -35,6 +35,7 @@ INSERT INTO `report_types` (`type_key`, `title_en`, `title_ar`, `category`, `sor
 CREATE TABLE IF NOT EXISTS `platform_report_stats` (
   `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
   `tenant_id` int(10) UNSIGNED DEFAULT NULL COMMENT 'NULL = platform-wide stat',
+  `entity_id` bigint(20) UNSIGNED DEFAULT NULL COMMENT 'NULL = all entities; set for entity-level stats',
   `report_type` varchar(100) NOT NULL,
   `period_type` enum('daily','weekly','monthly','yearly','custom') NOT NULL DEFAULT 'daily',
   `period_date` date NOT NULL COMMENT 'The date this stat covers',
@@ -46,6 +47,7 @@ CREATE TABLE IF NOT EXISTS `platform_report_stats` (
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_tenant_type_period` (`tenant_id`, `report_type`, `period_type`, `period_date`),
+  KEY `idx_entity_type_period` (`entity_id`, `report_type`, `period_type`, `period_date`),
   KEY `idx_report_type` (`report_type`),
   KEY `idx_period_date` (`period_date`),
   KEY `idx_period_type_date` (`period_type`, `period_date`)

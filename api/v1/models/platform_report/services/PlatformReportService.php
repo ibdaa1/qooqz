@@ -40,6 +40,7 @@ final class PlatformReportService
         $startDate  = $params['start_date'];
         $endDate    = $params['end_date'];
         $tenantId   = isset($params['tenant_id']) && $params['tenant_id'] !== '' ? (int)$params['tenant_id'] : null;
+        $entityId   = isset($params['entity_id']) && $params['entity_id'] !== '' ? (int)$params['entity_id'] : null;
         $groupBy    = $params['group_by'] ?? 'day';
 
         $start = $startDate . ' 00:00:00';
@@ -53,6 +54,7 @@ final class PlatformReportService
             'report_type' => $reportType,
             'period'      => ['start' => $startDate, 'end' => $endDate],
             'tenant_id'   => $tenantId,
+            'entity_id'   => $entityId,
             'metrics'     => $metrics,
             'time_series' => $timeSeries,
         ];
@@ -151,10 +153,18 @@ final class PlatformReportService
 
     private function getTimeSeries(string $type, string $start, string $end, ?int $tenantId, string $groupBy): array
     {
-        // Most report types benefit from orders/revenue time series
-        if (in_array($type, ['sales_overview', 'revenue_profit', 'orders_performance', 'entities_performance', 'platform_health'], true)) {
-            return $this->repo->getOrdersTimeSeries($start, $end, $tenantId, $groupBy);
-        }
-        return [];
+        return match ($type) {
+            'sales_overview', 'revenue_profit', 'orders_performance', 'entities_performance', 'platform_health'
+                => $this->repo->getOrdersTimeSeries($start, $end, $tenantId, $groupBy),
+            'products_performance'
+                => $this->repo->getProductsTimeSeries($start, $end, $tenantId, $groupBy),
+            'ads_performance'
+                => $this->repo->getAdsTimeSeries($start, $end, $tenantId, $groupBy),
+            'returns_complaints'
+                => $this->repo->getReturnsTimeSeries($start, $end, $tenantId, $groupBy),
+            'customer_behavior'
+                => $this->repo->getCustomerTimeSeries($start, $end, $groupBy),
+            default => [],
+        };
     }
 }
