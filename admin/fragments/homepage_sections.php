@@ -198,6 +198,7 @@ function _hst($key, $fallback = '') {
                         <option value="list"><?= htmlspecialchars(_hst('modal.layout_list', 'List')) ?></option>
                         <option value="carousel"><?= htmlspecialchars(_hst('modal.layout_carousel', 'Carousel')) ?></option>
                         <option value="masonry"><?= htmlspecialchars(_hst('modal.layout_masonry', 'Masonry')) ?></option>
+                        <option value="full"><?= htmlspecialchars(_hst('modal.layout_full', 'Full Width')) ?></option>
                     </select>
                 </div>
                 <!-- Items Per Row (homepage only) -->

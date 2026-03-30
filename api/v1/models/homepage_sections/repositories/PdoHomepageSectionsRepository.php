@@ -15,7 +15,8 @@ final class PdoHomepageSectionsRepository
     public function all(int $tenantId, ?string $sectionType = null, ?int $themeId = null, string $lang = 'en'): array
     {
         $sql = "
-            SELECT hs.id, hs.tenant_id, hs.theme_id, hs.section_type, hs.layout_type, hs.items_per_row, 
+            SELECT hs.id, hs.tenant_id, hs.theme_id, hs.section_type, hs.component,
+                   hs.layout_type, hs.layout_config, hs.items_per_row,
                    hs.background_color, hs.text_color, hs.padding, hs.custom_css, hs.custom_html, 
                    hs.data_source, hs.is_active, hs.sort_order, hs.created_at, hs.updated_at,
                    COALESCE(hst.title, hs.title) AS title,

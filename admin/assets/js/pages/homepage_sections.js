@@ -15,8 +15,9 @@
     };
 
     var HOMEPAGE_SECTION_TYPES = [
-        'slider', 'categories', 'featured_products', 'new_products', 'deals',
-        'brands', 'vendors', 'banners', 'testimonials', 'custom_html', 'other'
+        'ads', 'search', 'slider', 'categories', 'products', 'featured_products',
+        'new_products', 'deals', 'brands', 'vendors', 'entities', 'banners',
+        'testimonials', 'auctions', 'jobs', 'custom_html', 'other'
     ];
 
     var HOMEPAGE_COMPONENTS = [
@@ -30,9 +31,11 @@
         'hours', 'location', 'offers', 'reviews', 'policies'
     ];
 
-    var LAYOUT_TYPES = ['grid', 'slider', 'list', 'carousel', 'masonry'];
+    var LAYOUT_TYPES = ['grid', 'slider', 'list', 'carousel', 'masonry', 'full'];
 
     var TYPE_COLORS = {
+        ads:               '#0ea5e9',
+        search:            '#a855f7',
         slider:            '#3b82f6',
         categories:        '#8b5cf6',
         featured_products: '#f59e0b',
@@ -40,8 +43,11 @@
         deals:             '#ef4444',
         brands:            '#6366f1',
         vendors:           '#ec4899',
+        entities:          '#06b6d4',
         banners:           '#14b8a6',
         testimonials:      '#f97316',
+        auctions:          '#d946ef',
+        jobs:              '#84cc16',
         custom_html:       '#64748b',
         other:             '#94a3b8',
         header:            '#3b82f6',
@@ -468,6 +474,9 @@
         html += '<div class="hs-card-meta">';
         if (component) html += '<span>' + t('modal.component', 'Component') + ': ' + escHtml(component) + '</span>';
         if (layout) html += '<span>' + t('modal.layout_type', 'Layout') + ': ' + escHtml(layout) + '</span>';
+        if (section.data_source) html += '<span>' + t('modal.data_source', 'Data Source') + ': ' + escHtml(section.data_source) + '</span>';
+        if (section.items_per_row) html += '<span>' + t('modal.items_per_row', 'Items/Row') + ': ' + escHtml(String(section.items_per_row)) + '</span>';
+        if (section.background_color) html += '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;border:1px solid #ccc;background:' + escHtml(section.background_color) + '"></span>' + escHtml(section.background_color) + '</span>';
         html += '</div>';
         html += '</div>';
         html += '<div class="hs-card-actions">';

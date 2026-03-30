@@ -356,10 +356,14 @@ final class PdoStorePagesRepository
         foreach ($translations as $lang => $data) {
             // Prepare content value: always JSON-encode for the JSON column
             $contentValue = null;
-            if (isset($data['content'])) {
-                $contentValue = is_string($data['content'])
+            if (isset($data['content']) && $data['content'] !== '' && $data['content'] !== null) {
+                $encoded = is_string($data['content'])
                     ? json_encode($data['content'])
                     : json_encode($data['content']);
+                // Only use encoded value if json_encode succeeded
+                if ($encoded !== false) {
+                    $contentValue = $encoded;
+                }
             }
 
             $stmt->execute([
