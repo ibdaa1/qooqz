@@ -1,0 +1,560 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * Platform Report Repository
+ * Handles all database operations for the reporting/analytics system.
+ * Reads from live tables (orders, products, etc.) and writes aggregated data
+ * to platform_report_stats.
+ */
+final class PdoPlatformReportRepository
+{
+    private PDO $pdo;
+
+    public function __construct(PDO $pdo)
+    {
+        $this->pdo = $pdo;
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // REPORT TYPES
+    // ════════════════════════════════════════════════════════════
+
+    public function allReportTypes(): array
+    {
+        $stmt = $this->pdo->query(
+            'SELECT * FROM report_types WHERE is_active = 1 ORDER BY sort_order ASC'
+        );
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // STORED STATS (read cached aggregations)
+    // ════════════════════════════════════════════════════════════
+
+    public function getStoredStats(
+        string $reportType,
+        string $periodType,
+        string $startDate,
+        string $endDate,
+        ?int $tenantId = null
+    ): array {
+        $sql = 'SELECT * FROM platform_report_stats
+                WHERE report_type = :rt
+                  AND period_type = :pt
+                  AND period_date BETWEEN :sd AND :ed';
+        $params = [
+            ':rt' => $reportType,
+            ':pt' => $periodType,
+            ':sd' => $startDate,
+            ':ed' => $endDate,
+        ];
+        if ($tenantId !== null) {
+            $sql .= ' AND tenant_id = :tid';
+            $params[':tid'] = $tenantId;
+        } else {
+            $sql .= ' AND tenant_id IS NULL';
+        }
+        $sql .= ' ORDER BY period_date ASC';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function saveStats(array $data): int
+    {
+        $sql = 'INSERT INTO platform_report_stats
+                (tenant_id, report_type, period_type, period_date, period_start, period_end, metrics, generated_at)
+                VALUES (:tid, :rt, :pt, :pd, :ps, :pe, :m, NOW())
+                ON DUPLICATE KEY UPDATE
+                    metrics = VALUES(metrics),
+                    generated_at = NOW(),
+                    updated_at = NOW()';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            ':tid' => $data['tenant_id'] ?? null,
+            ':rt'  => $data['report_type'],
+            ':pt'  => $data['period_type'],
+            ':pd'  => $data['period_date'],
+            ':ps'  => $data['period_start'],
+            ':pe'  => $data['period_end'],
+            ':m'   => is_string($data['metrics']) ? $data['metrics'] : json_encode($data['metrics']),
+        ]);
+
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // LIVE AGGREGATIONS – Sales Overview
+    // ════════════════════════════════════════════════════════════
+
+    public function aggregateSalesOverview(string $start, string $end, ?int $tenantId = null): array
+    {
+        $where = 'WHERE o.created_at BETWEEN :s AND :e';
+        $params = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $where .= ' AND o.tenant_id = :tid';
+            $params[':tid'] = $tenantId;
+        }
+
+        $sql = "SELECT
+                    COUNT(o.id) AS total_orders,
+                    COALESCE(SUM(o.grand_total), 0) AS total_revenue,
+                    COALESCE(SUM(o.tax_amount), 0) AS total_tax,
+                    COALESCE(SUM(o.shipping_cost), 0) AS total_shipping,
+                    COALESCE(SUM(o.discount_amount + o.coupon_discount), 0) AS total_discounts,
+                    COALESCE(AVG(o.grand_total), 0) AS avg_order_value,
+                    COUNT(DISTINCT o.user_id) AS unique_customers,
+                    SUM(CASE WHEN o.status = 'completed' OR o.status = 'delivered' THEN 1 ELSE 0 END) AS completed_orders,
+                    SUM(CASE WHEN o.status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_orders,
+                    SUM(CASE WHEN o.status = 'refunded' THEN 1 ELSE 0 END) AS refunded_orders,
+                    SUM(CASE WHEN o.payment_status = 'paid' THEN 1 ELSE 0 END) AS paid_orders
+                FROM orders o
+                {$where}";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // LIVE AGGREGATIONS – Revenue & Profit
+    // ════════════════════════════════════════════════════════════
+
+    public function aggregateRevenueProfit(string $start, string $end, ?int $tenantId = null): array
+    {
+        $where = 'WHERE o.created_at BETWEEN :s AND :e';
+        $params = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $where .= ' AND o.tenant_id = :tid';
+            $params[':tid'] = $tenantId;
+        }
+
+        $sql = "SELECT
+                    COALESCE(SUM(o.grand_total), 0) AS gross_revenue,
+                    COALESCE(SUM(o.discount_amount + o.coupon_discount), 0) AS total_discounts,
+                    COALESCE(SUM(o.grand_total) - SUM(o.discount_amount + o.coupon_discount), 0) AS net_revenue,
+                    COALESCE(SUM(o.tax_amount), 0) AS total_tax,
+                    COALESCE(SUM(o.shipping_cost), 0) AS total_shipping,
+                    (SELECT COALESCE(SUM(ci.commission_amount), 0)
+                     FROM commission_invoices ci
+                     WHERE ci.created_at BETWEEN :s2 AND :e2
+                     " . ($tenantId !== null ? 'AND ci.tenant_id = :tid2' : '') . "
+                    ) AS total_commissions
+                FROM orders o
+                {$where}";
+
+        $params[':s2'] = $start;
+        $params[':e2'] = $end;
+        if ($tenantId !== null) {
+            $params[':tid2'] = $tenantId;
+        }
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // LIVE AGGREGATIONS – Orders Performance
+    // ════════════════════════════════════════════════════════════
+
+    public function aggregateOrdersPerformance(string $start, string $end, ?int $tenantId = null): array
+    {
+        $where = 'WHERE o.created_at BETWEEN :s AND :e';
+        $params = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $where .= ' AND o.tenant_id = :tid';
+            $params[':tid'] = $tenantId;
+        }
+
+        $sql = "SELECT
+                    COUNT(o.id) AS total_orders,
+                    SUM(CASE WHEN o.status = 'pending' THEN 1 ELSE 0 END) AS pending_orders,
+                    SUM(CASE WHEN o.status = 'confirmed' THEN 1 ELSE 0 END) AS confirmed_orders,
+                    SUM(CASE WHEN o.status = 'processing' THEN 1 ELSE 0 END) AS processing_orders,
+                    SUM(CASE WHEN o.status = 'shipped' THEN 1 ELSE 0 END) AS shipped_orders,
+                    SUM(CASE WHEN o.status = 'delivered' OR o.status = 'completed' THEN 1 ELSE 0 END) AS delivered_orders,
+                    SUM(CASE WHEN o.status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_orders,
+                    SUM(CASE WHEN o.status = 'refunded' THEN 1 ELSE 0 END) AS refunded_orders,
+                    SUM(CASE WHEN o.order_type = 'online' THEN 1 ELSE 0 END) AS online_orders,
+                    SUM(CASE WHEN o.order_type = 'pos' THEN 1 ELSE 0 END) AS pos_orders,
+                    SUM(CASE WHEN o.payment_status = 'paid' THEN 1 ELSE 0 END) AS paid_count,
+                    SUM(CASE WHEN o.payment_status = 'pending' THEN 1 ELSE 0 END) AS payment_pending_count,
+                    COALESCE(AVG(TIMESTAMPDIFF(HOUR, o.created_at, o.delivered_at)), 0) AS avg_delivery_hours
+                FROM orders o
+                {$where}";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // LIVE AGGREGATIONS – Products Performance
+    // ════════════════════════════════════════════════════════════
+
+    public function aggregateProductsPerformance(string $start, string $end, ?int $tenantId = null): array
+    {
+        $tWhere = $tenantId !== null ? 'AND p.tenant_id = :tid' : '';
+        $tWhere2 = $tenantId !== null ? 'AND oi.tenant_id = :tid2' : '';
+        $params = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $params[':tid'] = $tenantId;
+            $params[':tid2'] = $tenantId;
+        }
+
+        $sql = "SELECT
+                    (SELECT COUNT(*) FROM products p WHERE 1=1 {$tWhere}) AS total_products,
+                    (SELECT COUNT(*) FROM products p WHERE p.is_active = 1 {$tWhere}) AS active_products,
+                    (SELECT COUNT(*) FROM products p WHERE p.stock_status = 'out_of_stock' {$tWhere}) AS out_of_stock,
+                    (SELECT COUNT(*) FROM products p WHERE p.stock_quantity <= p.low_stock_threshold AND p.stock_quantity > 0 {$tWhere}) AS low_stock,
+                    (SELECT COUNT(DISTINCT oi.product_id) FROM order_items oi WHERE oi.created_at BETWEEN :s AND :e {$tWhere2}) AS products_sold_count,
+                    (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi WHERE oi.created_at BETWEEN :s AND :e {$tWhere2}) AS total_units_sold";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function getTopProducts(string $start, string $end, ?int $tenantId = null, int $limit = 10): array
+    {
+        $where = 'WHERE oi.created_at BETWEEN :s AND :e';
+        $params = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $where .= ' AND oi.tenant_id = :tid';
+            $params[':tid'] = $tenantId;
+        }
+
+        $sql = "SELECT oi.product_id, oi.product_name,
+                    SUM(oi.quantity) AS total_quantity,
+                    SUM(oi.total) AS total_revenue
+                FROM order_items oi
+                {$where}
+                GROUP BY oi.product_id, oi.product_name
+                ORDER BY total_revenue DESC
+                LIMIT " . (int)$limit;
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // LIVE AGGREGATIONS – Ads Performance
+    // ════════════════════════════════════════════════════════════
+
+    public function aggregateAdsPerformance(string $start, string $end, ?int $tenantId = null): array
+    {
+        $tWhere = $tenantId !== null ? 'AND ac.tenant_id = :tid' : '';
+        $params = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $params[':tid'] = $tenantId;
+        }
+
+        $sql = "SELECT
+                    (SELECT COUNT(*) FROM ad_campaigns ac WHERE ac.status = 'active' {$tWhere}) AS active_campaigns,
+                    COALESCE(SUM(ast.impressions), 0) AS total_impressions,
+                    COALESCE(SUM(ast.clicks), 0) AS total_clicks,
+                    CASE WHEN SUM(ast.impressions) > 0
+                         THEN ROUND(SUM(ast.clicks) * 100.0 / SUM(ast.impressions), 2)
+                         ELSE 0 END AS ctr,
+                    COALESCE(SUM(ast.spend), 0) AS total_spend
+                FROM ad_stats ast
+                LEFT JOIN ads a ON a.id = ast.ad_id
+                LEFT JOIN ad_campaigns ac ON ac.id = a.campaign_id
+                WHERE ast.stat_date BETWEEN :s AND :e
+                {$tWhere}";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // LIVE AGGREGATIONS – Returns & Complaints
+    // ════════════════════════════════════════════════════════════
+
+    public function aggregateReturnsComplaints(string $start, string $end, ?int $tenantId = null): array
+    {
+        $where = 'WHERE r.created_at BETWEEN :s AND :e';
+        $params = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $where .= ' AND r.tenant_id = :tid';
+            $params[':tid'] = $tenantId;
+        }
+
+        $sql = "SELECT
+                    COUNT(r.id) AS total_returns,
+                    SUM(CASE WHEN r.status = 'pending' THEN 1 ELSE 0 END) AS pending_returns,
+                    SUM(CASE WHEN r.status = 'approved' THEN 1 ELSE 0 END) AS approved_returns,
+                    SUM(CASE WHEN r.status = 'rejected' THEN 1 ELSE 0 END) AS rejected_returns,
+                    SUM(CASE WHEN r.status = 'completed' THEN 1 ELSE 0 END) AS completed_returns
+                FROM returns r
+                {$where}";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        $returnsData = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        // Tickets/complaints
+        $tWhere2 = 'WHERE st.created_at BETWEEN :s2 AND :e2';
+        $params2 = [':s2' => $start, ':e2' => $end];
+
+        $sql2 = "SELECT
+                    COUNT(st.id) AS total_tickets,
+                    SUM(CASE WHEN st.status = 'open' THEN 1 ELSE 0 END) AS open_tickets,
+                    SUM(CASE WHEN st.status = 'closed' OR st.status = 'resolved' THEN 1 ELSE 0 END) AS resolved_tickets
+                 FROM support_tickets st
+                 {$tWhere2}";
+
+        $stmt2 = $this->pdo->prepare($sql2);
+        $stmt2->execute($params2);
+        $ticketsData = $stmt2->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        return array_merge($returnsData, $ticketsData);
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // LIVE AGGREGATIONS – Entities Performance
+    // ════════════════════════════════════════════════════════════
+
+    public function aggregateEntitiesPerformance(string $start, string $end, ?int $tenantId = null): array
+    {
+        $tWhere = $tenantId !== null ? 'AND e.tenant_id = :tid' : '';
+        $params = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $params[':tid'] = $tenantId;
+        }
+
+        $sql = "SELECT
+                    (SELECT COUNT(*) FROM entities e WHERE 1=1 {$tWhere}) AS total_entities,
+                    (SELECT COUNT(*) FROM entities e WHERE e.status = 'approved' {$tWhere}) AS active_entities,
+                    (SELECT COUNT(*) FROM entities e WHERE e.status = 'pending' {$tWhere}) AS pending_entities,
+                    (SELECT COUNT(*) FROM entities e WHERE e.status = 'suspended' {$tWhere}) AS suspended_entities";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        $entityStats = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        // Top entities by revenue
+        $oWhere = 'WHERE o.created_at BETWEEN :s AND :e';
+        $oParams = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $oWhere .= ' AND o.tenant_id = :tid';
+            $oParams[':tid'] = $tenantId;
+        }
+
+        $sql2 = "SELECT o.entity_id, e.store_name,
+                    COUNT(o.id) AS order_count,
+                    COALESCE(SUM(o.grand_total), 0) AS total_revenue
+                 FROM orders o
+                 LEFT JOIN entities e ON e.id = o.entity_id
+                 {$oWhere}
+                 GROUP BY o.entity_id, e.store_name
+                 ORDER BY total_revenue DESC
+                 LIMIT 10";
+
+        $stmt2 = $this->pdo->prepare($sql2);
+        $stmt2->execute($oParams);
+        $topEntities = $stmt2->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $entityStats['top_entities'] = $topEntities;
+        return $entityStats;
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // LIVE AGGREGATIONS – Customer Behavior
+    // ════════════════════════════════════════════════════════════
+
+    public function aggregateCustomerBehavior(string $start, string $end, ?int $tenantId = null): array
+    {
+        $params = [':s' => $start, ':e' => $end];
+
+        // New users registered
+        $sql1 = "SELECT COUNT(*) AS new_users FROM users WHERE created_at BETWEEN :s AND :e";
+        $stmt1 = $this->pdo->prepare($sql1);
+        $stmt1->execute($params);
+        $newUsers = (int)($stmt1->fetchColumn() ?: 0);
+
+        // Cart stats
+        $sql2 = "SELECT
+                    COUNT(*) AS total_carts,
+                    SUM(CASE WHEN status = 'abandoned' THEN 1 ELSE 0 END) AS abandoned_carts,
+                    SUM(CASE WHEN status = 'converted' THEN 1 ELSE 0 END) AS converted_carts
+                 FROM carts WHERE created_at BETWEEN :s AND :e";
+        $stmt2 = $this->pdo->prepare($sql2);
+        $stmt2->execute($params);
+        $cartData = $stmt2->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        // Repeat customers
+        $oWhere = 'WHERE o.created_at BETWEEN :s AND :e';
+        $oParams = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $oWhere .= ' AND o.tenant_id = :tid';
+            $oParams[':tid'] = $tenantId;
+        }
+        $sql3 = "SELECT COUNT(*) AS repeat_customers
+                 FROM (
+                    SELECT o.user_id FROM orders o {$oWhere}
+                    GROUP BY o.user_id HAVING COUNT(o.id) > 1
+                 ) sub";
+        $stmt3 = $this->pdo->prepare($sql3);
+        $stmt3->execute($oParams);
+        $repeatCustomers = (int)($stmt3->fetchColumn() ?: 0);
+
+        // Wishlists
+        $sql4 = "SELECT COUNT(DISTINCT wi.id) AS total_wishlist_items
+                 FROM wishlist_items wi WHERE wi.created_at BETWEEN :s AND :e";
+        $stmt4 = $this->pdo->prepare($sql4);
+        $stmt4->execute($params);
+        $wishlistItems = (int)($stmt4->fetchColumn() ?: 0);
+
+        return [
+            'new_users'          => $newUsers,
+            'total_carts'        => (int)($cartData['total_carts'] ?? 0),
+            'abandoned_carts'    => (int)($cartData['abandoned_carts'] ?? 0),
+            'converted_carts'    => (int)($cartData['converted_carts'] ?? 0),
+            'cart_conversion_rate' => ($cartData['total_carts'] ?? 0) > 0
+                ? round((($cartData['converted_carts'] ?? 0) / $cartData['total_carts']) * 100, 2)
+                : 0,
+            'repeat_customers'   => $repeatCustomers,
+            'wishlist_items'     => $wishlistItems,
+        ];
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // LIVE AGGREGATIONS – Platform Health
+    // ════════════════════════════════════════════════════════════
+
+    public function aggregatePlatformHealth(string $start, string $end): array
+    {
+        $params = [':s' => $start, ':e' => $end];
+
+        $sql = "SELECT
+                    (SELECT COUNT(*) FROM users) AS total_users,
+                    (SELECT COUNT(*) FROM users WHERE is_active = 1) AS active_users,
+                    (SELECT COUNT(*) FROM tenants) AS total_tenants,
+                    (SELECT COUNT(*) FROM tenants WHERE status = 'active') AS active_tenants,
+                    (SELECT COUNT(*) FROM entities) AS total_entities,
+                    (SELECT COUNT(*) FROM products) AS total_products,
+                    (SELECT COUNT(*) FROM orders WHERE created_at BETWEEN :s AND :e) AS period_orders,
+                    (SELECT COALESCE(SUM(grand_total), 0) FROM orders WHERE created_at BETWEEN :s AND :e) AS period_revenue,
+                    (SELECT COUNT(*) FROM subscriptions WHERE status = 'active') AS active_subscriptions";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // CHART DATA – Time Series
+    // ════════════════════════════════════════════════════════════
+
+    public function getOrdersTimeSeries(string $start, string $end, ?int $tenantId = null, string $groupBy = 'day'): array
+    {
+        $where = 'WHERE o.created_at BETWEEN :s AND :e';
+        $params = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $where .= ' AND o.tenant_id = :tid';
+            $params[':tid'] = $tenantId;
+        }
+
+        $dateFormat = match($groupBy) {
+            'month' => '%Y-%m',
+            'week'  => '%x-W%v',
+            default => '%Y-%m-%d',
+        };
+
+        $sql = "SELECT
+                    DATE_FORMAT(o.created_at, '{$dateFormat}') AS period,
+                    COUNT(o.id) AS order_count,
+                    COALESCE(SUM(o.grand_total), 0) AS revenue
+                FROM orders o
+                {$where}
+                GROUP BY period
+                ORDER BY period ASC";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function getRevenueTimeSeries(string $start, string $end, ?int $tenantId = null, string $groupBy = 'day'): array
+    {
+        return $this->getOrdersTimeSeries($start, $end, $tenantId, $groupBy);
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // REPORT EXPORTS
+    // ════════════════════════════════════════════════════════════
+
+    public function createExport(array $data): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO report_exports (tenant_id, report_type, export_format, filters, requested_by)
+             VALUES (:tid, :rt, :ef, :f, :rb)'
+        );
+        $stmt->execute([
+            ':tid' => $data['tenant_id'] ?? null,
+            ':rt'  => $data['report_type'],
+            ':ef'  => $data['export_format'] ?? 'excel',
+            ':f'   => isset($data['filters']) ? json_encode($data['filters']) : null,
+            ':rb'  => $data['requested_by'] ?? null,
+        ]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function listExports(?int $tenantId, int $limit = 20): array
+    {
+        $sql = 'SELECT * FROM report_exports';
+        $params = [];
+        if ($tenantId !== null) {
+            $sql .= ' WHERE tenant_id = :tid';
+            $params[':tid'] = $tenantId;
+        }
+        $sql .= ' ORDER BY created_at DESC LIMIT ' . (int)$limit;
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // REPORT SCHEDULES
+    // ════════════════════════════════════════════════════════════
+
+    public function listSchedules(?int $tenantId): array
+    {
+        $sql = 'SELECT * FROM report_schedules';
+        $params = [];
+        if ($tenantId !== null) {
+            $sql .= ' WHERE tenant_id = :tid';
+            $params[':tid'] = $tenantId;
+        }
+        $sql .= ' ORDER BY created_at DESC';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function saveSchedule(array $data): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO report_schedules (tenant_id, report_type, frequency, recipients_email, is_active, created_by)
+             VALUES (:tid, :rt, :freq, :emails, :active, :cb)'
+        );
+        $stmt->execute([
+            ':tid'    => $data['tenant_id'] ?? null,
+            ':rt'     => $data['report_type'],
+            ':freq'   => $data['frequency'] ?? 'daily',
+            ':emails' => $data['recipients_email'] ?? null,
+            ':active' => $data['is_active'] ?? 1,
+            ':cb'     => $data['created_by'] ?? null,
+        ]);
+        return (int) $this->pdo->lastInsertId();
+    }
+}
