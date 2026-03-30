@@ -28,9 +28,9 @@ final class StorePagesService
     // Pages
     // =========================================================
 
-    public function listPages(int $tenantId): array
+    public function listPages(int $tenantId, ?int $entityId = null): array
     {
-        return $this->repo->allPages($tenantId);
+        return $this->repo->allPages($tenantId, $entityId);
     }
 
     public function getPage(int $tenantId, int $id): array
@@ -43,9 +43,9 @@ final class StorePagesService
         return $row;
     }
 
-    public function getPageByType(int $tenantId, string $type): array
+    public function getPageByType(int $tenantId, string $type, ?int $entityId = null): array
     {
-        $row = $this->repo->findPageByType($tenantId, $type);
+        $row = $this->repo->findPageByType($tenantId, $type, $entityId);
         if (!$row) {
             throw new RuntimeException('Store page not found', 404);
         }

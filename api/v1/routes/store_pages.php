@@ -86,7 +86,8 @@ try {
 
             // GET ?type=X&tenant_id=Y → getPageByType
             if (isset($_GET['type']) && $tenantId > 0) {
-                ResponseFormatter::success($controller->getPageByType($tenantId, $_GET['type']));
+                $entityId = isset($_GET['entity_id']) ? (int)$_GET['entity_id'] : null;
+                ResponseFormatter::success($controller->getPageByType($tenantId, $_GET['type'], $entityId));
                 break;
             }
 
@@ -98,7 +99,8 @@ try {
 
             // GET ?tenant_id=Y → listPages
             if ($tenantId > 0) {
-                ResponseFormatter::success($controller->listPages($tenantId));
+                $entityId = isset($_GET['entity_id']) ? (int)$_GET['entity_id'] : null;
+                ResponseFormatter::success($controller->listPages($tenantId, $entityId));
                 break;
             }
 

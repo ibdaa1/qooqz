@@ -16,16 +16,24 @@ final class PdoStorePagesRepository
     // Pages
     // =========================================================
 
-    public function allPages(int $tenantId): array
+    public function allPages(int $tenantId, ?int $entityId = null): array
     {
-        $stmt = $this->pdo->prepare("
-            SELECT id, tenant_id, type, slug, is_active, settings, created_at, updated_at
+        $sql = "
+            SELECT id, tenant_id, entity_id, type, slug, is_active, settings, created_at, updated_at
             FROM store_pages
             WHERE tenant_id = :tenantId
-            ORDER BY type ASC
-        ");
+        ";
+        $params = [':tenantId' => $tenantId];
 
-        $stmt->execute([':tenantId' => $tenantId]);
+        if ($entityId !== null) {
+            $sql .= " AND entity_id = :entityId";
+            $params[':entityId'] = $entityId;
+        }
+
+        $sql .= " ORDER BY type ASC";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -33,7 +41,7 @@ final class PdoStorePagesRepository
     public function findPage(int $tenantId, int $id): ?array
     {
         $stmt = $this->pdo->prepare("
-            SELECT id, tenant_id, type, slug, is_active, settings, created_at, updated_at
+            SELECT id, tenant_id, entity_id, type, slug, is_active, settings, created_at, updated_at
             FROM store_pages
             WHERE tenant_id = :tenantId AND id = :id
             LIMIT 1
@@ -44,16 +52,24 @@ final class PdoStorePagesRepository
         return $row ?: null;
     }
 
-    public function findPageByType(int $tenantId, string $type): ?array
+    public function findPageByType(int $tenantId, string $type, ?int $entityId = null): ?array
     {
-        $stmt = $this->pdo->prepare("
-            SELECT id, tenant_id, type, slug, is_active, settings, created_at, updated_at
+        $sql = "
+            SELECT id, tenant_id, entity_id, type, slug, is_active, settings, created_at, updated_at
             FROM store_pages
             WHERE tenant_id = :tenantId AND type = :type
-            LIMIT 1
-        ");
+        ";
+        $params = [':tenantId' => $tenantId, ':type' => $type];
 
-        $stmt->execute([':tenantId' => $tenantId, ':type' => $type]);
+        if ($entityId !== null) {
+            $sql .= " AND entity_id = :entityId";
+            $params[':entityId'] = $entityId;
+        }
+
+        $sql .= " LIMIT 1";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
     }
@@ -63,10 +79,15 @@ final class PdoStorePagesRepository
         $isUpdate = !empty($data['id']);
         $oldData  = $isUpdate ? $this->findPage($tenantId, (int)$data['id']) : null;
 
+        $settingsValue = isset($data['settings'])
+            ? (is_string($data['settings']) ? $data['settings'] : json_encode($data['settings']))
+            : null;
+
         if ($isUpdate) {
             $stmt = $this->pdo->prepare("
                 UPDATE store_pages
-                SET type       = :type,
+                SET entity_id  = :entity_id,
+                    type       = :type,
                     slug       = :slug,
                     is_active  = :is_active,
                     settings   = :settings,
@@ -75,10 +96,11 @@ final class PdoStorePagesRepository
             ");
 
             $stmt->execute([
+                ':entity_id' => isset($data['entity_id']) ? (int)$data['entity_id'] : null,
                 ':type'      => $data['type'] ?? 'store',
                 ':slug'      => $data['slug'] ?? null,
                 ':is_active' => (int)($data['is_active'] ?? 1),
-                ':settings'  => isset($data['settings']) ? (is_string($data['settings']) ? $data['settings'] : json_encode($data['settings'])) : null,
+                ':settings'  => $settingsValue,
                 ':tenantId'  => $tenantId,
                 ':id'        => (int)$data['id'],
             ]);
@@ -86,30 +108,20 @@ final class PdoStorePagesRepository
             $id = (int)$data['id'];
         } else {
             $stmt = $this->pdo->prepare("
-                INSERT INTO store_pages (tenant_id, type, slug, is_active, settings, created_at, updated_at)
-                VALUES (:tenantId, :type, :slug, :is_active, :settings, NOW(), NOW())
-                ON DUPLICATE KEY UPDATE
-                    slug       = VALUES(slug),
-                    is_active  = VALUES(is_active),
-                    settings   = VALUES(settings),
-                    updated_at = NOW()
+                INSERT INTO store_pages (tenant_id, entity_id, type, slug, is_active, settings, created_at, updated_at)
+                VALUES (:tenantId, :entity_id, :type, :slug, :is_active, :settings, NOW(), NOW())
             ");
 
             $stmt->execute([
                 ':tenantId'  => $tenantId,
+                ':entity_id' => isset($data['entity_id']) ? (int)$data['entity_id'] : null,
                 ':type'      => $data['type'] ?? 'store',
                 ':slug'      => $data['slug'] ?? null,
                 ':is_active' => (int)($data['is_active'] ?? 1),
-                ':settings'  => isset($data['settings']) ? (is_string($data['settings']) ? $data['settings'] : json_encode($data['settings'])) : null,
+                ':settings'  => $settingsValue,
             ]);
 
             $id = (int)$this->pdo->lastInsertId();
-
-            // ON DUPLICATE KEY UPDATE does not set lastInsertId; look up the row
-            if ($id === 0) {
-                $existing = $this->findPageByType($tenantId, $data['type'] ?? 'store');
-                $id = $existing ? (int)$existing['id'] : 0;
-            }
         }
 
         if ($userId) {

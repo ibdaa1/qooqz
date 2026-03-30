@@ -23,6 +23,13 @@ final class StorePagesValidator
             $errors['type'] = 'Invalid page type';
         }
 
+        // entity_id (optional, positive integer)
+        if (isset($data['entity_id']) && $data['entity_id'] !== null && $data['entity_id'] !== '') {
+            if (!is_numeric($data['entity_id']) || (int)$data['entity_id'] < 1) {
+                $errors['entity_id'] = 'entity_id must be a positive integer';
+            }
+        }
+
         // slug (optional)
         if (isset($data['slug']) && strlen($data['slug']) > 255) {
             $errors['slug'] = 'Slug is too long (max 255 characters)';

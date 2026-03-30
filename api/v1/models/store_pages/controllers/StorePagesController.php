@@ -16,9 +16,9 @@ final class StorePagesController
     // Pages
     // =========================================================
 
-    public function listPages(int $tenantId): array
+    public function listPages(int $tenantId, ?int $entityId = null): array
     {
-        return $this->service->listPages($tenantId);
+        return $this->service->listPages($tenantId, $entityId);
     }
 
     public function getPage(int $tenantId, int $id): array
@@ -26,9 +26,9 @@ final class StorePagesController
         return $this->service->getPage($tenantId, $id);
     }
 
-    public function getPageByType(int $tenantId, string $type): array
+    public function getPageByType(int $tenantId, string $type, ?int $entityId = null): array
     {
-        return $this->service->getPageByType($tenantId, $type);
+        return $this->service->getPageByType($tenantId, $type, $entityId);
     }
 
     public function createPage(int $tenantId, array $data, ?int $userId = null): array
