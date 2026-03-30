@@ -137,6 +137,13 @@ function _hst($key, $fallback = '') {
         <!-- Store page selector -->
         <div class="hs-filter-card">
             <div class="hs-form-group">
+                <label data-i18n="store_pages.select_entity"><?= htmlspecialchars(_hst('store_pages.select_entity', 'Select Store')) ?></label>
+                <select id="store-entity-select" class="hs-input">
+                    <option value="" data-i18n="store_pages.select_entity_placeholder"><?= htmlspecialchars(_hst('store_pages.select_entity_placeholder', '-- Select Store --')) ?></option>
+                </select>
+                <small class="hs-entity-info" id="store-entity-info" style="display:none" data-i18n="store_pages.no_entity_selected"><?= htmlspecialchars(_hst('store_pages.no_entity_selected', 'Please select a store first')) ?></small>
+            </div>
+            <div class="hs-form-group">
                 <label data-i18n="store_pages.page_type"><?= htmlspecialchars(_hst('store_pages.page_type', 'Page Type')) ?></label>
                 <select id="store-page-type" class="hs-input">
                     <option value="store"><?= htmlspecialchars(_hst('store_pages.type_store', 'Store')) ?></option>
@@ -213,29 +220,42 @@ function _hst($key, $fallback = '') {
                     <label data-i18n="modal.is_active"><?= htmlspecialchars(_hst('modal.is_active', 'Active')) ?></label>
                     <input type="checkbox" id="modal-is-active" checked>
                 </div>
+                <!-- Layout Config JSON (homepage only) -->
+                <div class="hs-form-group" id="modal-layout-config-group" style="display:none">
+                    <label data-i18n="modal.layout_config"><?= htmlspecialchars(_hst('modal.layout_config', 'Layout Config (JSON)')) ?></label>
+                    <textarea id="modal-layout-config" class="hs-input" rows="3" placeholder="{}"></textarea>
+                </div>
+                <!-- Padding (homepage only) -->
+                <div class="hs-form-group" id="modal-padding-group" style="display:none">
+                    <label data-i18n="modal.padding"><?= htmlspecialchars(_hst('modal.padding', 'Padding')) ?></label>
+                    <input type="text" id="modal-padding" class="hs-input" placeholder="e.g. 16px">
+                </div>
+                <!-- Custom CSS (homepage only) -->
+                <div class="hs-form-group" id="modal-custom-css-group" style="display:none">
+                    <label data-i18n="modal.custom_css"><?= htmlspecialchars(_hst('modal.custom_css', 'Custom CSS')) ?></label>
+                    <textarea id="modal-custom-css" class="hs-input" rows="3" placeholder=""></textarea>
+                </div>
+                <!-- Custom HTML (homepage only) -->
+                <div class="hs-form-group" id="modal-custom-html-group" style="display:none">
+                    <label data-i18n="modal.custom_html"><?= htmlspecialchars(_hst('modal.custom_html', 'Custom HTML')) ?></label>
+                    <textarea id="modal-custom-html" class="hs-input" rows="3" placeholder=""></textarea>
+                </div>
+                <!-- Data Source (homepage only) -->
+                <div class="hs-form-group" id="modal-data-source-group" style="display:none">
+                    <label data-i18n="modal.data_source"><?= htmlspecialchars(_hst('modal.data_source', 'Data Source')) ?></label>
+                    <input type="text" id="modal-data-source" class="hs-input" placeholder="">
+                </div>
                 <!-- Settings JSON (store sections) -->
                 <div class="hs-form-group" id="modal-settings-group" style="display:none">
                     <label data-i18n="modal.settings"><?= htmlspecialchars(_hst('modal.settings', 'Settings (JSON)')) ?></label>
                     <textarea id="modal-settings" class="hs-input" rows="4" placeholder="{}"></textarea>
                 </div>
-                <!-- Translations -->
+                <!-- Translations (dynamic) -->
                 <div class="hs-form-group">
                     <h4 data-i18n="modal.translations"><?= htmlspecialchars(_hst('modal.translations', 'Translations')) ?></h4>
-                    <div id="modal-translations">
-                        <div class="hs-translation-row">
-                            <label>AR</label>
-                            <input type="text" class="modal-trans-title hs-input" data-lang="ar"
-                                   placeholder="<?= htmlspecialchars(_hst('modal.title_arabic', 'Title (Arabic)')) ?>">
-                            <input type="text" class="modal-trans-subtitle hs-input" data-lang="ar"
-                                   placeholder="<?= htmlspecialchars(_hst('modal.subtitle_arabic', 'Subtitle (Arabic)')) ?>">
-                        </div>
-                        <div class="hs-translation-row">
-                            <label>EN</label>
-                            <input type="text" class="modal-trans-title hs-input" data-lang="en"
-                                   placeholder="<?= htmlspecialchars(_hst('modal.title_english', 'Title (English)')) ?>">
-                            <input type="text" class="modal-trans-subtitle hs-input" data-lang="en"
-                                   placeholder="<?= htmlspecialchars(_hst('modal.subtitle_english', 'Subtitle (English)')) ?>">
-                        </div>
+                    <div id="modal-translations" class="hs-translations-container">
+                        <!-- Dynamic language rows will be injected by JS -->
+                        <div class="hs-translations-loading" data-i18n="common.loading"><?= htmlspecialchars(_hst('common.loading', 'Loading languages...')) ?></div>
                     </div>
                 </div>
             </div>

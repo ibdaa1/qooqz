@@ -9,7 +9,9 @@
 
     var API = {
         homepageSections: '/api/v1/homepage_sections',
-        storePages:       '/api/v1/store_pages'
+        storePages:       '/api/v1/store_pages',
+        languages:        '/api/v1/languages',
+        entities:         '/api/entities'
     };
 
     var HOMEPAGE_SECTION_TYPES = [
@@ -55,20 +57,23 @@
     };
 
     var state = {
-        language:         'ar',
-        tenantId:         0,
-        userId:           0,
-        isSuperAdmin:     false,
-        canManage:        false,
-        activeTab:        'homepage',
-        homepageSections: [],
-        storePages:       [],
-        currentStorePage: null,
-        storeSections:    [],
-        modalMode:        null,
-        modalTab:         null,
-        editingSection:   null,
-        dragSrcIndex:     null
+        language:           'ar',
+        tenantId:           0,
+        userId:             0,
+        isSuperAdmin:       false,
+        canManage:          false,
+        activeTab:          'homepage',
+        homepageSections:   [],
+        storePages:         [],
+        currentStorePage:   null,
+        storeSections:      [],
+        modalMode:          null,
+        modalTab:           null,
+        editingSection:     null,
+        dragSrcIndex:       null,
+        availableLanguages: [],
+        allEntities:        [],
+        selectedEntityId:   null
     };
 
     var el = {};
@@ -88,8 +93,11 @@
         loadTranslations(state.language).then(function () {
             applyTranslations();
             initEventListeners();
-            loadHomepageSections();
-            loadStorePages();
+            // Load languages and entities first, then sections
+            Promise.all([loadLanguages(), loadEntities()]).then(function () {
+                loadHomepageSections();
+                // Don't auto-load store pages; wait for entity selection
+            });
         });
     }
 
@@ -115,6 +123,8 @@
             btnSaveHomepage:     document.getElementById('btn-save-homepage'),
 
             storePageType:       document.getElementById('store-page-type'),
+            storeEntitySelect:   document.getElementById('store-entity-select'),
+            storeEntityInfo:     document.getElementById('store-entity-info'),
             storeSectionsList:   document.getElementById('store-sections-list'),
             btnAddStore:         document.getElementById('btn-add-store-section'),
             btnSaveStore:        document.getElementById('btn-save-store-sections'),
@@ -135,6 +145,16 @@
             modalIsActive:       document.getElementById('modal-is-active'),
             modalSettings:       document.getElementById('modal-settings'),
             modalSettingsGroup:  document.getElementById('modal-settings-group'),
+            modalLayoutConfig:   document.getElementById('modal-layout-config'),
+            modalLayoutConfigGroup: document.getElementById('modal-layout-config-group'),
+            modalPadding:        document.getElementById('modal-padding'),
+            modalPaddingGroup:   document.getElementById('modal-padding-group'),
+            modalCustomCss:      document.getElementById('modal-custom-css'),
+            modalCustomCssGroup: document.getElementById('modal-custom-css-group'),
+            modalCustomHtml:     document.getElementById('modal-custom-html'),
+            modalCustomHtmlGroup:document.getElementById('modal-custom-html-group'),
+            modalDataSource:     document.getElementById('modal-data-source'),
+            modalDataSourceGroup:document.getElementById('modal-data-source-group'),
             modalTranslations:   document.getElementById('modal-translations'),
             modalCancel:         document.getElementById('modal-cancel'),
             modalSave:           document.getElementById('modal-save'),
@@ -176,6 +196,101 @@
                 elems[i].textContent = translated;
             }
         }
+    }
+
+    // ════════════════════════════════════════
+    // LANGUAGES & ENTITIES
+    // ════════════════════════════════════════
+    function loadLanguages() {
+        return apiCall(API.languages)
+            .then(function (res) {
+                var items = (res && res.data && res.data.items) || (res && res.data) || [];
+                state.availableLanguages = Array.isArray(items) ? items : [];
+            })
+            .catch(function (e) {
+                console.warn('Failed to load languages, falling back to AR/EN:', e);
+                state.availableLanguages = [
+                    { code: 'ar', name: 'Arabic', direction: 'rtl' },
+                    { code: 'en', name: 'English', direction: 'ltr' }
+                ];
+            });
+    }
+
+    function loadEntities() {
+        if (!state.tenantId) return Promise.resolve();
+        var url = API.entities + '?limit=500&tenant_id=' + state.tenantId + '&lang=' + encodeURIComponent(state.language);
+        return apiCall(url)
+            .then(function (res) {
+                var items = (res && res.data && res.data.items) || (res && res.data) || [];
+                state.allEntities = Array.isArray(items) ? items : [];
+                populateEntityDropdown();
+            })
+            .catch(function (e) {
+                console.error('Failed to load entities:', e);
+                state.allEntities = [];
+                populateEntityDropdown();
+            });
+    }
+
+    function populateEntityDropdown() {
+        if (!el.storeEntitySelect) return;
+        var html = '<option value="">' + escHtml(t('store_pages.select_entity_placeholder', '-- Select Store --')) + '</option>';
+        for (var i = 0; i < state.allEntities.length; i++) {
+            var entity = state.allEntities[i];
+            var entityName = entity.name || entity.title || ('Entity #' + entity.id);
+            html += '<option value="' + escHtml(String(entity.id)) + '">' + escHtml(entityName) + '</option>';
+        }
+        el.storeEntitySelect.innerHTML = html;
+        // Restore selection if any
+        if (state.selectedEntityId) {
+            el.storeEntitySelect.value = String(state.selectedEntityId);
+        }
+        updateEntityInfo();
+    }
+
+    function updateEntityInfo() {
+        if (!el.storeEntityInfo) return;
+        if (!state.selectedEntityId) {
+            el.storeEntityInfo.style.display = '';
+            el.storeEntityInfo.textContent = t('store_pages.no_entity_selected', 'Please select a store first');
+        } else {
+            el.storeEntityInfo.style.display = 'none';
+        }
+    }
+
+    function renderTranslationRows(tab) {
+        if (!el.modalTranslations) return;
+        var langs = state.availableLanguages;
+        if (!langs || langs.length === 0) {
+            langs = [
+                { code: 'ar', name: 'Arabic', direction: 'rtl' },
+                { code: 'en', name: 'English', direction: 'ltr' }
+            ];
+        }
+        var isStore = (tab === 'store_pages');
+        var html = '';
+        for (var i = 0; i < langs.length; i++) {
+            var lang = langs[i];
+            var dirIndicator = (lang.direction === 'rtl') ? 'RTL' : 'LTR';
+            var inputDir = lang.direction || 'ltr';
+            html += '<div class="hs-translation-row" data-lang-code="' + escHtml(lang.code) + '">';
+            html += '<span class="lang-label">' + escHtml(lang.code.toUpperCase());
+            html += ' <span class="lang-dir-indicator">(' + escHtml(dirIndicator) + ')</span>';
+            html += '</span>';
+            html += '<div class="hs-translation-fields">';
+            html += '<input type="text" class="modal-trans-title hs-input" data-lang="' + escHtml(lang.code) + '" dir="' + escHtml(inputDir) + '"';
+            html += ' placeholder="' + escHtml(t('modal.title_placeholder', 'Title')) + ' (' + escHtml(lang.name || lang.code) + ')">';
+            if (isStore) {
+                html += '<textarea class="modal-trans-content hs-translation-content" data-lang="' + escHtml(lang.code) + '" dir="' + escHtml(inputDir) + '"';
+                html += ' placeholder="' + escHtml(t('modal.content_placeholder', 'Content')) + ' (' + escHtml(lang.name || lang.code) + ')" rows="3"></textarea>';
+            } else {
+                html += '<input type="text" class="modal-trans-subtitle hs-input" data-lang="' + escHtml(lang.code) + '" dir="' + escHtml(inputDir) + '"';
+                html += ' placeholder="' + escHtml(t('modal.subtitle_placeholder', 'Subtitle')) + ' (' + escHtml(lang.name || lang.code) + ')">';
+            }
+            html += '</div>';
+            html += '</div>';
+        }
+        el.modalTranslations.innerHTML = html;
     }
 
     // ════════════════════════════════════════
@@ -259,12 +374,28 @@
         if (el.storePageType) {
             el.storePageType.addEventListener('change', function () {
                 var pageType = this.value;
-                if (pageType) {
+                if (pageType && state.selectedEntityId) {
                     ensureStorePage(pageType).then(function () {
                         if (state.currentStorePage) {
                             loadStoreSections(state.currentStorePage.id);
                         }
                     });
+                }
+            });
+        }
+
+        if (el.storeEntitySelect) {
+            el.storeEntitySelect.addEventListener('change', function () {
+                var entityId = this.value ? parseInt(this.value) : null;
+                state.selectedEntityId = entityId;
+                state.currentStorePage = null;
+                state.storePages = [];
+                state.storeSections = [];
+                updateEntityInfo();
+                updateBadgeCounts();
+                renderStoreSections();
+                if (entityId) {
+                    loadStorePages();
                 }
             });
         }
@@ -400,6 +531,9 @@
     function loadStorePages() {
         if (!state.tenantId) return Promise.resolve();
         var url = API.storePages + '?tenant_id=' + state.tenantId;
+        if (state.selectedEntityId) {
+            url += '&entity_id=' + state.selectedEntityId;
+        }
         return apiCall(url)
             .then(function (res) {
                 var items = (res && res.data && res.data.items) || (res && res.data) || [];
@@ -421,12 +555,16 @@
     function ensureStorePage(pageType) {
         pageType = pageType || 'store';
         for (var i = 0; i < state.storePages.length; i++) {
-            if (state.storePages[i].type === pageType) {
+            if (state.storePages[i].type === pageType &&
+                (!state.selectedEntityId || String(state.storePages[i].entity_id) === String(state.selectedEntityId))) {
                 state.currentStorePage = state.storePages[i];
                 return Promise.resolve(state.currentStorePage);
             }
         }
         var url = API.storePages + '?tenant_id=' + state.tenantId + '&type=' + encodeURIComponent(pageType);
+        if (state.selectedEntityId) {
+            url += '&entity_id=' + state.selectedEntityId;
+        }
         return apiCall(url)
             .then(function (res) {
                 var page = (res && res.data) || null;
@@ -443,14 +581,18 @@
     }
 
     function createStorePage(pageType) {
+        var body = {
+            tenant_id: state.tenantId,
+            type: pageType,
+            name: pageType.charAt(0).toUpperCase() + pageType.slice(1) + ' Page',
+            is_active: 1
+        };
+        if (state.selectedEntityId) {
+            body.entity_id = state.selectedEntityId;
+        }
         return apiCall(API.storePages + '?target=page', {
             method: 'POST',
-            body: {
-                tenant_id: state.tenantId,
-                type: pageType,
-                name: pageType.charAt(0).toUpperCase() + pageType.slice(1) + ' Page',
-                is_active: 1
-            }
+            body: body
         }).then(function (res) {
             var page = (res && res.data) || null;
             if (page && page.id) {
@@ -597,6 +739,7 @@
 
         populateModalTypeOptions(tab);
         configureModalFields(tab);
+        renderTranslationRows(tab);
 
         if (mode === 'edit' && section) {
             populateModalFromSection(section, tab);
@@ -634,11 +777,16 @@
 
     function configureModalFields(tab) {
         var isHomepage = (tab === 'homepage');
-        if (el.modalComponentGroup) el.modalComponentGroup.style.display = isHomepage ? '' : 'none';
-        if (el.modalLayoutGroup)    el.modalLayoutGroup.style.display    = isHomepage ? '' : 'none';
-        if (el.modalItemsGroup)     el.modalItemsGroup.style.display     = isHomepage ? '' : 'none';
-        if (el.modalTextColorGroup) el.modalTextColorGroup.style.display = isHomepage ? '' : 'none';
-        if (el.modalSettingsGroup)  el.modalSettingsGroup.style.display  = isHomepage ? 'none' : '';
+        if (el.modalComponentGroup)    el.modalComponentGroup.style.display    = isHomepage ? '' : 'none';
+        if (el.modalLayoutGroup)       el.modalLayoutGroup.style.display       = isHomepage ? '' : 'none';
+        if (el.modalItemsGroup)        el.modalItemsGroup.style.display        = isHomepage ? '' : 'none';
+        if (el.modalTextColorGroup)    el.modalTextColorGroup.style.display    = isHomepage ? '' : 'none';
+        if (el.modalLayoutConfigGroup) el.modalLayoutConfigGroup.style.display = isHomepage ? '' : 'none';
+        if (el.modalPaddingGroup)      el.modalPaddingGroup.style.display      = isHomepage ? '' : 'none';
+        if (el.modalCustomCssGroup)    el.modalCustomCssGroup.style.display    = isHomepage ? '' : 'none';
+        if (el.modalCustomHtmlGroup)   el.modalCustomHtmlGroup.style.display   = isHomepage ? '' : 'none';
+        if (el.modalDataSourceGroup)   el.modalDataSourceGroup.style.display   = isHomepage ? '' : 'none';
+        if (el.modalSettingsGroup)     el.modalSettingsGroup.style.display     = isHomepage ? 'none' : '';
     }
 
     function resetModalFields() {
@@ -650,6 +798,11 @@
         if (el.modalTextColor)    el.modalTextColor.value = '#000000';
         if (el.modalIsActive)     el.modalIsActive.checked = true;
         if (el.modalSettings)     el.modalSettings.value = '';
+        if (el.modalLayoutConfig) el.modalLayoutConfig.value = '';
+        if (el.modalPadding)      el.modalPadding.value = '';
+        if (el.modalCustomCss)    el.modalCustomCss.value = '';
+        if (el.modalCustomHtml)   el.modalCustomHtml.value = '';
+        if (el.modalDataSource)   el.modalDataSource.value = '';
         clearTranslationFields();
     }
 
@@ -661,6 +814,11 @@
             if (el.modalItemsPerRow)  el.modalItemsPerRow.value = section.items_per_row || '4';
             if (el.modalBgColor)      el.modalBgColor.value     = section.background_color || '#ffffff';
             if (el.modalTextColor)    el.modalTextColor.value   = section.text_color || '#000000';
+            if (el.modalLayoutConfig) el.modalLayoutConfig.value = section.layout_config ? (typeof section.layout_config === 'string' ? section.layout_config : JSON.stringify(section.layout_config, null, 2)) : '';
+            if (el.modalPadding)      el.modalPadding.value      = section.padding || '';
+            if (el.modalCustomCss)    el.modalCustomCss.value    = section.custom_css || '';
+            if (el.modalCustomHtml)   el.modalCustomHtml.value   = section.custom_html || '';
+            if (el.modalDataSource)   el.modalDataSource.value   = section.data_source || '';
         } else {
             if (el.modalSectionType)  el.modalSectionType.value = section.type || '';
             if (el.modalSettings)     el.modalSettings.value    = section.settings ? (typeof section.settings === 'string' ? section.settings : JSON.stringify(section.settings, null, 2)) : '';
@@ -672,6 +830,7 @@
         if (section.translations && typeof section.translations === 'object') {
             var titleInputs = el.modalTranslations ? el.modalTranslations.querySelectorAll('.modal-trans-title') : [];
             var subtitleInputs = el.modalTranslations ? el.modalTranslations.querySelectorAll('.modal-trans-subtitle') : [];
+            var contentInputs = el.modalTranslations ? el.modalTranslations.querySelectorAll('.modal-trans-content') : [];
             for (var ti = 0; ti < titleInputs.length; ti++) {
                 var lang = titleInputs[ti].getAttribute('data-lang');
                 if (lang && section.translations[lang]) {
@@ -684,6 +843,12 @@
                     subtitleInputs[si].value = section.translations[sLang].subtitle || '';
                 }
             }
+            for (var ci = 0; ci < contentInputs.length; ci++) {
+                var cLang = contentInputs[ci].getAttribute('data-lang');
+                if (cLang && section.translations[cLang]) {
+                    contentInputs[ci].value = section.translations[cLang].content || '';
+                }
+            }
         }
     }
 
@@ -693,12 +858,17 @@
         for (var i = 0; i < inputs.length; i++) {
             inputs[i].value = '';
         }
+        var textareas = el.modalTranslations.querySelectorAll('textarea');
+        for (var j = 0; j < textareas.length; j++) {
+            textareas[j].value = '';
+        }
     }
 
     function collectModalData(tab) {
         var data = {};
         var titleInputs = el.modalTranslations ? el.modalTranslations.querySelectorAll('.modal-trans-title') : [];
         var subtitleInputs = el.modalTranslations ? el.modalTranslations.querySelectorAll('.modal-trans-subtitle') : [];
+        var contentInputs = el.modalTranslations ? el.modalTranslations.querySelectorAll('.modal-trans-content') : [];
         var trs = {};
         for (var ti = 0; ti < titleInputs.length; ti++) {
             var lang = titleInputs[ti].getAttribute('data-lang');
@@ -714,6 +884,13 @@
                 trs[sLang].subtitle = subtitleInputs[si].value.trim();
             }
         }
+        for (var ci = 0; ci < contentInputs.length; ci++) {
+            var cLang = contentInputs[ci].getAttribute('data-lang');
+            if (cLang) {
+                if (!trs[cLang]) trs[cLang] = {};
+                trs[cLang].content = contentInputs[ci].value.trim();
+            }
+        }
 
         data.is_active = el.modalIsActive && el.modalIsActive.checked ? 1 : 0;
         data.translations = trs;
@@ -726,6 +903,15 @@
             data.background_color  = el.modalBgColor ? el.modalBgColor.value : '#ffffff';
             data.text_color        = el.modalTextColor ? el.modalTextColor.value : '#000000';
             data.tenant_id         = state.tenantId;
+            // New homepage fields
+            var layoutConfigStr = el.modalLayoutConfig ? el.modalLayoutConfig.value.trim() : '';
+            if (layoutConfigStr) {
+                try { data.layout_config = JSON.parse(layoutConfigStr); } catch (e) { data.layout_config = layoutConfigStr; }
+            }
+            data.padding     = el.modalPadding ? el.modalPadding.value.trim() : '';
+            data.custom_css  = el.modalCustomCss ? el.modalCustomCss.value.trim() : '';
+            data.custom_html = el.modalCustomHtml ? el.modalCustomHtml.value.trim() : '';
+            data.data_source = el.modalDataSource ? el.modalDataSource.value.trim() : '';
         } else {
             data.type = el.modalSectionType ? el.modalSectionType.value : '';
             var settingsStr = el.modalSettings ? el.modalSettings.value.trim() : '';
