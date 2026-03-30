@@ -264,6 +264,7 @@ $ADMIN_MENU = [
         'icon' => '📢',
         'i18n' => 'menu.marketing',
         'children' => [
+            ['id'=>'homepage_sections','order'=>5,'icon'=>'🏠','i18n'=>'menu.homepage_sections','url'=>'fragments/homepage_sections.php'],
             ['id'=>'ads','order'=>10,'icon'=>'📺','i18n'=>'ads','url'=>'fragments/ads.php'],
             ['id'=>'banners','order'=>20,'icon'=>'🖼️','i18n'=>'menu.banners','url'=>'fragments/banners.php'],
             ['id'=>'seo_meta','order'=>30,'icon'=>'🔍','i18n'=>'Seo Meta','url'=>'fragments/seo_meta.php'],

@@ -44,5 +44,6 @@
   "theme_preview_title": "Active Theme Settings",
   "theme_preview_subtitle": "Colors, fonts & styles loaded from database",
   "menu.tickets": "Support Tickets",
-  "menu.ticket_categories": "Ticket Categories"
+  "menu.ticket_categories": "Ticket Categories",
+  "menu.homepage_sections": "Page Sections"
 }
