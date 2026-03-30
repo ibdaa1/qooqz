@@ -357,9 +357,7 @@ final class PdoStorePagesRepository
             // Prepare content value: always JSON-encode for the JSON column
             $contentValue = null;
             if (isset($data['content']) && $data['content'] !== '' && $data['content'] !== null) {
-                $encoded = is_string($data['content'])
-                    ? json_encode($data['content'])
-                    : json_encode($data['content']);
+                $encoded = json_encode($data['content']);
                 // Only use encoded value if json_encode succeeded
                 if ($encoded !== false) {
                     $contentValue = $encoded;

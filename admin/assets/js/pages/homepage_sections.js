@@ -476,7 +476,13 @@
         if (layout) html += '<span>' + t('modal.layout_type', 'Layout') + ': ' + escHtml(layout) + '</span>';
         if (section.data_source) html += '<span>' + t('modal.data_source', 'Data Source') + ': ' + escHtml(section.data_source) + '</span>';
         if (section.items_per_row) html += '<span>' + t('modal.items_per_row', 'Items/Row') + ': ' + escHtml(String(section.items_per_row)) + '</span>';
-        if (section.background_color) html += '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;border:1px solid #ccc;background:' + escHtml(section.background_color) + '"></span>' + escHtml(section.background_color) + '</span>';
+        if (section.background_color) {
+            var bgVal = section.background_color;
+            var safeBg = /^(#[a-fA-F0-9]{3,8}|var\(--[\w-]+\))$/.test(bgVal) ? bgVal : '';
+            html += '<span style="display:inline-flex;align-items:center;gap:4px">';
+            if (safeBg) html += '<span style="width:12px;height:12px;border-radius:2px;border:1px solid #ccc;background:' + safeBg + '"></span>';
+            html += escHtml(bgVal) + '</span>';
+        }
         html += '</div>';
         html += '</div>';
         html += '<div class="hs-card-actions">';

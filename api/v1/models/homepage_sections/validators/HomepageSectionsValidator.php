@@ -47,16 +47,16 @@ final class HomepageSectionsValidator
             $errors['items_per_row'] = 'Items per row must be between 1 and 12';
         }
 
-        // background_color (optional) – accept hex (#RRGGBB) or CSS variable (var(--…))
+        // background_color (optional) – accept hex (#RGB, #RGBA, #RRGGBB, #RRGGBBAA) or CSS variable (var(--…))
         if (isset($data['background_color']) && $data['background_color'] !== ''
-            && !preg_match('/^#[a-fA-F0-9]{3,8}$/', $data['background_color'])
+            && !preg_match('/^#([a-fA-F0-9]{3}|[a-fA-F0-9]{4}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/', $data['background_color'])
             && !preg_match('/^var\(--[\w-]+\)$/', $data['background_color'])) {
             $errors['background_color'] = 'Background color must be a valid hex color or CSS variable';
         }
 
-        // text_color (optional) – accept hex (#RRGGBB) or CSS variable (var(--…))
+        // text_color (optional) – accept hex (#RGB, #RGBA, #RRGGBB, #RRGGBBAA) or CSS variable (var(--…))
         if (isset($data['text_color']) && $data['text_color'] !== ''
-            && !preg_match('/^#[a-fA-F0-9]{3,8}$/', $data['text_color'])
+            && !preg_match('/^#([a-fA-F0-9]{3}|[a-fA-F0-9]{4}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/', $data['text_color'])
             && !preg_match('/^var\(--[\w-]+\)$/', $data['text_color'])) {
             $errors['text_color'] = 'Text color must be a valid hex color or CSS variable';
         }
