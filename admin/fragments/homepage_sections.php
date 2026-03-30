@@ -183,7 +183,7 @@ function _hst($key, $fallback = '') {
                 <thead>
                     <tr>
                         <th data-i18n="table.id"><?= htmlspecialchars(_hst('table.id', 'ID')) ?></th>
-                        <th data-i18n="table.section_type"><?= htmlspecialchars(_hst('table.section_type', 'Type')) ?></th>
+                        <th data-i18n="table.section_type"><?= htmlspecialchars(_hst('table.section_type', 'Section Type')) ?></th>
                         <th data-i18n="table.title"><?= htmlspecialchars(_hst('table.title', 'Title')) ?></th>
                         <th data-i18n="table.position"><?= htmlspecialchars(_hst('table.position', 'Position')) ?></th>
                         <th data-i18n="table.settings"><?= htmlspecialchars(_hst('table.settings', 'Settings')) ?></th>

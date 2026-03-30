@@ -500,12 +500,14 @@
         html += '</td>';
         html += '<td>' + escHtml(String(sortOrder)) + '</td>';
         // Actions
-        html += '<td class="hs-table-actions">';
+        html += '<td class="hs-table-actions"><div class="hs-table-actions-inner">';
         if (state.canManage) {
+            html += '<button class="hs-btn hs-btn-sm hs-btn-move" data-action="move-up" data-tab="homepage" data-index="' + index + '" title="&#9650;"><i class="fas fa-arrow-up"></i></button>';
+            html += '<button class="hs-btn hs-btn-sm hs-btn-move" data-action="move-down" data-tab="homepage" data-index="' + index + '" title="&#9660;"><i class="fas fa-arrow-down"></i></button>';
             html += '<button class="hs-btn hs-btn-sm hs-btn-edit" data-action="edit" data-tab="homepage" data-id="' + sectionId + '" data-index="' + index + '" title="' + t('common.edit', 'Edit') + '"><i class="fas fa-edit"></i></button>';
             html += '<button class="hs-btn hs-btn-sm hs-btn-delete" data-action="delete" data-tab="homepage" data-id="' + sectionId + '" data-index="' + index + '" title="' + t('common.delete', 'Delete') + '"><i class="fas fa-trash"></i></button>';
         }
-        html += '</td>';
+        html += '</div></td>';
         html += '</tr>';
         return html;
     }
@@ -518,6 +520,32 @@
                 var idx = parseInt(this.getAttribute('data-index'));
                 if (state.homepageSections[idx]) {
                     state.homepageSections[idx].is_active = this.checked ? 1 : 0;
+                }
+            });
+        }
+        var moveUpBtns = el.homepageSectionsBody.querySelectorAll('[data-action="move-up"][data-tab="homepage"]');
+        for (var u = 0; u < moveUpBtns.length; u++) {
+            moveUpBtns[u].addEventListener('click', function () {
+                var idx = parseInt(this.getAttribute('data-index'));
+                if (idx > 0) {
+                    arrayMove(state.homepageSections, idx, idx - 1);
+                    for (var s = 0; s < state.homepageSections.length; s++) {
+                        state.homepageSections[s].sort_order = s + 1;
+                    }
+                    renderHomepageSections();
+                }
+            });
+        }
+        var moveDownBtns = el.homepageSectionsBody.querySelectorAll('[data-action="move-down"][data-tab="homepage"]');
+        for (var dn = 0; dn < moveDownBtns.length; dn++) {
+            moveDownBtns[dn].addEventListener('click', function () {
+                var idx = parseInt(this.getAttribute('data-index'));
+                if (idx < state.homepageSections.length - 1) {
+                    arrayMove(state.homepageSections, idx, idx + 1);
+                    for (var s = 0; s < state.homepageSections.length; s++) {
+                        state.homepageSections[s].sort_order = s + 1;
+                    }
+                    renderHomepageSections();
                 }
             });
         }
@@ -698,12 +726,14 @@
         html += '</label>';
         html += '</td>';
         // Actions
-        html += '<td class="hs-table-actions">';
+        html += '<td class="hs-table-actions"><div class="hs-table-actions-inner">';
         if (state.canManage) {
+            html += '<button class="hs-btn hs-btn-sm hs-btn-move" data-action="move-up" data-tab="store_pages" data-index="' + index + '" title="&#9650;"><i class="fas fa-arrow-up"></i></button>';
+            html += '<button class="hs-btn hs-btn-sm hs-btn-move" data-action="move-down" data-tab="store_pages" data-index="' + index + '" title="&#9660;"><i class="fas fa-arrow-down"></i></button>';
             html += '<button class="hs-btn hs-btn-sm hs-btn-edit" data-action="edit" data-tab="store_pages" data-id="' + sectionId + '" data-index="' + index + '" title="' + t('common.edit', 'Edit') + '"><i class="fas fa-edit"></i></button>';
             html += '<button class="hs-btn hs-btn-sm hs-btn-delete" data-action="delete" data-tab="store_pages" data-id="' + sectionId + '" data-index="' + index + '" title="' + t('common.delete', 'Delete') + '"><i class="fas fa-trash"></i></button>';
         }
-        html += '</td>';
+        html += '</div></td>';
         html += '</tr>';
         return html;
     }
@@ -716,6 +746,32 @@
                 var idx = parseInt(this.getAttribute('data-index'));
                 if (state.storeSections[idx]) {
                     state.storeSections[idx].is_active = this.checked ? 1 : 0;
+                }
+            });
+        }
+        var moveUpBtns = el.storeSectionsBody.querySelectorAll('[data-action="move-up"][data-tab="store_pages"]');
+        for (var u = 0; u < moveUpBtns.length; u++) {
+            moveUpBtns[u].addEventListener('click', function () {
+                var idx = parseInt(this.getAttribute('data-index'));
+                if (idx > 0) {
+                    arrayMove(state.storeSections, idx, idx - 1);
+                    for (var s = 0; s < state.storeSections.length; s++) {
+                        state.storeSections[s].position = s + 1;
+                    }
+                    renderStoreSections();
+                }
+            });
+        }
+        var moveDownBtns = el.storeSectionsBody.querySelectorAll('[data-action="move-down"][data-tab="store_pages"]');
+        for (var dn = 0; dn < moveDownBtns.length; dn++) {
+            moveDownBtns[dn].addEventListener('click', function () {
+                var idx = parseInt(this.getAttribute('data-index'));
+                if (idx < state.storeSections.length - 1) {
+                    arrayMove(state.storeSections, idx, idx + 1);
+                    for (var s = 0; s < state.storeSections.length; s++) {
+                        state.storeSections[s].position = s + 1;
+                    }
+                    renderStoreSections();
                 }
             });
         }
