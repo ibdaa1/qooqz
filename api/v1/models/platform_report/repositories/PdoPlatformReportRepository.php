@@ -235,10 +235,14 @@ final class PdoPlatformReportRepository
                 {$where}
                 GROUP BY oi.product_id, oi.product_name
                 ORDER BY total_revenue DESC
-                LIMIT " . (int)$limit;
+                LIMIT :lmt";
 
+        $params[':lmt'] = $limit;
         $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v, $k === ':lmt' ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
@@ -515,10 +519,14 @@ final class PdoPlatformReportRepository
             $sql .= ' WHERE tenant_id = :tid';
             $params[':tid'] = $tenantId;
         }
-        $sql .= ' ORDER BY created_at DESC LIMIT ' . (int)$limit;
+        $sql .= ' ORDER BY created_at DESC LIMIT :lmt';
+        $params[':lmt'] = $limit;
 
         $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v, $k === ':lmt' ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
