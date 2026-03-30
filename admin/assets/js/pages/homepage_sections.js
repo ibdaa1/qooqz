@@ -124,14 +124,14 @@
             homepageCountBadge:  document.getElementById('homepage-count'),
             storePagesCountBadge:document.getElementById('store-pages-count'),
 
-            homepageSectionsList:document.getElementById('homepage-sections-list'),
+            homepageSectionsBody:document.getElementById('homepage-sections-body'),
             btnAddHomepage:      document.getElementById('btn-add-homepage-section'),
             btnSaveHomepage:     document.getElementById('btn-save-homepage'),
 
             storePageType:       document.getElementById('store-page-type'),
             storeEntitySelect:   document.getElementById('store-entity-select'),
             storeEntityInfo:     document.getElementById('store-entity-info'),
-            storeSectionsList:   document.getElementById('store-sections-list'),
+            storeSectionsBody:   document.getElementById('store-sections-body'),
             btnAddStore:         document.getElementById('btn-add-store-section'),
             btnSaveStore:        document.getElementById('btn-save-store-sections'),
 
@@ -430,27 +430,20 @@
     }
 
     function renderHomepageSections() {
-        if (!el.homepageSectionsList) return;
+        if (!el.homepageSectionsBody) return;
         if (state.homepageSections.length === 0) {
-            el.homepageSectionsList.innerHTML = '<div class="hs-empty">' + t('homepage.no_sections', 'No sections yet') + '</div>';
+            el.homepageSectionsBody.innerHTML = '<tr><td colspan="13" class="hs-table-empty">' + t('homepage.no_sections', 'No sections yet') + '</td></tr>';
             return;
         }
         var html = '';
         for (var i = 0; i < state.homepageSections.length; i++) {
-            html += renderHomepageSectionCard(state.homepageSections[i], i);
+            html += renderHomepageSectionRow(state.homepageSections[i], i);
         }
-        el.homepageSectionsList.innerHTML = html;
-        initSortable(el.homepageSectionsList, function (oldIdx, newIdx) {
-            arrayMove(state.homepageSections, oldIdx, newIdx);
-            for (var s = 0; s < state.homepageSections.length; s++) {
-                state.homepageSections[s].sort_order = s + 1;
-            }
-            renderHomepageSections();
-        });
+        el.homepageSectionsBody.innerHTML = html;
         attachHomepageCardListeners();
     }
 
-    function renderHomepageSectionCard(section, index) {
+    function renderHomepageSectionRow(section, index) {
         var sectionId = parseInt(section.id);
         var sType = section.section_type || section.type || 'other';
         var title = section.title || section.translated_title || '';
@@ -458,50 +451,68 @@
             var trLang = section.translations[state.language] || section.translations['ar'] || section.translations['en'];
             if (trLang) title = trLang.title || '';
         }
-        if (!title) title = t('section_types.' + sType, sType);
+        var subtitle = section.subtitle || '';
+        if (!subtitle && section.translations) {
+            var trL2 = section.translations[state.language] || section.translations['ar'] || section.translations['en'];
+            if (trL2) subtitle = trL2.subtitle || '';
+        }
         var isActive = section.is_active == 1 || section.is_active === true;
         var sortOrder = section.sort_order || (index + 1);
         var color = TYPE_COLORS[sType] || '#94a3b8';
         var component = section.component || '';
         var layout = section.layout_type || '';
+        var bgColor = section.background_color || '';
+        var textColor = section.text_color || '';
+        var dataSource = section.data_source || '';
+        var itemsPerRow = section.items_per_row || '';
 
-        var html = '<div class="hs-section-card" data-id="' + sectionId + '" data-index="' + index + '" draggable="true">';
-        html += '<div class="hs-card-drag" title="' + t('common.drag_to_reorder', 'Drag to reorder') + '">&#9776;</div>';
-        html += '<div class="hs-card-order">' + escHtml(String(sortOrder)) + '</div>';
-        html += '<span class="hs-card-type-badge" style="background:' + color + '">' + escHtml(sType) + '</span>';
-        html += '<div class="hs-card-info">';
-        html += '<div class="hs-card-title">' + escHtml(title) + '</div>';
-        html += '<div class="hs-card-meta">';
-        if (component) html += '<span>' + t('modal.component', 'Component') + ': ' + escHtml(component) + '</span>';
-        if (layout) html += '<span>' + t('modal.layout_type', 'Layout') + ': ' + escHtml(layout) + '</span>';
-        if (section.data_source) html += '<span>' + t('modal.data_source', 'Data Source') + ': ' + escHtml(section.data_source) + '</span>';
-        if (section.items_per_row) html += '<span>' + t('modal.items_per_row', 'Items/Row') + ': ' + escHtml(String(section.items_per_row)) + '</span>';
-        if (section.background_color) {
-            var bgVal = section.background_color;
-            var safeBg = /^(#[a-fA-F0-9]{3,8}|var\(--[\w-]+\))$/.test(bgVal) ? bgVal : '';
-            html += '<span style="display:inline-flex;align-items:center;gap:4px">';
-            if (safeBg) html += '<span style="width:12px;height:12px;border-radius:2px;border:1px solid #ccc;background:' + safeBg + '"></span>';
-            html += escHtml(bgVal) + '</span>';
+        var html = '<tr data-id="' + sectionId + '" data-index="' + index + '">';
+        html += '<td>' + escHtml(String(sectionId)) + '</td>';
+        html += '<td><span class="hs-type-badge" style="background:' + color + '">' + escHtml(sType) + '</span></td>';
+        html += '<td>' + escHtml(component) + '</td>';
+        html += '<td>' + escHtml(title) + '</td>';
+        html += '<td>' + escHtml(subtitle) + '</td>';
+        html += '<td>' + escHtml(layout) + '</td>';
+        html += '<td>' + escHtml(String(itemsPerRow)) + '</td>';
+        // Background color with swatch
+        html += '<td>';
+        if (bgColor) {
+            var safeBg = /^(#[a-fA-F0-9]{3,8}|var\(--[\w-]+\))$/.test(bgColor) ? bgColor : '';
+            if (safeBg) html += '<span class="hs-color-swatch" style="background:' + safeBg + '"></span>';
+            html += escHtml(bgColor);
         }
-        html += '</div>';
-        html += '</div>';
-        html += '<div class="hs-card-actions">';
-        html += '<label class="hs-toggle" title="' + t('modal.is_active', 'Active') + '">';
+        html += '</td>';
+        // Text color with swatch
+        html += '<td>';
+        if (textColor) {
+            var safeTxt = /^(#[a-fA-F0-9]{3,8}|var\(--[\w-]+\))$/.test(textColor) ? textColor : '';
+            if (safeTxt) html += '<span class="hs-color-swatch" style="background:' + safeTxt + '"></span>';
+            html += escHtml(textColor);
+        }
+        html += '</td>';
+        html += '<td>' + escHtml(dataSource) + '</td>';
+        // Active toggle
+        html += '<td>';
+        html += '<label class="hs-toggle">';
         html += '<input type="checkbox"' + (isActive ? ' checked' : '') + ' data-action="toggle-active" data-tab="homepage" data-id="' + sectionId + '" data-index="' + index + '">';
         html += '<span class="hs-toggle-slider"></span>';
         html += '</label>';
+        html += '</td>';
+        html += '<td>' + escHtml(String(sortOrder)) + '</td>';
+        // Actions
+        html += '<td class="hs-table-actions">';
         if (state.canManage) {
             html += '<button class="hs-btn hs-btn-sm hs-btn-edit" data-action="edit" data-tab="homepage" data-id="' + sectionId + '" data-index="' + index + '" title="' + t('common.edit', 'Edit') + '"><i class="fas fa-edit"></i></button>';
             html += '<button class="hs-btn hs-btn-sm hs-btn-delete" data-action="delete" data-tab="homepage" data-id="' + sectionId + '" data-index="' + index + '" title="' + t('common.delete', 'Delete') + '"><i class="fas fa-trash"></i></button>';
         }
-        html += '</div>';
-        html += '</div>';
+        html += '</td>';
+        html += '</tr>';
         return html;
     }
 
     function attachHomepageCardListeners() {
-        if (!el.homepageSectionsList) return;
-        var toggles = el.homepageSectionsList.querySelectorAll('[data-action="toggle-active"][data-tab="homepage"]');
+        if (!el.homepageSectionsBody) return;
+        var toggles = el.homepageSectionsBody.querySelectorAll('[data-action="toggle-active"][data-tab="homepage"]');
         for (var i = 0; i < toggles.length; i++) {
             toggles[i].addEventListener('change', function () {
                 var idx = parseInt(this.getAttribute('data-index'));
@@ -510,7 +521,7 @@
                 }
             });
         }
-        var editBtns = el.homepageSectionsList.querySelectorAll('[data-action="edit"][data-tab="homepage"]');
+        var editBtns = el.homepageSectionsBody.querySelectorAll('[data-action="edit"][data-tab="homepage"]');
         for (var e = 0; e < editBtns.length; e++) {
             editBtns[e].addEventListener('click', function () {
                 var idx = parseInt(this.getAttribute('data-index'));
@@ -518,7 +529,7 @@
                 editHomepageSection(sectionId, idx);
             });
         }
-        var delBtns = el.homepageSectionsList.querySelectorAll('[data-action="delete"][data-tab="homepage"]');
+        var delBtns = el.homepageSectionsBody.querySelectorAll('[data-action="delete"][data-tab="homepage"]');
         for (var d = 0; d < delBtns.length; d++) {
             delBtns[d].addEventListener('click', function () {
                 var sectionId = parseInt(this.getAttribute('data-id'));
@@ -641,27 +652,20 @@
     }
 
     function renderStoreSections() {
-        if (!el.storeSectionsList) return;
+        if (!el.storeSectionsBody) return;
         if (state.storeSections.length === 0) {
-            el.storeSectionsList.innerHTML = '<div class="hs-empty">' + t('store_pages.no_sections', 'No sections yet') + '</div>';
+            el.storeSectionsBody.innerHTML = '<tr><td colspan="7" class="hs-table-empty">' + t('store_pages.no_sections', 'No sections yet') + '</td></tr>';
             return;
         }
         var html = '';
         for (var i = 0; i < state.storeSections.length; i++) {
-            html += renderStoreSectionCard(state.storeSections[i], i);
+            html += renderStoreSectionRow(state.storeSections[i], i);
         }
-        el.storeSectionsList.innerHTML = html;
-        initSortable(el.storeSectionsList, function (oldIdx, newIdx) {
-            arrayMove(state.storeSections, oldIdx, newIdx);
-            for (var s = 0; s < state.storeSections.length; s++) {
-                state.storeSections[s].position = s + 1;
-            }
-            renderStoreSections();
-        });
+        el.storeSectionsBody.innerHTML = html;
         attachStoreCardListeners();
     }
 
-    function renderStoreSectionCard(section, index) {
+    function renderStoreSectionRow(section, index) {
         var sectionId = parseInt(section.id);
         var sType = section.type || 'info';
         var title = section.title || section.translated_title || '';
@@ -673,31 +677,40 @@
         var isActive = section.is_active == 1 || section.is_active === true;
         var position = section.position || (index + 1);
         var color = TYPE_COLORS[sType] || '#94a3b8';
+        var settings = section.settings || {};
+        var settingsStr = '';
+        if (typeof settings === 'object' && Object.keys(settings).length > 0) {
+            settingsStr = JSON.stringify(settings);
+            if (settingsStr.length > 50) settingsStr = settingsStr.substring(0, 50) + '...';
+        }
 
-        var html = '<div class="hs-section-card" data-id="' + sectionId + '" data-index="' + index + '" draggable="true">';
-        html += '<div class="hs-card-drag" title="' + t('common.drag_to_reorder', 'Drag to reorder') + '">&#9776;</div>';
-        html += '<div class="hs-card-order">' + escHtml(String(position)) + '</div>';
-        html += '<span class="hs-card-type-badge" style="background:' + color + '">' + escHtml(sType) + '</span>';
-        html += '<div class="hs-card-info">';
-        html += '<div class="hs-card-title">' + escHtml(title) + '</div>';
-        html += '</div>';
-        html += '<div class="hs-card-actions">';
-        html += '<label class="hs-toggle" title="' + t('modal.is_active', 'Active') + '">';
+        var html = '<tr data-id="' + sectionId + '" data-index="' + index + '">';
+        html += '<td>' + escHtml(String(sectionId)) + '</td>';
+        html += '<td><span class="hs-type-badge" style="background:' + color + '">' + escHtml(sType) + '</span></td>';
+        html += '<td>' + escHtml(title) + '</td>';
+        html += '<td>' + escHtml(String(position)) + '</td>';
+        html += '<td class="hs-settings-cell">' + escHtml(settingsStr) + '</td>';
+        // Active toggle
+        html += '<td>';
+        html += '<label class="hs-toggle">';
         html += '<input type="checkbox"' + (isActive ? ' checked' : '') + ' data-action="toggle-active" data-tab="store_pages" data-id="' + sectionId + '" data-index="' + index + '">';
         html += '<span class="hs-toggle-slider"></span>';
         html += '</label>';
+        html += '</td>';
+        // Actions
+        html += '<td class="hs-table-actions">';
         if (state.canManage) {
             html += '<button class="hs-btn hs-btn-sm hs-btn-edit" data-action="edit" data-tab="store_pages" data-id="' + sectionId + '" data-index="' + index + '" title="' + t('common.edit', 'Edit') + '"><i class="fas fa-edit"></i></button>';
             html += '<button class="hs-btn hs-btn-sm hs-btn-delete" data-action="delete" data-tab="store_pages" data-id="' + sectionId + '" data-index="' + index + '" title="' + t('common.delete', 'Delete') + '"><i class="fas fa-trash"></i></button>';
         }
-        html += '</div>';
-        html += '</div>';
+        html += '</td>';
+        html += '</tr>';
         return html;
     }
 
     function attachStoreCardListeners() {
-        if (!el.storeSectionsList) return;
-        var toggles = el.storeSectionsList.querySelectorAll('[data-action="toggle-active"][data-tab="store_pages"]');
+        if (!el.storeSectionsBody) return;
+        var toggles = el.storeSectionsBody.querySelectorAll('[data-action="toggle-active"][data-tab="store_pages"]');
         for (var i = 0; i < toggles.length; i++) {
             toggles[i].addEventListener('change', function () {
                 var idx = parseInt(this.getAttribute('data-index'));
@@ -706,7 +719,7 @@
                 }
             });
         }
-        var editBtns = el.storeSectionsList.querySelectorAll('[data-action="edit"][data-tab="store_pages"]');
+        var editBtns = el.storeSectionsBody.querySelectorAll('[data-action="edit"][data-tab="store_pages"]');
         for (var e = 0; e < editBtns.length; e++) {
             editBtns[e].addEventListener('click', function () {
                 var idx = parseInt(this.getAttribute('data-index'));
@@ -714,7 +727,7 @@
                 editStoreSection(sectionId, idx);
             });
         }
-        var delBtns = el.storeSectionsList.querySelectorAll('[data-action="delete"][data-tab="store_pages"]');
+        var delBtns = el.storeSectionsBody.querySelectorAll('[data-action="delete"][data-tab="store_pages"]');
         for (var d = 0; d < delBtns.length; d++) {
             delBtns[d].addEventListener('click', function () {
                 var sectionId = parseInt(this.getAttribute('data-id'));

@@ -7,6 +7,23 @@
       "homepage": "أقسام الصفحة الرئيسية",
       "store_pages": "أقسام صفحات المتاجر"
     },
+    "table": {
+      "id": "المعرف",
+      "section_type": "نوع القسم",
+      "component": "المكون",
+      "title": "العنوان",
+      "subtitle": "العنوان الفرعي",
+      "layout_type": "التخطيط",
+      "items_per_row": "عناصر/صف",
+      "background_color": "لون الخلفية",
+      "text_color": "لون النص",
+      "data_source": "مصدر البيانات",
+      "is_active": "نشط",
+      "sort_order": "الترتيب",
+      "position": "الموضع",
+      "settings": "الإعدادات",
+      "actions": "الإجراءات"
+    },
     "homepage": {
       "title": "أقسام الصفحة الرئيسية",
       "add_section": "إضافة قسم",

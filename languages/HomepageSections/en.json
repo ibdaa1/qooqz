@@ -7,6 +7,23 @@
       "homepage": "Homepage Sections",
       "store_pages": "Store Page Sections"
     },
+    "table": {
+      "id": "ID",
+      "section_type": "Section Type",
+      "component": "Component",
+      "title": "Title",
+      "subtitle": "Subtitle",
+      "layout_type": "Layout",
+      "items_per_row": "Items/Row",
+      "background_color": "BG Color",
+      "text_color": "Text Color",
+      "data_source": "Data Source",
+      "is_active": "Active",
+      "sort_order": "Order",
+      "position": "Position",
+      "settings": "Settings",
+      "actions": "Actions"
+    },
     "homepage": {
       "title": "Homepage Sections",
       "add_section": "Add Section",

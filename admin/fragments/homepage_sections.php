@@ -120,8 +120,29 @@ function _hst($key, $fallback = '') {
             </button>
             <?php endif; ?>
         </div>
-        <div id="homepage-sections-list" class="hs-sections-list">
-            <div class="hs-empty" data-i18n="homepage.no_sections"><?= htmlspecialchars(_hst('homepage.no_sections', 'No sections yet')) ?></div>
+        <div class="hs-table-wrap">
+            <table class="hs-data-table" id="homepage-sections-table">
+                <thead>
+                    <tr>
+                        <th data-i18n="table.id"><?= htmlspecialchars(_hst('table.id', 'ID')) ?></th>
+                        <th data-i18n="table.section_type"><?= htmlspecialchars(_hst('table.section_type', 'Section Type')) ?></th>
+                        <th data-i18n="table.component"><?= htmlspecialchars(_hst('table.component', 'Component')) ?></th>
+                        <th data-i18n="table.title"><?= htmlspecialchars(_hst('table.title', 'Title')) ?></th>
+                        <th data-i18n="table.subtitle"><?= htmlspecialchars(_hst('table.subtitle', 'Subtitle')) ?></th>
+                        <th data-i18n="table.layout_type"><?= htmlspecialchars(_hst('table.layout_type', 'Layout')) ?></th>
+                        <th data-i18n="table.items_per_row"><?= htmlspecialchars(_hst('table.items_per_row', 'Items/Row')) ?></th>
+                        <th data-i18n="table.background_color"><?= htmlspecialchars(_hst('table.background_color', 'BG Color')) ?></th>
+                        <th data-i18n="table.text_color"><?= htmlspecialchars(_hst('table.text_color', 'Text Color')) ?></th>
+                        <th data-i18n="table.data_source"><?= htmlspecialchars(_hst('table.data_source', 'Data Source')) ?></th>
+                        <th data-i18n="table.is_active"><?= htmlspecialchars(_hst('table.is_active', 'Active')) ?></th>
+                        <th data-i18n="table.sort_order"><?= htmlspecialchars(_hst('table.sort_order', 'Order')) ?></th>
+                        <th data-i18n="table.actions"><?= htmlspecialchars(_hst('table.actions', 'Actions')) ?></th>
+                    </tr>
+                </thead>
+                <tbody id="homepage-sections-body">
+                    <tr><td colspan="13" class="hs-table-empty" data-i18n="homepage.no_sections"><?= htmlspecialchars(_hst('homepage.no_sections', 'No sections yet')) ?></td></tr>
+                </tbody>
+            </table>
         </div>
         <?php if ($canManage): ?>
         <div class="hs-actions">
@@ -157,8 +178,23 @@ function _hst($key, $fallback = '') {
             </button>
             <?php endif; ?>
         </div>
-        <div id="store-sections-list" class="hs-sections-list">
-            <div class="hs-empty" data-i18n="store_pages.no_sections"><?= htmlspecialchars(_hst('store_pages.no_sections', 'No sections yet')) ?></div>
+        <div class="hs-table-wrap">
+            <table class="hs-data-table" id="store-sections-table">
+                <thead>
+                    <tr>
+                        <th data-i18n="table.id"><?= htmlspecialchars(_hst('table.id', 'ID')) ?></th>
+                        <th data-i18n="table.section_type"><?= htmlspecialchars(_hst('table.section_type', 'Type')) ?></th>
+                        <th data-i18n="table.title"><?= htmlspecialchars(_hst('table.title', 'Title')) ?></th>
+                        <th data-i18n="table.position"><?= htmlspecialchars(_hst('table.position', 'Position')) ?></th>
+                        <th data-i18n="table.settings"><?= htmlspecialchars(_hst('table.settings', 'Settings')) ?></th>
+                        <th data-i18n="table.is_active"><?= htmlspecialchars(_hst('table.is_active', 'Active')) ?></th>
+                        <th data-i18n="table.actions"><?= htmlspecialchars(_hst('table.actions', 'Actions')) ?></th>
+                    </tr>
+                </thead>
+                <tbody id="store-sections-body">
+                    <tr><td colspan="7" class="hs-table-empty" data-i18n="store_pages.no_sections"><?= htmlspecialchars(_hst('store_pages.no_sections', 'No sections yet')) ?></td></tr>
+                </tbody>
+            </table>
         </div>
         <?php if ($canManage): ?>
         <div class="hs-actions">

@@ -137,81 +137,85 @@
     min-height: 60px;
 }
 
-/* ─── Section card ─── */
-.hs-section-card {
+/* ─── Data Table ─── */
+.hs-table-wrap {
+    overflow-x: auto;
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius, 8px);
-    padding: 12px 16px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    transition: border-color .2s, box-shadow .2s;
-    box-shadow: 0 1px 3px rgba(0,0,0,.1);
 }
-.hs-section-card:hover {
-    border-color: var(--primary-color);
+.hs-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
 }
-.hs-section-card.hs-dragging {
-    opacity: 0.5;
-    border-color: var(--primary-color);
-    box-shadow: 0 4px 16px rgba(0,0,0,.2);
-    background: var(--background-secondary);
-}
-.hs-section-card.hs-drag-over {
-    border-color: var(--primary-color);
-    border-style: dashed;
-}
-
-/* ─── Drag handle ─── */
-.hs-card-drag {
-    cursor: grab;
+.hs-data-table thead th {
+    background: var(--background-secondary, #f5f5f5);
     color: var(--text-secondary);
-    font-size: 1.1rem;
-    flex-shrink: 0;
-    padding: 4px;
-    display: flex;
-    align-items: center;
-    user-select: none;
-}
-.hs-card-drag:active {
-    cursor: grabbing;
-}
-
-/* ─── Type badge ─── */
-.hs-type-badge {
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    display: inline-block;
+    font-weight: 700;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 10px 12px;
+    border-bottom: 2px solid var(--border-color);
     white-space: nowrap;
-    background: rgba(59,130,246,.12);
-    color: var(--primary-color);
+    text-align: start;
+}
+.hs-data-table tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+    color: var(--text-primary);
+}
+.hs-data-table tbody tr:last-child td {
+    border-bottom: none;
+}
+.hs-data-table tbody tr:hover {
+    background: rgba(59,130,246,.04);
+}
+.hs-table-empty {
+    text-align: center;
+    padding: 32px 16px !important;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+.hs-table-actions {
+    white-space: nowrap;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+.hs-type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+}
+.hs-color-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid var(--border-color);
+    vertical-align: middle;
+    margin-inline-end: 4px;
+}
+.hs-settings-cell {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
 }
 
 /* ─── Section info ─── */
 .hs-section-info {
     flex: 1;
     min-width: 0;
-}
-.hs-section-info .hs-section-title {
-    font-weight: 700;
-    font-size: 0.95rem;
-    margin-bottom: 2px;
-    color: var(--text-primary);
-}
-.hs-section-info .hs-section-subtitle {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-}
-
-/* ─── Section controls ─── */
-.hs-section-controls {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
 }
 
 /* ─── Actions (save button area) ─── */
@@ -272,6 +276,24 @@
 .hs-btn-sm {
     padding: 4px 10px;
     font-size: 0.8rem;
+}
+.hs-btn-edit {
+    background: transparent;
+    color: var(--primary-color);
+    border: 1px solid var(--primary-color);
+}
+.hs-btn-edit:hover {
+    background: var(--primary-color);
+    color: #fff;
+}
+.hs-btn-delete {
+    background: transparent;
+    color: var(--danger-color);
+    border: 1px solid var(--danger-color);
+}
+.hs-btn-delete:hover {
+    background: var(--danger-color);
+    color: #fff;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -539,9 +561,6 @@
 /* ═══════════════════════════════════════════════════
    RTL Support
    ═══════════════════════════════════════════════════ */
-[dir="rtl"] .hs-section-card {
-    flex-direction: row-reverse;
-}
 [dir="rtl"] .hs-toolbar {
     flex-direction: row-reverse;
 }
@@ -554,7 +573,7 @@
 [dir="rtl"] .hs-actions {
     flex-direction: row-reverse;
 }
-[dir="rtl"] .hs-section-controls {
+[dir="rtl"] .hs-table-actions {
     flex-direction: row-reverse;
 }
 [dir="rtl"] .hs-toggle .hs-toggle-slider::before {
@@ -576,13 +595,6 @@
         flex-direction: column;
         align-items: stretch;
     }
-    .hs-section-card {
-        flex-wrap: wrap;
-    }
-    .hs-section-controls {
-        width: 100%;
-        justify-content: flex-end;
-    }
     .hs-filter-card {
         flex-direction: column;
         align-items: stretch;
@@ -603,6 +615,19 @@
     .hs-translations-container {
         max-height: 250px;
     }
+    .hs-table-wrap {
+        margin: 0 -12px;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+    }
+    .hs-data-table {
+        font-size: 0.78rem;
+    }
+    .hs-data-table thead th,
+    .hs-data-table tbody td {
+        padding: 6px 8px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -612,10 +637,6 @@
     .hs-tab {
         padding: 8px 12px;
         font-size: 0.8rem;
-    }
-    .hs-section-card {
-        padding: 10px 12px;
-        gap: 8px;
     }
     .hs-btn {
         padding: 6px 12px;
