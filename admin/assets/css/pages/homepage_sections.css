@@ -152,15 +152,19 @@
 .hs-section-card:hover {
     border-color: var(--primary-color);
 }
-.hs-section-card.dragging {
+.hs-section-card.hs-dragging {
     opacity: 0.5;
     border-color: var(--primary-color);
     box-shadow: 0 4px 16px rgba(0,0,0,.2);
     background: var(--background-secondary);
 }
+.hs-section-card.hs-drag-over {
+    border-color: var(--primary-color);
+    border-style: dashed;
+}
 
 /* ─── Drag handle ─── */
-.hs-drag-handle {
+.hs-card-drag {
     cursor: grab;
     color: var(--text-secondary);
     font-size: 1.1rem;
@@ -170,7 +174,7 @@
     align-items: center;
     user-select: none;
 }
-.hs-drag-handle:active {
+.hs-card-drag:active {
     cursor: grabbing;
 }
 
@@ -412,11 +416,11 @@
 }
 [dir="ltr"] .hs-toast { right: 20px; }
 [dir="rtl"] .hs-toast { left: 20px; }
-.hs-toast.success {
+.hs-toast-success {
     background: var(--success-color);
     color: #fff;
 }
-.hs-toast.error {
+.hs-toast-error {
     background: var(--danger-color);
     color: #fff;
 }
@@ -449,7 +453,7 @@
     width: 0;
     height: 0;
 }
-.hs-toggle .slider {
+.hs-toggle .hs-toggle-slider {
     position: absolute;
     inset: 0;
     background: var(--border-color);
@@ -457,7 +461,7 @@
     cursor: pointer;
     transition: background .2s;
 }
-.hs-toggle .slider::before {
+.hs-toggle .hs-toggle-slider::before {
     content: '';
     position: absolute;
     width: 16px;
@@ -468,10 +472,10 @@
     left: 2px;
     transition: transform .2s;
 }
-.hs-toggle input:checked + .slider {
+.hs-toggle input:checked + .hs-toggle-slider {
     background: var(--success-color);
 }
-.hs-toggle input:checked + .slider::before {
+.hs-toggle input:checked + .hs-toggle-slider::before {
     transform: translateX(18px);
 }
 
@@ -496,11 +500,11 @@
 [dir="rtl"] .hs-section-controls {
     flex-direction: row-reverse;
 }
-[dir="rtl"] .hs-toggle .slider::before {
+[dir="rtl"] .hs-toggle .hs-toggle-slider::before {
     left: auto;
     right: 2px;
 }
-[dir="rtl"] .hs-toggle input:checked + .slider::before {
+[dir="rtl"] .hs-toggle input:checked + .hs-toggle-slider::before {
     transform: translateX(-18px);
 }
 
