@@ -110,9 +110,10 @@ try {
                 break;
             }
 
-            // GET /homepage_sections/{id}
-            if ($id !== null) {
-                ResponseFormatter::success($controller->get($tenantId, $id, $userId));
+            // GET /homepage_sections/{id}  OR  GET ?id=X
+            $resolvedId = $id ?? (isset($_GET['id']) && ctype_digit((string)$_GET['id']) ? (int)$_GET['id'] : null);
+            if ($resolvedId !== null) {
+                ResponseFormatter::success($controller->get($tenantId, $resolvedId, $userId));
                 break;
             }
 

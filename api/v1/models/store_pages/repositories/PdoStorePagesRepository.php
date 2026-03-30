@@ -232,6 +232,23 @@ final class PdoStorePagesRepository
         return $row ?: null;
     }
 
+    /**
+     * Find a section by ID without requiring page_id.
+     */
+    public function findSectionByIdOnly(int $sectionId): ?array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT *
+            FROM store_sections
+            WHERE id = :sectionId
+            LIMIT 1
+        ");
+
+        $stmt->execute([':sectionId' => $sectionId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
     private function getTenantIdByPageId(int $pageId): int
     {
         $stmt = $this->pdo->prepare("SELECT tenant_id FROM store_pages WHERE id = :id LIMIT 1");
@@ -337,11 +354,28 @@ final class PdoStorePagesRepository
         ");
 
         foreach ($translations as $lang => $data) {
+            // Prepare content value: must be valid JSON for the JSON column
+            $contentValue = null;
+            if (isset($data['content'])) {
+                if (is_string($data['content'])) {
+                    // Check if it's already valid JSON
+                    json_decode($data['content']);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $contentValue = $data['content'];
+                    } else {
+                        // Plain string - wrap as JSON string
+                        $contentValue = json_encode($data['content']);
+                    }
+                } else {
+                    $contentValue = json_encode($data['content']);
+                }
+            }
+
             $stmt->execute([
                 ':section_id' => $sectionId,
                 ':lang'       => $lang,
                 ':title'      => $data['title'] ?? null,
-                ':content'    => isset($data['content']) ? (is_string($data['content']) ? $data['content'] : json_encode($data['content'])) : null,
+                ':content'    => $contentValue,
             ]);
         }
     }
@@ -359,9 +393,17 @@ final class PdoStorePagesRepository
 
         $translations = [];
         foreach ($rows as $row) {
+            $content = $row['content'];
+            // Decode JSON content for display - if it's a JSON string, unwrap it
+            if ($content !== null) {
+                $decoded = json_decode($content, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $content = $decoded;
+                }
+            }
             $translations[$row['language_code']] = [
                 'title'   => $row['title'],
-                'content' => $row['content'],
+                'content' => $content,
             ];
         }
 

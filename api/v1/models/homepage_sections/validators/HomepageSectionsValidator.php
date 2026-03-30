@@ -9,12 +9,17 @@ final class HomepageSectionsValidator
     {
         $errors = [];
 
+        // When updating only sort_order/is_active (e.g. reorder), skip section_type validation
+        $isOrderOnly = !empty($data['id']) && isset($data['sort_order']) && !isset($data['section_type']);
+
         // section_type
         $allowedTypes = ['slider', 'categories', 'featured_products', 'new_products', 'deals', 'brands', 'vendors', 'banners', 'testimonials', 'custom_html', 'other'];
-        if (empty($data['section_type'])) {
-            $errors['section_type'] = 'Section type is required';
-        } elseif (!in_array($data['section_type'], $allowedTypes)) {
-            $errors['section_type'] = 'Invalid section type';
+        if (!$isOrderOnly) {
+            if (empty($data['section_type'])) {
+                $errors['section_type'] = 'Section type is required';
+            } elseif (!in_array($data['section_type'], $allowedTypes)) {
+                $errors['section_type'] = 'Invalid section type';
+            }
         }
 
         // title (optional)

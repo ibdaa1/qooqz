@@ -92,6 +92,11 @@ final class PdoHomepageSectionsRepository
         $oldData = $isUpdate ? $this->findById($tenantId, (int)$data['id']) : null;
 
         if ($isUpdate) {
+            // Merge with existing data so partial updates (e.g. reorder) don't overwrite fields with defaults
+            if ($oldData) {
+                $data = array_merge($oldData, $data);
+            }
+
             $stmt = $this->pdo->prepare("
                 UPDATE homepage_sections
                 SET section_type = :section_type,
@@ -113,7 +118,7 @@ final class PdoHomepageSectionsRepository
             ");
 
             $stmt->execute([
-                ':section_type'    => $data['section_type'],
+                ':section_type'    => $data['section_type'] ?? 'other',
                 ':title'           => $data['title'] ?? null,
                 ':subtitle'        => $data['subtitle'] ?? null,
                 ':layout_type'     => $data['layout_type'] ?? 'grid',

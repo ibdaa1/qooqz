@@ -48,9 +48,10 @@ try {
         : (isset($_GET['user_id']) ? (int)$_GET['user_id'] : null);
 
     // Wiring
+    $repo = new PdoStorePagesRepository($pdo);
     $controller = new StorePagesController(
         new StorePagesService(
-            new PdoStorePagesRepository($pdo),
+            $repo,
             new StorePagesValidator()
         )
     );
@@ -62,9 +63,26 @@ try {
         // =====================================================
         case 'GET':
 
-            // GET ?section_id=Y&translations → getSectionTranslations
+            // GET ?section_id=Y&translations → getSection with all translations
             if (isset($_GET['section_id']) && isset($_GET['translations'])) {
                 $sectionId = (int)$_GET['section_id'];
+                // Look up page_id from the section itself
+                $sectionRow = $repo->findSectionByIdOnly($sectionId);
+                if ($sectionRow) {
+                    $fullSection = $repo->findSection((int)$sectionRow['page_id'], $sectionId, 'en', true);
+                    if ($fullSection) {
+                        // Parse settings JSON if needed
+                        if (isset($fullSection['settings']) && is_string($fullSection['settings'])) {
+                            $decoded = json_decode($fullSection['settings'], true);
+                            if (json_last_error() === JSON_ERROR_NONE) {
+                                $fullSection['settings'] = $decoded;
+                            }
+                        }
+                        ResponseFormatter::success($fullSection);
+                        break;
+                    }
+                }
+                // Fallback: return just translations
                 ResponseFormatter::success($controller->getSectionTranslations($sectionId));
                 break;
             }
