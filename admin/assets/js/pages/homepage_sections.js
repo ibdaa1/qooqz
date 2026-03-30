@@ -814,7 +814,13 @@
             if (el.modalItemsPerRow)  el.modalItemsPerRow.value = section.items_per_row || '4';
             if (el.modalBgColor)      el.modalBgColor.value     = section.background_color || '#ffffff';
             if (el.modalTextColor)    el.modalTextColor.value   = section.text_color || '#000000';
-            if (el.modalLayoutConfig) el.modalLayoutConfig.value = section.layout_config ? (typeof section.layout_config === 'string' ? section.layout_config : JSON.stringify(section.layout_config, null, 2)) : '';
+            if (el.modalLayoutConfig) {
+                var lcVal = section.layout_config;
+                if (lcVal && typeof lcVal !== 'string') {
+                    lcVal = JSON.stringify(lcVal, null, 2);
+                }
+                el.modalLayoutConfig.value = lcVal || '';
+            }
             if (el.modalPadding)      el.modalPadding.value      = section.padding || '';
             if (el.modalCustomCss)    el.modalCustomCss.value    = section.custom_css || '';
             if (el.modalCustomHtml)   el.modalCustomHtml.value   = section.custom_html || '';
@@ -906,7 +912,7 @@
             // New homepage fields
             var layoutConfigStr = el.modalLayoutConfig ? el.modalLayoutConfig.value.trim() : '';
             if (layoutConfigStr) {
-                try { data.layout_config = JSON.parse(layoutConfigStr); } catch (e) { data.layout_config = layoutConfigStr; }
+                try { data.layout_config = JSON.parse(layoutConfigStr); } catch (e) { console.warn('Invalid layout_config JSON, storing as string:', e.message); data.layout_config = layoutConfigStr; }
             }
             data.padding     = el.modalPadding ? el.modalPadding.value.trim() : '';
             data.custom_css  = el.modalCustomCss ? el.modalCustomCss.value.trim() : '';
