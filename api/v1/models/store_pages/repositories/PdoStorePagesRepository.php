@@ -354,21 +354,12 @@ final class PdoStorePagesRepository
         ");
 
         foreach ($translations as $lang => $data) {
-            // Prepare content value: must be valid JSON for the JSON column
+            // Prepare content value: always JSON-encode for the JSON column
             $contentValue = null;
             if (isset($data['content'])) {
-                if (is_string($data['content'])) {
-                    // Check if it's already valid JSON
-                    json_decode($data['content']);
-                    if (json_last_error() === JSON_ERROR_NONE) {
-                        $contentValue = $data['content'];
-                    } else {
-                        // Plain string - wrap as JSON string
-                        $contentValue = json_encode($data['content']);
-                    }
-                } else {
-                    $contentValue = json_encode($data['content']);
-                }
+                $contentValue = is_string($data['content'])
+                    ? json_encode($data['content'])
+                    : json_encode($data['content']);
             }
 
             $stmt->execute([
