@@ -1,0 +1,439 @@
+/**
+ * Platform Report & Analytics – CSS
+ * admin/assets/css/pages/platform_report.css
+ * Uses admin theme CSS variables (--primary-color, --card-bg, etc.)
+ */
+
+/* ═══════════════════════════════════════════
+   CONTAINER
+   ═══════════════════════════════════════════ */
+.pr-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: var(--body-font-family, 'Segoe UI', Tahoma, sans-serif);
+    color: var(--text-primary, #1f2937);
+}
+
+/* ═══════════════════════════════════════════
+   PAGE HEADER
+   ═══════════════════════════════════════════ */
+.pr-page-header {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--border-color, #e5e7eb);
+}
+
+.pr-page-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-primary, #1f2937);
+}
+
+/* ═══════════════════════════════════════════
+   SECTION TITLES
+   ═══════════════════════════════════════════ */
+.pr-section-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 0 0 16px;
+    color: var(--text-primary, #374151);
+}
+
+/* ═══════════════════════════════════════════
+   SUMMARY CARDS
+   ═══════════════════════════════════════════ */
+.pr-summary-section {
+    margin-bottom: 28px;
+}
+
+.pr-summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.pr-card {
+    background: var(--card-bg, #ffffff);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: var(--border-radius, 8px);
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.pr-card-header {
+    padding: 12px 16px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    background: var(--primary-color, #4F46E5);
+    color: #fff;
+}
+
+.pr-card-today .pr-card-header {
+    background: var(--primary-color, #4F46E5);
+}
+
+.pr-card-month .pr-card-header {
+    background: var(--success-color, #10B981);
+}
+
+.pr-card-body {
+    padding: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+}
+
+.pr-stat {
+    text-align: center;
+}
+
+.pr-stat-label {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--text-secondary, #6b7280);
+    margin-bottom: 4px;
+}
+
+.pr-stat-value {
+    display: block;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text-primary, #1f2937);
+}
+
+/* ═══════════════════════════════════════════
+   FILTERS
+   ═══════════════════════════════════════════ */
+.pr-filters-section {
+    margin-bottom: 24px;
+    background: var(--card-bg, #ffffff);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: var(--border-radius, 8px);
+    padding: 20px;
+}
+
+.pr-filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+}
+
+.pr-filter-group {
+    flex: 1 1 180px;
+    min-width: 150px;
+}
+
+.pr-filter-group label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--text-secondary, #374151);
+}
+
+.pr-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: var(--border-radius, 6px);
+    background: var(--input-bg, #ffffff);
+    color: var(--text-primary, #1f2937);
+    font-size: 0.9rem;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+
+.pr-input:focus {
+    outline: none;
+    border-color: var(--primary-color, #4F46E5);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.pr-filter-actions {
+    display: flex;
+    align-items: flex-end;
+}
+
+/* ═══════════════════════════════════════════
+   BUTTONS
+   ═══════════════════════════════════════════ */
+.pr-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border: none;
+    border-radius: var(--border-radius, 6px);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.pr-btn-primary {
+    background: var(--primary-color, #4F46E5);
+    color: #fff;
+}
+
+.pr-btn-primary:hover {
+    background: var(--primary-hover, #4338CA);
+}
+
+.pr-btn-export {
+    background: var(--card-bg, #f3f4f6);
+    color: var(--text-primary, #374151);
+    border: 1px solid var(--border-color, #d1d5db);
+}
+
+.pr-btn-export:hover {
+    background: var(--background-secondary, #e5e7eb);
+}
+
+/* ═══════════════════════════════════════════
+   EXPORT SECTION
+   ═══════════════════════════════════════════ */
+.pr-export-section {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+/* ═══════════════════════════════════════════
+   LOADING
+   ═══════════════════════════════════════════ */
+.pr-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 40px;
+    color: var(--text-secondary, #6b7280);
+    font-size: 1rem;
+}
+
+.pr-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--border-color, #e5e7eb);
+    border-top-color: var(--primary-color, #4F46E5);
+    border-radius: 50%;
+    animation: pr-spin 0.8s linear infinite;
+}
+
+@keyframes pr-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ═══════════════════════════════════════════
+   METRICS GRID
+   ═══════════════════════════════════════════ */
+.pr-metrics-section {
+    margin-bottom: 28px;
+}
+
+.pr-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.pr-metric-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: var(--card-bg, #ffffff);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: var(--border-radius, 8px);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.pr-metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.pr-metric-icon {
+    font-size: 1.8rem;
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: var(--background-secondary, #f3f4f6);
+}
+
+.pr-metric-info {
+    min-width: 0;
+}
+
+.pr-metric-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary, #1f2937);
+    line-height: 1.2;
+}
+
+.pr-metric-label {
+    font-size: 0.78rem;
+    color: var(--text-secondary, #6b7280);
+    margin-top: 2px;
+    text-transform: capitalize;
+}
+
+/* Color accent classes */
+.pr-blue .pr-metric-icon { background: rgba(59, 130, 246, 0.12); }
+.pr-green .pr-metric-icon { background: rgba(16, 185, 129, 0.12); }
+.pr-red .pr-metric-icon { background: rgba(239, 68, 68, 0.12); }
+.pr-yellow .pr-metric-icon { background: rgba(245, 158, 11, 0.12); }
+.pr-purple .pr-metric-icon { background: rgba(139, 92, 246, 0.12); }
+.pr-orange .pr-metric-icon { background: rgba(249, 115, 22, 0.12); }
+
+/* ═══════════════════════════════════════════
+   CHART
+   ═══════════════════════════════════════════ */
+.pr-chart-section {
+    margin-bottom: 28px;
+    background: var(--card-bg, #ffffff);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: var(--border-radius, 8px);
+    padding: 20px;
+}
+
+.pr-chart-wrapper {
+    position: relative;
+    height: 350px;
+}
+
+/* ═══════════════════════════════════════════
+   DATA TABLE
+   ═══════════════════════════════════════════ */
+.pr-table-section {
+    margin-bottom: 28px;
+    background: var(--card-bg, #ffffff);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: var(--border-radius, 8px);
+    padding: 20px;
+}
+
+.pr-table-wrapper {
+    overflow-x: auto;
+}
+
+.pr-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.pr-data-table th,
+.pr-data-table td {
+    padding: 10px 14px;
+    text-align: start;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.pr-data-table th {
+    font-weight: 600;
+    color: var(--text-secondary, #6b7280);
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    background: var(--background-secondary, #f9fafb);
+}
+
+.pr-data-table tbody tr:hover {
+    background: var(--background-secondary, #f9fafb);
+}
+
+.pr-data-table td {
+    color: var(--text-primary, #1f2937);
+}
+
+/* ═══════════════════════════════════════════
+   NO DATA
+   ═══════════════════════════════════════════ */
+.pr-no-data {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-secondary, #9ca3af);
+    font-size: 1rem;
+}
+
+.pr-no-data p {
+    margin: 0;
+}
+
+/* ═══════════════════════════════════════════
+   RTL SUPPORT
+   ═══════════════════════════════════════════ */
+.pr-container[dir="rtl"] .pr-data-table th,
+.pr-container[dir="rtl"] .pr-data-table td {
+    text-align: right;
+}
+
+.pr-container[dir="rtl"] .pr-metric-card {
+    flex-direction: row-reverse;
+}
+
+.pr-container[dir="rtl"] .pr-metric-info {
+    text-align: right;
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════ */
+@media (max-width: 768px) {
+    .pr-container {
+        padding: 12px;
+    }
+
+    .pr-filters-row {
+        flex-direction: column;
+    }
+
+    .pr-filter-group {
+        flex: 1 1 100%;
+    }
+
+    .pr-summary-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .pr-metrics-grid {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    }
+
+    .pr-chart-wrapper {
+        height: 250px;
+    }
+
+    .pr-page-title {
+        font-size: 1.35rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .pr-metrics-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .pr-metric-card {
+        padding: 12px;
+    }
+
+    .pr-metric-value {
+        font-size: 1.1rem;
+    }
+
+    .pr-export-section {
+        flex-direction: column;
+    }
+}

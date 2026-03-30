@@ -252,6 +252,7 @@ $ADMIN_MENU = [
             ['id'=>'commissions','order'=>20,'icon'=>'💹','i18n'=>'Commissions','url'=>'fragments/commissions.php'],
             ['id'=>'subscriptions','order'=>30,'icon'=>'🔄','i18n'=>'Subscriptions','url'=>'fragments/subscriptions.php'],
             ['id'=>'plan_selection','order'=>40,'icon'=>'📋','i18n'=>'plan_selection','url'=>'fragments/plan_selection.php'],
+            ['id'=>'platform_report','order'=>50,'icon'=>'📊','i18n'=>'nav.platform_report','url'=>'fragments/platform_report.php'],
         ]
     ],
 
