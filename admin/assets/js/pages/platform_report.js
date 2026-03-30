@@ -198,7 +198,7 @@
         try {
             const params = {};
             if (CFG.tenantId) params.tenant_id = CFG.tenantId;
-            const url = new URL('/api/entities', window.location.origin);
+            const url = new URL((CFG.apiBase || '/api') + '/entities', window.location.origin);
             url.searchParams.set('limit', '200');
             if (params.tenant_id) url.searchParams.set('tenant_id', params.tenant_id);
             const resp = await fetch(url.toString(), {

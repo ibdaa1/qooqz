@@ -293,24 +293,31 @@ final class PdoPlatformReportRepository
                          ELSE 0 END AS ctr,
                     COALESCE(SUM(ast.views + ast.clicks), 0) AS total_interactions
                 FROM ad_stats ast
-                LEFT JOIN ads a ON a.id = ast.ad_id
-                LEFT JOIN ad_campaigns ac ON ac.id = a.campaign_id
-                WHERE ast.date BETWEEN :s AND :e";
+                INNER JOIN ads a ON a.id = ast.ad_id
+                INNER JOIN ad_campaigns ac ON ac.id = a.campaign_id
+                WHERE ast.date BETWEEN :s AND :e
+                {$tWhere}";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
         $adsData = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
         // Top ads by views
+        $tWhere2 = $tenantId !== null ? 'AND ac2.tenant_id = :tid2' : '';
         $params2 = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $params2[':tid2'] = $tenantId;
+        }
         $sql2 = "SELECT ast.ad_id,
                     COALESCE(a.target_type, '') AS ad_type,
                     COALESCE(a.target_value, '') AS ad_target,
                     SUM(ast.views) AS total_views,
                     SUM(ast.clicks) AS total_clicks
                  FROM ad_stats ast
-                 LEFT JOIN ads a ON a.id = ast.ad_id
+                 INNER JOIN ads a ON a.id = ast.ad_id
+                 INNER JOIN ad_campaigns ac2 ON ac2.id = a.campaign_id
                  WHERE ast.date BETWEEN :s AND :e
+                 {$tWhere2}
                  GROUP BY ast.ad_id, a.target_type, a.target_value
                  ORDER BY total_views DESC
                  LIMIT 10";
@@ -538,7 +545,11 @@ final class PdoPlatformReportRepository
 
     public function getAdsTimeSeries(string $start, string $end, ?int $tenantId = null, string $groupBy = 'day'): array
     {
+        $tWhere = $tenantId !== null ? 'AND ac.tenant_id = :tid' : '';
         $params = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $params[':tid'] = $tenantId;
+        }
 
         $dateFormat = match($groupBy) {
             'month' => '%Y-%m',
@@ -551,7 +562,10 @@ final class PdoPlatformReportRepository
                     COALESCE(SUM(ast.views), 0) AS views,
                     COALESCE(SUM(ast.clicks), 0) AS clicks
                 FROM ad_stats ast
+                INNER JOIN ads a ON a.id = ast.ad_id
+                INNER JOIN ad_campaigns ac ON ac.id = a.campaign_id
                 WHERE ast.date BETWEEN :s AND :e
+                {$tWhere}
                 GROUP BY period
                 ORDER BY period ASC";
 
