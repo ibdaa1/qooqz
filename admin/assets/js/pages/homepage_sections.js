@@ -912,7 +912,7 @@
             // New homepage fields
             var layoutConfigStr = el.modalLayoutConfig ? el.modalLayoutConfig.value.trim() : '';
             if (layoutConfigStr) {
-                try { data.layout_config = JSON.parse(layoutConfigStr); } catch (e) { console.warn('Invalid layout_config JSON, storing as string:', e.message); data.layout_config = layoutConfigStr; }
+                try { data.layout_config = JSON.parse(layoutConfigStr); } catch (e) { showToast(t('messages.invalid_json', 'Invalid JSON in Layout Config'), 'error'); return null; }
             }
             data.padding     = el.modalPadding ? el.modalPadding.value.trim() : '';
             data.custom_css  = el.modalCustomCss ? el.modalCustomCss.value.trim() : '';
@@ -949,6 +949,7 @@
     function handleModalSave() {
         var tab = state.modalTab;
         var data = collectModalData(tab);
+        if (!data) return; // Validation failed
 
         if (tab === 'homepage') {
             saveHomepageSection(data);

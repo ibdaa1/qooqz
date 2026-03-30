@@ -96,7 +96,8 @@
       "delete_failed": "فشل في حذف القسم",
       "load_failed": "فشل في تحميل البيانات",
       "confirm_delete": "هل أنت متأكد من حذف هذا القسم؟",
-      "no_permission": "ليس لديك صلاحية لتنفيذ هذا الإجراء"
+      "no_permission": "ليس لديك صلاحية لتنفيذ هذا الإجراء",
+      "invalid_json": "تنسيق JSON غير صالح"
     },
     "common": {
       "active": "نشط",
