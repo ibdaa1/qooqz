@@ -1,0 +1,563 @@
+/* ═══════════════════════════════════════════════════
+   Homepage Sections Manager – Two-Tab UI
+   Uses admin theme CSS variables from database
+   ═══════════════════════════════════════════════════ */
+
+.hs-module {
+    font-family: var(--body-font-family, 'Cairo', 'Inter', sans-serif);
+    color: var(--text-primary);
+    padding: clamp(12px, 2vw, 24px);
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* ─── Page header ─── */
+.hs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.hs-header h1 {
+    font-size: clamp(1.2rem, 2.5vw, 1.75rem);
+    font-weight: 700;
+    margin: 0;
+}
+.hs-header p {
+    color: var(--text-secondary);
+    margin: 4px 0 0;
+    font-size: 0.9rem;
+}
+
+/* ─── Tabs ─── */
+.hs-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: 0;
+}
+.hs-tab {
+    padding: 10px 20px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all .2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: inherit;
+}
+.hs-tab:hover {
+    color: var(--text-primary);
+}
+.hs-tab.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+/* ─── Tab badge ─── */
+.hs-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+.hs-tab.active .hs-badge {
+    background: var(--primary-color);
+    color: #fff;
+}
+
+/* ─── Tab content ─── */
+.hs-tab-content {
+    display: none;
+    padding: 16px 0;
+}
+.hs-tab-content.active {
+    display: block;
+}
+
+/* ─── Toolbar ─── */
+.hs-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+/* ─── Filter card ─── */
+.hs-filter-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius, 8px);
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.hs-filter-card label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+.hs-filter-card select {
+    padding: 6px 12px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius, 8px);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+/* ─── Sections list ─── */
+.hs-sections-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 60px;
+}
+
+/* ─── Section card ─── */
+.hs-section-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius, 8px);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: border-color .2s, box-shadow .2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,.1);
+}
+.hs-section-card:hover {
+    border-color: var(--primary-color);
+}
+.hs-section-card.dragging {
+    opacity: 0.5;
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 16px rgba(0,0,0,.2);
+    background: var(--background-secondary);
+}
+
+/* ─── Drag handle ─── */
+.hs-drag-handle {
+    cursor: grab;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    user-select: none;
+}
+.hs-drag-handle:active {
+    cursor: grabbing;
+}
+
+/* ─── Type badge ─── */
+.hs-type-badge {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: inline-block;
+    white-space: nowrap;
+    background: rgba(59,130,246,.12);
+    color: var(--primary-color);
+}
+
+/* ─── Section info ─── */
+.hs-section-info {
+    flex: 1;
+    min-width: 0;
+}
+.hs-section-info .hs-section-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 2px;
+    color: var(--text-primary);
+}
+.hs-section-info .hs-section-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* ─── Section controls ─── */
+.hs-section-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* ─── Actions (save button area) ─── */
+.hs-actions {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* ─── Buttons ─── */
+.hs-btn {
+    padding: 8px 16px;
+    border-radius: var(--border-radius, 8px);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all .2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    font-family: inherit;
+}
+.hs-btn-primary {
+    background: var(--primary-color);
+    color: #fff;
+}
+.hs-btn-primary:hover {
+    background: var(--primary-hover);
+}
+.hs-btn-secondary {
+    background: transparent;
+    color: var(--text-secondary);
+    border-color: var(--border-color);
+}
+.hs-btn-secondary:hover {
+    background: rgba(128,128,128,.1);
+    color: var(--text-primary);
+}
+.hs-btn-success {
+    background: var(--success-color);
+    color: #fff;
+}
+.hs-btn-success:hover {
+    filter: brightness(1.1);
+}
+.hs-btn-danger {
+    background: var(--danger-color);
+    color: #fff;
+}
+.hs-btn-danger:hover {
+    filter: brightness(1.1);
+}
+.hs-btn-sm {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+}
+
+/* ═══════════════════════════════════════════════════
+   Modal overlay
+   ═══════════════════════════════════════════════════ */
+.hs-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.55);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.hs-modal {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius, 8px);
+    width: 100%;
+    max-width: 600px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,.3);
+}
+.hs-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+.hs-modal-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+.hs-modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+.hs-modal-close:hover {
+    color: var(--text-primary);
+}
+.hs-modal-body {
+    padding: 16px 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+.hs-modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* ─── Form group ─── */
+.hs-form-group {
+    margin-bottom: 14px;
+}
+.hs-form-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+.hs-form-group input,
+.hs-form-group select,
+.hs-form-group textarea {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius, 8px);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    transition: border-color .2s;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+.hs-form-group input:focus,
+.hs-form-group select:focus,
+.hs-form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(59,130,246,.15);
+}
+
+/* ─── Translation row ─── */
+.hs-translation-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+.hs-translation-row:last-child {
+    border-bottom: none;
+}
+.hs-translation-row .lang-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 40px;
+    text-transform: uppercase;
+}
+.hs-translation-row input {
+    flex: 1;
+    padding: 6px 10px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-family: inherit;
+}
+.hs-translation-row input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+/* ═══════════════════════════════════════════════════
+   Toast Notifications
+   ═══════════════════════════════════════════════════ */
+.hs-toast {
+    position: fixed;
+    top: 20px;
+    z-index: 10000;
+    padding: 12px 20px;
+    border-radius: var(--border-radius, 8px);
+    font-size: 0.875rem;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0,0,0,.3);
+    animation: hsSlideIn .3s ease;
+}
+[dir="ltr"] .hs-toast { right: 20px; }
+[dir="rtl"] .hs-toast { left: 20px; }
+.hs-toast.success {
+    background: var(--success-color);
+    color: #fff;
+}
+.hs-toast.error {
+    background: var(--danger-color);
+    color: #fff;
+}
+@keyframes hsSlideIn {
+    from { transform: translateY(-20px); opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
+}
+
+/* ─── Empty state ─── */
+.hs-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+.hs-empty p {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+/* ─── Toggle switch ─── */
+.hs-toggle {
+    position: relative;
+    display: inline-block;
+    width: 38px;
+    height: 20px;
+    flex-shrink: 0;
+}
+.hs-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.hs-toggle .slider {
+    position: absolute;
+    inset: 0;
+    background: var(--border-color);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background .2s;
+}
+.hs-toggle .slider::before {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    top: 2px;
+    left: 2px;
+    transition: transform .2s;
+}
+.hs-toggle input:checked + .slider {
+    background: var(--success-color);
+}
+.hs-toggle input:checked + .slider::before {
+    transform: translateX(18px);
+}
+
+/* ═══════════════════════════════════════════════════
+   RTL Support
+   ═══════════════════════════════════════════════════ */
+[dir="rtl"] .hs-section-card {
+    flex-direction: row-reverse;
+}
+[dir="rtl"] .hs-toolbar {
+    flex-direction: row-reverse;
+}
+[dir="rtl"] .hs-modal-header {
+    flex-direction: row-reverse;
+}
+[dir="rtl"] .hs-modal-footer {
+    flex-direction: row-reverse;
+}
+[dir="rtl"] .hs-actions {
+    flex-direction: row-reverse;
+}
+[dir="rtl"] .hs-section-controls {
+    flex-direction: row-reverse;
+}
+[dir="rtl"] .hs-toggle .slider::before {
+    left: auto;
+    right: 2px;
+}
+[dir="rtl"] .hs-toggle input:checked + .slider::before {
+    transform: translateX(-18px);
+}
+
+/* ═══════════════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    .hs-header {
+        flex-direction: column;
+    }
+    .hs-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .hs-section-card {
+        flex-wrap: wrap;
+    }
+    .hs-section-controls {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    .hs-filter-card {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .hs-modal {
+        max-height: 95vh;
+    }
+    .hs-tabs {
+        overflow-x: auto;
+    }
+    .hs-translation-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+@media (max-width: 480px) {
+    .hs-module {
+        padding: 8px;
+    }
+    .hs-tab {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+    }
+    .hs-section-card {
+        padding: 10px 12px;
+        gap: 8px;
+    }
+    .hs-btn {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+    .hs-modal-header,
+    .hs-modal-body,
+    .hs-modal-footer {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+}
