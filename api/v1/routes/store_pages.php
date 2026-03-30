@@ -109,7 +109,13 @@ try {
         // POST
         // =====================================================
         case 'POST':
-            $data   = json_decode((string)file_get_contents('php://input'), true) ?? [];
+            $rawBody = (string)file_get_contents('php://input');
+            $data    = json_decode($rawBody, true);
+            if ($rawBody !== '' && $data === null && json_last_error() !== JSON_ERROR_NONE) {
+                ResponseFormatter::error('Invalid JSON in request body', 400);
+                break;
+            }
+            $data   = $data ?? [];
             $target = $_GET['target'] ?? '';
 
             // POST ?target=translations → saveSectionTranslations
@@ -183,7 +189,13 @@ try {
         // PUT
         // =====================================================
         case 'PUT':
-            $data   = json_decode((string)file_get_contents('php://input'), true) ?? [];
+            $rawBody = (string)file_get_contents('php://input');
+            $data    = json_decode($rawBody, true);
+            if ($rawBody !== '' && $data === null && json_last_error() !== JSON_ERROR_NONE) {
+                ResponseFormatter::error('Invalid JSON in request body', 400);
+                break;
+            }
+            $data   = $data ?? [];
             $target = $_GET['target'] ?? '';
 
             // PUT ?target=section → updateSection

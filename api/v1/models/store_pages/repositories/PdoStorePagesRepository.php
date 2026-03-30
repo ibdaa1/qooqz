@@ -113,7 +113,7 @@ final class PdoStorePagesRepository
         }
 
         if ($userId) {
-            $this->logAction('store_pages', $id, $isUpdate ? 'update' : 'create', $userId, $oldData, $data);
+            $this->logAction('store_pages', $id, $isUpdate ? 'update' : 'create', $userId, $oldData, $data, $tenantId);
         }
 
         return $id;
@@ -145,7 +145,7 @@ final class PdoStorePagesRepository
             $result = $stmt->execute([':tenantId' => $tenantId, ':id' => $id]);
 
             if ($userId && $oldData) {
-                $this->logAction('store_pages', $id, 'delete', $userId, $oldData, null);
+                $this->logAction('store_pages', $id, 'delete', $userId, $oldData, null, $tenantId);
             }
 
             $this->pdo->commit();
@@ -220,6 +220,13 @@ final class PdoStorePagesRepository
         return $row ?: null;
     }
 
+    private function getTenantIdByPageId(int $pageId): int
+    {
+        $stmt = $this->pdo->prepare("SELECT tenant_id FROM store_pages WHERE id = :id LIMIT 1");
+        $stmt->execute([':id' => $pageId]);
+        return (int)($stmt->fetchColumn() ?: 0);
+    }
+
     public function saveSection(int $pageId, array $data, ?int $userId = null): int
     {
         $isUpdate = !empty($data['id']);
@@ -269,7 +276,7 @@ final class PdoStorePagesRepository
         }
 
         if ($userId) {
-            $this->logAction('store_sections', $id, $isUpdate ? 'update' : 'create', $userId, $oldData, $data);
+            $this->logAction('store_sections', $id, $isUpdate ? 'update' : 'create', $userId, $oldData, $data, $this->getTenantIdByPageId($pageId));
         }
 
         return $id;
@@ -294,7 +301,7 @@ final class PdoStorePagesRepository
             $result = $stmt->execute([':pageId' => $pageId, ':sectionId' => $sectionId]);
 
             if ($userId && $oldData) {
-                $this->logAction('store_sections', $sectionId, 'delete', $userId, $oldData, null);
+                $this->logAction('store_sections', $sectionId, 'delete', $userId, $oldData, null, $this->getTenantIdByPageId($pageId));
             }
 
             $this->pdo->commit();
@@ -375,7 +382,7 @@ final class PdoStorePagesRepository
     // Audit log
     // =========================================================
 
-    public function logAction(string $table, int $recordId, string $action, ?int $userId, ?array $oldData = null, ?array $newData = null): void
+    public function logAction(string $table, int $recordId, string $action, ?int $userId, ?array $oldData = null, ?array $newData = null, int $tenantId = 0): void
     {
         if (!$userId) {
             return;
@@ -399,7 +406,7 @@ final class PdoStorePagesRepository
         ");
 
         $stmt->execute([
-            ':tenantId'   => 0,
+            ':tenantId'   => $tenantId,
             ':userId'     => $userId,
             ':entityType' => $table,
             ':entityId'   => $recordId,
