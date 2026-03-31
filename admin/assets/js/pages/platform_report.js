@@ -125,9 +125,6 @@
             });
         });
 
-        // Load dashboard summary
-        loadDashboardSummary();
-
         // Load tenants if super admin
         if (CFG.isSuperAdmin) {
             loadTenants();
@@ -136,10 +133,16 @@
         // Load entities for filter
         loadEntities();
 
-        // Auto-generate default report on page load
-        setTimeout(function () {
-            generateReport();
-        }, 300);
+        // Auto-generate default report after a short delay for initial render
+        loadDashboardAndAutoReport();
+    }
+
+    /**
+     * Load dashboard summary first, then auto-generate report.
+     */
+    async function loadDashboardAndAutoReport() {
+        await loadDashboardSummary();
+        generateReport();
     }
 
     // ═══════════════════════════════════════════
