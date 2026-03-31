@@ -31,7 +31,14 @@ if (!is_admin_logged_in()) {
 
 $user     = admin_user();
 $lang     = admin_lang();
-$dir      = (strpos($lang, 'ar') === 0 || strpos($lang, 'he') === 0 || strpos($lang, 'fa') === 0 || strpos($lang, 'ur') === 0) ? 'rtl' : 'ltr';
+$rtlPrefixes = ['ar', 'he', 'fa', 'ur'];
+$dir = 'ltr';
+foreach ($rtlPrefixes as $prefix) {
+    if (strpos($lang, $prefix) === 0) {
+        $dir = 'rtl';
+        break;
+    }
+}
 $csrf     = admin_csrf();
 $tenantId = admin_tenant_id();
 $userId   = admin_user_id();

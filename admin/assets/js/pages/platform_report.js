@@ -598,6 +598,10 @@
         return _chartJsPromise;
     }
 
+    var _chartRetryCount = 0;
+    var CHART_RENDER_RETRY_DELAY_MS = 150;
+    var CHART_RENDER_MAX_RETRIES = 5;
+
     async function renderChart(type, timeSeries) {
         const canvas = $('#prMainChart');
         if (!canvas) return;
@@ -620,9 +624,13 @@
         // On desktop, the results section may still be display:none when renderChart
         // is first called; retrying gives showResults(true) time to make it visible.
         if (wrapper && wrapper.offsetParent === null) {
-            setTimeout(function () { renderChart(type, timeSeries); }, 150);
+            if (_chartRetryCount < CHART_RENDER_MAX_RETRIES) {
+                _chartRetryCount++;
+                setTimeout(function () { renderChart(type, timeSeries); }, CHART_RENDER_RETRY_DELAY_MS);
+            }
             return;
         }
+        _chartRetryCount = 0;
 
         // Ensure Chart.js is loaded
         try {
