@@ -31,12 +31,15 @@ if (!is_admin_logged_in()) {
 
 $user     = admin_user();
 $lang     = admin_lang();
-$rtlPrefixes = ['ar', 'he', 'fa', 'ur'];
-$dir = 'ltr';
-foreach ($rtlPrefixes as $prefix) {
-    if (strpos($lang, $prefix) === 0) {
-        $dir = 'rtl';
-        break;
+$dir      = function_exists('admin_dir') ? admin_dir() : 'ltr';
+// Fallback: detect RTL from language prefix if admin_dir() returned default
+if ($dir === 'ltr') {
+    $rtlPrefixes = ['ar', 'he', 'fa', 'ur'];
+    foreach ($rtlPrefixes as $prefix) {
+        if (strpos($lang, $prefix) === 0) {
+            $dir = 'rtl';
+            break;
+        }
     }
 }
 $csrf     = admin_csrf();
@@ -58,11 +61,16 @@ if (!function_exists('__t')) {
     }
 }
 
-// Load language file
+// Load language file (try exact match, then language prefix, then English fallback)
 $_PR_LANG = [];
 $langFile = __DIR__ . '/../../languages/PlatformReport/' . $lang . '.json';
 if (!file_exists($langFile)) {
-    $langFile = __DIR__ . '/../../languages/PlatformReport/en.json';
+    // Try language prefix (e.g., 'ar' from 'ar_SA')
+    $langPrefix = strtok($lang, '_');
+    $langFile = __DIR__ . '/../../languages/PlatformReport/' . $langPrefix . '.json';
+    if (!file_exists($langFile)) {
+        $langFile = __DIR__ . '/../../languages/PlatformReport/en.json';
+    }
 }
 if (file_exists($langFile)) {
     $_PR_LANG = json_decode(file_get_contents($langFile), true) ?: [];

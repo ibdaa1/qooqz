@@ -32,7 +32,8 @@
         if (num === null || num === undefined || num === '') return '-';
         const n = parseFloat(num);
         if (isNaN(n)) return num;
-        return n.toLocaleString(CFG.lang === 'ar' ? 'ar-SA' : 'en-US', {
+        var isArabic = (CFG.lang || '').indexOf('ar') === 0;
+        return n.toLocaleString(isArabic ? 'ar-SA' : 'en-US', {
             minimumFractionDigits: 0,
             maximumFractionDigits: 2
         });
@@ -42,7 +43,8 @@
         if (num === null || num === undefined || num === '') return '-';
         const n = parseFloat(num);
         if (isNaN(n)) return num;
-        return n.toLocaleString(CFG.lang === 'ar' ? 'ar-SA' : 'en-US', {
+        var isArabic = (CFG.lang || '').indexOf('ar') === 0;
+        return n.toLocaleString(isArabic ? 'ar-SA' : 'en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         });
@@ -598,10 +600,6 @@
         return _chartJsPromise;
     }
 
-    var _chartRetryCount = 0;
-    var CHART_RENDER_RETRY_DELAY_MS = 150;
-    var CHART_RENDER_MAX_RETRIES = 5;
-
     async function renderChart(type, timeSeries) {
         const canvas = $('#prMainChart');
         if (!canvas) return;
@@ -619,18 +617,6 @@
             return;
         }
         if (wrapper) wrapper.style.display = 'block';
-
-        // If container is hidden, retry after a short delay instead of bailing out.
-        // On desktop, the results section may still be display:none when renderChart
-        // is first called; retrying gives showResults(true) time to make it visible.
-        if (wrapper && wrapper.offsetParent === null) {
-            if (_chartRetryCount < CHART_RENDER_MAX_RETRIES) {
-                _chartRetryCount++;
-                setTimeout(function () { renderChart(type, timeSeries); }, CHART_RENDER_RETRY_DELAY_MS);
-            }
-            return;
-        }
-        _chartRetryCount = 0;
 
         // Ensure Chart.js is loaded
         try {
