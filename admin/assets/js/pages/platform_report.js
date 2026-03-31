@@ -135,6 +135,11 @@
 
         // Load entities for filter
         loadEntities();
+
+        // Auto-generate default report on page load
+        setTimeout(function () {
+            generateReport();
+        }, 300);
     }
 
     // ═══════════════════════════════════════════
@@ -393,6 +398,18 @@
                     { icon: '❤️', label: t('wishlist_items'), value: fmt(m.wishlist_items), color: 'pr-yellow' },
                 ];
 
+            case 'delivery_performance':
+                return [
+                    { icon: '🚚', label: t('total_deliveries', 'Total Deliveries'), value: fmt(m.total_deliveries), color: 'pr-blue' },
+                    { icon: '📍', label: t('pending_deliveries', 'Pending'), value: fmt(m.pending_deliveries), color: 'pr-yellow' },
+                    { icon: '🚛', label: t('in_transit_deliveries', 'In Transit'), value: fmt(m.in_transit_deliveries), color: 'pr-purple' },
+                    { icon: '✅', label: t('completed_deliveries', 'Completed'), value: fmt(m.completed_deliveries), color: 'pr-green' },
+                    { icon: '❌', label: t('failed_deliveries', 'Failed'), value: fmt(m.failed_deliveries), color: 'pr-red' },
+                    { icon: '💰', label: t('total_delivery_fees', 'Delivery Fees'), value: fmtCurrency(m.total_delivery_fees), color: 'pr-orange' },
+                    { icon: '⏱️', label: t('avg_delivery_minutes', 'Avg Time (min)'), value: fmt(m.avg_delivery_minutes), color: 'pr-purple' },
+                    { icon: '💵', label: t('total_delivery_revenue', 'Delivery Revenue'), value: fmtCurrency(m.total_delivery_revenue), color: 'pr-green' },
+                ];
+
             case 'platform_health':
                 return [
                     { icon: '👥', label: t('total_users'), value: fmt(m.total_users), color: 'pr-blue' },
@@ -573,6 +590,38 @@
                             y: { beginAtZero: true, position: CFG.dir === 'rtl' ? 'right' : 'left' }
                         }
                     }
+                };
+
+            case 'delivery_performance':
+                return {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                label: t('total_deliveries', 'Deliveries'),
+                                data: timeSeries.map(d => parseFloat(d.delivery_count) || 0),
+                                backgroundColor: primaryColor + '80',
+                                borderColor: primaryColor,
+                                borderWidth: 1,
+                                yAxisID: 'y',
+                                order: 2,
+                            },
+                            {
+                                label: t('delivery_fees', 'Delivery Fees'),
+                                data: timeSeries.map(d => parseFloat(d.delivery_fees) || 0),
+                                type: 'line',
+                                borderColor: successColor,
+                                backgroundColor: successColor + '20',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.3,
+                                yAxisID: 'y1',
+                                order: 1,
+                            },
+                        ]
+                    },
+                    options: buildChartOptions(t('total_deliveries', 'Deliveries'), t('delivery_fees', 'Delivery Fees'), true)
                 };
 
             default:

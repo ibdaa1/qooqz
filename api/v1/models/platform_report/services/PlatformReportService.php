@@ -149,6 +149,7 @@ final class PlatformReportService
             'returns_complaints'   => $this->repo->aggregateReturnsComplaints($start, $end, $tenantId),
             'entities_performance' => $this->repo->aggregateEntitiesPerformance($start, $end, $tenantId),
             'customer_behavior'    => $this->repo->aggregateCustomerBehavior($start, $end, $tenantId),
+            'delivery_performance' => $this->repo->aggregateDeliveryStats($start, $end, $tenantId, $entityId),
             'platform_health'      => $this->repo->aggregatePlatformHealth($start, $end),
             default                => [],
         };
@@ -169,6 +170,8 @@ final class PlatformReportService
                 => $this->repo->getReturnsTimeSeries($start, $end, $tenantId, $groupBy),
             'customer_behavior'
                 => $this->repo->getCustomerTimeSeries($start, $end, $groupBy),
+            'delivery_performance'
+                => $this->repo->getDeliveryTimeSeries($start, $end, $tenantId, $groupBy, $entityId),
             default => [],
         };
     }

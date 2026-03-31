@@ -15,6 +15,7 @@ final class PlatformReportValidator
         'returns_complaints',
         'entities_performance',
         'customer_behavior',
+        'delivery_performance',
         'platform_health',
     ];
 

@@ -128,5 +128,9 @@
     "cancelled_deliveries": "Cancelled Deliveries",
     "total_delivery_fees": "Delivery Fees",
     "total_provider_payouts": "Provider Payouts",
-    "avg_delivery_minutes": "Avg Delivery (min)"
+    "avg_delivery_minutes": "Avg Delivery (min)",
+    "delivery_performance": "Delivery Performance",
+    "failed_deliveries": "Failed Deliveries",
+    "total_delivery_revenue": "Delivery Revenue",
+    "delivery_fees": "Delivery Fees"
 }

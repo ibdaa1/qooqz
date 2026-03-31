@@ -128,5 +128,9 @@
     "cancelled_deliveries": "توصيلات ملغية",
     "total_delivery_fees": "رسوم التوصيل",
     "total_provider_payouts": "مدفوعات مزودي الخدمة",
-    "avg_delivery_minutes": "متوسط التوصيل (دقيقة)"
+    "avg_delivery_minutes": "متوسط التوصيل (دقيقة)",
+    "delivery_performance": "أداء التوصيل",
+    "failed_deliveries": "توصيلات فاشلة",
+    "total_delivery_revenue": "إيرادات التوصيل",
+    "delivery_fees": "رسوم التوصيل"
 }

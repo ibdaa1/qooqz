@@ -134,6 +134,7 @@ if (file_exists($langFile)) {
                     <option value="returns_complaints"><?= __t('returns_complaints', 'Returns & Complaints') ?></option>
                     <option value="entities_performance"><?= __t('entities_performance', 'Entities Performance') ?></option>
                     <option value="customer_behavior"><?= __t('customer_behavior', 'Customer Behavior') ?></option>
+                    <option value="delivery_performance"><?= __t('delivery_performance', 'Delivery Performance') ?></option>
                     <?php if ($isSuperAdmin): ?>
                     <option value="platform_health"><?= __t('platform_health', 'Platform Health') ?></option>
                     <?php endif; ?>
@@ -239,9 +240,6 @@ if (file_exists($langFile)) {
 
 </div>
 
-<!-- Chart.js CDN -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-
 <script>
     // Pass PHP variables to JS
     window.__PR_CONFIG = {
@@ -253,6 +251,8 @@ if (file_exists($langFile)) {
         strings: <?= json_encode($_PR_LANG) ?>
     };
 </script>
+<!-- Chart.js CDN (async to prevent page blocking) -->
+<script async src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="/admin/assets/js/pages/platform_report.js"></script>
 
 <?php

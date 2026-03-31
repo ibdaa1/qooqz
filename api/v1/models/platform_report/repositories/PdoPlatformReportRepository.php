@@ -746,6 +746,46 @@ final class PdoPlatformReportRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    public function getDeliveryTimeSeries(string $start, string $end, ?int $tenantId = null, string $groupBy = 'day', ?int $entityId = null): array
+    {
+        $join = '';
+        $where = 'WHERE do2.created_at BETWEEN :s AND :e';
+        $params = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $where .= ' AND do2.tenant_id = :tid';
+            $params[':tid'] = $tenantId;
+        }
+        if ($entityId !== null) {
+            $join = 'INNER JOIN orders o ON o.id = do2.order_id';
+            $where .= ' AND o.entity_id = :eid';
+            $params[':eid'] = $entityId;
+        }
+
+        $dateFormat = match($groupBy) {
+            'month' => '%Y-%m',
+            'week'  => '%x-W%v',
+            default => '%Y-%m-%d',
+        };
+
+        $sql = "SELECT
+                    DATE_FORMAT(do2.created_at, '{$dateFormat}') AS period,
+                    COUNT(do2.id) AS delivery_count,
+                    COALESCE(SUM(do2.delivery_fee), 0) AS delivery_fees
+                FROM delivery_orders do2
+                {$join}
+                {$where}
+                GROUP BY period
+                ORDER BY period ASC";
+
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (\PDOException $e) {
+            return [];
+        }
+    }
+
     // ════════════════════════════════════════════════════════════
     // REPORT EXPORTS
     // ════════════════════════════════════════════════════════════
