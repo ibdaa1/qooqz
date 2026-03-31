@@ -185,7 +185,7 @@ if (file_exists($langFile)) {
             <?php else: ?>
             <div class="pr-filter-group">
                 <label for="prTenantDisplay"><?= __t('tenant', 'Tenant') ?></label>
-                <input type="text" id="prTenantDisplay" class="pr-input" value="<?= htmlspecialchars($user['tenant_name'] ?? __t('tenant', 'Tenant') . ' #' . $tenantId) ?>" disabled>
+                <input type="text" id="prTenantDisplay" class="pr-input" value="<?= htmlspecialchars($user['tenant_name'] ?? __t('tenant', 'Tenant') . ' #' . (int)$tenantId) ?>" disabled>
                 <input type="hidden" id="prTenantId" value="<?= (int)$tenantId ?>">
             </div>
             <?php endif; ?>
