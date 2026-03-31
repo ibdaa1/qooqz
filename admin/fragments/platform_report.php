@@ -31,7 +31,7 @@ if (!is_admin_logged_in()) {
 
 $user     = admin_user();
 $lang     = admin_lang();
-$dir      = in_array($lang, ['ar', 'he', 'fa', 'ur']) ? 'rtl' : 'ltr';
+$dir      = (strpos($lang, 'ar') === 0 || strpos($lang, 'he') === 0 || strpos($lang, 'fa') === 0 || strpos($lang, 'ur') === 0) ? 'rtl' : 'ltr';
 $csrf     = admin_csrf();
 $tenantId = admin_tenant_id();
 $userId   = admin_user_id();

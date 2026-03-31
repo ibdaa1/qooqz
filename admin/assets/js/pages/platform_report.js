@@ -404,8 +404,9 @@
 
             if (resp.success && resp.data?.success) {
                 currentReportData = resp.data;
-                await renderReport(resp.data);
+                // Show results container BEFORE rendering so chart container is visible
                 showResults(true);
+                await renderReport(resp.data);
             } else {
                 const msg = resp.message || resp.data?.errors?.join('; ') || t('error_loading');
                 showNoData(msg);
@@ -615,8 +616,11 @@
         }
         if (wrapper) wrapper.style.display = 'block';
 
-        // Do NOT render if container is hidden (e.g. display:none parent)
+        // If container is hidden, retry after a short delay instead of bailing out.
+        // On desktop, the results section may still be display:none when renderChart
+        // is first called; retrying gives showResults(true) time to make it visible.
         if (wrapper && wrapper.offsetParent === null) {
+            setTimeout(function () { renderChart(type, timeSeries); }, 150);
             return;
         }
 
