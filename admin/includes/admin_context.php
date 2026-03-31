@@ -318,10 +318,15 @@ if (!isset($GLOBALS['ADMIN_UI'])) {
                 'entity_id' => isset($tenantUser['entity_id']) ? (int)$tenantUser['entity_id'] : null,
             ],
             'lang' => $_SESSION['preferred_language'] ?? $currentUser['preferred_language'] ?? 'en',
-            'direction' => in_array(
-                $_SESSION['preferred_language'] ?? $currentUser['preferred_language'] ?? 'en', 
-                ['ar', 'fa', 'he', 'ur']
-            ) ? 'rtl' : 'ltr',
+            'direction' => (function () use ($currentUser) {
+                $lang = $_SESSION['preferred_language'] ?? $currentUser['preferred_language'] ?? 'en';
+                foreach (['ar', 'fa', 'he', 'ur'] as $prefix) {
+                    if (strpos($lang, $prefix) === 0) {
+                        return 'rtl';
+                    }
+                }
+                return 'ltr';
+            })(),
             'csrf_token' => $_SESSION['csrf_token'] ?? '',
             'tenant_id' => $tenantId,
             'is_super_admin' => in_array('super_admin', $_SESSION['roles'] ?? [], true),
