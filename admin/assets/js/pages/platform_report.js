@@ -94,9 +94,44 @@
     }
 
     // ═══════════════════════════════════════════
+    // DIRECTION (RTL/LTR)
+    // ═══════════════════════════════════════════
+    function applyDirection() {
+        var dir = CFG.dir || 'ltr';
+
+        // Apply dir globally
+        document.documentElement.dir = dir;
+        document.documentElement.setAttribute('dir', dir);
+        document.body.dir = dir;
+        document.body.setAttribute('dir', dir);
+
+        // Apply to main container
+        var app = $('#platformReportApp');
+        if (app) {
+            app.dir = dir;
+            app.setAttribute('dir', dir);
+            app.dataset.dir = dir;
+        }
+
+        // Chart.js canvas must stay LTR for correct rendering
+        var canvas = $('#prMainChart');
+        if (canvas) {
+            canvas.dir = 'ltr';
+            canvas.setAttribute('dir', 'ltr');
+            if (canvas.parentElement) {
+                canvas.parentElement.dir = 'ltr';
+                canvas.parentElement.setAttribute('dir', 'ltr');
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════
     // INIT
     // ═══════════════════════════════════════════
     function init() {
+        // Apply direction first (RTL/LTR)
+        applyDirection();
+
         // Set default dates (last 30 days)
         const endDateEl = $('#prEndDate');
         const startDateEl = $('#prStartDate');
@@ -134,6 +169,17 @@
 
         // Load entities for filter
         loadEntities();
+
+        // Debounced window resize handler for chart
+        var _resizeTimer = null;
+        window.addEventListener('resize', function () {
+            if (_resizeTimer) clearTimeout(_resizeTimer);
+            _resizeTimer = setTimeout(function () {
+                if (mainChart) {
+                    mainChart.resize();
+                }
+            }, 250);
+        });
 
         // Auto-generate default report after a short delay for initial render
         loadDashboardAndAutoReport();
@@ -555,26 +601,53 @@
         const canvas = $('#prMainChart');
         if (!canvas) return;
 
-        // Destroy previous chart
+        const wrapper = canvas.parentElement;
+
+        // Destroy previous chart instance before creating new one
         if (mainChart) {
             mainChart.destroy();
             mainChart = null;
         }
 
         if (!timeSeries || timeSeries.length === 0) {
-            canvas.parentElement.style.display = 'none';
+            if (wrapper) wrapper.style.display = 'none';
             return;
         }
-        canvas.parentElement.style.display = 'block';
+        if (wrapper) wrapper.style.display = 'block';
+
+        // Do NOT render if container is hidden (e.g. display:none parent)
+        if (wrapper && wrapper.offsetParent === null) {
+            return;
+        }
 
         // Ensure Chart.js is loaded
         try {
             await ensureChartJs();
         } catch (e) {
             console.error('Chart.js failed to load:', e);
-            canvas.parentElement.style.display = 'none';
+            if (wrapper) wrapper.style.display = 'none';
             return;
         }
+
+        // Set explicit height on wrapper and canvas for desktop rendering
+        if (wrapper) {
+            wrapper.style.height = wrapper.style.height || '400px';
+            wrapper.style.position = 'relative';
+        }
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+
+        // Force canvas LTR even in RTL mode
+        canvas.dir = 'ltr';
+        canvas.setAttribute('dir', 'ltr');
+        if (wrapper) {
+            wrapper.dir = 'ltr';
+            wrapper.setAttribute('dir', 'ltr');
+        }
+
+        // Force reflow before rendering to ensure correct layout dimensions
+        void canvas.offsetHeight;
+        if (wrapper) void wrapper.offsetHeight;
 
         const labels = timeSeries.map(d => d.period);
 
@@ -588,10 +661,19 @@
 
         mainChart = new Chart(canvas.getContext('2d'), chartConfig);
 
-        // Force resize to ensure correct dimensions (fixes desktop rendering)
+        // Multi-stage resize to ensure correct rendering on desktop
+        // Stage 1: immediate resize after render
+        if (mainChart) mainChart.resize();
+
+        // Stage 2: delayed resize (100ms)
         setTimeout(function () {
             if (mainChart) mainChart.resize();
-        }, 200);
+        }, 100);
+
+        // Stage 3: further delayed resize (300ms) for slow layout recalc
+        setTimeout(function () {
+            if (mainChart) mainChart.resize();
+        }, 300);
     }
 
     function getChartConfig(type, timeSeries, labels, primaryColor, successColor) {
@@ -1149,7 +1231,15 @@
             el.style.display = show ? 'block' : 'none';
             // Deliberate reflow trigger: reading offsetHeight forces the browser
             // to recalculate layout, fixing render issues on desktop after display change
-            if (show) void el.offsetHeight;
+            if (show) {
+                void el.offsetHeight;
+                // Re-trigger chart resize when results become visible
+                if (mainChart) {
+                    setTimeout(function () {
+                        if (mainChart) mainChart.resize();
+                    }, 150);
+                }
+            }
         }
         if (exp) exp.style.display = show ? 'flex' : 'none';
         if (noData) noData.style.display = 'none';

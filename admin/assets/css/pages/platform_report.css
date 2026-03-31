@@ -15,6 +15,15 @@
     color: var(--text-primary, #1f2937);
 }
 
+/* Ensure all report sections are visible on desktop */
+.pr-results-section {
+    overflow: visible;
+}
+
+.pr-results-section > * {
+    overflow: visible;
+}
+
 /* ═══════════════════════════════════════════
    PAGE HEADER
    ═══════════════════════════════════════════ */
@@ -306,18 +315,24 @@
     border: 1px solid var(--border-color, #e5e7eb);
     border-radius: var(--border-radius, 8px);
     padding: 20px;
+    overflow: visible;
 }
 
 .pr-chart-wrapper {
     position: relative;
-    height: 350px;
+    height: 400px;
     width: 100%;
+    min-height: 300px;
+    /* Chart.js canvas must always be LTR */
+    direction: ltr !important;
 }
 
 /* !important needed to override Chart.js inline width style on canvas elements */
 .pr-chart-wrapper canvas {
     width: 100% !important;
+    height: 100% !important;
     max-width: 100%;
+    direction: ltr !important;
 }
 
 /* ═══════════════════════════════════════════
@@ -381,6 +396,7 @@
 /* ═══════════════════════════════════════════
    RTL SUPPORT
    ═══════════════════════════════════════════ */
+[dir="rtl"] .pr-container,
 .pr-container[dir="rtl"] {
     direction: rtl;
     text-align: right;
@@ -463,6 +479,36 @@
     text-transform: none;
 }
 
+/* Chart canvas MUST stay LTR even in RTL mode */
+.pr-container[dir="rtl"] .pr-chart-wrapper {
+    direction: ltr !important;
+}
+
+.pr-container[dir="rtl"] .pr-chart-wrapper canvas {
+    direction: ltr !important;
+}
+
+/* RTL input and filter overrides */
+.pr-container[dir="rtl"] .pr-input {
+    text-align: right;
+}
+
+.pr-container[dir="rtl"] .pr-filter-actions {
+    direction: rtl;
+}
+
+.pr-container[dir="rtl"] .pr-summary-cards {
+    direction: rtl;
+}
+
+.pr-container[dir="rtl"] .pr-metrics-grid {
+    direction: rtl;
+}
+
+.pr-container[dir="rtl"] .pr-table-wrapper {
+    direction: rtl;
+}
+
 /* ═══════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════ */
@@ -513,7 +559,8 @@
     }
 
     .pr-chart-wrapper {
-        height: 250px;
+        height: 300px;
+        min-height: 250px;
     }
 
     .pr-chart-section,
@@ -581,7 +628,8 @@
     }
 
     .pr-chart-wrapper {
-        height: 200px;
+        height: 220px;
+        min-height: 200px;
     }
 
     .pr-chart-section,

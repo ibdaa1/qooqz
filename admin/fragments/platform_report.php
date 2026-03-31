@@ -64,7 +64,7 @@ if (file_exists($langFile)) {
 
 <link rel="stylesheet" href="/admin/assets/css/pages/platform_report.css">
 
-<div id="platformReportApp" class="pr-container" dir="<?= htmlspecialchars($dir) ?>">
+<div id="platformReportApp" class="pr-container" dir="<?= htmlspecialchars($dir) ?>" data-dir="<?= htmlspecialchars($dir) ?>">
 
     <!-- Page Header -->
     <div class="pr-page-header">
