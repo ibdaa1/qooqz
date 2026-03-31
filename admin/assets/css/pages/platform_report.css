@@ -314,6 +314,7 @@
     width: 100%;
 }
 
+/* !important needed to override Chart.js inline width style on canvas elements */
 .pr-chart-wrapper canvas {
     width: 100% !important;
     max-width: 100%;

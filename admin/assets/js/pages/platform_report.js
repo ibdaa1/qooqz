@@ -1147,8 +1147,9 @@
         const noData = $('#prNoData');
         if (el) {
             el.style.display = show ? 'block' : 'none';
-            // Force browser reflow to fix rendering on desktop
-            if (show) el.offsetHeight;
+            // Deliberate reflow trigger: reading offsetHeight forces the browser
+            // to recalculate layout, fixing render issues on desktop after display change
+            if (show) void el.offsetHeight;
         }
         if (exp) exp.style.display = show ? 'flex' : 'none';
         if (noData) noData.style.display = 'none';
