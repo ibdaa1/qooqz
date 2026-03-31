@@ -161,11 +161,11 @@ if (file_exists($langFile)) {
             </div>
 
             <?php if ($isSuperAdmin): ?>
-            <div class="pr-filter-group">
-                <label for="prTenantId"><?= __t('tenant', 'Tenant') ?></label>
-                <select id="prTenantId" class="pr-input">
-                    <option value=""><?= __t('all_tenants', 'All Tenants') ?></option>
-                </select>
+            <div class="pr-filter-group pr-tenant-search">
+                <label for="prTenantSearch"><?= __t('tenant', 'Tenant') ?></label>
+                <input type="text" id="prTenantSearch" class="pr-input" placeholder="<?= __t('search_tenant', 'Search tenant by name or ID...') ?>" autocomplete="off">
+                <input type="hidden" id="prTenantId" value="">
+                <div id="prTenantDropdown" class="pr-autocomplete-dropdown" style="display:none;"></div>
             </div>
             <?php endif; ?>
 

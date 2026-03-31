@@ -177,46 +177,134 @@
     }
 
     // ═══════════════════════════════════════════
-    // LOAD TENANTS (super admin)
+    // LOAD TENANTS (super admin) – searchable autocomplete
     // ═══════════════════════════════════════════
+    let tenantSearchTimer = null;
+
     async function loadTenants() {
+        const searchInput = $('#prTenantSearch');
+        const hiddenInput = $('#prTenantId');
+        const dropdown = $('#prTenantDropdown');
+        if (!searchInput || !hiddenInput || !dropdown) return;
+
+        // Debounced search on input
+        searchInput.addEventListener('input', function () {
+            clearTimeout(tenantSearchTimer);
+            const query = this.value.trim();
+            if (query.length < 1) {
+                dropdown.style.display = 'none';
+                hiddenInput.value = '';
+                loadEntities();
+                return;
+            }
+            tenantSearchTimer = setTimeout(function () {
+                searchTenants(query);
+            }, 300);
+        });
+
+        // Hide dropdown on click outside
+        document.addEventListener('click', function (e) {
+            if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        // Show dropdown on focus if has value
+        searchInput.addEventListener('focus', function () {
+            if (this.value.trim().length >= 1 && dropdown.children.length > 0) {
+                dropdown.style.display = 'block';
+            }
+        });
+    }
+
+    async function searchTenants(query) {
+        const dropdown = $('#prTenantDropdown');
+        const hiddenInput = $('#prTenantId');
+        const searchInput = $('#prTenantSearch');
+        if (!dropdown) return;
+
         try {
-            const resp = await fetch('/api/tenants?limit=100', {
+            const url = new URL((CFG.apiBase || '/api') + '/tenants', window.location.origin);
+            url.searchParams.set('limit', '20');
+            url.searchParams.set('search', query);
+            const resp = await fetch(url.toString(), {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
             const data = await resp.json();
-            const sel = $('#prTenantId');
-            if (!sel) return;
             const items = data?.data?.items || data?.data || [];
-            items.forEach(t => {
-                const opt = document.createElement('option');
-                opt.value = t.id;
-                opt.textContent = t.name || ('Tenant #' + t.id);
-                sel.appendChild(opt);
+
+            dropdown.innerHTML = '';
+
+            // "All Tenants" clear option
+            const clearDiv = document.createElement('div');
+            clearDiv.className = 'pr-autocomplete-clear';
+            clearDiv.textContent = t('all_tenants', '✕ All Tenants (clear)');
+            clearDiv.addEventListener('click', function () {
+                hiddenInput.value = '';
+                searchInput.value = '';
+                dropdown.style.display = 'none';
+                loadEntities();
             });
+            dropdown.appendChild(clearDiv);
+
+            if (items.length === 0) {
+                const noResult = document.createElement('div');
+                noResult.className = 'pr-autocomplete-item';
+                noResult.textContent = t('no_results', 'No tenants found');
+                noResult.style.opacity = '0.6';
+                noResult.style.cursor = 'default';
+                dropdown.appendChild(noResult);
+            } else {
+                items.forEach(function (tenant) {
+                    const item = document.createElement('div');
+                    item.className = 'pr-autocomplete-item';
+                    item.innerHTML = h(tenant.name || ('Tenant #' + tenant.id)) +
+                        ' <span class="pr-ac-id">#' + h(String(tenant.id)) + '</span>';
+                    item.addEventListener('click', function () {
+                        hiddenInput.value = tenant.id;
+                        searchInput.value = tenant.name || ('Tenant #' + tenant.id);
+                        dropdown.style.display = 'none';
+                        loadEntities(tenant.id);
+                    });
+                    dropdown.appendChild(item);
+                });
+            }
+
+            dropdown.style.display = 'block';
         } catch (e) {
-            console.error('Failed to load tenants:', e);
+            console.error('Failed to search tenants:', e);
         }
     }
 
     // ═══════════════════════════════════════════
     // LOAD ENTITIES (for entity filter)
     // ═══════════════════════════════════════════
-    async function loadEntities() {
+    async function loadEntities(tenantIdOverride) {
         try {
-            const params = {};
-            if (CFG.tenantId) params.tenant_id = CFG.tenantId;
+            const sel = $('#prEntityId');
+            if (!sel) return;
+
+            // Determine tenant ID: override > hidden input > config
+            let tid = tenantIdOverride;
+            if (tid === undefined) {
+                const hiddenTenant = $('#prTenantId');
+                tid = hiddenTenant ? hiddenTenant.value : '';
+            }
+            if (!tid && CFG.tenantId) tid = CFG.tenantId;
+
+            // Clear existing options
+            sel.innerHTML = '<option value="">' + t('all_entities', 'All Entities') + '</option>';
+
             const url = new URL((CFG.apiBase || '/api') + '/entities', window.location.origin);
             url.searchParams.set('limit', '200');
-            if (params.tenant_id) url.searchParams.set('tenant_id', params.tenant_id);
+            if (tid) url.searchParams.set('tenant_id', tid);
+
             const resp = await fetch(url.toString(), {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
             const data = await resp.json();
-            const sel = $('#prEntityId');
-            if (!sel) return;
             const items = data?.data?.items || data?.data || [];
-            items.forEach(e => {
+            items.forEach(function (e) {
                 const opt = document.createElement('option');
                 opt.value = e.id;
                 opt.textContent = e.store_name || e.name || ('Entity #' + e.id);

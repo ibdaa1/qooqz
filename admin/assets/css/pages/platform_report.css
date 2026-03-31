@@ -437,3 +437,63 @@
         flex-direction: column;
     }
 }
+
+/* ═══════════════════════════════════════════
+   TENANT AUTOCOMPLETE SEARCH
+   ═══════════════════════════════════════════ */
+.pr-tenant-search {
+    position: relative;
+}
+
+.pr-autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.pr-autocomplete-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    transition: background 0.15s;
+}
+
+.pr-autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.pr-autocomplete-item:hover,
+.pr-autocomplete-item.active {
+    background: var(--primary-color, #4F46E5);
+    color: #fff;
+}
+
+.pr-autocomplete-item .pr-ac-id {
+    opacity: 0.7;
+    font-size: 0.75rem;
+    margin-inline-start: 6px;
+}
+
+.pr-autocomplete-clear {
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--danger-color, #EF4444);
+    text-align: center;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    font-weight: 600;
+}
+
+.pr-autocomplete-clear:hover {
+    background: #fef2f2;
+}
