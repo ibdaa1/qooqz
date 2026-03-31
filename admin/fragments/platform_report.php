@@ -182,6 +182,12 @@ if (file_exists($langFile)) {
                 <input type="hidden" id="prTenantId" value="">
                 <div id="prTenantDropdown" class="pr-autocomplete-dropdown" style="display:none;"></div>
             </div>
+            <?php else: ?>
+            <div class="pr-filter-group">
+                <label for="prTenantDisplay"><?= __t('tenant', 'Tenant') ?></label>
+                <input type="text" id="prTenantDisplay" class="pr-input" value="<?= htmlspecialchars($user['tenant_name'] ?? __t('tenant', 'Tenant') . ' #' . $tenantId) ?>" disabled>
+                <input type="hidden" id="prTenantId" value="<?= (int)$tenantId ?>">
+            </div>
             <?php endif; ?>
 
             <div class="pr-filter-group">

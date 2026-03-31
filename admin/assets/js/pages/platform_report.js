@@ -201,7 +201,9 @@
     async function loadDashboardSummary() {
         try {
             const params = {};
-            if (CFG.tenantId) params.tenant_id = CFG.tenantId;
+            const hiddenTenant = $('#prTenantId');
+            const tid = (hiddenTenant && hiddenTenant.value) || CFG.tenantId || '';
+            if (tid) params.tenant_id = tid;
             const resp = await apiGet('dashboard', params);
             if (resp.success && resp.data) {
                 const d = resp.data;
@@ -275,7 +277,7 @@
 
         try {
             const url = new URL((CFG.apiBase || '/api') + '/tenants', window.location.origin);
-            url.searchParams.set('limit', '20');
+            url.searchParams.set('per_page', '20');
             url.searchParams.set('search', query);
             const resp = await fetch(url.toString(), {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
@@ -349,13 +351,17 @@
             // Clear existing options
             sel.innerHTML = '<option value="">' + t('all_entities', 'All Entities') + '</option>';
 
+            // For super admin with no tenant selected, don't fetch entities
+            if (!tid) return;
+
             const url = new URL((CFG.apiBase || '/api') + '/entities', window.location.origin);
             url.searchParams.set('limit', '200');
-            if (tid) url.searchParams.set('tenant_id', tid);
+            url.searchParams.set('tenant_id', tid);
 
             const resp = await fetch(url.toString(), {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
+            if (!resp.ok) return;
             const data = await resp.json();
             const items = data?.data?.items || data?.data || [];
             items.forEach(function (e) {
