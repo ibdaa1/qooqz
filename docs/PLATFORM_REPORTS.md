@@ -210,7 +210,11 @@ Content-Type: application/json
 - **Data Table:** Detailed table for top products, top entities, top ads, or metric key-value pairs
 
 ### Export
-- Excel, PDF, CSV export buttons (creates export request for background processing)
+- **CSV:** Generates and downloads a UTF-8 CSV file with BOM (for Arabic/RTL support in Excel)
+- **Excel:** Generates and downloads an XLS file (HTML table format with RTL support and themed styling)
+- **PDF:** Opens a print-ready window with formatted report for printing/saving as PDF
+- All exports include report metadata (type, period) and respect RTL text direction for Arabic
+- Export requests are also logged to `report_exports` table for audit tracking
 
 ## Tenant Search
 
@@ -225,7 +229,21 @@ The tenant filter uses a debounced searchable text input instead of a dropdown, 
 All SQL queries use unique named parameters to avoid PDO's restriction on reusing named parameters in native prepared statements. Complex queries with multiple subqueries are split into separate executions.
 
 ### Chart.js Loading
-Chart.js is loaded asynchronously from CDN with a fallback retry mechanism for fragment/SPA mode where the script might not be loaded yet when rendering occurs.
+Chart.js is loaded asynchronously from CDN via `ensureChartJs()` promise. The function checks if `Chart` is already defined, and if not, dynamically injects a script tag. This avoids the "Chart is not defined" error in fragment/SPA mode.
+
+### RTL (Right-to-Left) Support
+- The PHP fragment detects RTL languages (ar, he, fa, ur) and sets `dir="rtl"` on the container
+- CSS provides comprehensive RTL rules: table alignment, metric card layout reversal, filter direction, section titles
+- Chart.js Y-axis positions are swapped for RTL (primary axis on right, secondary on left)
+- Export files (Excel, PDF) respect RTL direction for Arabic content
+- Number formatting uses `ar-SA` locale for Arabic language
+
+### Responsive Design
+- **1024px+:** Full desktop layout with auto-fit grids
+- **768px:** Filters stack vertically, summary cards go single-column, chart height reduced
+- **480px:** Compact metrics grid (2 columns), smaller fonts, reduced padding
+- Tables use `overflow-x: auto` for horizontal scrolling on small screens
+- Export buttons stack vertically on mobile
 
 ### Error Handling
 - SQL errors are caught and returned as JSON error responses

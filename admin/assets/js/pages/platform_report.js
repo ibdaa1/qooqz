@@ -893,24 +893,233 @@
     async function requestExport(format) {
         if (!currentReportData) return;
 
+        // Also log export to backend for tracking
         try {
-            const resp = await apiPost('export', {
+            apiPost('export', {
                 report_type: currentReportData.report_type,
                 start_date: currentReportData.period?.start,
                 end_date: currentReportData.period?.end,
                 tenant_id: currentReportData.tenant_id || '',
                 export_format: format
-            });
+            }).catch(function () { /* silent */ });
+        } catch (_) { /* silent */ }
 
-            if (resp.success) {
-                alert(resp.data?.message || resp.message || 'Export requested successfully');
-            } else {
-                alert(resp.message || 'Export failed');
+        // Generate actual downloadable file client-side
+        try {
+            if (format === 'csv') {
+                exportCSV(currentReportData);
+            } else if (format === 'excel') {
+                exportExcel(currentReportData);
+            } else if (format === 'pdf') {
+                exportPDF(currentReportData);
             }
         } catch (e) {
             console.error('Export failed:', e);
-            alert('Export failed');
+            alert(t('export_failed', 'Export failed'));
         }
+    }
+
+    /**
+     * Build export rows from report data (shared by CSV/Excel)
+     */
+    function buildExportRows(data) {
+        var headers = [];
+        var rows = [];
+        var type = data.report_type;
+        var metrics = data.metrics || {};
+
+        // If there's a top list table, export that
+        if (type === 'products_performance' && metrics.top_products) {
+            headers = ['#', t('product_name', 'Product Name'), t('quantity', 'Quantity'), t('revenue', 'Revenue')];
+            rows = metrics.top_products.map(function (p, i) {
+                return [i + 1, p.product_name || '-', p.total_quantity || 0, p.total_revenue || 0];
+            });
+        } else if (type === 'entities_performance' && metrics.top_entities) {
+            headers = ['#', t('entity_name', 'Entity Name'), t('order_count', 'Order Count'), t('revenue', 'Revenue')];
+            rows = metrics.top_entities.map(function (e, i) {
+                return [i + 1, e.store_name || '-', e.order_count || 0, e.total_revenue || 0];
+            });
+        } else if (type === 'ads_performance' && metrics.top_ads) {
+            headers = ['#', t('ad_type', 'Ad Type'), t('ad_target', 'Target'), t('total_impressions', 'Views'), t('total_clicks', 'Clicks')];
+            rows = metrics.top_ads.map(function (a, i) {
+                return [i + 1, a.ad_type || '-', a.ad_target || '-', a.total_views || 0, a.total_clicks || 0];
+            });
+        } else {
+            // Default: metrics key-value pairs
+            headers = [t('metric', 'Metric'), t('value', 'Value')];
+            Object.entries(metrics).forEach(function (entry) {
+                var k = entry[0], v = entry[1];
+                if (typeof v !== 'object') {
+                    rows.push([t(k, k.replace(/_/g, ' ')), v]);
+                }
+            });
+        }
+
+        // If there's time series, add it as a separate section
+        var timeSeries = data.time_series || [];
+        if (timeSeries.length > 0) {
+            rows.push([]); // blank row separator
+            var tsKeys = Object.keys(timeSeries[0]);
+            rows.push(tsKeys.map(function (k) { return t(k, k.replace(/_/g, ' ')); }));
+            timeSeries.forEach(function (row) {
+                rows.push(tsKeys.map(function (k) { return row[k] != null ? row[k] : ''; }));
+            });
+        }
+
+        return { headers: headers, rows: rows };
+    }
+
+    /**
+     * Export as CSV with proper encoding for Arabic/RTL
+     */
+    function exportCSV(data) {
+        var result = buildExportRows(data);
+        var csvContent = '\uFEFF'; // BOM for Excel UTF-8 recognition
+
+        // Add report info header
+        csvContent += t('report_type', 'Report Type') + ',' + t(data.report_type, data.report_type) + '\n';
+        if (data.period) {
+            csvContent += t('period', 'Period') + ',' + (data.period.start || '') + ' - ' + (data.period.end || '') + '\n';
+        }
+        csvContent += '\n';
+
+        // Add headers
+        csvContent += result.headers.map(escapeCsvCell).join(',') + '\n';
+
+        // Add rows
+        result.rows.forEach(function (row) {
+            csvContent += row.map(escapeCsvCell).join(',') + '\n';
+        });
+
+        downloadFile(csvContent, 'report_' + data.report_type + '.csv', 'text/csv;charset=utf-8;');
+    }
+
+    /**
+     * Export as Excel (HTML table format that Excel can open)
+     */
+    function exportExcel(data) {
+        var result = buildExportRows(data);
+        var isRtl = CFG.dir === 'rtl';
+        var dirAttr = isRtl ? ' dir="rtl"' : '';
+
+        var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">';
+        html += '<head><meta charset="utf-8">';
+        html += '<style>';
+        html += 'table { border-collapse: collapse; width: 100%; direction: ' + (isRtl ? 'rtl' : 'ltr') + '; }';
+        html += 'th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: ' + (isRtl ? 'right' : 'left') + '; }';
+        html += 'th { background-color: #4F46E5; color: #fff; font-weight: bold; }';
+        html += '.info { font-weight: bold; color: #374151; }';
+        html += '</style></head>';
+        html += '<body' + dirAttr + '>';
+
+        // Report info
+        html += '<table><tr><td class="info">' + h(t('report_type', 'Report Type')) + '</td>';
+        html += '<td>' + h(t(data.report_type, data.report_type)) + '</td></tr>';
+        if (data.period) {
+            html += '<tr><td class="info">' + h(t('period', 'Period')) + '</td>';
+            html += '<td>' + h((data.period.start || '') + ' - ' + (data.period.end || '')) + '</td></tr>';
+        }
+        html += '</table><br>';
+
+        // Data table
+        html += '<table><thead><tr>';
+        result.headers.forEach(function (hdr) {
+            html += '<th>' + h(String(hdr)) + '</th>';
+        });
+        html += '</tr></thead><tbody>';
+        result.rows.forEach(function (row) {
+            if (row.length === 0) {
+                html += '<tr><td colspan="' + result.headers.length + '">&nbsp;</td></tr>';
+                return;
+            }
+            html += '<tr>';
+            row.forEach(function (cell) {
+                html += '<td>' + h(String(cell != null ? cell : '')) + '</td>';
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table></body></html>';
+
+        var blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'report_' + data.report_type + '.xls';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    /**
+     * Export as PDF via browser print dialog
+     */
+    function exportPDF(data) {
+        var result = buildExportRows(data);
+        var isRtl = CFG.dir === 'rtl';
+        var dirAttr = isRtl ? ' dir="rtl"' : '';
+
+        var html = '<!DOCTYPE html><html' + dirAttr + '><head><meta charset="utf-8">';
+        html += '<title>' + h(t('report_type', 'Report')) + ': ' + h(t(data.report_type, data.report_type)) + '</title>';
+        html += '<style>';
+        html += '* { margin: 0; padding: 0; box-sizing: border-box; }';
+        html += 'body { font-family: "Segoe UI", Tahoma, sans-serif; padding: 24px; direction: ' + (isRtl ? 'rtl' : 'ltr') + '; }';
+        html += 'h1 { font-size: 18px; margin-bottom: 8px; color: #1f2937; }';
+        html += 'p { font-size: 13px; color: #6b7280; margin-bottom: 16px; }';
+        html += 'table { border-collapse: collapse; width: 100%; margin-top: 12px; }';
+        html += 'th, td { border: 1px solid #d1d5db; padding: 8px 12px; text-align: ' + (isRtl ? 'right' : 'left') + '; font-size: 13px; }';
+        html += 'th { background-color: #4F46E5; color: #fff; font-weight: 600; }';
+        html += 'tr:nth-child(even) { background-color: #f9fafb; }';
+        html += '@media print { body { padding: 0; } }';
+        html += '</style></head><body>';
+
+        html += '<h1>' + h(t(data.report_type, data.report_type)) + '</h1>';
+        if (data.period) {
+            html += '<p>' + h(t('period', 'Period')) + ': ' + h((data.period.start || '') + ' - ' + (data.period.end || '')) + '</p>';
+        }
+
+        html += '<table><thead><tr>';
+        result.headers.forEach(function (hdr) {
+            html += '<th>' + h(String(hdr)) + '</th>';
+        });
+        html += '</tr></thead><tbody>';
+        result.rows.forEach(function (row) {
+            if (row.length === 0) return;
+            html += '<tr>';
+            row.forEach(function (cell) {
+                html += '<td>' + h(String(cell != null ? cell : '')) + '</td>';
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table></body></html>';
+
+        var printWin = window.open('', '_blank');
+        if (printWin) {
+            printWin.document.write(html);
+            printWin.document.close();
+            printWin.focus();
+            setTimeout(function () { printWin.print(); }, 500);
+        }
+    }
+
+    function escapeCsvCell(val) {
+        var str = String(val != null ? val : '');
+        if (str.indexOf(',') !== -1 || str.indexOf('"') !== -1 || str.indexOf('\n') !== -1) {
+            return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+    }
+
+    function downloadFile(content, filename, mimeType) {
+        var blob = new Blob([content], { type: mimeType });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
     // ═══════════════════════════════════════════

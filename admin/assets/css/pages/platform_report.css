@@ -374,6 +374,11 @@
 /* ═══════════════════════════════════════════
    RTL SUPPORT
    ═══════════════════════════════════════════ */
+.pr-container[dir="rtl"] {
+    direction: rtl;
+    text-align: right;
+}
+
 .pr-container[dir="rtl"] .pr-data-table th,
 .pr-container[dir="rtl"] .pr-data-table td {
     text-align: right;
@@ -385,6 +390,47 @@
 
 .pr-container[dir="rtl"] .pr-metric-info {
     text-align: right;
+}
+
+.pr-container[dir="rtl"] .pr-filters-row {
+    direction: rtl;
+}
+
+.pr-container[dir="rtl"] .pr-filter-group label {
+    text-align: right;
+}
+
+.pr-container[dir="rtl"] .pr-btn {
+    flex-direction: row-reverse;
+}
+
+.pr-container[dir="rtl"] .pr-export-section {
+    direction: rtl;
+}
+
+.pr-container[dir="rtl"] .pr-stat {
+    text-align: center;
+}
+
+.pr-container[dir="rtl"] .pr-page-header {
+    text-align: right;
+}
+
+.pr-container[dir="rtl"] .pr-section-title {
+    text-align: right;
+}
+
+.pr-container[dir="rtl"] .pr-autocomplete-dropdown {
+    text-align: right;
+}
+
+.pr-container[dir="rtl"] .pr-autocomplete-item .pr-ac-id {
+    margin-inline-start: 0;
+    margin-inline-end: 6px;
+}
+
+.pr-container[dir="rtl"] .pr-no-data {
+    direction: rtl;
 }
 
 /* ═══════════════════════════════════════════
