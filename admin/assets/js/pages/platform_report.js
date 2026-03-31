@@ -19,6 +19,7 @@
     const CFG = window.__PR_CONFIG || {};
     const API = (CFG.apiBase || '/api') + '/platform_report';
     const T   = CFG.strings || {};
+    const CHARTJS_LOAD_TIMEOUT_MS = 3000;
     let mainChart = null;
     let currentReportData = null;
 
@@ -560,7 +561,7 @@
                         canvas.parentElement.style.display = 'none';
                         console.error('Chart.js failed to load');
                     }
-                }, 3000);
+                }, CHARTJS_LOAD_TIMEOUT_MS);
                 return;
             }
             console.warn('Chart.js not loaded yet, loading fallback...');
