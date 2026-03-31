@@ -631,7 +631,7 @@
 
         // Set explicit height on wrapper and canvas for desktop rendering
         if (wrapper) {
-            wrapper.style.height = wrapper.style.height || '400px';
+            wrapper.style.height = '400px';
             wrapper.style.position = 'relative';
         }
         canvas.style.width = '100%';
