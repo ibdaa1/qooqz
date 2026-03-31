@@ -9,12 +9,21 @@ final class HomepageSectionsValidator
     {
         $errors = [];
 
+        // When updating only sort_order/is_active (e.g. reorder), skip section_type validation
+        $isOrderOnly = !empty($data['id']) && isset($data['sort_order']) && !isset($data['section_type']);
+
         // section_type
-        $allowedTypes = ['slider', 'categories', 'featured_products', 'new_products', 'deals', 'brands', 'vendors', 'banners', 'testimonials', 'custom_html', 'other'];
-        if (empty($data['section_type'])) {
-            $errors['section_type'] = 'Section type is required';
-        } elseif (!in_array($data['section_type'], $allowedTypes)) {
-            $errors['section_type'] = 'Invalid section type';
+        $allowedTypes = [
+            'slider', 'categories', 'featured_products', 'new_products', 'deals',
+            'brands', 'vendors', 'banners', 'testimonials', 'custom_html', 'other',
+            'ads', 'search', 'products', 'entities', 'auctions', 'jobs',
+        ];
+        if (!$isOrderOnly) {
+            if (empty($data['section_type'])) {
+                $errors['section_type'] = 'Section type is required';
+            } elseif (!in_array($data['section_type'], $allowedTypes)) {
+                $errors['section_type'] = 'Invalid section type';
+            }
         }
 
         // title (optional)
@@ -28,7 +37,7 @@ final class HomepageSectionsValidator
         }
 
         // layout_type
-        $allowedLayouts = ['grid', 'slider', 'list', 'carousel', 'masonry'];
+        $allowedLayouts = ['grid', 'slider', 'list', 'carousel', 'masonry', 'full'];
         if (isset($data['layout_type']) && !in_array($data['layout_type'], $allowedLayouts)) {
             $errors['layout_type'] = 'Invalid layout type';
         }
@@ -38,14 +47,18 @@ final class HomepageSectionsValidator
             $errors['items_per_row'] = 'Items per row must be between 1 and 12';
         }
 
-        // background_color (optional)
-        if (isset($data['background_color']) && !preg_match('/^#[a-fA-F0-9]{6}$/', $data['background_color'])) {
-            $errors['background_color'] = 'Background color must be a valid hex color (e.g., #FFFFFF)';
+        // background_color (optional) – accept hex (#RGB, #RGBA, #RRGGBB, #RRGGBBAA) or CSS variable (var(--…))
+        if (isset($data['background_color']) && $data['background_color'] !== ''
+            && !preg_match('/^#([a-fA-F0-9]{3}|[a-fA-F0-9]{4}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/', $data['background_color'])
+            && !preg_match('/^var\(--[\w-]+\)$/', $data['background_color'])) {
+            $errors['background_color'] = 'Background color must be a valid hex color or CSS variable';
         }
 
-        // text_color (optional)
-        if (isset($data['text_color']) && !preg_match('/^#[a-fA-F0-9]{6}$/', $data['text_color'])) {
-            $errors['text_color'] = 'Text color must be a valid hex color (e.g., #000000)';
+        // text_color (optional) – accept hex (#RGB, #RGBA, #RRGGBB, #RRGGBBAA) or CSS variable (var(--…))
+        if (isset($data['text_color']) && $data['text_color'] !== ''
+            && !preg_match('/^#([a-fA-F0-9]{3}|[a-fA-F0-9]{4}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/', $data['text_color'])
+            && !preg_match('/^var\(--[\w-]+\)$/', $data['text_color'])) {
+            $errors['text_color'] = 'Text color must be a valid hex color or CSS variable';
         }
 
         // padding (optional)

@@ -20,8 +20,9 @@ final class PdoTenantsRepository
 
         // Add filters
         if (!empty($filters['search'])) {
-            $where .= " AND (t.name LIKE :search OR t.domain LIKE :search)";
-            $params[':search'] = '%' . $filters['search'] . '%';
+            $where .= " AND (t.name LIKE :search_name OR t.domain LIKE :search_domain)";
+            $params[':search_name'] = '%' . $filters['search'] . '%';
+            $params[':search_domain'] = '%' . $filters['search'] . '%';
         }
 
         if (!empty($filters['status'])) {
@@ -66,8 +67,9 @@ final class PdoTenantsRepository
 
         // Add filters
         if (!empty($filters['search'])) {
-            $where .= " AND (t.name LIKE :search OR t.domain LIKE :search)";
-            $params[':search'] = '%' . $filters['search'] . '%';
+            $where .= " AND (t.name LIKE :search_name OR t.domain LIKE :search_domain)";
+            $params[':search_name'] = '%' . $filters['search'] . '%';
+            $params[':search_domain'] = '%' . $filters['search'] . '%';
         }
 
         if (!empty($filters['status'])) {

@@ -17,6 +17,7 @@
   "menu.vendors": "Vendors",
   "menu.delivery_companies": "Delivery Companies",
   "nav.orders": "Orders",
+  "nav.pos": "POS Cashier",
   "menu.payments": "Payments",
   "menu.shipping": "Shipping",
   "nav.users": "Users",
@@ -41,5 +42,8 @@
   "quick_actions_title": "Quick Actions",
   "manage_orders": "Track & process orders",
   "theme_preview_title": "Active Theme Settings",
-  "theme_preview_subtitle": "Colors, fonts & styles loaded from database"
+  "theme_preview_subtitle": "Colors, fonts & styles loaded from database",
+  "menu.tickets": "Support Tickets",
+  "menu.ticket_categories": "Ticket Categories",
+  "menu.homepage_sections": "Page Sections"
 }

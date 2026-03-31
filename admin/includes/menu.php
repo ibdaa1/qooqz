@@ -1,9 +1,15 @@
 <?php
-// htdocs/admin/includes/menu.php
-// Unified Admin Sidebar with DB-driven colors, icons, i18n, RTL support
+/**
+ * Unified Admin Sidebar – Always stays on /admin/dashboard.php
+ * - All navigation uses AJAX, never changes browser URL.
+ * - Menu items are sorted by numeric 'order' (recursively).
+ * - Modern icons via Font Awesome 6.
+ * - Colors fetched from DB theme settings.
+ * - RTL & i18n ready.
+ */
 
 if (!function_exists('h')) {
-    function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
+    function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 }
 
 // -----------------------
@@ -13,6 +19,10 @@ $ui_payload = $GLOBALS['ADMIN_UI'] ?? ($ADMIN_UI_PAYLOAD ?? []);
 $strings = is_array($ui_payload['strings'] ?? null) ? $ui_payload['strings'] : [];
 $theme = $ui_payload['theme'] ?? [];
 $settings = $ui_payload['system_settings'] ?? [];
+$dir = $ui_payload['direction'] ?? 'ltr';
+$isRtl = $dir === 'rtl';
+$GLOBALS['ADMIN_UI_LANG_DIR'] = $dir;
+$GLOBALS['ADMIN_UI_LANG_CODE'] = $ui_payload['lang'] ?? ($GLOBALS['ADMIN_UI_LANG_CODE'] ?? 'en');
 
 // -----------------------
 // Helpers
@@ -33,11 +43,6 @@ function getMenuThemeValue($arrayKey, $settingKey, $default = '') {
     return $default;
 }
 
-$dir = $ui_payload['direction'] ?? 'ltr';
-$isRtl = $dir === 'rtl';
-$GLOBALS['ADMIN_UI_LANG_DIR'] = $dir;
-$GLOBALS['ADMIN_UI_LANG_CODE'] = $ui_payload['lang'] ?? ($GLOBALS['ADMIN_UI_LANG_CODE'] ?? 'en');
-
 function _can_view($perm) {
     if (!$perm) return true;
     if (function_exists('user_can')) return user_can($perm);
@@ -45,17 +50,6 @@ function _can_view($perm) {
         return in_array($perm, $_SESSION['permissions'], true);
     }
     return true;
-}
-
-function _is_active_item($item) {
-    $uri = $_SERVER['REQUEST_URI'] ?? '';
-    $u = $item['url'] ?? ($item['load'] ?? '');
-    if (!$u) return false;
-    $uri_path = parse_url($uri, PHP_URL_PATH) ?: $uri;
-    $u_path = parse_url($u, PHP_URL_PATH) ?: $u;
-    if ($uri_path === $u_path) return true;
-    if ($u_path !== '' && strpos($uri_path, $u_path) === 0) return true;
-    return false;
 }
 
 function resolve_dot_key(array $arr, string $key) {
@@ -100,41 +94,65 @@ function getMenuTitle($id, $default = '') {
     return getMenuSetting('menu_title_' . $id, $default);
 }
 
+/**
+ * Recursively sort menu items by the 'order' key.
+ */
+function sortMenuByOrder(&$items) {
+    usort($items, function($a, $b) {
+        $orderA = $a['order'] ?? PHP_INT_MAX;
+        $orderB = $b['order'] ?? PHP_INT_MAX;
+        return $orderA - $orderB;
+    });
+    foreach ($items as &$item) {
+        if (!empty($item['children'])) {
+            sortMenuByOrder($item['children']);
+        }
+    }
+}
+
+/**
+ * Renders menu items.
+ * - Parent items (with children) have href="#" and js-toggle class.
+ * - Leaf items have js-ajax-link class and data-load-url attribute.
+ */
 function render_menu_items($items, $level = 0) {
     global $isRtl;
     if (!is_array($items) || empty($items)) return '';
-    $ulClass = 'sidebar-list sidebar-level-' . (int)$level;
+    $ulClass = 'sidebar-list sidebar-list--' . (int)$level;
     if ($isRtl) $ulClass .= ' rtl';
     $out = '<ul class="' . h($ulClass) . '" role="' . ($level === 0 ? 'menu' : 'group') . '">';
     foreach ($items as $item) {
         if (!_can_view($item['permission'] ?? null)) continue;
         $hasChildren = !empty($item['children']) && is_array($item['children']);
-        $active = _is_active_item($item);
-        $childActive = false;
-        if ($hasChildren) foreach ($item['children'] as $c) {
-            if (_is_active_item($c)) { $childActive = true; break; }
-        }
-        $liClasses = [];
-        if ($active) $liClasses[] = 'active';
-        if ($childActive) $liClasses[] = 'open';
-        if ($hasChildren) $liClasses[] = 'has-children';
-        $liClassAttr = $liClasses ? ' class="' . h(implode(' ', $liClasses)) . '"' : '';
-        $idAttr = isset($item['id']) ? ' data-menu-id="' . h($item['id']) . '"' : '';
-        $i18nKey = $item['i18n'] ?? (isset($item['id']) ? 'nav.' . $item['id'] : '');
+        $href = $hasChildren ? '#' : h($item['url'] ?? '#');
         $titleFallback = getMenuTitle($item['id'] ?? '', $item['title'] ?? (isset($item['id']) ? ucwords(str_replace(['_', '-'], ' ', $item['id'])) : ''));
+        $i18nKey = $item['i18n'] ?? (isset($item['id']) ? 'nav.' . $item['id'] : '');
         $titleText = t($i18nKey, $titleFallback);
-        $iconHtml = getMenuIcon($item['id'] ?? '', $item['icon'] ?? '');
-        if ($iconHtml) $iconHtml = '<span class="sidebar-icon" aria-hidden="true">' . h($iconHtml) . '</span>';
-        $url = $item['url'] ?? '#';
-        $load = $item['load'] ?? $url;
-        $loadAttr = ' data-load-url="' . h($load) . '"';
-        $ariaHasPopup = $hasChildren ? ' aria-haspopup="true"' : '';
-        $out .= "<li{$liClassAttr}{$idAttr} role=\"none\">";
-        $out .= '<a href="' . h($url) . '" role="menuitem" class="sidebar-link"' . $loadAttr . $ariaHasPopup . '>';
+        
+        // Icon handling
+        $iconHtml = '';
+        $dbIcon = getMenuIcon($item['id'] ?? '', '');
+        if ($dbIcon) {
+            $iconHtml = '<span class="sidebar-icon" aria-hidden="true">' . h($dbIcon) . '</span>';
+        } elseif (!empty($item['icon_class'])) {
+            $iconHtml = '<i class="' . h($item['icon_class']) . ' sidebar-icon" aria-hidden="true"></i>';
+        } elseif (!empty($item['icon'])) {
+            $iconHtml = '<span class="sidebar-icon" aria-hidden="true">' . h($item['icon']) . '</span>';
+        }
+        
+        $out .= '<li class="menu-item' . ($hasChildren ? ' has-children' : '') . '">';
+        $isHome = ($item['url'] ?? '') === 'dashboard.php';
+        $linkClass = $hasChildren ? ' js-toggle' : ($isHome ? ' js-home-link' : ' js-ajax-link');
+        $out .= '<a href="' . $href . '" class="sidebar-link' . $linkClass . '" data-load-url="' . h($item['url'] ?? '') . '" role="menuitem">';
         $out .= $iconHtml;
         $out .= '<span class="sidebar-title" data-i18n="' . h($i18nKey) . '">' . h($titleText) . '</span>';
+        if ($hasChildren) {
+            $out .= '<span class="sidebar-arrow">' . ($isRtl ? '❮' : '❯') . '</span>';
+        }
         $out .= '</a>';
-        if ($hasChildren) $out .= render_menu_items($item['children'], $level + 1);
+        if ($hasChildren) {
+            $out .= render_menu_items($item['children'], $level + 1);
+        }
         $out .= '</li>';
     }
     $out .= '</ul>';
@@ -142,88 +160,259 @@ function render_menu_items($items, $level = 0) {
 }
 
 // -----------------------
-// Menu items
+// Menu definition (ordered categories)
 // -----------------------
 $ADMIN_MENU = [
-    ['id'=>'dashboard','i18n'=>'nav.dashboard','icon'=>'🏠','url'=>'/admin/dashboard.php','load'=>'/admin/dashboard.php'],
-    ['id'=>'platform','i18n'=>'menu.platform','icon'=>'📁','children'=>[
-        ['id'=>'vendor_attributes','i18n'=>'menu.vendor_attributes','icon'=>'🏷️','url'=>'/admin/fragments/vendor_attributes_values.php','load'=>'/admin/fragments/vendor_attributes_values.php'],
-        ['id'=>'vendor_working_hours','i18n'=>'menu.vendor_working_hours','icon'=>'🕒','url'=>'/admin/fragments/vendor_working_hours.php','load'=>'/admin/fragments/vendor_working_hours.php'],
-        ['id'=>'banners','i18n'=>'menu.banners','icon'=>'📢','url'=>'/admin/fragments/banners.php','load'=>'/admin/fragments/banners.php'],
-    ]],
-    ['id'=>'menus','i18n'=>'nav.menus','icon'=>'📋','url'=>'/admin/fragments/categories.php','load'=>'/admin/fragments/categories.php'],
-    ['id'=>'tenant_users','i18n'=>'nav.tenant_users','icon'=>'🛡️','url'=>'/admin/fragments/tenant_users.php','load'=>'/admin/fragments/tenant_users.php'],
-    ['id'=>'permissions','i18n'=>'nav.permissions','icon'=>'🔐','url'=>'/admin/fragments/permissions.php','load'=>'/admin/fragments/permissions.php'],
-    ['id'=>'categories','i18n'=>'nav.categories','icon'=>'📂','url'=>'/admin/menus_list.php','load'=>'/admin/menus_list.php'],
-    ['id'=>'products','i18n'=>'nav.products','icon'=>'📦','url'=>'/admin/fragments/products.php','load'=>'/admin/fragments/products.php'],
-    ['id'=>'vendors','i18n'=>'menu.vendors','icon'=>'🏪','url'=>'/admin/fragments/tenant_categories.php','load'=>'/admin/fragments/tenant_categories.php'],
-    ['id'=>'delivery_companies','i18n'=>'menu.delivery_companies','icon'=>'🚚','url'=>'/admin/fragments/IndependentDriver.php','load'=>'/admin/fragments/IndependentDriver.php'],
-    ['id'=>'orders','i18n'=>'nav.orders','icon'=>'🧾','url'=>'/admin/orders.php','load'=>'/admin/orders.php'],
-    ['id'=>'payments','i18n'=>'menu.payments','icon'=>'💳','url'=>'/admin/payments.php','load'=>'/admin/payments.php'],
-    ['id'=>'shipping','i18n'=>'menu.shipping','icon'=>'🚛','url'=>'/admin/shipping.php','load'=>'/admin/shipping.php'],
-    ['id'=>'users','i18n'=>'nav.users','icon'=>'👥','url'=>'/admin/fragments/users.php','load'=>'/admin/fragments/users.php'],
-    ['id'=>'reviews','i18n'=>'menu.reviews','icon'=>'⭐','url'=>'/admin/reviews.php','load'=>'/admin/reviews.php'],
-    ['id'=>'auctions','i18n'=>'menu.auctions','icon'=>'🔨','url'=>'/admin/auctions.php','load'=>'/admin/auctions.php'],
-    ['id'=>'jobs','i18n'=>'menu.jobs','icon'=>'💼','url'=>'/admin/jobs.php','load'=>'/admin/jobs.php'],
-    ['id'=>'coupons','i18n'=>'menu.coupons','icon'=>'🏷️','url'=>'/admin/coupons.php','load'=>'/admin/coupons.php'],
-    ['id'=>'notifications','i18n'=>'menu.notifications','icon'=>'🔔','url'=>'/admin/notifications.php','load'=>'/admin/notifications.php'],
-    ['id'=>'reports','i18n'=>'nav.reports','icon'=>'📈','url'=>'/admin/reports.php','load'=>'/admin/reports.php'],
-    ['id'=>'support','i18n'=>'menu.support','icon'=>'🛠️','url'=>'/admin/support.php','load'=>'/admin/support.php'],
-    ['id'=>'wallet','i18n'=>'menu.wallet','icon'=>'👛','url'=>'/admin/wallet.php','load'=>'/admin/wallet.php'],
-    ['id'=>'entities','i18n'=>'menu.entities','icon'=>'🏢','url'=>'/admin/fragments/entities.php','load'=>'/admin/fragments/entities.php'],
-    ['id'=>'entities_Payment','i18n'=>'entities_Payment','icon'=>'🏢','url'=>'/admin/fragments/entities_Payment.php','load'=>'/admin/fragments/entities_Payment.php'],
-    ['id'=>'bad_words','i18n'=>'bad_words','icon'=>'🏢','url'=>'/admin/fragments/bad_words.php','load'=>'/admin/fragments/bad_words.php'],
-    ['id'=>'queues','i18n'=>'queues','icon'=>'🏢','url'=>'/admin/fragments/queues.php','load'=>'/admin/fragments/queues.php'],
-    ['id'=>'Seo Meta','i18n'=>'Seo Meta','icon'=>'🏢','url'=>'/admin/fragments/seo_meta.php','load'=>'/admin/fragments/seo_meta.php'],
-    ['id'=>'Flash Sales','i18n'=>'Flash Sales','icon'=>'🏢','url'=>'/admin/fragments/flash_sales.php','load'=>'/admin/fragments/flash_sales.php'],
-    ['id'=>'discounts','i18n'=>'discounts','icon'=>'🏢','url'=>'/admin/fragments/discounts.php','load'=>'/admin/fragments/discounts.php'],
-    ['id'=>'Stock Movements','i18n'=>'Stock Movements','icon'=>'🏢','url'=>'/admin/fragments/stock_movements.php','load'=>'/admin/fragments/stock_movements.php'],
-    ['id'=>'Subscriptions','i18n'=>'Subscriptions','icon'=>'🏢','url'=>'/admin/fragments/subscriptions.php','load'=>'/admin/fragments/subscriptions.php'],
-    ['id'=>'plan_selection','i18n'=>'plan_selection','icon'=>'🏢','url'=>'/admin/fragments/plan_selection.php','load'=>'/admin/fragments/plan_selection.php'],
-    ['id'=>'Commissions','i18n'=>'Commissions','icon'=>'🏢','url'=>'/admin/fragments/commissions.php','load'=>'/admin/fragments/commissions.php'],
-    ['id'=>'settings','i18n'=>'nav.settings','icon'=>'⚙️','url'=>'/admin/fragments/themes.php','load'=>'/admin/fragments/themes.php','children'=>[
-        ['id'=>'addresses','i18n'=>'nav.addresses','icon'=>'🌍','url'=>'/admin/fragments/addresses.php','load'=>'/admin/fragments/addresses.php'],
-    ]],
+
+    // -----------------------
+    // Dashboard
+    // -----------------------
+    [
+        'id' => 'dashboard',
+        'order' => 1,
+        'icon' => '🏠',
+        'i18n' => 'nav.dashboard',
+        'url' => 'dashboard.php',
+    ],
+
+    // -----------------------
+    // Users & Access
+    // -----------------------
+    [
+        'id' => 'users_access',
+        'order' => 10,
+        'icon' => '🛡️',
+        'i18n' => 'menu.users_access',
+        'children' => [
+            ['id'=>'tenant_users','order'=>10,'icon'=>'👥','i18n'=>'nav.tenant_users','url'=>'fragments/tenant_users.php'],
+            ['id'=>'users','order'=>20,'icon'=>'👤','i18n'=>'nav.users','url'=>'fragments/users.php'],
+            ['id'=>'permissions','order'=>30,'icon'=>'🔒','i18n'=>'nav.permissions','url'=>'fragments/permissions.php'],
+        ]
+    ],
+
+    // -----------------------
+    // Catalog
+    // -----------------------
+    [
+        'id' => 'catalog',
+        'order' => 20,
+        'icon' => '🛍️',
+        'i18n' => 'menu.catalog',
+        'children' => [
+            ['id'=>'products','order'=>10,'icon'=>'📦','i18n'=>'nav.products','url'=>'fragments/products.php'],
+            ['id'=>'categories','order'=>20,'icon'=>'📂','i18n'=>'nav.menus','url'=>'fragments/categories.php'],
+            ['id'=>'media_studio','order'=>25,'icon'=>'🎬','i18n'=>'nav.media_studio','url'=>'fragments/media_studio.php'],
+            ['id'=>'tenant_categories','order'=>26,'icon'=>'📑','i18n'=>'nav.tenant_categories','url'=>'fragments/tenant_categories.php'],
+            ['id'=>'brands','order'=>30,'icon'=>'⭐','i18n'=>'brands','url'=>'fragments/brands.php'],
+        ]
+    ],
+
+    // -----------------------
+    // Sales
+    // -----------------------
+    [
+        'id' => 'sales',
+        'order' => 30,
+        'icon' => '💰',
+        'i18n' => 'menu.sales',
+        'children' => [
+            ['id'=>'pos','order'=>10,'icon'=>'🧾','i18n'=>'nav.pos','url'=>'fragments/pos.php'],
+            ['id'=>'discounts','order'=>20,'icon'=>'💲','i18n'=>'discounts','url'=>'fragments/discounts.php'],
+            ['id'=>'flash_sales','order'=>30,'icon'=>'⚡','i18n'=>'Flash Sales','url'=>'fragments/flash_sales.php'],
+            ['id'=>'carts','order'=>40,'icon'=>'🛒','i18n'=>'carts','url'=>'fragments/carts.php'],
+        ]
+    ],
+
+    // -----------------------
+    // Orders & Logistics
+    // -----------------------
+    [
+        'id' => 'logistics',
+        'order' => 40,
+        'icon' => '🚚',
+        'i18n' => 'menu.logistics',
+        'children' => [
+            ['id'=>'delivery','order'=>10,'icon'=>'📬','i18n'=>'menu.delivery','url'=>'fragments/delivery.php'],
+            ['id'=>'auctions','order'=>20,'icon'=>'🔨','i18n'=>'menu.auctions','url'=>'fragments/auctions.php'],
+            ['id'=>'stock_movements','order'=>30,'icon'=>'🏭','i18n'=>'Stock Movements','url'=>'fragments/stock_movements.php'],
+            ['id'=>'returns','order'=>40,'icon'=>'↩️','i18n'=>'menu.returns','url'=>'fragments/returns.php'],
+        ]
+    ],
+
+    // -----------------------
+    // Finance
+    // -----------------------
+    [
+        'id' => 'finance',
+        'order' => 50,
+        'icon' => '💳',
+        'i18n' => 'menu.finance',
+        'children' => [
+            ['id'=>'escrow','order'=>10,'icon'=>'🤝','i18n'=>'menu.escro','url'=>'fragments/escrow.php'],
+            ['id'=>'commissions','order'=>20,'icon'=>'💹','i18n'=>'Commissions','url'=>'fragments/commissions.php'],
+            ['id'=>'subscriptions','order'=>30,'icon'=>'🔄','i18n'=>'Subscriptions','url'=>'fragments/subscriptions.php'],
+            ['id'=>'plan_selection','order'=>40,'icon'=>'📋','i18n'=>'plan_selection','url'=>'fragments/plan_selection.php'],
+            ['id'=>'platform_report','order'=>50,'icon'=>'📊','i18n'=>'nav.platform_report','url'=>'fragments/platform_report.php'],
+        ]
+    ],
+
+    // -----------------------
+    // Content & Marketing
+    // -----------------------
+    [
+        'id' => 'marketing',
+        'order' => 60,
+        'icon' => '📢',
+        'i18n' => 'menu.marketing',
+        'children' => [
+            ['id'=>'homepage_sections','order'=>5,'icon'=>'🏠','i18n'=>'menu.homepage_sections','url'=>'fragments/homepage_sections.php'],
+            ['id'=>'ads','order'=>10,'icon'=>'📺','i18n'=>'ads','url'=>'fragments/ads.php'],
+            ['id'=>'banners','order'=>20,'icon'=>'🖼️','i18n'=>'menu.banners','url'=>'fragments/banners.php'],
+            ['id'=>'seo_meta','order'=>30,'icon'=>'🔍','i18n'=>'Seo Meta','url'=>'fragments/seo_meta.php'],
+            ['id'=>'notifications','order'=>40,'icon'=>'🔔','i18n'=>'menu.notifications','url'=>'fragments/notification.php'],
+        ]
+    ],
+
+    // -----------------------
+    // Support
+    // -----------------------
+    [
+        'id' => 'support',
+        'order' => 70,
+        'icon' => '🎫',
+        'i18n' => 'menu.support',
+        'children' => [
+            ['id'=>'tickets','order'=>10,'icon'=>'🎟️','i18n'=>'menu.tickets','url'=>'fragments/tickets.php'],
+            ['id'=>'ticket_categories','order'=>20,'icon'=>'📌','i18n'=>'menu.ticket_categories','url'=>'fragments/ticket_categories.php'],
+            ['id'=>'bad_words','order'=>30,'icon'=>'🚫','i18n'=>'bad_words','url'=>'fragments/bad_words.php'],
+        ]
+    ],
+
+    // -----------------------
+    // Business / Entities
+    // -----------------------
+    [
+        'id' => 'business',
+        'order' => 80,
+        'icon' => '🏢',
+        'i18n' => 'menu.business',
+        'children' => [
+            ['id'=>'entities','order'=>10,'icon'=>'🏪','i18n'=>'menu.entities','url'=>'fragments/entities.php'],
+            ['id'=>'entity_product_variants','order'=>15,'icon'=>'🔀','i18n'=>'nav.entity_product_variants','url'=>'fragments/entity_product_variants.php'],
+            ['id'=>'entities_payment','order'=>20,'icon'=>'🏦','i18n'=>'entities_Payment','url'=>'fragments/entities_Payment.php'],
+            ['id'=>'jobs','order'=>30,'icon'=>'💼','i18n'=>'menu.jobs','url'=>'fragments/jobs.php'],
+            ['id'=>'job_categories','order'=>40,'icon'=>'📁','i18n'=>'job_categories','url'=>'fragments/job_categories.php'],
+        ]
+    ],
+
+    // -----------------------
+    // System
+    // -----------------------
+    [
+        'id' => 'system',
+        'order' => 90,
+        'icon' => '⚙️',
+        'i18n' => 'menu.system',
+        'children' => [
+            ['id'=>'tenant','order'=>10,'icon'=>'🏬','i18n'=>'menu.tenant','url'=>'fragments/tenant.php'],
+            ['id'=>'themes','order'=>20,'icon'=>'🎨','i18n'=>'nav.settings','url'=>'fragments/themes.php'],
+            ['id'=>'addresses','order'=>30,'icon'=>'📍','i18n'=>'nav.addresses','url'=>'fragments/addresses.php'],
+            ['id'=>'queues','order'=>40,'icon'=>'📊','i18n'=>'queues','url'=>'fragments/queues.php'],
+        ]
+    ],
+
 ];
 
-
-
-// -----------------------
-// Dynamic CSS from DB theme
-// -----------------------
-$sidebarBg = getMenuThemeValue('color_settings', 'sidebar_background', '#4B0082');
-$sidebarText = getMenuThemeValue('color_settings', 'sidebar_text', '#FFFFFF');
-$sidebarHover = getMenuThemeValue('color_settings', 'sidebar_hover', '#6A0DAD');
-$sidebarActive = getMenuThemeValue('color_settings', 'sidebar_active', '#8A2BE2');
-$primaryColor = getMenuThemeValue('color_settings', 'primary_color', '#3b82f6');
-$dangerColor = getMenuThemeValue('color_settings', 'danger_color', '#ef4444');
-
-echo '<style>
-:root {
-    --sidebar-bg: ' . h($sidebarBg) . ';
-    --sidebar-text: ' . h($sidebarText) . ';
-    --sidebar-hover: ' . h($sidebarHover) . ';
-    --sidebar-active: ' . h($sidebarActive) . ';
-    --primary-color: ' . h($primaryColor) . ';
-    --danger-color: ' . h($dangerColor) . ';
-}
-
-.sidebar-list {
-    background-color: var(--sidebar-bg);
-    color: var(--sidebar-text);
-}
-.sidebar-list li.active > a,
-.sidebar-list li.open > a {
-    background-color: var(--sidebar-active);
-    color: var(--sidebar-text);
-}
-.sidebar-list li a:hover {
-    background-color: var(--sidebar-hover);
-}
-' . ($isRtl ? '.sidebar-list.rtl { direction: rtl; text-align: right; }' : '') . '
-</style>';
+// Sort menu (including children) by order
+sortMenuByOrder($ADMIN_MENU);
 
 // -----------------------
-// Render sidebar
+// Dynamic CSS from DB
 // -----------------------
+// Sidebar CSS is fully DB-driven via AdminUiThemeLoader (header.php) + sidebar.css.
+// No inline styles needed — all colors come from :root CSS variables.
+
+// -----------------------
+// Render the sidebar
+// -----------------------
+echo '<nav class="admin-sidebar-nav ' . ($isRtl ? 'rtl' : '') . '">';
 echo render_menu_items($ADMIN_MENU, 0);
+echo '</nav>';
+
+// -----------------------
+// JavaScript: Toggle categories & load fragments without changing URL
+// -----------------------
+echo '<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // 1. Toggle expand/collapse for categories (accordion behavior)
+    function closeDescendants(item) {
+        item.querySelectorAll(".menu-item.has-children.is-open").forEach(function(desc) {
+            desc.classList.remove("is-open");
+        });
+    }
+
+    document.querySelectorAll(".js-toggle").forEach(btn => {
+        btn.addEventListener("click", function(e) {
+            e.preventDefault();     // Prevents any URL change (href="#")
+            e.stopPropagation();
+            const currentItem = this.closest(".menu-item");
+            const parentList  = currentItem.parentElement;
+            const isOpening   = !currentItem.classList.contains("is-open");
+
+            // Accordion: close all other open siblings at the same level
+            if (isOpening && parentList) {
+                parentList.querySelectorAll(":scope > .menu-item.has-children.is-open").forEach(sibling => {
+                    if (sibling !== currentItem) {
+                        closeDescendants(sibling);
+                        sibling.classList.remove("is-open");
+                    }
+                });
+            }
+
+            // Closing: also close all open descendants inside this item
+            if (!isOpening) {
+                closeDescendants(currentItem);
+            }
+
+            currentItem.classList.toggle("is-open");
+        });
+    });
+
+    // 2. Dashboard / Home link – reloads the page (clears filters)
+    document.querySelectorAll(".js-home-link").forEach(link => {
+        link.addEventListener("click", function(e) {
+            e.preventDefault();
+            window.location.reload();
+        });
+    });
+
+    // 3. AJAX loading for fragment links – NEVER changes the browser URL
+    document.querySelectorAll(".js-ajax-link").forEach(link => {
+        link.addEventListener("click", function(e) {
+            e.preventDefault();     // Prevents navigation away from dashboard.php
+            const url = this.getAttribute("data-load-url");
+            if (!url) return;
+            
+            // Use the global fragment loader (adjust function name as needed)
+            if (typeof window.loadAdminFragment === "function") {
+                window.loadAdminFragment(url);
+            } else if (typeof window.loadPage === "function") {
+                window.loadPage(url);
+            } else {
+                console.warn("No AJAX loader found. Falling back to full page load.");
+                // Fallback: do NOT change URL, but load the fragment manually
+                fetch(url)
+                    .then(response => response.text())
+                    .then(html => {
+                        const mainContent = document.getElementById("main-content");
+                        if (mainContent) mainContent.innerHTML = html;
+                    });
+            }
+            
+            // Highlight the active link
+            document.querySelectorAll(".sidebar-link").forEach(el => el.classList.remove("active"));
+            this.classList.add("active");
+        });
+    });
+});
+</script>';

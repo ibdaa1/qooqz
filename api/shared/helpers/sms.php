@@ -115,9 +115,16 @@ class SMS {
     private static function sendWithUnifonicCURL($phone, $message) {
         $url = SMS_API_URL;
         
+        $appSid = defined('UNIFONIC_APP_SID') ? UNIFONIC_APP_SID : getenv('UNIFONIC_APP_SID');
+        if (empty($appSid)) {
+            self::logError('Unifonic AppSid not configured');
+            return ['success' => false, 'message' => 'SMS provider not configured', 'message_id' => null];
+        }
+        $senderID = defined('SMS_SENDER_ID') ? SMS_SENDER_ID : (getenv('SMS_SENDER_ID') ?: '');
+
         $data = [
-            'AppSid' => UNIFONIC_APP_SID,
-            'SenderID' => SMS_SENDER_ID,
+            'AppSid' => $appSid,
+            'SenderID' => $senderID,
             'Recipient' => $phone,
             'Body' => $message
         ];
@@ -130,7 +137,7 @@ class SMS {
             CURLOPT_POSTFIELDS => http_build_query($data),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_TIMEOUT => 30,
+            CURLOPT_TIMEOUT => 8,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/x-www-form-urlencoded'
             ]
@@ -249,7 +256,7 @@ class SMS {
     private static function sendWithNexmo($phone, $message) {
         $apiKey = getenv('NEXMO_API_KEY');
         $apiSecret = getenv('NEXMO_API_SECRET');
-        $from = SMS_SENDER_ID;
+        $from = defined('SMS_SENDER_ID') ? SMS_SENDER_ID : (getenv('SMS_SENDER_ID') ?: '');
         
         $url = 'https://rest.nexmo.com/sms/json';
         
@@ -268,7 +275,7 @@ class SMS {
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => http_build_query($data),
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 30
+            CURLOPT_TIMEOUT => 8
         ]);
         
         $response = curl_exec($ch);
@@ -358,6 +365,32 @@ class SMS {
         return self::send($phone, $message, $lang);
     }
     
+    // ===========================================
+    // 5.2 إرسال رابط تفعيل الحساب (بدون كشف الرمز)
+    // ===========================================
+
+    /**
+     * إرسال رابط تفعيل الحساب عبر SMS.
+     * الرابط يحتوي على الرمز المشفر فقط — لا يُعرض للمستخدم أبداً.
+     *
+     * @param string $phone  رقم الجوال مع كود الدولة
+     * @param string $link   رابط التفعيل الكامل
+     * @param string $lang   ar | en
+     * @return array
+     */
+    public static function sendVerificationLink(string $phone, string $link, string $lang = 'ar'): array {
+        if ($lang === 'ar') {
+            $message  = "مرحباً! لتفعيل حسابك في " . APP_NAME . " افتح الرابط التالي من نفس الجهاز الذي سجّلت منه:";
+            $message .= "\n" . $link;
+            $message .= "\nصالح لمدة 15 دقيقة. لا تشارك هذا الرابط.";
+        } else {
+            $message  = "Welcome to " . APP_NAME . "! Open the link below on the same device you registered from to activate your account:";
+            $message .= "\n" . $link;
+            $message .= "\nValid for 15 minutes. Do not share this link.";
+        }
+        return self::send($phone, $message, $lang);
+    }
+
     // ===========================================
     // 6️⃣ إرسال إشعار طلب جديد
     // ===========================================

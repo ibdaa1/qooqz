@@ -107,6 +107,11 @@ final class ResponseFormatter
         self::respond($payload, $status);
     }
 
+    public static function notFound(string $message = 'Not Found'): void
+    {
+        self::error($message, 404);
+    }
+
     public static function serverError(mixed $details = null): void
     {
         self::error(

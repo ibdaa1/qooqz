@@ -1,4 +1,4 @@
-(function(){
+(function () {
     'use strict';
 
     /**
@@ -12,8 +12,8 @@
     // ════════════════════════════════════════════════════════════
     const CONFIG = window.PRODUCTS_CONFIG || {};
     const AF = window.AdminFramework || {};
-    const PERMS = window.PAGE_PERMISSIONS || {};
-    
+    const PERMS = CONFIG.permissions || window.PAGE_PERMISSIONS || {};
+
     const API = {
         products: CONFIG.apiUrl || '/api/products',
         categories: CONFIG.categoriesApi || '/api/categories',
@@ -24,7 +24,9 @@
         currencies: CONFIG.currenciesApi || '/api/currencies',
         languages: CONFIG.languagesApi || '/api/languages',
         images: CONFIG.imagesApi || '/api/images',
-        tenants: CONFIG.tenantsApi || '/api/tenants'
+        tenants: CONFIG.tenantsApi || '/api/tenants',
+        badWords: '/api/bad_words/check',
+        auditLogs: '/api/audit_logs'
     };
 
     const state = {
@@ -45,10 +47,11 @@
         productAttributes: [],
         productVariants: [],
         permissions: PERMS,
-        language: window.USER_LANGUAGE || CONFIG.lang || 'en',
-        direction: window.USER_DIRECTION || 'ltr',
-        csrfToken: window.CSRF_TOKEN || CONFIG.csrfToken || '',
-        tenantId: window.APP_CONFIG?.TENANT_ID || 1
+        language: CONFIG.lang || window.USER_LANGUAGE || 'en',
+        direction: CONFIG.dir || window.USER_DIRECTION || 'ltr',
+        csrfToken: CONFIG.csrfToken || window.CSRF_TOKEN || '',
+        tenantId: Number(CONFIG.tenantId || window.APP_CONFIG?.TENANT_ID || 1),
+        userId: Number(CONFIG.userId || window.APP_CONFIG?.USER_ID || 0)
     };
 
     let el = {}; // DOM elements cache
@@ -90,21 +93,30 @@
         const tr = s.translations || {};
         const val = s.validation || {};
         const msg = s.messages || {};
+        const csv = s.csv || {};
+        const tbl = s.table || {};
+        const fil = s.filters || {};
+        const tabs = s.tabs || {};
         return {
             // products.* keys
             products: {
                 title: s.title || s.products,
-                subtitle: s.product || s.title,
+                subtitle: s.subtitle || s.product || s.title,
                 add_new: s.create,
                 loading: s.loading,
-                retry: s.refresh || 'Retry'
+                retry: s.refresh || 'Retry',
+                found: s.found || '{count} product(s)'
             },
             // tabs.* keys (top-level, NOT under form)
             tabs: {
-                general: g.general, pricing: p.pricing, inventory: inv.inventory,
-                attributes: attr.attributes, variants: vr.variants,
-                images: med.images, categories: cat.categories,
-                translations: tr.translations
+                general: tabs.general || g.general,
+                pricing: tabs.pricing || p.pricing,
+                inventory: tabs.inventory || inv.inventory,
+                attributes: tabs.attributes || attr.attributes,
+                variants: tabs.variants || vr.variants,
+                images: tabs.images || med.images,
+                categories: tabs.categories || cat.categories,
+                translations: tabs.translations || tr.translations
             },
             // form.* keys
             form: {
@@ -112,23 +124,24 @@
                 edit_title: s.edit,
                 fields: {
                     name: { label: g.name, placeholder: g.name, required: val.name_required },
-                    sku: { label: g.sku, placeholder: g.sku },
-                    slug: { label: g.slug, placeholder: g.slug },
-                    barcode: { label: g.barcode, placeholder: g.barcode },
-                    product_type: { label: g.type },
-                    brand: { label: g.brand },
-                    main_category: { label: cat.categories },
-                    sub_category: { label: cat.hierarchy_info },
+                    sku: { label: g.sku, placeholder: g.sku_placeholder || g.sku },
+                    slug: { label: g.slug, placeholder: g.slug_placeholder || g.slug },
+                    barcode: { label: g.barcode, placeholder: g.barcode_placeholder || g.barcode },
+                    product_type: { label: g.type, select: g.select_type || g.select },
+                    brand: { label: g.brand, select: g.select_brand || g.select },
+                    main_category: { label: cat.categories, select: cat.select_main || g.select },
+                    sub_category: { label: cat.hierarchy_info, select: cat.select_sub || g.select },
                     categories: { label: cat.categories },
                     price: { label: p.price },
                     compare_price: { label: p.compare_at_price },
                     cost_price: { label: p.cost_price },
                     tax_rate: { label: p.tax_rate },
-                    currency: { label: g.select || 'Currency' },
-                    pricing_type: { label: p.pricing },
+                    currency: { label: g.currency || g.select || 'Currency', select: g.select_currency || g.select },
+                    pricing_type: { label: p.pricing_type || p.pricing },
                     stock_quantity: { label: inv.stock_quantity },
                     low_stock_threshold: { label: inv.low_stock_threshold },
-                    stock_status: { label: inv.stock_status,
+                    stock_status: {
+                        label: inv.stock_status,
                         in_stock: inv.in_stock, out_of_stock: inv.out_of_stock, on_backorder: inv.on_backorder
                     },
                     manage_stock: { label: inv.manage_stock, yes: g.yes, no: g.no },
@@ -136,13 +149,13 @@
                     featured: { label: s.featured || 'Featured', yes: g.yes, no: g.no },
                     bestseller: { label: s.bestseller || 'Bestseller', yes: g.yes, no: g.no },
                     new: { label: s.new_product || 'New', yes: g.yes, no: g.no },
-                    status: { label: s.active || 'Status', active: s.active, inactive: s.inactive },
+                    status: { label: g.status || s.active || 'Status', active: s.active, inactive: s.inactive },
                     weight: { label: dim.weight },
                     length: { label: dim.length },
                     width: { label: dim.width },
                     height: { label: dim.height },
-                    weight_unit: { label: dim.weight },
-                    dimension_unit: { label: dim.dimensions },
+                    weight_unit: { label: dim.weight_unit || dim.weight },
+                    dimension_unit: { label: dim.dimension_unit || dim.dimensions },
                     images: { label: med.images },
                     short_description: { label: g.short_description },
                     description: { label: g.description },
@@ -154,49 +167,131 @@
                 buttons: {
                     save: s.save, cancel: s.cancel,
                     add_attribute: attr.add_attribute,
-                    add_variant: vr.variants,
+                    add_variant: vr.add_variant || vr.variants,
                     generate_variants: vr.generate_variants
                 },
                 sections: { physical: dim.dimensions },
-                translations: { select_lang: tr.add_language }
+                translations: { select_lang: tr.add_language },
+                attributes: {
+                    select: attr.select_attribute || attr.attribute,
+                    select_value: attr.select_value || attr.value,
+                    custom_value: attr.custom_value
+                }
             },
             // filters.* keys
             filters: {
                 search: s.search_placeholder,
                 search_placeholder: s.search_placeholder,
-                product_type: g.type, brand: g.brand,
-                status: inv.stock_status, tenant_id: 'Tenant',
-                tenant_placeholder: 'Tenant ID',
-                status_options: { all: s.total, active: s.active, inactive: s.inactive },
-                apply: s.save, reset: s.cancel
+                product_type: fil.product_type || g.type,
+                brand: fil.brand || g.brand,
+                status: fil.status || inv.stock_status,
+                tenant_id: fil.tenant_id || 'Tenant',
+                tenant_placeholder: fil.tenant_placeholder || 'Tenant ID',
+                status_options: {
+                    all: fil.all_statuses || s.total,
+                    active: s.active,
+                    inactive: s.inactive
+                },
+                apply: fil.apply || s.save,
+                reset: fil.reset || s.cancel,
+                all_types: fil.all_types || g.type,
+                all_brands: fil.all_brands || g.brand
             },
             // common.* keys
-            common: { select_image: med.select_from_studio },
+            common: { select_image: med.select_from_studio, delete: s.delete || 'Delete' },
             // table.* keys
             table: {
                 headers: {
-                    id: 'ID', tenant: 'Tenant', image: med.images,
-                    name: g.name, sku: g.sku, type: g.type,
-                    price: p.price, stock: inv.stock_quantity,
-                    status: s.active, actions: s.actions
+                    id: tbl.id || 'ID',
+                    tenant: tbl.tenant || 'Tenant',
+                    image: tbl.image || med.images,
+                    name: tbl.name || g.name,
+                    sku: tbl.sku || g.sku,
+                    type: tbl.type || g.type,
+                    price: tbl.price || p.price,
+                    stock: tbl.stock || inv.stock_quantity,
+                    status: tbl.status || s.active,
+                    actions: tbl.actions || s.actions
                 },
                 empty: {
                     title: s.no_products,
                     message: s.create || 'Add your first product',
                     add_first: s.create
                 },
-                actions: { delete: s.delete }
+                actions: {
+                    edit: tbl.edit || s.edit,
+                    delete: tbl.delete || s.delete,
+                    duplicate: tbl.duplicate || s.duplicate || 'Duplicate'
+                },
+                status: {
+                    active: s.active,
+                    inactive: s.inactive
+                }
             },
             // pagination.* keys
             pagination: { showing: s.total || 'Showing' },
-            // messages.* keys
+            // messages.* keys (covers all t('messages.*') calls)
             messages: {
-                error: { load_failed: msg.server_error || 'Error loading data' }
+                created: s.save_success || 'Product created successfully',
+                updated: s.update_success || 'Product updated successfully',
+                deleted: s.delete_success || 'Product deleted successfully',
+                confirm_delete: s.delete_confirm || 'Are you sure?',
+                validation_failed: val.validation_failed || msg.validation_failed || 'Please fill all required fields',
+                attribute_exists: msg.attribute_exists || 'Attribute already added',
+                translation_exists: msg.translation_exists || 'Translation already exists for this language',
+                save_first: msg.save_first || 'Please save the product first',
+                bad_words_found: msg.bad_words_found || 'Content contains prohibited words',
+                checking_content: msg.checking_content || 'Checking content…',
+                error: {
+                    load_failed: msg.server_error || 'Error loading data',
+                    save_failed: msg.save_failed || msg.server_error || 'Failed to save product',
+                    delete_failed: msg.delete_failed || msg.server_error || 'Failed to delete product',
+                    duplicate_failed: msg.duplicate_failed || msg.server_error || 'Failed to duplicate product'
+                }
             },
             // strings used internally
-            strings: { save_success: s.save_success, update_success: s.update_success,
-                delete_confirm: s.delete_confirm, delete_success: s.delete_success,
-                saving: s.saving, loading: s.loading
+            strings: {
+                save_success: s.save_success,
+                update_success: s.update_success,
+                delete_confirm: s.delete_confirm,
+                delete_success: s.delete_success,
+                saving: s.saving,
+                loading: s.loading,
+                no_attributes: s.no_attributes || attr.no_attributes || 'No attributes added',
+                no_combinations: s.no_combinations || vr.no_combinations || 'No variant combinations available'
+            },
+            // variants.* keys — used directly by renderVariants()
+            variants: {
+                variants: vr.variants,
+                variant_name: vr.variant_name || g.name,
+                variant_sku: vr.variant_sku,
+                variant_sku_placeholder: vr.variant_sku_placeholder || g.sku_placeholder,
+                variant_barcode: vr.variant_barcode || g.barcode,
+                variant_stock: vr.variant_stock,
+                variant_price: vr.variant_price,
+                variant_active: vr.variant_active,
+                add_variant: vr.add_variant,
+                remove_variant: vr.remove_variant,
+                generate_variants: vr.generate_variants,
+                generate_from_attributes: vr.generate_from_attributes,
+                no_combinations: vr.no_combinations,
+                save_variant: vr.save_variant || s.save || 'Save'
+            },
+            // csv.* keys used in CSV import modal
+            csv: {
+                import_button: csv.import_button,
+                title: csv.title,
+                instructions: csv.instructions,
+                download_sample: csv.download_sample,
+                choose_file: csv.choose_file,
+                importing: csv.importing,
+                import: csv.import,
+                cancel: csv.cancel,
+                preview_found: csv.preview_found,
+                import_complete: csv.import_complete,
+                created: csv.created,
+                failed: csv.failed,
+                columns_info_label: csv.columns_info_label
             }
         };
     }
@@ -217,7 +312,7 @@
     function applyTranslations() {
         const container = document.getElementById('productsPageContainer');
         if (!container) return;
-        
+
         container.querySelectorAll('[data-i18n]').forEach(elem => {
             const key = elem.getAttribute('data-i18n');
             const txt = t(key);
@@ -270,7 +365,7 @@
         try {
             const res = await fetch(url, config);
             const contentType = res.headers.get('content-type');
-            
+
             if (contentType && contentType.includes('application/json')) {
                 const data = await res.json();
                 if (!res.ok) {
@@ -328,14 +423,14 @@
                 // API returns { data: { items: [], meta: {} } }
                 const items = result.data.items || result.data;
                 const meta = result.data.meta || result.meta || {};
-                
+
                 state.products = Array.isArray(items) ? items : [];
                 state.total = meta.total || state.products.length;
-                
+
                 await renderTable(state.products);
                 updatePagination(meta.total !== undefined ? meta : { page, per_page: state.perPage, total: state.total });
                 updateResultsCount(state.total);
-                
+
                 showTable();
             } else {
                 throw new Error(result.error || result.message || 'Invalid response format');
@@ -444,9 +539,9 @@
 
     function populateDropdown(selectEl, data, valueKey, textKey, placeholder = '') {
         if (!selectEl) return;
-        
+
         selectEl.innerHTML = '';
-        
+
         if (placeholder) {
             const opt = document.createElement('option');
             opt.value = '';
@@ -464,9 +559,9 @@
 
     function populateAttributeSelect(attributes) {
         if (!el.attrSelect) return;
-        
+
         el.attrSelect.innerHTML = '<option value="">' + t('form.attributes.select', 'Select attribute') + '</option>';
-        
+
         attributes.forEach(attr => {
             const opt = document.createElement('option');
             opt.value = attr.id;
@@ -498,19 +593,53 @@
 
         el.tbody.innerHTML = items.map(prod => {
             const image = prod.main_image_url || prod.image_url || '';
-            const name = prod.name || prod.slug || `Product #${prod.id}`;
+
+            // Resolve display name: prefer current-language translation over default name
+            let name = prod.name || prod.slug || `Product #${prod.id}`;
+            if (prod.translations && typeof prod.translations === 'object') {
+                const langTrans = prod.translations[state.language] || prod.translations['en'];
+                if (langTrans && (langTrans.name || langTrans.title)) {
+                    name = langTrans.name || langTrans.title;
+                }
+            }
+            // Also check flat translation fields (e.g. name_ar, name_en)
+            const langSuffix = `_${state.language}`;
+            if (!name && prod[`name${langSuffix}`]) name = prod[`name${langSuffix}`];
+
             const price = prod.price ? Number(prod.price).toFixed(2) : '0.00';
             const currency = prod.currency_code || 'SAR';
             const stock = prod.stock_quantity || 0;
-            const statusBadge = prod.is_active == 1 
+            const statusBadge = prod.is_active == 1
                 ? `<span class="badge badge-active">${t('table.status.active', 'Active')}</span>`
                 : `<span class="badge badge-inactive">${t('table.status.inactive', 'Inactive')}</span>`;
 
-            const canEdit = state.permissions.canEdit || state.permissions.canEditAll || 
-                           (state.permissions.canEditOwn && prod.created_by_user_id == window.APP_CONFIG?.USER_ID);
-            const canDelete = state.permissions.canDelete || state.permissions.canDeleteAll || 
-                             (state.permissions.canDeleteOwn && prod.created_by_user_id == window.APP_CONFIG?.USER_ID);
-            
+            // Variants / variables summary
+            const variantCount = prod.variants_count ?? prod.product_variants?.length ?? 0;
+            const variantsBadge = variantCount > 0
+                ? `<span class="badge badge-variants" title="${t('table.variants', 'Variants')}">${variantCount} ${t('table.variants_label', 'vars')}</span>`
+                : '';
+
+            // Key variable values shown as pills (size, color, SKU-level attributes)
+            let varPills = '';
+            if (Array.isArray(prod.product_variants) && prod.product_variants.length) {
+                // Collect unique attribute combos from first few variants
+                const pills = prod.product_variants.slice(0, 3).map(v => {
+                    const combo = v.attributes_label || v.combination || v.sku || '';
+                    return combo ? `<span class="var-pill">${esc(combo)}</span>` : '';
+                }).filter(Boolean);
+                if (pills.length) varPills = `<div class="var-pills">${pills.join('')}${variantCount > 3 ? `<span class="var-pill var-pill-more">+${variantCount - 3}</span>` : ''}</div>`;
+            } else if (Array.isArray(prod.attributes) && prod.attributes.length) {
+                const pills = prod.attributes.slice(0, 3).map(a =>
+                    `<span class="var-pill">${esc(a.value_label || a.value || a.name || '')}</span>`
+                ).filter(p => p.includes('>') && !p.includes('></span>'));
+                if (pills.length) varPills = `<div class="var-pills">${pills.join('')}</div>`;
+            }
+
+            const canEdit = state.permissions.canEdit || state.permissions.canEditAll ||
+                (state.permissions.canEditOwn && prod.created_by_user_id == state.userId);
+            const canDelete = state.permissions.canDelete || state.permissions.canDeleteAll ||
+                (state.permissions.canDeleteOwn && prod.created_by_user_id == state.userId);
+
             return `
                 <tr data-id="${prod.id}">
                     <td>${esc(prod.id)}</td>
@@ -518,16 +647,21 @@
                     <td>
                         ${image ? `<img src="${esc(image)}" alt="${esc(name)}" style="width:50px;height:50px;object-fit:cover;border-radius:4px;">` : '📦'}
                     </td>
-                    <td><strong>${esc(name)}</strong><br><small style="color:var(--text-secondary,#94a3b8);">${esc(prod.sku || '')}</small></td>
+                    <td>
+                        <strong>${esc(name)}</strong>
+                        <br><small style="color:var(--text-secondary,#94a3b8);">${esc(prod.sku || '')}</small>
+                        ${variantsBadge}
+                        ${varPills}
+                    </td>
                     <td>${esc(prod.sku || '-')}</td>
-                    <td>${esc(prod.product_type_name || '-')}</td>
+                    <td>${esc(prod.product_type_name || (state.productTypes.find(pt => pt.id == prod.product_type_id)?.name) || '-')}</td>
                     <td>${price} ${esc(currency)}</td>
                     <td>${esc(stock)}</td>
                     <td>${statusBadge}</td>
                     <td>
                         <div class="table-actions">
-                            ${canEdit ? `<button class="btn btn-sm btn-secondary" onclick="Products.edit(${prod.id})" title="${t('table.actions.edit', 'Edit')}">
-                                <i class="fas fa-edit"></i>
+                            ${canEdit ? `<button class="btn btn-sm btn-primary edit-btn" data-id="${prod.id}" onclick="Products.edit(${prod.id})" title="${t('table.actions.edit', 'Edit')}">
+                                <i class="fas fa-edit" aria-hidden="true"></i>
                             </button>` : ''}
                             ${state.permissions.canDuplicate ? `<button class="btn btn-sm btn-secondary" onclick="Products.duplicate(${prod.id})" title="${t('table.actions.duplicate', 'Duplicate')}">
                                 <i class="fas fa-copy"></i>
@@ -589,14 +723,14 @@
             if (el.prodIsFeatured) el.prodIsFeatured.value = product.is_featured || '0';
             if (el.prodIsBestseller) el.prodIsBestseller.value = product.is_bestseller || '0';
             if (el.prodIsNew) el.prodIsNew.value = product.is_new || '0';
-            
+
             // Pricing
             if (el.prodPrice) el.prodPrice.value = product.price || '';
             if (el.prodComparePrice) el.prodComparePrice.value = product.compare_at_price || '';
             if (el.prodCostPrice) el.prodCostPrice.value = product.cost_price || '';
             if (el.prodCurrency) el.prodCurrency.value = product.currency_code || 'SAR';
             if (el.prodTaxRate) el.prodTaxRate.value = product.tax_rate || '';
-            
+
             // Inventory
             if (el.prodStockQty) el.prodStockQty.value = product.stock_quantity || '0';
             if (el.prodLowStock) el.prodLowStock.value = product.low_stock_threshold || '5';
@@ -627,8 +761,16 @@
             if (el.prodAttributesList) el.prodAttributesList.innerHTML = '';
             // Clear variants list
             if (el.prodVariantsList) el.prodVariantsList.innerHTML = '';
-            // Clear translations
+            // Clear translations panels
             if (el.prodTranslations) el.prodTranslations.innerHTML = '';
+            // Clear inline English fields
+            if (el.enProdName) el.enProdName.value = '';
+            if (el.enProdShortDesc) el.enProdShortDesc.value = '';
+            if (el.enProdDesc) el.enProdDesc.value = '';
+            if (el.enProdSpecs) el.enProdSpecs.value = '';
+            if (el.enMetaTitle) el.enMetaTitle.value = '';
+            if (el.enMetaDescription) el.enMetaDescription.value = '';
+            if (el.enMetaKeywords) el.enMetaKeywords.value = '';
             // Reset category dropdowns
             if (el.prodMainCategory) el.prodMainCategory.value = '';
             if (el.prodSubCategory) {
@@ -660,10 +802,10 @@
         tabButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 const targetTab = btn.dataset.tab;
-                
+
                 tabButtons.forEach(b => b.classList.remove('active'));
                 tabContents.forEach(c => c.style.display = 'none');
-                
+
                 btn.classList.add('active');
                 const targetContent = document.getElementById(`tab-${targetTab}`);
                 if (targetContent) targetContent.style.display = 'block';
@@ -682,16 +824,53 @@
             return;
         }
 
+        // Client-side bad words check before sending to server
+        const textFieldsToCheck = [
+            el.enProdName?.value || '',
+            el.enProdShortDesc?.value || '',
+            el.enProdDesc?.value || '',
+            el.enProdSpecs?.value || ''
+        ].filter(Boolean);
+
+        for (const text of textFieldsToCheck) {
+            if (!text.trim()) continue;
+            try {
+                const checkResult = await apiCall(API.badWords, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+                if (checkResult.success && checkResult.data && !checkResult.data.clean) {
+                    const words = (checkResult.data.found || []).map(f => f.word).join(', ');
+                    showNotification(
+                        t('messages.bad_words_found', 'Content contains prohibited words') + (words ? ': ' + words : ''),
+                        'error'
+                    );
+                    return;
+                }
+            } catch (bwErr) {
+                // Don't block save if bad words API is unavailable
+                console.warn('[Products] Bad words check failed:', bwErr);
+            }
+        }
+
         try {
             const formData = new FormData(el.form);
             const productId = el.formId.value;
             const isEdit = !!productId;
 
             // Build product data object
+            // Use English inline name as the authoritative product name
+            const enName = el.enProdName?.value?.trim() || '';
+            const baseName = enName || formData.get('name') || '';
+            if (el.prodName && !el.prodName.value.trim() && enName) {
+                el.prodName.value = enName;
+            }
+
             const productData = {
-                name: formData.get('name'),
+                name: baseName,
                 sku: formData.get('sku') || null,
-                slug: formData.get('slug') || generateSlug(formData.get('name')),
+                slug: formData.get('slug') || generateSlug(baseName),
                 barcode: formData.get('barcode') || null,
                 product_type_id: formData.get('product_type_id') || null,
                 brand_id: formData.get('brand_id') || null,
@@ -700,19 +879,18 @@
                 is_featured: formData.get('is_featured') || '0',
                 is_bestseller: formData.get('is_bestseller') || '0',
                 is_new: formData.get('is_new') || '0',
-                
+
                 // Inventory
                 stock_quantity: formData.get('stock_quantity') || '0',
                 low_stock_threshold: formData.get('low_stock_threshold') || '5',
                 stock_status: formData.get('stock_status') || 'in_stock',
                 manage_stock: formData.get('manage_stock') || '1',
                 allow_backorder: formData.get('allow_backorder') || '0',
-                
-                // Related data
-                translations: collectTranslations(),
+
+                // Related data — DO NOT pass translations here; they are saved via saveProductTranslations
+                // NOTE: variants are managed exclusively via /api/product_variants — not included here
                 categories: state.selectedCategories,
-                attributes: state.productAttributes,
-                variants: state.productVariants
+                attributes: state.productAttributes
             };
 
             if (isEdit) {
@@ -1034,18 +1212,18 @@
     function validateForm() {
         let isValid = true;
 
-        // Validate required fields - only name is required, SKU is auto-generated
-        const requiredFields = [el.prodName];
-        
-        requiredFields.forEach(field => {
-            if (!field || !field.value.trim()) {
-                isValid = false;
-                if (field) {
-                    field.classList.add('is-invalid');
-                    field.addEventListener('input', () => field.classList.remove('is-invalid'), { once: true });
-                }
+        // Require English name (inline field) as main required field
+        const enNameVal = el.enProdName?.value?.trim();
+        if (!enNameVal) {
+            isValid = false;
+            if (el.enProdName) {
+                el.enProdName.classList.add('is-invalid');
+                el.enProdName.addEventListener('input', () => el.enProdName.classList.remove('is-invalid'), { once: true });
             }
-        });
+        } else {
+            // Auto-sync to base prodName field
+            if (el.prodName) el.prodName.value = enNameVal;
+        }
 
         return isValid;
     }
@@ -1099,7 +1277,7 @@
         el.prodAttributesList.innerHTML = state.productAttributes.map((attr, idx) => {
             // إذا كانت هناك قيم محددة مسبقاً، عرضها كقائمة منسدلة + حقل نص مخصص
             if (attr.available_values && attr.available_values.length > 0) {
-                const options = attr.available_values.map(v => 
+                const options = attr.available_values.map(v =>
                     `<option value="${esc(v.id)}" ${String(v.id) === String(attr.attribute_value_id) ? 'selected' : ''}>${esc(v.label || v.value || v.name)}</option>`
                 ).join('');
                 return `
@@ -1190,32 +1368,32 @@
     function renderVariants() {
         if (!el.prodVariantsList) return;
 
+        const isEditMode = !!(el.formId?.value);
+
         el.prodVariantsList.innerHTML = state.productVariants.map((variant, idx) => `
             <div class="variant-item card" data-index="${idx}" style="margin-bottom:12px; padding:12px;">
                 <div class="form-row">
                     <div class="form-group" style="flex:1;">
-                        <label>Name</label>
-                        <input type="text" class="form-control" value="${esc(variant.name || '')}"
-                               onchange="Products.updateVariantField(${idx}, 'name', this.value)">
-                    </div>
-                    <div class="form-group" style="flex:1;">
-                        <label>SKU</label>
+                        <label>${t('variants.variant_sku', 'SKU')}</label>
                         <input type="text" class="form-control" value="${esc(variant.sku || '')}"
-                               placeholder="Auto-generated"
+                               placeholder="${t('variants.variant_sku_placeholder', 'Auto-generated')}"
                                onchange="Products.updateVariantField(${idx}, 'sku', this.value)">
                     </div>
                     <div class="form-group" style="flex:1;">
-                        <label>Barcode</label>
+                        <label>${t('variants.variant_barcode', 'Barcode')}</label>
                         <input type="text" class="form-control" value="${esc(variant.barcode || '')}"
                                onchange="Products.updateVariantField(${idx}, 'barcode', this.value)">
                     </div>
                     <div class="form-group" style="width:100px;">
-                        <label>Stock</label>
+                        <label>${t('variants.variant_stock', 'Stock')}</label>
                         <input type="number" class="form-control" value="${esc(variant.stock_quantity || 0)}"
                                onchange="Products.updateVariantField(${idx}, 'stock_quantity', this.value)">
                     </div>
-                    <div style="display:flex;align-items:flex-end;padding-bottom:8px;">
-                        <button type="button" class="btn btn-sm btn-danger" onclick="Products.removeVariant(${idx})">
+                    <div style="display:flex;align-items:flex-end;gap:6px;padding-bottom:8px;">
+                        ${isEditMode ? `<button type="button" class="btn btn-sm btn-primary" title="${t('variants.save_variant', 'Save')}" onclick="Products.saveVariantRow(${idx})">
+                            <i class="fas fa-save"></i>
+                        </button>` : ''}
+                        <button type="button" class="btn btn-sm btn-danger" title="${t('common.delete', 'Delete')}" onclick="Products.removeVariant(${idx})">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -1230,12 +1408,89 @@
         }
     }
 
-    function removeVariant(index) {
+    async function removeVariant(index) {
+        const variant = state.productVariants[index];
+        if (variant && variant.id) {
+            try {
+                await apiCall(`/api/product_variants?tenant_id=${state.tenantId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: parseInt(variant.id) })
+                });
+            } catch (err) {
+                console.warn('[Products] Failed to delete variant via API:', err);
+            }
+        }
         state.productVariants.splice(index, 1);
         renderVariants();
     }
 
-    function generateVariantsFromAttributes() {
+    /**
+     * Save (POST or PUT) a single variant row via /api/product_variants.
+     * In edit mode (product already exists) this fires immediately so the API
+     * is always the source of truth.  In create mode the buffered
+     * saveProductVariants() call after product creation covers the save.
+     */
+    async function saveVariantRow(index) {
+        const variant = state.productVariants[index];
+        if (!variant) return;
+
+        const productId = el.formId?.value ? parseInt(el.formId.value) : null;
+        if (!productId) {
+            // Create mode: nothing to persist yet — saveProductVariants() handles this
+            return;
+        }
+
+        const variantData = {
+            product_id: productId,
+            sku: variant.sku || null,
+            barcode: variant.barcode || null,
+            stock_quantity: parseInt(variant.stock_quantity) || 0,
+            low_stock_threshold: parseInt(variant.low_stock_threshold) || 5,
+            is_active: variant.is_active !== undefined ? parseInt(variant.is_active) : 1,
+            is_default: variant.is_default !== undefined ? parseInt(variant.is_default) : 0
+        };
+        if (variant.id) variantData.id = parseInt(variant.id);
+
+        const method = variant.id ? 'PUT' : 'POST';
+
+        try {
+            const result = await apiCall(`/api/product_variants?tenant_id=${state.tenantId}`, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(variantData)
+            });
+
+            if (result.success) {
+                const savedId = variant.id || result.data?.id;
+                if (savedId) {
+                    state.productVariants[index].id = savedId;
+
+                    // Persist name as translation
+                    if (variant.name) {
+                        try {
+                            await apiCall(`/api/product_variants?tenant_id=${state.tenantId}`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    variant_id: parseInt(savedId),
+                                    translation: { language_code: state.language, name: variant.name }
+                                })
+                            });
+                        } catch (err) {
+                            console.warn('[Products] Failed to save variant translation:', err);
+                        }
+                    }
+                }
+                renderVariants(); // Refresh to show saved state (id now set)
+            }
+        } catch (err) {
+            console.warn('[Products] Failed to save variant row:', err);
+        }
+    }
+
+
+    async function generateVariantsFromAttributes() {
         // Collect variation attributes that have values
         const variationAttrs = state.productAttributes.filter(a => !!(a.attribute_value_id || a.value));
 
@@ -1266,6 +1521,7 @@
 
         // Create variants from combinations
         const baseSku = document.getElementById('prodSku')?.value || 'VAR';
+        const startIdx = state.productVariants.length;
         combinations.forEach((combo, i) => {
             const nameParts = combo.map(v => v.label);
             const variant = {
@@ -1282,6 +1538,14 @@
         });
 
         renderVariants();
+
+        // In edit mode, auto-save each generated variant via API immediately
+        const productId = el.formId?.value ? parseInt(el.formId.value) : null;
+        if (productId) {
+            for (let i = startIdx; i < state.productVariants.length; i++) {
+                await saveVariantRow(i);
+            }
+        }
     }
 
     function cartesian(arrays) {
@@ -1306,7 +1570,7 @@
             return;
         }
         if (el.mediaModal && el.mediaFrame) {
-            el.mediaModal.style.display = 'block';
+            el.mediaModal.style.display = 'flex';
             // Pass product id as owner_id and image_type_id=2 for product images
             el.mediaFrame.src = `/admin/fragments/media_studio.php?embedded=1&tenant_id=${state.tenantId}&lang=${state.language}&owner_id=${state.currentProduct.id}&image_type_id=2`;
         }
@@ -1329,12 +1593,21 @@
                         onclick="Products.removeImage(${idx})">
                     <i class="fas fa-times"></i>
                 </button>
-                ${idx === 0 ? '<span style="position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.7);color:white;padding:2px 6px;border-radius:4px;font-size:10px;">Main</span>' : ''}
+                ${idx === 0 ? '<span class="image-main-badge">Main</span>' : ''}
             </div>
         `).join('');
     }
 
-    function removeImage(index) {
+    async function removeImage(index) {
+        const img = state.selectedImages[index];
+        if (img && img.id && el.formId?.value) {
+            // In edit mode: delete via API so the change is persisted immediately
+            try {
+                await apiCall(`${API.images}/${img.id}`, { method: 'DELETE' });
+            } catch (err) {
+                console.warn('[Products] Failed to delete image via API:', err);
+            }
+        }
         state.selectedImages.splice(index, 1);
         renderProductImages();
     }
@@ -1347,9 +1620,9 @@
 
         // القوائم الرئيسية = التي ليس لها أب (parent_id = null)
         const mainCategories = state.categories.filter(cat => !cat.parent_id);
-        
+
         el.prodMainCategory.innerHTML = '<option value="">' + t('form.fields.main_category.select', 'Select main category') + '</option>';
-        
+
         mainCategories.forEach(cat => {
             const opt = document.createElement('option');
             opt.value = cat.id;
@@ -1365,7 +1638,7 @@
 
     function onMainCategoryChange() {
         const mainCatId = el.prodMainCategory ? el.prodMainCategory.value : '';
-        
+
         if (!el.prodSubCategory) return;
 
         el.prodSubCategory.innerHTML = '<option value="">' + t('form.fields.sub_category.select', 'Select sub category') + '</option>';
@@ -1374,7 +1647,7 @@
 
         // القوائم الفرعية = التي parent_id = القائمة الرئيسية المختارة (+ أحفادها)
         const subCategories = state.categories.filter(cat => String(cat.parent_id) === String(mainCatId));
-        
+
         subCategories.forEach(cat => {
             const opt = document.createElement('option');
             opt.value = cat.id;
@@ -1412,42 +1685,178 @@
     // ════════════════════════════════════════════════════════════
     // CATEGORIES TREE
     // ════════════════════════════════════════════════════════════
+    // ── Category tree helpers ──────────────────────────────────
+
+    /** Return all descendant IDs of a category (any depth) */
+    function getDescendantIds(categoryId) {
+        const ids = [];
+        const queue = [categoryId];
+        while (queue.length) {
+            const pid = queue.shift();
+            state.categories.forEach(c => {
+                if (c.parent_id == pid) {
+                    ids.push(c.id);
+                    queue.push(c.id);
+                }
+            });
+        }
+        return ids;
+    }
+
+    /** Return the direct parent ID of a category (null if root) */
+    function getCategoryParentId(categoryId) {
+        const cat = state.categories.find(c => c.id == categoryId);
+        return cat ? (cat.parent_id || null) : null;
+    }
+
+    /** Sync indeterminate / checked state on every checkbox in the tree */
+    function syncTreeCheckboxStates() {
+        if (!el.prodCategoriesTree) return;
+        el.prodCategoriesTree.querySelectorAll('input[type="checkbox"][data-cat-id]').forEach(cb => {
+            const id = parseInt(cb.dataset.catId, 10);
+            const descendants = getDescendantIds(id);
+            if (!descendants.length) {
+                // Leaf node: simply reflect selection
+                cb.checked       = state.selectedCategories.includes(id);
+                cb.indeterminate = false;
+            } else {
+                const selectedDescendants = descendants.filter(d => state.selectedCategories.includes(d));
+                if (selectedDescendants.length === 0 && !state.selectedCategories.includes(id)) {
+                    cb.checked       = false;
+                    cb.indeterminate = false;
+                } else if (selectedDescendants.length === descendants.length && state.selectedCategories.includes(id)) {
+                    cb.checked       = true;
+                    cb.indeterminate = false;
+                } else {
+                    cb.checked       = false;
+                    cb.indeterminate = true;
+                }
+            }
+        });
+    }
+
     function renderCategoriesTree() {
         if (!el.prodCategoriesTree) return;
 
-        const buildTree = (categories, parentId = null) => {
-            return categories
-                .filter(cat => cat.parent_id == parentId)
-                .map(cat => {
-                    const isSelected = state.selectedCategories.includes(cat.id);
-                    const children = buildTree(categories, cat.id);
-                    
-                    return `
-                        <div class="category-node" style="margin-left:${parentId ? '20px' : '0'};">
-                            <label style="display:flex;align-items:center;gap:8px;padding:4px 0;">
-                                <input type="checkbox" value="${cat.id}" 
-                                       ${isSelected ? 'checked' : ''}
-                                       onchange="Products.toggleCategory(${cat.id}, this.checked)">
-                                <span>${esc(cat.name)}</span>
-                            </label>
-                            ${children ? `<div class="category-children">${children}</div>` : ''}
-                        </div>
-                    `;
-                }).join('');
+        // Build the DOM tree recursively from flat array
+        const buildNodes = (parentId) => {
+            const children = state.categories.filter(c => c.parent_id == parentId);
+            if (!children.length) return null;
+
+            const ul = document.createElement('ul');
+            ul.className = parentId ? 'category-children' : 'category-tree-root';
+
+            children.forEach(cat => {
+                const hasChildren = state.categories.some(c => c.parent_id == cat.id);
+                const isSelected  = state.selectedCategories.includes(cat.id);
+
+                const li = document.createElement('li');
+                li.className = 'category-node';
+                li.dataset.nodeId = cat.id;
+
+                // Toggle button (only for nodes that have children)
+                const toggleBtn = document.createElement('button');
+                toggleBtn.type = 'button';
+                toggleBtn.className = 'category-toggle';
+                toggleBtn.setAttribute('aria-label', 'Expand/Collapse');
+                if (!hasChildren) {
+                    toggleBtn.style.visibility = 'hidden';
+                    toggleBtn.setAttribute('tabindex', '-1');
+                }
+                toggleBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
+
+                const label = document.createElement('label');
+                label.className = 'category-label';
+
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.dataset.catId = cat.id;
+                cb.checked = isSelected;
+
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = cat.name || `#${cat.id}`;
+
+                label.appendChild(cb);
+                label.appendChild(nameSpan);
+                li.appendChild(toggleBtn);
+                li.appendChild(label);
+
+                const subNodes = buildNodes(cat.id);
+                if (subNodes) {
+                    subNodes.style.display = 'none'; // start collapsed
+                    li.appendChild(subNodes);
+                    li.classList.add('has-children', 'collapsed');
+                }
+
+                ul.appendChild(li);
+            });
+
+            return ul;
         };
 
-        el.prodCategoriesTree.innerHTML = buildTree(state.categories);
+        el.prodCategoriesTree.innerHTML = '';
+        const tree = buildNodes(null) || buildNodes(0);
+        if (tree) {
+            tree.style.display = ''; // root is always visible
+            el.prodCategoriesTree.appendChild(tree);
+        }
+
+        // ── Event delegation on the tree container ───────────────
+
+        // Remove old listener and replace the node (clone trick to strip stale handlers)
+        const fresh = el.prodCategoriesTree.cloneNode(false);
+        // Move children into fresh clone
+        while (el.prodCategoriesTree.firstChild) fresh.appendChild(el.prodCategoriesTree.firstChild);
+        el.prodCategoriesTree.parentNode.replaceChild(fresh, el.prodCategoriesTree);
+        el.prodCategoriesTree = fresh;
+
+        el.prodCategoriesTree.addEventListener('change', e => {
+            const cb = e.target.closest('input[type="checkbox"][data-cat-id]');
+            if (!cb) return;
+            const id = parseInt(cb.dataset.catId, 10);
+            _toggleCategoryWithCascade(id, cb.checked);
+        });
+
+        el.prodCategoriesTree.addEventListener('click', e => {
+            const btn = e.target.closest('.category-toggle');
+            if (!btn) return;
+            const li = btn.closest('.category-node.has-children');
+            if (!li) return;
+            const subList = li.querySelector(':scope > ul');
+            if (!subList) return;
+            const collapsed = li.classList.contains('collapsed');
+            if (collapsed) {
+                subList.style.display = '';
+                li.classList.remove('collapsed');
+                li.classList.add('expanded');
+            } else {
+                subList.style.display = 'none';
+                li.classList.remove('expanded');
+                li.classList.add('collapsed');
+            }
+        });
+
+        syncTreeCheckboxStates();
+    }
+
+    /** Internal cascade: select/deselect a node and all its descendants */
+    function _toggleCategoryWithCascade(categoryId, checked) {
+        const all = [categoryId, ...getDescendantIds(categoryId)];
+        if (checked) {
+            all.forEach(id => {
+                if (!state.selectedCategories.includes(id)) {
+                    state.selectedCategories.push(id);
+                }
+            });
+        } else {
+            state.selectedCategories = state.selectedCategories.filter(id => !all.includes(id));
+        }
+        syncTreeCheckboxStates();
+        syncCategoryDropdownsFromSelection();
     }
 
     function toggleCategory(categoryId, checked) {
-        if (checked) {
-            if (!state.selectedCategories.includes(categoryId)) {
-                state.selectedCategories.push(categoryId);
-            }
-        } else {
-            state.selectedCategories = state.selectedCategories.filter(id => id != categoryId);
-        }
-        syncCategoryDropdownsFromSelection();
+        _toggleCategoryWithCascade(parseInt(categoryId, 10), checked);
     }
 
     function syncCategoryDropdownsFromSelection() {
@@ -1485,7 +1894,7 @@
         if (!langCode) return;
 
         const langName = el.prodLangSelect.options[el.prodLangSelect.selectedIndex].textContent;
-        
+
         // Check if already added
         const existingPanel = document.querySelector(`[data-lang="${langCode}"]`);
         if (existingPanel) {
@@ -1497,7 +1906,7 @@
         if (el.prodTranslations) {
             el.prodTranslations.appendChild(panel);
         }
-        
+
         el.prodLangSelect.value = '';
     }
 
@@ -1505,7 +1914,7 @@
         const panel = document.createElement('div');
         panel.className = 'translation-panel';
         panel.dataset.lang = langCode;
-        
+
         panel.innerHTML = `
             <div class="translation-panel-header">
                 <h5><i class="fas fa-language"></i> ${esc(langName)} (${esc(langCode)})</h5>
@@ -1544,15 +1953,38 @@
                 </div>
             </div>
         `;
-        
+
         return panel;
     }
 
     function collectTranslations() {
         const translations = {};
-        
+
+        // ── 1. Collect from the inline English section (always present) ──
+        const enName = el.enProdName?.value?.trim() || '';
+        const enShortDesc = el.enProdShortDesc?.value?.trim() || '';
+        const enDesc = el.enProdDesc?.value?.trim() || '';
+        const enSpecs = el.enProdSpecs?.value?.trim() || '';
+        const enMetaTitle = el.enMetaTitle?.value?.trim() || '';
+        const enMetaDesc = el.enMetaDescription?.value?.trim() || '';
+        const enMetaKw = el.enMetaKeywords?.value?.trim() || '';
+
+        if (enName || enShortDesc || enDesc || enSpecs || enMetaTitle || enMetaDesc || enMetaKw) {
+            translations['en'] = {
+                name: enName,
+                short_description: enShortDesc,
+                description: enDesc,
+                specifications: enSpecs,
+                meta_title: enMetaTitle,
+                meta_description: enMetaDesc,
+                meta_keywords: enMetaKw
+            };
+        }
+
+        // ── 2. Collect from the dynamic translation panels (other languages) ──
         document.querySelectorAll('.translation-panel').forEach(panel => {
             const lang = panel.dataset.lang;
+            if (lang === 'en') return; // already handled above
             const name = panel.querySelector('.trans-name')?.value || '';
             const shortDesc = panel.querySelector('.trans-short-desc')?.value || '';
             const desc = panel.querySelector('.trans-desc')?.value || '';
@@ -1560,20 +1992,15 @@
             const metaTitle = panel.querySelector('.trans-meta-title')?.value || '';
             const metaDesc = panel.querySelector('.trans-meta-desc')?.value || '';
             const metaKeywords = panel.querySelector('.trans-meta-keywords')?.value || '';
-            
+
             if (name || shortDesc || desc || specifications || metaTitle || metaDesc || metaKeywords) {
                 translations[lang] = {
-                    name: name,
-                    short_description: shortDesc,
-                    description: desc,
-                    specifications: specifications,
-                    meta_title: metaTitle,
-                    meta_description: metaDesc,
-                    meta_keywords: metaKeywords
+                    name, short_description: shortDesc, description: desc,
+                    specifications, meta_title: metaTitle, meta_description: metaDesc, meta_keywords: metaKeywords
                 };
             }
         });
-        
+
         return translations;
     }
 
@@ -1584,7 +2011,20 @@
             if (result.success) {
                 const items = Array.isArray(result.data) ? result.data : (result.data?.items || []);
                 if (el.prodTranslations) el.prodTranslations.innerHTML = '';
+
                 items.forEach(trans => {
+                    if (trans.language_code === 'en') {
+                        // Populate the inline English fields instead of creating a panel
+                        if (el.enProdName) el.enProdName.value = trans.name || '';
+                        if (el.enProdShortDesc) el.enProdShortDesc.value = trans.short_description || '';
+                        if (el.enProdDesc) el.enProdDesc.value = trans.description || '';
+                        if (el.enProdSpecs) el.enProdSpecs.value = trans.specifications || '';
+                        if (el.enMetaTitle) el.enMetaTitle.value = trans.meta_title || '';
+                        if (el.enMetaDescription) el.enMetaDescription.value = trans.meta_description || '';
+                        if (el.enMetaKeywords) el.enMetaKeywords.value = trans.meta_keywords || '';
+                        return; // skip creating a panel for English
+                    }
+
                     const langName = state.languages.find(l => l.code === trans.language_code)?.name || trans.language_code;
                     const panel = createTranslationPanel(trans.language_code, langName, {
                         name: trans.name || '',
@@ -1681,7 +2121,7 @@
             const result = await apiCall(`/api/product_attribute_assignments/by_product?product_id=${productId}`);
             if (result.success) {
                 const items = Array.isArray(result.data) ? result.data : (result.data?.items || []);
-                
+
                 // بناء قائمة السمات مع تحميل القيم المتاحة لكل سمة
                 const attrs = [];
                 for (const item of items) {
@@ -1698,7 +2138,7 @@
 
                     // البحث عن اسم السمة من state.attributes
                     const attrInfo = state.attributes.find(a => String(a.id) === String(item.attribute_id));
-                    
+
                     attrs.push({
                         attribute_id: item.attribute_id,
                         attribute_name: attrInfo?.name || item.attribute_name || item.attribute_slug || `Attribute #${item.attribute_id}`,
@@ -1709,7 +2149,7 @@
                         available_values: availableValues
                     });
                 }
-                
+
                 state.productAttributes = attrs;
                 renderAttributes();
             }
@@ -1724,11 +2164,13 @@
             const result = await apiCall(`/api/product_variants?product_id=${productId}&tenant_id=${state.tenantId}&language_code=${state.language}&format=json`);
             if (result.success) {
                 const items = result.data?.items || (Array.isArray(result.data) ? result.data : []);
+                // translation_name holds the value from product_variant_translations (pvt.name AS translation_name).
+                // Fall back to v.name (legacy) if present.
                 state.productVariants = items.map(v => ({
                     id: v.id,
                     sku: v.sku || '',
                     barcode: v.barcode || '',
-                    name: v.name || '',
+                    name: v.translation_name || v.name || '',
                     stock_quantity: v.stock_quantity || 0,
                     price: v.price || '',
                     is_active: v.is_active || 1,
@@ -1755,7 +2197,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: id })
             });
-            
+
             if (result.success) {
                 showNotification(t('messages.deleted', 'Product deleted successfully'), 'success');
                 hideForm();
@@ -1772,7 +2214,7 @@
     async function duplicateProduct(id) {
         try {
             const result = await apiCall(`${API.products}?id=${id}&format=json&lang=${state.language}`);
-            
+
             if (result.success && result.data) {
                 const productData = result.data;
                 const product = { ...productData };
@@ -1783,7 +2225,7 @@
                 product.slug = `${product.slug || ''}-copy-${uid}`;
                 // مسح الباركود لتجنب خطأ الإدخال المكرر
                 product.barcode = null;
-                
+
                 showForm(product);
             } else {
                 throw new Error('Failed to load product for duplication');
@@ -1799,7 +2241,7 @@
     // ════════════════════════════════════════════════════════════
     function applyFilters() {
         state.filters = {};
-        
+
         if (el.searchInput?.value) state.filters.search = el.searchInput.value;
         if (el.tenantFilter?.value) state.filters.tenant_id = el.tenantFilter.value;
         if (el.typeFilter?.value) state.filters.product_type_id = el.typeFilter.value;
@@ -1811,7 +2253,7 @@
 
     function resetFilters() {
         state.filters = {};
-        
+
         if (el.searchInput) el.searchInput.value = '';
         if (el.tenantFilter) el.tenantFilter.value = state.tenantId;
         if (el.typeFilter) el.typeFilter.value = '';
@@ -1934,6 +2376,241 @@
     }
 
     // ════════════════════════════════════════════════════════════
+    // CSV IMPORT
+    // ════════════════════════════════════════════════════════════
+    const CSV_COLUMNS = [
+        'sku', 'barcode', 'product_type_id', 'brand_id',
+        'is_active', 'is_featured', 'is_bestseller', 'is_new',
+        'price', 'compare_at_price', 'cost_price', 'currency_code', 'tax_rate',
+        'stock_quantity', 'low_stock_threshold', 'stock_status', 'manage_stock', 'allow_backorder',
+        'weight', 'length', 'width', 'height', 'weight_unit', 'dimension_unit',
+        'en_name', 'en_short_description', 'en_description',
+        'en_specifications', 'en_meta_title', 'en_meta_description', 'en_meta_keywords'
+    ];
+
+    let _csvParsedRows = [];
+    let _csvImporting = false;
+
+    function openCsvImport() {
+        const modal = document.getElementById('csvImportModal');
+        if (!modal) return;
+        // Reset state
+        _csvParsedRows = [];
+        _csvImporting = false;
+        document.getElementById('csvFileInput').value = '';
+        document.getElementById('csvPreviewInfo').style.display = 'none';
+        document.getElementById('csvProgressArea').style.display = 'none';
+        document.getElementById('csvResultSummary').style.display = 'none';
+        document.getElementById('csvProgressLog').textContent = '';
+        document.getElementById('csvProgressBar').style.width = '0%';
+        document.getElementById('csvProgressPct').textContent = '0%';
+        document.getElementById('csvImportStart').disabled = true;
+        modal.style.display = 'flex';
+    }
+
+    function closeCsvImport() {
+        if (_csvImporting) return;
+        const modal = document.getElementById('csvImportModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function downloadSampleCsv() {
+        const header = CSV_COLUMNS.join(',');
+        const example = [
+            'SKU-001', '', '1', '1',
+            '1', '0', '0', '0',
+            '99.99', '', '', 'SAR', '',
+            '100', '5', 'in_stock', '1', '0',
+            '', '', '', '', 'kg', 'cm',
+            'Sample Product Name', 'Short product summary', 'Full product description',
+            'Material: Cotton', 'Sample Product | Store', 'A great product', 'product, sample'
+        ].join(',');
+        const csv = header + '\n' + example;
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'products_import_sample.csv'; a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function parseCsv(text) {
+        // Simple CSV parser: handles quoted fields
+        const rows = [];
+        const lines = text.split(/\r?\n/);
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/^"|"$/g, ''));
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            // Split by comma, respecting quoted strings
+            const vals = [];
+            let inQuote = false, cur = '';
+            for (let c = 0; c < line.length; c++) {
+                const ch = line[c];
+                if (ch === '"') { inQuote = !inQuote; }
+                else if (ch === ',' && !inQuote) { vals.push(cur); cur = ''; }
+                else { cur += ch; }
+            }
+            vals.push(cur);
+            const row = {};
+            headers.forEach((h, idx) => { row[h] = (vals[idx] || '').trim(); });
+            rows.push(row);
+        }
+        return rows;
+    }
+
+    async function startCsvImport() {
+        if (_csvImporting || _csvParsedRows.length === 0) return;
+        _csvImporting = true;
+
+        const startBtn = document.getElementById('csvImportStart');
+        const cancelBtn = document.getElementById('csvImportCancel');
+        const progressArea = document.getElementById('csvProgressArea');
+        const progressBar = document.getElementById('csvProgressBar');
+        const progressPct = document.getElementById('csvProgressPct');
+        const progressLabel = document.getElementById('csvProgressLabel');
+        const progressLog = document.getElementById('csvProgressLog');
+        const resultDiv = document.getElementById('csvResultSummary');
+
+        startBtn.disabled = true;
+        cancelBtn.disabled = true;
+        progressArea.style.display = 'block';
+        resultDiv.style.display = 'none';
+
+        let successCount = 0, failCount = 0;
+        const total = _csvParsedRows.length;
+
+        function logLine(msg, ok = true) {
+            const span = document.createElement('span');
+            span.textContent = msg + '\n';
+            span.className = ok ? 'csv-count-success' : 'csv-count-fail';
+            progressLog.appendChild(span);
+            progressLog.scrollTop = progressLog.scrollHeight;
+        }
+
+        for (let i = 0; i < total; i++) {
+            const row = _csvParsedRows[i];
+            const pct = Math.round(((i) / total) * 100);
+            progressBar.style.width = pct + '%';
+            progressPct.textContent = pct + '%';
+            progressLabel.textContent = t('csv.importing', 'Importing…') + ` (${i + 1}/${total})`;
+
+            try {
+                // Build product payload
+                const productData = {
+                    tenant_id: state.tenantId,
+                    sku: row.sku || null,
+                    barcode: row.barcode || null,
+                    product_type_id: row.product_type_id || null,
+                    brand_id: row.brand_id || null,
+                    is_active: row.is_active !== undefined ? row.is_active : '1',
+                    is_featured: row.is_featured !== undefined ? row.is_featured : '0',
+                    is_bestseller: row.is_bestseller !== undefined ? row.is_bestseller : '0',
+                    is_new: row.is_new !== undefined ? row.is_new : '0',
+                    stock_quantity: row.stock_quantity || '0',
+                    low_stock_threshold: row.low_stock_threshold || '5',
+                    stock_status: row.stock_status || 'in_stock',
+                    manage_stock: row.manage_stock !== undefined ? row.manage_stock : '1',
+                    allow_backorder: row.allow_backorder !== undefined ? row.allow_backorder : '0',
+                    // Use English name as the base product name
+                    name: row.en_name || row.sku || `Product ${i + 1}`,
+                    slug: generateSlug(row.en_name || row.sku || `product-${i + 1}`),
+                    translations: {}
+                };
+
+                // Create product
+                const prodResult = await apiCall(API.products, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(productData)
+                });
+
+                if (!prodResult.success) throw new Error(prodResult.error || prodResult.message || 'Product creation failed');
+
+                const savedId = prodResult.data?.id || prodResult.data?.items?.[0]?.id;
+                if (!savedId) throw new Error('No product ID returned');
+
+                // Save English translation
+                if (row.en_name || row.en_description || row.en_short_description) {
+                    const transData = {
+                        product_id: parseInt(savedId),
+                        language_code: 'en',
+                        name: row.en_name || '',
+                        short_description: row.en_short_description || '',
+                        description: row.en_description || '',
+                        specifications: row.en_specifications || '',
+                        meta_title: row.en_meta_title || '',
+                        meta_description: row.en_meta_description || '',
+                        meta_keywords: row.en_meta_keywords || ''
+                    };
+                    await apiCall('/api/product_translations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(transData)
+                    });
+                }
+
+                // Save pricing if price provided
+                if (row.price) {
+                    const formData = new Map(Object.entries(row));
+                    formData.get = (k) => row[k] || '';
+                    await savePricingData(savedId, formData);
+                }
+
+                // Save physical attributes if provided
+                if (row.weight || row.length || row.width || row.height) {
+                    const physData = {
+                        product_id: parseInt(savedId),
+                        weight: parseFloat(row.weight) || null,
+                        length: parseFloat(row.length) || null,
+                        width: parseFloat(row.width) || null,
+                        height: parseFloat(row.height) || null,
+                        weight_unit: row.weight_unit || 'kg',
+                        dimension_unit: row.dimension_unit || 'cm'
+                    };
+                    await apiCall('/api/product_physical_attributes', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(physData)
+                    });
+                }
+
+                successCount++;
+                logLine(`✓ Row ${i + 1}: "${row.en_name || row.sku}" imported (ID: ${savedId})`, true);
+
+            } catch (err) {
+                failCount++;
+                logLine(`✗ Row ${i + 1}: ${err.message}`, false);
+                console.warn('[Products CSV] Row failed:', i + 1, err);
+            }
+
+            // Small delay to avoid rate limiting
+            await new Promise(r => setTimeout(r, 80));
+        }
+
+        // Done
+        progressBar.style.width = '100%';
+        progressPct.textContent = '100%';
+        progressLabel.textContent = t('csv.import_complete', 'Import complete!');
+
+        const ok = failCount === 0;
+        resultDiv.style.display = 'block';
+        resultDiv.className = ok ? 'csv-result-success' : 'csv-result-partial';
+        resultDiv.style.padding = '12px';
+        resultDiv.style.borderRadius = 'var(--border-radius, 8px)';
+        resultDiv.innerHTML = `
+            <strong>${ok ? '✅' : '⚠️'} ${t('csv.import_complete', 'Import Finished')}</strong><br>
+            <span class="csv-count-success">✓ ${t('csv.created', 'Created')}: ${successCount}</span>
+            ${failCount > 0 ? `  <span class="csv-count-fail">✗ ${t('csv.failed', 'Failed')}: ${failCount}</span>` : ''}
+        `;
+
+        cancelBtn.disabled = false;
+        _csvImporting = false;
+
+        // Refresh table
+        if (successCount > 0) setTimeout(() => loadProducts(1), 500);
+    }
+
+    // ════════════════════════════════════════════════════════════
     // INITIALIZATION
     // ════════════════════════════════════════════════════════════
     async function init() {
@@ -1945,18 +2622,18 @@
         // Cache DOM elements
         el = {
             // Containers
-            container: $id('tableContainer'),
-            loading: $id('tableLoading'),
-            empty: $id('emptyState'),
-            error: $id('errorState'),
-            errorMessage: $id('errorMessage'),
-            
+            container: $id('pageTableContainer') || $id('tableContainer'),
+            loading: $id('pageLoading') || $id('tableLoading'),
+            empty: $id('pageEmpty') || $id('emptyState'),
+            error: $id('pageError') || $id('errorState'),
+            errorMessage: $id('pageErrorMessage') || $id('errorMessage'),
+
             // Form
             formContainer: $id('productFormContainer'),
             form: $id('productForm'),
             formTitle: $id('formTitle'),
             formId: $id('formId'),
-            
+
             // Form fields - General
             prodName: $id('prodName'),
             prodSku: $id('prodSku'),
@@ -1971,21 +2648,21 @@
             prodIsBestseller: $id('prodIsBestseller'),
             prodIsNew: $id('prodIsNew'),
             prodTenantId: $id('prodTenantId'),
-            
+
             // Form fields - Pricing
             prodPrice: $id('prodPrice'),
             prodComparePrice: $id('prodComparePrice'),
             prodCostPrice: $id('prodCostPrice'),
             prodCurrency: $id('prodCurrency'),
             prodTaxRate: $id('prodTaxRate'),
-            
+
             // Form fields - Inventory
             prodStockQty: $id('prodStockQty'),
             prodLowStock: $id('prodLowStock'),
             prodStockStatus: $id('prodStockStatus'),
             prodManageStock: $id('prodManageStock'),
             prodAllowBackorder: $id('prodAllowBackorder'),
-            
+
             // Form fields - Physical
             prodWeight: $id('prodWeight'),
             prodLength: $id('prodLength'),
@@ -1993,52 +2670,62 @@
             prodHeight: $id('prodHeight'),
             prodWeightUnit: $id('prodWeightUnit'),
             prodDimensionUnit: $id('prodDimensionUnit'),
-            
+
             // Attributes
             attrSelect: $id('attrSelect'),
             btnAddAttribute: $id('btnAddAttribute'),
             prodAttributesList: $id('prodAttributesList'),
-            
+
             // Variants
             btnGenerateVariants: $id('btnGenerateVariants'),
             btnAddVariant: $id('btnAddVariant'),
             prodVariantsList: $id('prodVariantsList'),
-            
+
             // Images
             prodSelectImageBtn: $id('prodSelectImageBtn'),
             prodImagesPreview: $id('prodImagesPreview'),
             mediaModal: $id('prodMediaStudioModal'),
             mediaFrame: $id('prodMediaStudioFrame'),
             mediaClose: $id('prodMediaStudioClose'),
-            
+
             // Categories
             prodCategoriesTree: $id('prodCategoriesTree'),
-            
+
             // Translations
             prodTranslations: $id('prodTranslations'),
             prodLangSelect: $id('prodLangSelect'),
             prodAddLangBtn: $id('prodAddLangBtn'),
-            
+
+            // English inline translation fields
+            enProdName: $id('enProdName'),
+            enProdShortDesc: $id('enProdShortDesc'),
+            enProdDesc: $id('enProdDesc'),
+            enProdSpecs: $id('enProdSpecs'),
+            enMetaTitle: $id('enMetaTitle'),
+            enMetaDescription: $id('enMetaDescription'),
+            enMetaKeywords: $id('enMetaKeywords'),
+
             // Table
             tbody: $id('tableBody'),
-            
+
             // Filters
             searchInput: $id('searchInput'),
             tenantFilter: $id('tenantFilter'),
             typeFilter: $id('typeFilter'),
             brandFilter: $id('brandFilter'),
             statusFilter: $id('statusFilter'),
-            
+
             // Buttons
             btnSubmit: $id('btnSubmitForm'),
             btnAdd: $id('btnAddProduct'),
+            btnImportCsv: $id('btnImportCsv'),
             btnClose: $id('btnCloseForm'),
             btnCancel: $id('btnCancelForm'),
             btnApply: $id('btnApplyFilters'),
             btnReset: $id('btnResetFilters'),
             btnRetry: $id('btnRetry'),
             btnDeleteProduct: $id('btnDeleteProduct'),
-            
+
             // Pagination
             pagination: $id('pagination'),
             paginationInfo: $id('paginationInfo'),
@@ -2063,6 +2750,9 @@
         // Load translations
         await loadTranslations(state.language);
 
+        // Theme CSS (colors, buttons, cards) comes from header.php via
+        // AdminUiThemeLoader::generateCss() — no manual injection needed.
+
         // Setup event listeners (use onXxx to prevent duplicate handlers on re-init)
         if (el.form) {
             el.form.onsubmit = saveProduct;
@@ -2071,7 +2761,7 @@
             console.error('[Products] ✗ Form element not found!');
         }
         if (el.btnAdd) {
-            el.btnAdd.onclick = function() { showForm(); };
+            el.btnAdd.onclick = function () { showForm(); };
             console.log('[Products] ✓ Add button handler attached');
         } else {
             console.error('[Products] ✗ Add button not found!');
@@ -2080,38 +2770,94 @@
         if (el.btnCancel) el.btnCancel.onclick = hideForm;
         if (el.btnApply) el.btnApply.onclick = applyFilters;
         if (el.btnReset) el.btnReset.onclick = resetFilters;
-        if (el.btnRetry) el.btnRetry.onclick = function() { loadProducts(state.page); };
-        if (el.btnDeleteProduct) el.btnDeleteProduct.onclick = function() {
+        if (el.btnRetry) el.btnRetry.onclick = function () { loadProducts(state.page); };
+        if (el.btnDeleteProduct) el.btnDeleteProduct.onclick = function () {
             if (state.currentProduct) deleteProduct(state.currentProduct.id);
         };
-        
+
         // Attributes
         if (el.btnAddAttribute) el.btnAddAttribute.onclick = addAttribute;
-        
+
         // Variants
         if (el.btnAddVariant) el.btnAddVariant.onclick = addVariant;
         if (el.btnGenerateVariants) el.btnGenerateVariants.onclick = generateVariantsFromAttributes;
-        
+
         // Images
         if (el.prodSelectImageBtn) el.prodSelectImageBtn.onclick = openMediaStudio;
         if (el.mediaClose) el.mediaClose.onclick = closeMediaStudio;
-        
+
         // Translations
         if (el.prodAddLangBtn) el.prodAddLangBtn.onclick = addTranslation;
+
+        // Auto-sync English Name → prodName (hidden base name field)
+        if (el.enProdName) {
+            el.enProdName.addEventListener('input', function () {
+                if (el.prodName) el.prodName.value = this.value;
+                if (el.prodSlug && !el.prodSlug.value) el.prodSlug.value = generateSlug(this.value);
+            });
+        }
+
+        // ── CSV Import ──
+        if (el.btnImportCsv) el.btnImportCsv.onclick = openCsvImport;
+        const csvCloseBtn = $id('csvImportClose');
+        const csvCancelBtn = $id('csvImportCancel');
+        const csvStartBtn = $id('csvImportStart');
+        const csvFileInput = $id('csvFileInput');
+        const csvSampleBtn = $id('btnDownloadSample');
+        if (csvCloseBtn) csvCloseBtn.onclick = closeCsvImport;
+        if (csvCancelBtn) csvCancelBtn.onclick = closeCsvImport;
+        if (csvStartBtn) csvStartBtn.onclick = startCsvImport;
+        if (csvSampleBtn) csvSampleBtn.onclick = downloadSampleCsv;
+        if (csvFileInput) {
+            csvFileInput.onchange = function () {
+                const file = this.files[0];
+                if (!file) { _csvParsedRows = []; $id('csvImportStart').disabled = true; $id('csvPreviewInfo').style.display = 'none'; return; }
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    _csvParsedRows = parseCsv(e.target.result);
+                    const infoEl = $id('csvPreviewInfo');
+                    const countEl = $id('csvRowCount');
+                    if (infoEl && countEl) {
+                        const found = (t('csv.preview_found', 'Found {count} rows ready to import') || 'Found {count} rows ready to import').replace('{count}', _csvParsedRows.length);
+                        countEl.textContent = `📄 ${found}`;
+                        infoEl.style.display = 'block';
+                    }
+                    $id('csvImportStart').disabled = _csvParsedRows.length === 0;
+                };
+                reader.readAsText(file);
+            };
+        }
+        // Close CSV modal when clicking outside
+        const csvModal = $id('csvImportModal');
+        if (csvModal) {
+            csvModal.addEventListener('click', function (e) {
+                if (e.target === csvModal) closeCsvImport();
+            });
+        }
 
         // Main category → Sub category cascade
         if (el.prodMainCategory) el.prodMainCategory.onchange = onMainCategoryChange;
         if (el.prodSubCategory) el.prodSubCategory.onchange = onSubCategoryChange;
-        
-        // Media Studio message listener (only add once to prevent accumulation)
+
+        // Media Studio event listener (only add once to prevent accumulation)
         if (!_messageListenerAdded) {
             _messageListenerAdded = true;
-            window.addEventListener('message', function(e) {
-                if (e.data && e.data.type === 'media-selected') {
-                    state.selectedImages = e.data.images || [];
-                    renderProductImages();
-                    closeMediaStudio();
+            window.addEventListener('ImageStudio:selected', async function (e) {
+                const detail = e.detail;
+                // detail is either a single image object or an array
+                const images = Array.isArray(detail) ? detail : (detail ? [detail] : []);
+                state.selectedImages = images;
+                renderProductImages();
+                closeMediaStudio();
+
+                // In edit mode, reload from API to get fully persisted state
+                const productId = el.formId?.value ? parseInt(el.formId.value) : null;
+                if (productId) {
+                    await loadProductImages(productId);
                 }
+            });
+            window.addEventListener('ImageStudio:close', function () {
+                closeMediaStudio();
             });
         }
 
@@ -2155,9 +2901,11 @@
         removeAttribute,
         updateVariantField,
         removeVariant,
+        saveVariantRow,
         generateVariantsFromAttributes,
         removeImage,
         toggleCategory,
+        openCsvImport,
         setLanguage: async (lang) => {
             state.language = lang;
             await loadTranslations(lang);
@@ -2171,14 +2919,14 @@
 
     // Auto-init: matches categories.js pattern (which works)
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             if (window.AdminFramework && !window.page.__fragment_init) {
-                init().catch(function(e) { console.error('[Products] Auto-init failed:', e); });
+                init().catch(function (e) { console.error('[Products] Auto-init failed:', e); });
             }
         });
     } else {
         if (window.AdminFramework && !window.page.__fragment_init) {
-            init().catch(function(e) { console.error('[Products] Auto-init failed:', e); });
+            init().catch(function (e) { console.error('[Products] Auto-init failed:', e); });
         }
     }
     window.page.__fragment_init = false;

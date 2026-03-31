@@ -21,6 +21,7 @@
       "username": "Username",
       "email": "Email",
       "tenant": "Tenant",
+      "entity": "Entity",
       "role": "Role",
       "joined_at": "Joined At",
       "status": "Status",
@@ -32,7 +33,8 @@
       "confirm_delete": "Are you sure you want to delete this user? This action cannot be undone.",
       "view": "View",
       "activate": "Activate",
-      "suspend": "Suspend"
+      "suspend": "Suspend",
+      "export": "Export Excel"
     },
     "status": {
       "active": "Active",
@@ -43,7 +45,8 @@
     "empty": {
       "title": "No Tenant Users",
       "message": "Start by adding users to tenants",
-      "add_first": "Add First User"
+      "add_first": "Add First User",
+      "no_entity": "Not assigned"
     },
     "loading": "Loading data...",
     "error": "Failed to load data"
@@ -56,6 +59,8 @@
     "tenant_placeholder": "Enter tenant ID",
     "user_id": "User ID",
     "user_placeholder": "Enter user ID",
+    "entity_id": "Entity",
+    "entity_placeholder": "Enter entity ID",
     "status": "Status",
     "status_options": {
       "all": "All statuses",
@@ -118,7 +123,22 @@
         "label": "Notes",
         "placeholder": "Enter additional notes...",
         "help": "Optional"
+      },
+      "entity_id": {
+        "label": "Entity (optional)",
+        "placeholder": "Select entity (optional)",
+        "help": "You can optionally assign the user to a specific entity",
+        "enter_tenant_first": "Enter tenant ID first",
+        "not_found": "Entity not found",
+        "no_entities": "No entities available"
       }
+    },
+    "entity_info": {
+      "title": "Entity Information",
+      "name": "Store:",
+      "slug": "Slug:",
+      "status": "Status:",
+      "loading": "Loading entity information..."
     },
     "tenant_info": {
       "title": "Tenant Information",

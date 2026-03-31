@@ -1,632 +1,627 @@
 /**
- * Addresses Management - Production Version
- * Full CRUD + Countries/Cities + Multilingual + Owner-aware
+ * /admin/assets/js/pages/addresses.js — Production v2.0
+ *
+ * ─ التغييرات عن النسخة السابقة ─────────────────────────────
+ * • btn-secondary للـ edit → btn-primary
+ * • notify() بـ addr- prefix يتطابق مع CSS
+ * • showState() IDs محدَّثة لـ addressesLoading/Empty/Error/TableContainer
+ * • ESC يُغلق form card
+ * • Admin.page.register + window.page للـ fragment navigation
+ * • credentials: 'same-origin' موجودة بالفعل في apiFetch ✓
+ * ─────────────────────────────────────────────────────────────
  */
 (function () {
     'use strict';
 
-    const AF = window.AdminFramework || {};
     const CFG = window.ADDRESSES_CONFIG || {};
 
-    const API = CFG.apiUrl || '/api/addresses';
+    const API          = CFG.apiUrl       || '/api/addresses';
     const COUNTRIES_API = CFG.countriesApi || '/api/countries';
-    const CITIES_API = CFG.citiesApi || '/api/cities';
+    const CITIES_API    = CFG.citiesApi    || '/api/cities';
+    const ENTITIES_API  = CFG.entitiesApi  || '/api/entities';
 
+    // ── i18n ──────────────────────────────────────────────────
     const S = CFG.strings || {};
-    function t(key, fallback) { return S[key] || fallback || key; }
+    function t(key, fallback) {
+        const keys = key.split('.');
+        let val = S;
+        for (const k of keys) {
+            if (val && typeof val === 'object' && k in val) val = val[k];
+            else return fallback || key;
+        }
+        return typeof val === 'string' ? val : (fallback || key);
+    }
 
-    const PER_PAGE = 10;
-    let currentPage = 1;
-
+    // ── State ─────────────────────────────────────────────────
     const state = {
-        language: CFG.lang || 'ar',
-        items: [],
+        lang:      CFG.lang || 'en',
+        items:     [],
         countries: [],
-        cities: []
+        cities:    [],
+        entities:  [],
+        page:      1,
+        perPage:   10,
     };
 
     let el = {};
 
-    // ═══════════════════════════════════════════════════════════
-    // HELPERS
-    // ═══════════════════════════════════════════════════════════
-    
-    function esc(txt) {
-        if (!txt) return '';
-        const d = document.createElement('div');
-        d.textContent = txt;
-        return d.innerHTML;
-    }
-
+    // ════════════════════════════════════════════════════════
+    // API HELPER
+    // ════════════════════════════════════════════════════════
     async function apiFetch(url, options = {}) {
         const defaults = {
             credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' }
+            headers: {
+                'Content-Type':     'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-Token':     CFG.csrf || '',
+            },
         };
-        const res = await fetch(url, { ...defaults, ...options });
-        return await res.json();
+        const config = {
+            ...defaults,
+            ...options,
+            headers: { ...defaults.headers, ...(options.headers || {}) },
+        };
+
+        const res = await fetch(url, config);
+        const ct  = res.headers.get('content-type') || '';
+
+        if (ct.includes('application/json')) {
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
+            return data;
+        }
+
+        const text = await res.text();
+        if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+        try { return JSON.parse(text); } catch (_) { return { success: true }; }
     }
 
-    function showMessage(msg, type = 'success') {
-        if (AF.success && type === 'success') return AF.success(msg);
-        if (AF.error && type === 'error') return AF.error(msg);
-        alert(msg);
+    // ════════════════════════════════════════════════════════
+    // TOAST NOTIFICATIONS  (addr- prefix → matches CSS)
+    // ════════════════════════════════════════════════════════
+    function notify(message, type = 'info') {
+        // Delegate to AdminFramework if available
+        const AF = window.AdminFramework;
+        if (AF) {
+            if (type === 'success' && AF.success) return AF.success(message);
+            if (type === 'error'   && AF.error)   return AF.error(message);
+            if (type === 'warning' && AF.warning)  return AF.warning(message);
+            if (AF.notify) return AF.notify(message, type);
+        }
+
+        // Page-level toast
+        let container = document.getElementById('addrNotifications');
+        if (!container) {
+            container = document.createElement('div');
+            container.id        = 'addrNotifications';
+            container.className = 'addr-notifications';
+            const page = document.getElementById('addressesPage');
+            (page || document.body).insertBefore(container, (page || document.body).firstChild);
+        }
+
+        const toast = document.createElement('div');
+        toast.className = `addr-toast addr-toast-${type}`;
+        toast.setAttribute('role', 'alert');
+
+        const msg = document.createElement('span');
+        msg.textContent = message;
+        toast.appendChild(msg);
+
+        const close = document.createElement('button');
+        close.className = 'addr-toast-close';
+        close.setAttribute('aria-label', 'Close');
+        close.textContent = '\u00d7';
+        close.addEventListener('click', () => toast.remove());
+        toast.appendChild(close);
+
+        container.appendChild(toast);
+        setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4500);
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // GET USER LOCATION
-    // ═══════════════════════════════════════════════════════════
-    
+    // ════════════════════════════════════════════════════════
+    // TABLE STATE
+    // ════════════════════════════════════════════════════════
+    function showState(which, msg = '') {
+        const loading   = document.getElementById('addressesLoading');
+        const empty     = document.getElementById('addressesEmpty');
+        const error     = document.getElementById('addressesError');
+        const container = document.getElementById('addressesTableContainer');
+        const errMsg    = document.getElementById('addressesErrorMsg');
+
+        [loading, empty, error, container].forEach(e => { if (e) e.style.display = 'none'; });
+
+        switch (which) {
+            case 'loading': if (loading)   loading.style.display   = 'flex';  break;
+            case 'empty':   if (empty)     empty.style.display     = 'flex';  break;
+            case 'error':
+                if (error)  error.style.display = 'flex';
+                if (errMsg && msg) errMsg.textContent = msg;
+                break;
+            default:        if (container) container.style.display = 'block'; break;
+        }
+    }
+
+    // ════════════════════════════════════════════════════════
+    // HELPERS
+    // ════════════════════════════════════════════════════════
+    function esc(txt) {
+        if (txt == null) return '';
+        const d = document.createElement('div');
+        d.textContent = String(txt);
+        return d.innerHTML;
+    }
+
+    function extractItems(result) {
+        if (!result)                           return [];
+        if (Array.isArray(result))             return result;
+        if (Array.isArray(result.data))        return result.data;
+        if (Array.isArray(result.data?.data))  return result.data.data;
+        if (Array.isArray(result.data?.items)) return result.data.items;
+        if (Array.isArray(result.items))       return result.items;
+        return [];
+    }
+
+    function setField(nameOrId, value, byId = false) {
+        const el2 = byId
+            ? document.getElementById(nameOrId)
+            : el.form?.querySelector(`[name="${nameOrId}"]`);
+        if (el2) el2.value = value ?? '';
+    }
+
+    // ════════════════════════════════════════════════════════
+    // GEOLOCATION
+    // ════════════════════════════════════════════════════════
     function getUserLocation() {
         if (!navigator.geolocation) {
-            showMessage(t('location_not_supported', 'Geolocation is not supported by your browser'), 'error');
-            return;
+            return notify(t('location_not_supported', 'Geolocation not supported'), 'error');
         }
-
-        const btnGetLocation = document.getElementById('btnGetLocation');
-        if (btnGetLocation) {
-            btnGetLocation.disabled = true;
-            btnGetLocation.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + t('getting_location', 'Getting location...');
-        }
+        const btn = el.btnGetLocation;
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
 
         navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-
-                if (el.latitude) el.latitude.value = lat.toFixed(7);
-                if (el.longitude) el.longitude.value = lng.toFixed(7);
-
-                showMessage(t('location_success', 'Location retrieved successfully!'), 'success');
-                
-                if (btnGetLocation) {
-                    btnGetLocation.disabled = false;
-                    btnGetLocation.innerHTML = '<i class="fas fa-map-marker-alt"></i> ' + t('get_location', 'Get Location');
+            pos => {
+                if (el.latitude)  el.latitude.value  = pos.coords.latitude.toFixed(7);
+                if (el.longitude) el.longitude.value = pos.coords.longitude.toFixed(7);
+                notify(t('location_success', 'Location retrieved'), 'success');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-map-marker-alt" aria-hidden="true"></i> '
+                                  + t('get_location', 'Get Location');
                 }
             },
-            (error) => {
-                let errorMsg = t('location_error', 'Unable to retrieve your location');
-                
-                switch(error.code) {
-                    case error.PERMISSION_DENIED:
-                        errorMsg = t('location_denied', 'Location access denied. Please enable location permissions.');
-                        break;
-                    case error.POSITION_UNAVAILABLE:
-                        errorMsg = t('location_unavailable', 'Location information is unavailable.');
-                        break;
-                    case error.TIMEOUT:
-                        errorMsg = t('location_timeout', 'Location request timed out.');
-                        break;
-                }
-
-                showMessage(errorMsg, 'error');
-                
-                if (btnGetLocation) {
-                    btnGetLocation.disabled = false;
-                    btnGetLocation.innerHTML = '<i class="fas fa-map-marker-alt"></i> ' + t('get_location', 'Get Location');
+            err => {
+                const msgs = {
+                    1: t('location_denied',      'Location access denied'),
+                    2: t('location_unavailable', 'Location unavailable'),
+                    3: t('location_timeout',     'Location request timed out'),
+                };
+                notify(msgs[err.code] || t('location_error', 'Unable to get location'), 'error');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-map-marker-alt" aria-hidden="true"></i> '
+                                  + t('get_location', 'Get Location');
                 }
             },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            }
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     }
 
-    // ═══════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════
     // LOAD COUNTRIES
-    // ═══════════════════════════════════════════════════════════
-    
+    // ════════════════════════════════════════════════════════
     async function loadCountries(selectedId = null) {
         try {
-            const url = `${COUNTRIES_API}?language=${encodeURIComponent(state.language)}`;
-            console.log('📡 Loading countries from:', url);
-            
-            const result = await apiFetch(url);
-            console.log('📦 Countries response:', result);
-            
-            // Handle different response formats
-            if (result.data) {
-                if (Array.isArray(result.data.data)) {
-                    state.countries = result.data.data;
-                } else if (Array.isArray(result.data)) {
-                    state.countries = result.data;
-                }
-            } else if (Array.isArray(result)) {
-                state.countries = result;
-            } else {
-                state.countries = [];
-            }
+            const data = await apiFetch(
+                `${COUNTRIES_API}?language=${encodeURIComponent(state.lang)}&limit=500`
+            );
+            state.countries = extractItems(data);
 
-            if (el.country) {
-                el.country.innerHTML = '<option value="">' + t('select_country', 'Select Country') + '</option>';
-                state.countries.forEach(country => {
-                    const option = document.createElement('option');
-                    option.value = country.id;
-                    option.textContent = country.name;
-                    if (selectedId && String(selectedId) === String(country.id)) {
-                        option.selected = true;
-                    }
-                    el.country.appendChild(option);
-                });
-
-                // Trigger city load if country selected
-                if (selectedId) {
-                    await loadCities(selectedId);
-                }
-            }
-
-            console.log('✓ Countries loaded:', state.countries.length);
+            if (!el.country) return;
+            el.country.innerHTML = `<option value="">${t('select_country', 'Select Country')}</option>`;
+            state.countries.forEach(c => {
+                const o = document.createElement('option');
+                o.value       = c.id;
+                o.textContent = c.name;
+                if (selectedId && String(selectedId) === String(c.id)) o.selected = true;
+                el.country.appendChild(o);
+            });
+            if (selectedId) await loadCities(selectedId);
         } catch (e) {
-            console.error('❌ loadCountries error:', e);
-            showMessage(t('failed_load_countries', 'Failed to load countries'), 'error');
+            console.error('[Addresses] loadCountries:', e);
+            notify(t('failed_load_countries', 'Failed to load countries'), 'error');
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════
     // LOAD CITIES
-    // ═══════════════════════════════════════════════════════════
-    
+    // ════════════════════════════════════════════════════════
     async function loadCities(countryId, selectedId = null) {
         if (!el.city) return;
-
-        el.city.innerHTML = '<option value="">' + t('select_city', 'Select City') + '</option>';
-        el.city.disabled = true;
-
-        if (!countryId) {
-            return;
-        }
+        el.city.innerHTML = `<option value="">${t('select_city', 'Select City')}</option>`;
+        el.city.disabled = !countryId;
+        if (!countryId) return;
 
         try {
-            const url = `${CITIES_API}?country_id=${encodeURIComponent(countryId)}&language=${encodeURIComponent(state.language)}`;
-            console.log('📡 Loading cities from:', url);
-            
-            const result = await apiFetch(url);
-            console.log('📦 Cities response:', result);
-            
-            // Handle different response formats
-            if (result.data) {
-                if (Array.isArray(result.data.data)) {
-                    state.cities = result.data.data;
-                } else if (Array.isArray(result.data)) {
-                    state.cities = result.data;
-                }
-            } else if (Array.isArray(result)) {
-                state.cities = result;
-            } else {
-                state.cities = [];
-            }
-
+            const data = await apiFetch(
+                `${CITIES_API}?country_id=${encodeURIComponent(countryId)}&language=${encodeURIComponent(state.lang)}&limit=1000`
+            );
+            state.cities = extractItems(data);
             el.city.disabled = false;
-            state.cities.forEach(city => {
-                const option = document.createElement('option');
-                option.value = city.id;
-                option.textContent = city.name;
-                if (selectedId && String(selectedId) === String(city.id)) {
-                    option.selected = true;
-                }
-                el.city.appendChild(option);
+            state.cities.forEach(c => {
+                const o = document.createElement('option');
+                o.value       = c.id;
+                o.textContent = c.name;
+                if (selectedId && String(selectedId) === String(c.id)) o.selected = true;
+                el.city.appendChild(o);
             });
-
-            console.log('✓ Cities loaded:', state.cities.length);
         } catch (e) {
-            console.error('❌ loadCities error:', e);
-            showMessage(t('failed_load_cities', 'Failed to load cities'), 'error');
+            console.error('[Addresses] loadCities:', e);
+            notify(t('failed_load_cities', 'Failed to load cities'), 'error');
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // LOAD ADDRESSES
-    // ═══════════════════════════════════════════════════════════
-    
-    async function loadAddresses() {
-        if (!el.tbody) return;
-
-        el.tbody.innerHTML = '<tr><td colspan="7" style="text-align:center">' + t('loading', 'Loading...') + '</td></tr>';
-
+    // ════════════════════════════════════════════════════════
+    // LOAD ENTITIES  (tenant mode)
+    // ════════════════════════════════════════════════════════
+    async function loadEntities(selectedId = null) {
+        if (!el.entitySelect) return;
         try {
-            const params = new URLSearchParams({
-                tenant_id: CFG.tenantId,
-                language: state.language
+            const data = await apiFetch(
+                `${ENTITIES_API}?tenant_id=${encodeURIComponent(CFG.tenantId)}&limit=500&lang=${encodeURIComponent(state.lang)}`
+            );
+            state.entities = extractItems(data);
+            el.entitySelect.innerHTML = `<option value="">${t('select_entity', 'Select Entity')}</option>`;
+            state.entities.forEach(entity => {
+                const o = document.createElement('option');
+                o.value       = entity.id;
+                o.textContent = entity.store_name || entity.name || `Entity #${entity.id}`;
+                if (selectedId && String(selectedId) === String(entity.id)) o.selected = true;
+                el.entitySelect.appendChild(o);
             });
-
-            // Add owner filters only if provided (for non-super-admin or filtered view)
-            if (CFG.ownerType) {
-                params.append('owner_type', CFG.ownerType);
+            if (state.entities.length === 1 && !selectedId) {
+                el.entitySelect.value = state.entities[0].id;
             }
-            if (CFG.ownerId) {
-                params.append('owner_id', CFG.ownerId);
-            }
-
-            const url = `${API}?${params}`;
-            console.log('📡 Loading addresses from:', url);
-            
-            const result = await apiFetch(url);
-            console.log('📦 API Response:', result);
-            
-            // Handle different response formats
-            let items = [];
-            if (result.data) {
-                // Format: {success: true, data: {data: [], meta: {}}}
-                if (Array.isArray(result.data.data)) {
-                    items = result.data.data;
-                }
-                // Format: {success: true, data: []}
-                else if (Array.isArray(result.data)) {
-                    items = result.data;
-                }
-            }
-            // Format: {data: []}
-            else if (result.items) {
-                items = result.items;
-            }
-            // Format: []
-            else if (Array.isArray(result)) {
-                items = result;
-            }
-
-            state.items = items;
-            currentPage = 1;
-            renderPage();
-            console.log('✓ Addresses loaded:', state.items.length);
         } catch (e) {
-            console.error('❌ loadAddresses error:', e);
-            el.tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:red">' + t('error_loading', 'Error loading addresses') + '</td></tr>';
-            showMessage(t('failed_load_list', 'Failed to load addresses'), 'error');
+            console.error('[Addresses] loadEntities:', e);
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // PAGINATION
-    // ═══════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════
+    // LOAD ADDRESSES
+    // ════════════════════════════════════════════════════════
+    async function loadAddresses() {
+        showState('loading');
+        try {
+            const params = new URLSearchParams({ tenant_id: CFG.tenantId, language: state.lang, limit: 500 });
 
+            if (CFG.tenantMode) {
+                params.set('filter_tenant_id', CFG.tenantId);
+            } else {
+                if (CFG.ownerType) params.set('owner_type', CFG.ownerType);
+                if (CFG.ownerId)   params.set('owner_id',   CFG.ownerId);
+            }
+
+            const data = await apiFetch(`${API}?${params}`);
+            state.items = extractItems(data);
+            state.page  = 1;
+
+            if (state.items.length === 0) {
+                showState('empty');
+            } else {
+                showState('table');
+                renderPage();
+            }
+        } catch (e) {
+            console.error('[Addresses] loadAddresses:', e);
+            showState('error', e.message);
+        }
+    }
+
+    // ════════════════════════════════════════════════════════
+    // RENDER
+    // ════════════════════════════════════════════════════════
     function renderPage() {
-        const total = state.items.length;
-        const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
-        if (currentPage > totalPages) currentPage = totalPages;
-        const start = (currentPage - 1) * PER_PAGE;
-        const pageItems = state.items.slice(start, start + PER_PAGE);
+        const total      = state.items.length;
+        const totalPages = Math.max(1, Math.ceil(total / state.perPage));
+        if (state.page > totalPages) state.page = totalPages;
+
+        const start     = (state.page - 1) * state.perPage;
+        const pageItems = state.items.slice(start, start + state.perPage);
+
         renderTable(pageItems);
         renderPagination(total, totalPages);
     }
 
+    function renderTable(items) {
+        const tbody = el.tbody;
+        if (!tbody) return;
+
+        tbody.innerHTML = items.map(a => {
+            // ✅ btn-primary للتعديل (موحَّد مع بقية الصفحات)
+            const editBtn = CFG.permissions?.canEdit
+                ? `<button class="btn btn-sm btn-primary btnEdit" data-id="${esc(a.id)}" aria-label="${t('edit','Edit')}">
+                       <i class="fas fa-edit" aria-hidden="true"></i>
+                   </button>`
+                : '';
+            const delBtn = CFG.permissions?.canDelete
+                ? `<button class="btn btn-sm btn-danger btnDelete" data-id="${esc(a.id)}" aria-label="${t('delete','Delete')}">
+                       <i class="fas fa-trash" aria-hidden="true"></i>
+                   </button>`
+                : '';
+            const primary = (a.is_primary == 1 || a.is_default == 1)
+                ? '<span class="badge badge-active">✔</span>'
+                : '<span class="badge badge-inactive">—</span>';
+
+            return `
+                <tr data-id="${esc(a.id)}">
+                    <td>${esc(a.id)}</td>
+                    <td>${esc(a.country_name || a.country || '')}</td>
+                    <td>${esc(a.city_name    || a.city    || '')}</td>
+                    <td>${esc(a.address_line1 || a.address_line || '')}</td>
+                    <td>${esc(a.postal_code || '—')}</td>
+                    <td>${primary}</td>
+                    <td>
+                        <div class="table-actions">
+                            ${editBtn}
+                            ${delBtn}
+                        </div>
+                    </td>
+                </tr>`;
+        }).join('');
+
+        tbody.querySelectorAll('.btnEdit').forEach(b =>
+            b.addEventListener('click', () => editAddress(b.dataset.id)));
+        tbody.querySelectorAll('.btnDelete').forEach(b =>
+            b.addEventListener('click', () => deleteAddress(b.dataset.id)));
+    }
+
     function renderPagination(total, totalPages) {
-        const infoEl = document.getElementById('paginationInfo');
-        const pagEl = document.getElementById('pagination');
-        if (!infoEl || !pagEl) return;
+        const info = document.getElementById('paginationInfo');
+        const pag  = document.getElementById('pagination');
+        if (!info || !pag) return;
 
-        if (total === 0) {
-            infoEl.textContent = '';
-            pagEl.innerHTML = '';
-            return;
-        }
+        if (total === 0) { info.textContent = ''; pag.innerHTML = ''; return; }
 
-        const start = (currentPage - 1) * PER_PAGE + 1;
-        const end = Math.min(currentPage * PER_PAGE, total);
-        infoEl.textContent = t('pagination_showing', 'Showing') + ' ' + start + '-' + end + ' ' + t('pagination_of', 'of') + ' ' + total;
+        const start = (state.page - 1) * state.perPage + 1;
+        const end   = Math.min(state.page * state.perPage, total);
+        info.textContent = `${start}–${end} / ${total}`;
 
-        let html = '';
-        // Prev
-        html += '<button class="page-btn" data-page="' + (currentPage - 1) + '"' + (currentPage <= 1 ? ' disabled' : '') + '>&laquo;</button>';
+        if (totalPages <= 1) { pag.innerHTML = ''; return; }
 
-        // Page numbers
+        const makeBtn = (label, targetPage, active = false, disabled = false) => {
+            const btn = document.createElement('button');
+            btn.className = 'page-btn' + (active ? ' active' : '');
+            btn.innerHTML = label;
+            btn.disabled  = disabled;
+            if (!disabled) btn.addEventListener('click', () => {
+                state.page = targetPage;
+                renderPage();
+            });
+            return btn;
+        };
+
+        pag.innerHTML = '';
+        pag.appendChild(makeBtn('&#8249;', state.page - 1, false, state.page <= 1));
+
         for (let i = 1; i <= totalPages; i++) {
-            if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
-                html += '<button class="page-btn' + (i === currentPage ? ' active' : '') + '" data-page="' + i + '">' + i + '</button>';
-            } else if (i === currentPage - 3 || i === currentPage + 3) {
-                html += '<span class="page-ellipsis">...</span>';
+            if (i === 1 || i === totalPages || (i >= state.page - 2 && i <= state.page + 2)) {
+                pag.appendChild(makeBtn(String(i), i, i === state.page, i === state.page));
+            } else if (i === state.page - 3 || i === state.page + 3) {
+                const sp = document.createElement('span');
+                sp.className   = 'page-ellipsis';
+                sp.textContent = '\u2026';
+                pag.appendChild(sp);
             }
         }
 
-        // Next
-        html += '<button class="page-btn" data-page="' + (currentPage + 1) + '"' + (currentPage >= totalPages ? ' disabled' : '') + '>&raquo;</button>';
-
-        pagEl.innerHTML = html;
-
-        pagEl.querySelectorAll('.page-btn').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                const page = parseInt(this.getAttribute('data-page'));
-                if (page >= 1 && page <= totalPages) {
-                    goToPage(page);
-                }
-            });
-        });
+        pag.appendChild(makeBtn('&#8250;', state.page + 1, false, state.page >= totalPages));
     }
 
-    function goToPage(page) {
-        currentPage = page;
-        renderPage();
-        const table = document.getElementById('addressesTable');
-        if (table) table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // ════════════════════════════════════════════════════════
+    // FORM
+    // ════════════════════════════════════════════════════════
+    function showForm() {
+        if (el.formCard) {
+            el.formCard.style.display = 'block';
+            setTimeout(() => el.formCard.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+        }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // RENDER TABLE
-    // ═══════════════════════════════════════════════════════════
-    
-    function renderTable(items) {
-        if (!el.tbody) return;
-
-        console.log('🎨 Rendering table with items:', items);
-
-        if (!items || items.length === 0) {
-            el.tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888">' + t('no_addresses', 'No addresses found') + '</td></tr>';
-            return;
-        }
-
-        el.tbody.innerHTML = items.map(addr => {
-            const countryName = addr.country_name || addr.country || '';
-            const cityName = addr.city_name || addr.city || '';
-            const addressLine = addr.address_line1 || addr.address_line || '';
-            const postalCode = addr.postal_code || '';
-            const isPrimary = addr.is_primary || addr.is_default || false;
-
-            const editBtn = CFG.permissions.canEdit 
-                ? `<button class="btn btn-sm btn-secondary btnEdit" data-id="${addr.id}">${t('edit', 'Edit')}</button>` 
-                : '';
-            const deleteBtn = CFG.permissions.canDelete 
-                ? `<button class="btn btn-sm btn-danger btnDelete" data-id="${addr.id}">${t('delete', 'Delete')}</button>` 
-                : '';
-
-            return `
-                <tr>
-                    <td>${addr.id}</td>
-                    <td>${esc(countryName)}</td>
-                    <td>${esc(cityName)}</td>
-                    <td>${esc(addressLine)}</td>
-                    <td>${esc(postalCode)}</td>
-                    <td>${isPrimary ? t('primary_yes', '✔') : ''}</td>
-                    <td>${editBtn} ${deleteBtn}</td>
-                </tr>
-            `;
-        }).join('');
-
-        // Attach event listeners
-        el.tbody.querySelectorAll('.btnEdit').forEach(btn => {
-            btn.onclick = () => editAddress(btn.dataset.id);
-        });
-
-        el.tbody.querySelectorAll('.btnDelete').forEach(btn => {
-            btn.onclick = () => deleteAddress(btn.dataset.id);
-        });
-
-        console.log('✓ Table rendered with', items.length, 'rows');
+    function hideForm() {
+        if (el.formCard) el.formCard.style.display = 'none';
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // ADD ADDRESS
-    // ═══════════════════════════════════════════════════════════
-    
-    function addAddress() {
-        if (el.form) el.form.reset();
-        if (el.formCard) el.formCard.style.display = 'block';
-        if (el.formTitle) el.formTitle.textContent = t('add_address', 'Add Address');
-        if (el.btnDelete) el.btnDelete.style.display = 'none';
-
-        // Set default values for Super Admin fields
-        if (CFG.canEditAllFields) {
-            const ownerTypeSelect = document.getElementById('ownerTypeSelect');
-            const ownerIdInput = document.getElementById('ownerIdInput');
-            if (ownerTypeSelect) ownerTypeSelect.value = 'user';
-            if (ownerIdInput) ownerIdInput.value = CFG.ownerId || '';
-        }
-
-        // Reset selects
-        loadCountries();
-        if (el.city) {
-            el.city.innerHTML = '<option value="">' + t('select_city', 'Select City') + '</option>';
-            el.city.disabled = true;
-        }
-        
-        // Clear coordinates
-        if (el.latitude) el.latitude.value = '';
+    function resetForm() {
+        if (el.form)     el.form.reset();
+        if (el.city)     { el.city.innerHTML = `<option value="">${t('select_city','Select City')}</option>`; el.city.disabled = true; }
+        if (el.latitude)  el.latitude.value  = '';
         if (el.longitude) el.longitude.value = '';
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // EDIT ADDRESS
-    // ═══════════════════════════════════════════════════════════
-    
+    function addAddress() {
+        resetForm();
+        if (el.formTitle) el.formTitle.textContent = t('add_address', 'Add Address');
+        if (el.btnDelete) el.btnDelete.style.display = 'none';
+        showForm();
+        loadCountries();
+    }
+
     async function editAddress(id) {
         try {
-            const url = `${API}/${id}?language=${encodeURIComponent(state.language)}`;
-            const result = await apiFetch(url);
-            
-            const addr = result.data || result;
+            const data   = await apiFetch(`${API}?id=${encodeURIComponent(id)}&language=${encodeURIComponent(state.lang)}&format=json`);
+            const addr   = data.data || data;
+            const record = Array.isArray(addr) ? addr[0] : addr;
+            if (!record) throw new Error('Address not found');
 
-            if (el.formCard) el.formCard.style.display = 'block';
+            resetForm();
             if (el.formTitle) el.formTitle.textContent = t('edit_address', 'Edit Address');
-            if (el.btnDelete) el.btnDelete.style.display = 'block';
+            if (el.btnDelete) el.btnDelete.style.display = 'inline-flex';
 
-            // Fill form
-            if (el.form) {
-                el.form.id.value = addr.id || '';
-                el.form.address_line1.value = addr.address_line1 || addr.address_line || '';
-                el.form.address_line2.value = addr.address_line2 || '';
-                el.form.postal_code.value = addr.postal_code || '';
-                el.form.is_primary.value = addr.is_primary || addr.is_default || '0';
-                
-                // Fill coordinates
-                if (el.latitude) el.latitude.value = addr.latitude || '';
-                if (el.longitude) el.longitude.value = addr.longitude || '';
+            setField('id',            record.id);
+            setField('address_line1', record.address_line1 || record.address_line || '');
+            setField('address_line2', record.address_line2 || '');
+            setField('postal_code',   record.postal_code   || '');
+            setField('is_primary',    record.is_primary ?? record.is_default ?? 0);
 
-                // Fill Super Admin fields if available
-                if (CFG.canEditAllFields) {
-                    const ownerTypeSelect = document.getElementById('ownerTypeSelect');
-                    const ownerIdInput = document.getElementById('ownerIdInput');
-                    if (ownerTypeSelect) ownerTypeSelect.value = addr.owner_type || 'user';
-                    if (ownerIdInput) ownerIdInput.value = addr.owner_id || '';
-                }
+            if (el.latitude)  el.latitude.value  = record.latitude  || '';
+            if (el.longitude) el.longitude.value = record.longitude || '';
+
+            if (CFG.canEditAllFields) {
+                setField('owner_type', record.owner_type || 'user', false);
+                const ownerInput = el.form?.querySelector('[name="owner_id"]');
+                if (ownerInput) ownerInput.value = record.owner_id || '';
             }
 
-            // Load countries and cities
-            await loadCountries(addr.country_id);
-            await loadCities(addr.country_id, addr.city_id);
+            if (CFG.tenantMode) await loadEntities(record.owner_id);
 
+            await loadCountries(record.country_id);
+            await loadCities(record.country_id, record.city_id);
+
+            showForm();
         } catch (e) {
-            console.error('❌ editAddress error:', e);
-            showMessage(t('failed_load', 'Failed to load address'), 'error');
+            console.error('[Addresses] editAddress:', e);
+            notify(t('failed_load', 'Failed to load address'), 'error');
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // SAVE ADDRESS
-    // ═══════════════════════════════════════════════════════════
-    
     async function saveAddress(e) {
         e.preventDefault();
 
-        const formData = new FormData(el.form);
-        const data = Object.fromEntries(formData.entries());
+        const fd   = new FormData(el.form);
+        const data = Object.fromEntries(fd.entries());
 
-        // Add required fields
         data.tenant_id = CFG.tenantId;
-        
-        // For non-super-admin, use config owner values
-        if (!CFG.canEditAllFields) {
+
+        if (CFG.tenantMode) {
+            data.owner_type = 'entity';
+            if (!data.owner_id) {
+                return notify(t('select_entity_required', 'Please select an entity'), 'error');
+            }
+        } else if (!CFG.canEditAllFields) {
             data.owner_type = CFG.ownerType || 'user';
-            data.owner_id = CFG.ownerId || 1;
+            data.owner_id   = CFG.ownerId   || 1;
         }
-        // For super-admin, values come from form (already in data)
 
         const id = data.id;
-        if (id) delete data.id;
+        delete data.id;
+        delete data.csrf_token;
 
-        console.log('💾 Saving address:', { id, data });
+        const btn = el.form?.querySelector('[type="submit"]');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
 
         try {
-            const url = id ? `${API}/${id}` : API;
-            const method = id ? 'PUT' : 'POST';
-
-            const result = await apiFetch(url, {
-                method,
-                body: JSON.stringify(data)
+            const result = await apiFetch(API, {
+                method: id ? 'PUT' : 'POST',
+                body:   JSON.stringify(id ? { id, ...data } : data),
             });
 
-            console.log('📥 Save response:', result);
-
             if (result.success !== false) {
-                showMessage(id ? t('address_updated', 'Address updated successfully') : t('address_created', 'Address created successfully'), 'success');
-                if (el.formCard) el.formCard.style.display = 'none';
+                notify(id
+                    ? t('address_updated', 'Address updated')
+                    : t('address_created', 'Address created'),
+                    'success'
+                );
+                hideForm();
                 loadAddresses();
             } else {
-                const errorMsg = result.message || result.error || t('save_failed', 'Save failed');
-                showMessage(errorMsg, 'error');
-                console.error('Save failed:', result);
+                throw new Error(result.error || result.message || t('save_failed', 'Save failed'));
             }
-        } catch (e) {
-            console.error('❌ saveAddress error:', e);
-            const errorMsg = e.message || t('save_failed', 'Failed to save address');
-            showMessage(errorMsg, 'error');
+        } catch (err) {
+            console.error('[Addresses] saveAddress:', err);
+            notify(err.message || t('save_failed', 'Save failed'), 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fas fa-save" aria-hidden="true"></i> ${t('save','Save')}`;
+            }
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // DELETE ADDRESS
-    // ═══════════════════════════════════════════════════════════
-    
     async function deleteAddress(id) {
-        if (!confirm(t('confirm_delete', 'Are you sure you want to delete this address?'))) {
-            return;
-        }
-
+        if (!confirm(t('confirm_delete', 'Delete this address?'))) return;
         try {
-            const result = await apiFetch(`${API}/${id}`, {
+            const result = await apiFetch(`${API}?id=${encodeURIComponent(id)}`, {
                 method: 'DELETE',
-                body: JSON.stringify({ csrf_token: CFG.csrf })
+                body:   JSON.stringify({ id }),
             });
-
             if (result.success !== false) {
-                showMessage(t('address_deleted', 'Address deleted successfully'), 'success');
+                notify(t('address_deleted', 'Address deleted'), 'success');
+                hideForm();
                 loadAddresses();
             } else {
-                showMessage(result.message || t('delete_failed', 'Delete failed'), 'error');
+                throw new Error(result.error || t('delete_failed', 'Delete failed'));
             }
-        } catch (e) {
-            console.error('❌ deleteAddress error:', e);
-            showMessage(t('delete_failed', 'Failed to delete address'), 'error');
+        } catch (err) {
+            console.error('[Addresses] deleteAddress:', err);
+            notify(err.message || t('delete_failed', 'Delete failed'), 'error');
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════
     // INIT
-    // ═══════════════════════════════════════════════════════════
-    
+    // ════════════════════════════════════════════════════════
     async function init() {
-        // Get elements
         el = {
-            tbody: document.querySelector('#addressesTable tbody'),
-            form: document.getElementById('addressForm'),
-            formCard: document.getElementById('addressFormCard'),
-            formTitle: document.getElementById('addressFormTitle'),
-            country: document.getElementById('countrySelect'),
-            city: document.getElementById('citySelect'),
-            latitude: document.getElementById('latitude'),
-            longitude: document.getElementById('longitude'),
-            btnAdd: document.getElementById('btnAddAddress'),
-            btnClose: document.getElementById('btnCloseForm'),
-            btnDelete: document.getElementById('btnDeleteAddress'),
-            btnGetLocation: document.getElementById('btnGetLocation')
+            tbody:          document.getElementById('addressesTableBody'),
+            form:           document.getElementById('addressForm'),
+            formCard:       document.getElementById('addressFormCard'),
+            formTitle:      document.getElementById('addressFormTitle'),
+            country:        document.getElementById('countrySelect'),
+            city:           document.getElementById('citySelect'),
+            entitySelect:   document.getElementById('entitySelect'),
+            latitude:       document.getElementById('latitude'),
+            longitude:      document.getElementById('longitude'),
+            btnAdd:         document.getElementById('btnAddAddress'),
+            btnAddEmpty:    document.getElementById('btnAddAddressEmpty'),
+            btnClose:       document.getElementById('btnCloseForm'),
+            btnCancel:      document.getElementById('btnCancelForm'),
+            btnDelete:      document.getElementById('btnDeleteAddress'),
+            btnGetLocation: document.getElementById('btnGetLocation'),
+            btnRetry:       document.getElementById('btnRetry'),
         };
 
-        // Attach events
-        if (el.form) {
-            el.form.onsubmit = saveAddress;
-        }
+        // ESC closes form
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Escape') return;
+            if (el.formCard && el.formCard.style.display !== 'none') hideForm();
+        });
 
-        if (el.btnAdd) {
-            el.btnAdd.onclick = addAddress;
-        }
-
-        if (el.btnClose) {
-            el.btnClose.onclick = () => {
-                if (el.formCard) el.formCard.style.display = 'none';
-            };
-        }
-
+        if (el.form)           el.form.onsubmit             = saveAddress;
+        if (el.btnAdd)         el.btnAdd.onclick             = addAddress;
+        if (el.btnAddEmpty)    el.btnAddEmpty.onclick        = addAddress;
+        if (el.btnClose)       el.btnClose.onclick           = hideForm;
+        if (el.btnCancel)      el.btnCancel.onclick          = hideForm;
+        if (el.btnRetry)       el.btnRetry.onclick           = loadAddresses;
+        if (el.btnGetLocation) el.btnGetLocation.onclick     = getUserLocation;
+        if (el.country)        el.country.onchange           = () => loadCities(el.country.value);
         if (el.btnDelete) {
             el.btnDelete.onclick = () => {
-                const id = el.form?.id?.value;
+                const id = el.form?.querySelector('[name="id"]')?.value;
                 if (id) deleteAddress(id);
             };
         }
 
-        if (el.btnGetLocation) {
-            el.btnGetLocation.onclick = getUserLocation;
-        }
-
-        if (el.country) {
-            el.country.onchange = () => {
-                const countryId = el.country.value;
-                loadCities(countryId);
-            };
-        }
-
-        // Initial load
-        await loadCountries();
+        if (CFG.tenantMode) await loadEntities();
         await loadAddresses();
 
-        console.log('✓ Addresses module initialized');
+        console.log('[Addresses] ✓ Initialized');
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // EXPOSE API
-    // ═══════════════════════════════════════════════════════════
-    
-    window.Addresses = {
-        init,
-        load: loadAddresses,
-        add: addAddress,
-        edit: editAddress,
-        delete: deleteAddress
-    };
+    // ════════════════════════════════════════════════════════
+    // REGISTER
+    // ════════════════════════════════════════════════════════
+    window.Addresses = { init, load: loadAddresses, add: addAddress, edit: editAddress };
+    window.page = { run: init };
 
-    // Auto-init
+    if (window.Admin?.page?.register) {
+        window.Admin.page.register('addresses', init);
+    }
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
         init();
     }
 
-})();
+}());

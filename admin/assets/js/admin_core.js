@@ -68,6 +68,18 @@
     return dest;
   }
 
+  // System / generic font names that do NOT exist on Google Fonts.
+  // Used to skip unnecessary Google Fonts requests.
+  const SYSTEM_FONT_NAMES = new Set([
+    'system-ui', 'ui-sans-serif', 'ui-serif', 'ui-monospace',
+    'sans-serif', 'serif', 'monospace', 'cursive', 'fantasy', 'math',
+    'inherit', 'initial', 'unset',
+    'arial', 'verdana', 'helvetica', 'helvetica neue', 'georgia',
+    'times', 'times new roman', 'courier', 'courier new',
+    'impact', 'trebuchet ms', 'comic sans ms', 'tahoma',
+    'lucida', 'palatino', 'garamond',
+  ]);
+
   function normalizeExplicitColor(v) {
     if (v === undefined || v === null) return null;
     const s = String(v).trim();
@@ -263,15 +275,12 @@
   // THEME APPLICATION
   // ════════════════════════════════════════════════════════════
   
-  function ensureThemeStyleContainer() {
-    let style = document.getElementById('theme-component-styles');
-    if (!style) {
-      style = document.createElement('style');
-      style.id = 'theme-component-styles';
-      document.head.appendChild(style);
-    }
-    return style;
-  }
+  // ensureThemeStyleContainer() – removed.
+  // Button/card CSS is now the sole responsibility of AdminUiThemeLoader::generateCss()
+  // which is injected by header.php via <style id="dynamic-theme-db"> and applied by
+  // syncThemeVarsFromAdminUI() step 1 (themeData.generated_css).
+  // The old JS-side generateComponentStyles() duplicated those rules with !important
+  // flags, causing inconsistent button colors across pages.
 
   function syncThemeVarsFromAdminUI() {
     try {
@@ -305,9 +314,50 @@
         themeData.color_settings.forEach(c => {
           if (!c?.setting_key || !c?.color_value) return;
           const key = '--' + safeSlug(c.setting_key);
+          // Also set the hyphenated version so CSS var() references using hyphens work
+          // e.g. DB key "background_secondary" → sets both --background_secondary AND --background-secondary
+          const keyH = '--' + safeSlug(c.setting_key).replace(/_/g, '-');
           const val = normalizeExplicitColor(c.color_value) || c.color_value;
           root.style.setProperty(key, String(val));
+          if (keyH !== key) root.style.setProperty(keyH, String(val));
         });
+
+        // Create CSS variable aliases so CSS files can use stable names
+        // regardless of which key name the DB stores them under.
+        // Checks both hyphen and underscore variants of each source.
+        const getProp = name => {
+          return root.style.getPropertyValue(name).trim() ||
+                 root.style.getPropertyValue(name.replace(/-/g, '_')).trim() ||
+                 root.style.getPropertyValue(name.replace(/_/g, '-')).trim();
+        };
+        const alias = (target, ...sources) => {
+          if (getProp(target)) return; // already set by DB
+          for (const src of sources) {
+            const v = getProp(src);
+            if (v) { root.style.setProperty(target, v); return; }
+          }
+        };
+        // --danger-color mirrors --error-color (DB key: error_color)
+        alias('--danger-color', '--error-color', '--error_color');
+        // --card-bg mirrors --background-secondary
+        alias('--card-bg', '--card_bg', '--background-secondary', '--background_secondary');
+        // --input-bg: CSS files use this name; JS previously only set --input-background
+        alias('--input-bg', '--input_bg', '--input-background', '--background-secondary', '--background_secondary', '--background-primary');
+        // --input-background: keep for backward-compat with any code using this name
+        alias('--input-background', '--input-bg', '--background-secondary', '--background_secondary', '--background-primary');
+        // --background-tertiary: use secondary if not explicitly set
+        const secBg = getProp('--background-secondary');
+        if (secBg && !getProp('--background-tertiary')) {
+          root.style.setProperty('--background-tertiary', secBg);
+        }
+        // --thead-bg: table header background — maps to DB's background-tertiary/secondary
+        alias('--thead-bg', '--thead_bg', '--background-tertiary', '--background_tertiary', '--background-secondary', '--background_secondary', '--background-primary');
+        // --border-color: if DB uses a different key name
+        alias('--border-color', '--border', '--divider-color', '--line-color');
+        // --text-secondary/tertiary: placeholders and muted text
+        alias('--text-secondary', '--text_secondary', '--text-muted', '--text-light');
+        alias('--text-tertiary', '--text_tertiary', '--text-secondary', '--text_secondary', '--text-muted');
+        Admin.log('✓ Color aliases applied');
       }
 
       // 3. Apply font_settings
@@ -320,14 +370,20 @@
           if (f.font_family) {
             root.style.setProperty(base + '-family', f.font_family);
 
-            // Load Google Font
+            // Load Google Font — extract only the first font name from the CSS stack
+            // e.g. "Courier New, monospace" → "Courier New" (not "Courier New, monospace")
             if (f.font_url) {
               Admin.asset.loadCss(f.font_url);
-            } else if (!/system|arial|verdana|sans-serif/i.test(f.font_family)) {
-              const gurl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(
-                f.font_family.replace(/\s+/g, '+')
-              )}&display=swap`;
-              Admin.asset.loadCss(gurl);
+            } else {
+              // Strip quotes and take only the first family from the comma-separated stack
+              const primaryFont = f.font_family.split(',')[0].trim().replace(/['"]/g, '');
+              // Skip generic and known system fonts — they don't exist on Google Fonts
+              if (primaryFont && !SYSTEM_FONT_NAMES.has(primaryFont.toLowerCase())) {
+                const gurl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(
+                  primaryFont.replace(/\s+/g, '+')
+                )}&display=swap`;
+                Admin.asset.loadCss(gurl);
+              }
             }
           }
 
@@ -352,8 +408,8 @@
         Admin.log('📐 Direction:', window.ADMIN_UI.direction);
       }
 
-      // 6. Generate component styles
-      generateComponentStyles();
+      // 6. Component styles — handled by generated_css above
+      // (generateComponentStyles removed — it duplicated DB rules with !important)
 
       Admin.log('✅ Theme applied');
     } catch (e) {
@@ -361,99 +417,222 @@
     }
   }
 
+  // generateComponentStyles() – removed.
+  // Button/card CSS comes solely from AdminUiThemeLoader::generateCss() (DB-driven).
+  // The old implementation wrote .btn-* / .card-* rules with !important, which
+  // conflicted with the authoritative generated_css and caused each page to
+  // display different button colors depending on CSS load order.
   function generateComponentStyles() {
-    try {
-      const themeData = window.ADMIN_UI?.theme;
-      if (!themeData) return;
-
-      const styleEl = ensureThemeStyleContainer();
-      const rules = [];
-
-      // Buttons
-      if (Array.isArray(themeData.button_styles)) {
-        themeData.button_styles.forEach(b => {
-          if (!b?.slug) return;
-
-          const slug = safeSlug(b.slug);
-          const sel = `.btn-${slug}, .btn.${slug}`;
-
-          let css = `${sel} {`;
-          if (b.background_color) css += `background-color: ${b.background_color} !important;`;
-          if (b.text_color) css += `color: ${b.text_color} !important;`;
-          if (b.border_color && b.border_width)
-            css += `border: ${b.border_width}px solid ${b.border_color} !important;`;
-          if (b.border_radius) css += `border-radius: ${b.border_radius}px !important;`;
-          if (b.padding) css += `padding: ${b.padding} !important;`;
-          if (b.font_size) css += `font-size: ${b.font_size} !important;`;
-          if (b.font_weight) css += `font-weight: ${b.font_weight} !important;`;
-          css += 'cursor: pointer; display: inline-block; transition: all 0.2s;}';
-
-          rules.push(css);
-
-          // Hover
-          if (b.hover_background_color || b.hover_text_color) {
-            let hcss = `${sel}:hover {`;
-            if (b.hover_background_color)
-              hcss += `background-color: ${b.hover_background_color} !important;`;
-            if (b.hover_text_color) hcss += `color: ${b.hover_text_color} !important;`;
-            hcss += '}';
-            rules.push(hcss);
-          }
-        });
-      }
-
-      // Cards
-      if (Array.isArray(themeData.card_styles)) {
-        themeData.card_styles.forEach(c => {
-          if (!c?.slug) return;
-
-          const slug = safeSlug(c.slug);
-          const sel = `.card-${slug}, .card.${slug}`;
-
-          let css = `${sel} {`;
-          if (c.background_color) css += `background-color: ${c.background_color} !important;`;
-          if (c.border_color && c.border_width)
-            css += `border: ${c.border_width}px solid ${c.border_color} !important;`;
-          if (c.border_radius) css += `border-radius: ${c.border_radius}px !important;`;
-          if (c.padding) css += `padding: ${c.padding} !important;`;
-          if (c.shadow_style) css += `box-shadow: ${c.shadow_style} !important;`;
-          if (c.text_align) css += `text-align: ${c.text_align} !important;`;
-          css += 'transition: all 0.2s;}';
-
-          rules.push(css);
-
-          // Hover
-          if (c.hover_effect && c.hover_effect !== 'none') {
-            let hcss = `${sel}:hover {`;
-            switch (c.hover_effect) {
-              case 'lift':
-                hcss += 'transform: translateY(-6px); box-shadow: 0 10px 30px rgba(0,0,0,0.15);';
-                break;
-              case 'zoom':
-                hcss += 'transform: scale(1.03);';
-                break;
-              case 'shadow':
-                hcss += 'box-shadow: 0 12px 36px rgba(0,0,0,0.2);';
-                break;
-              case 'border':
-                hcss += 'border-color: var(--primary-color, #6366f1);';
-                break;
-              case 'bright':
-                hcss += 'filter: brightness(1.05);';
-                break;
-            }
-            hcss += '}';
-            rules.push(hcss);
-          }
-        });
-      }
-
-      styleEl.textContent = rules.join('\n');
-      Admin.log(`✓ Generated ${rules.length} component rules`);
-    } catch (e) {
-      Admin.error('generateComponentStyles failed', e);
-    }
+    // No-op — kept as stub so external callers don't throw.
+    Admin.log('generateComponentStyles: skipped (handled by generated_css)');
   }
+
+  // ════════════════════════════════════════════════════════════
+  // DYNAMIC BUTTON ENGINE
+  // ════════════════════════════════════════════════════════════
+  // Provides utilities for creating, styling, and managing buttons
+  // dynamically from DB-driven button_styles data.
+  // All button properties come from window.ADMIN_UI.theme.button_styles.
+  // Pages use a prefix (e.g. 'prd-', 'usr-') to namespace their buttons.
+
+  Admin.buttons = (function () {
+    'use strict';
+
+    /**
+     * Get all button styles from ADMIN_UI theme data.
+     * @returns {Array} Array of button style objects from DB
+     */
+    function getStyles() {
+      return window.ADMIN_UI?.theme?.button_styles || [];
+    }
+
+    /**
+     * Find a specific button style by slug.
+     * @param {string} slug - Button slug (e.g. 'primary', 'danger', 'outline')
+     * @returns {Object|null} Button style object or null
+     */
+    function getStyleBySlug(slug) {
+      if (!slug) return null;
+      const styles = getStyles();
+      return styles.find(function (s) {
+        return s.slug === slug;
+      }) || null;
+    }
+
+    /**
+     * Build inline style string from a button style object.
+     * @param {Object} style - Button style from DB
+     * @returns {string} CSS inline style string
+     */
+    function buildInlineStyle(style) {
+      if (!style) return '';
+      var parts = [];
+      if (style.background_color) parts.push('background-color:' + style.background_color);
+      if (style.text_color)       parts.push('color:' + style.text_color);
+      if (style.border_color) {
+        var bw = style.border_width || 1;
+        parts.push('border:' + bw + 'px solid ' + style.border_color);
+      }
+      if (style.border_radius) parts.push('border-radius:' + style.border_radius + 'px');
+      if (style.padding)       parts.push('padding:' + style.padding);
+      if (style.font_size)     parts.push('font-size:' + style.font_size);
+      if (style.font_weight)   parts.push('font-weight:' + style.font_weight);
+      return parts.join(';');
+    }
+
+    /**
+     * Build hover style string from a button style object.
+     * @param {Object} style - Button style from DB
+     * @returns {string} CSS inline style string for hover state
+     */
+    function buildHoverStyle(style) {
+      if (!style) return '';
+      var parts = [];
+      if (style.hover_background_color) parts.push('background-color:' + style.hover_background_color);
+      if (style.hover_text_color)       parts.push('color:' + style.hover_text_color);
+      if (style.hover_border_color)     parts.push('border-color:' + style.hover_border_color);
+      return parts.join(';');
+    }
+
+    /**
+     * Create a button element with DB-driven styles.
+     * @param {Object} options
+     * @param {string} options.slug     - Button style slug (e.g. 'primary')
+     * @param {string} options.prefix   - Page prefix (e.g. 'prd-')
+     * @param {string} options.text     - Button label text
+     * @param {string} [options.icon]   - FontAwesome icon class (e.g. 'fas fa-plus')
+     * @param {string} [options.id]     - Button ID
+     * @param {string} [options.type]   - Button type ('button', 'submit', 'reset')
+     * @param {Object} [options.data]   - data-* attributes as key-value pairs
+     * @param {string} [options.extraClass] - Additional CSS classes
+     * @param {Function} [options.onClick] - Click handler
+     * @returns {HTMLButtonElement}
+     */
+    function create(options) {
+      var slug   = options.slug || 'primary';
+      var prefix = options.prefix || '';
+      var style  = getStyleBySlug(slug);
+      var btn    = document.createElement('button');
+
+      btn.type = options.type || 'button';
+      btn.className = 'btn btn-' + slug;
+      if (options.extraClass) btn.className += ' ' + options.extraClass;
+      if (prefix) btn.className += ' ' + prefix + 'btn-' + slug;
+
+      if (options.id) btn.id = options.id;
+
+      // Set data attributes
+      if (options.data) {
+        Object.keys(options.data).forEach(function (key) {
+          btn.setAttribute('data-' + key, options.data[key]);
+        });
+      }
+
+      // Store slug for hover engine
+      btn.setAttribute('data-btn-slug', slug);
+
+      // Build content
+      var html = '';
+      if (options.icon) {
+        html += '<i class="' + options.icon + '" aria-hidden="true"></i>';
+      }
+      if (options.text) {
+        html += (options.icon ? ' ' : '') + options.text;
+      }
+      btn.innerHTML = html;
+
+      // Attach click handler
+      if (typeof options.onClick === 'function') {
+        btn.addEventListener('click', options.onClick);
+      }
+
+      return btn;
+    }
+
+    /**
+     * Apply hover effects to all buttons with [data-btn-slug] inside a container.
+     * Uses DB-driven hover_* properties from button_styles.
+     * @param {HTMLElement} [container=document] - Scope to search within
+     */
+    function applyHoverEffects(container) {
+      var root = container || document;
+      var buttons = root.querySelectorAll('[data-btn-slug]');
+      buttons.forEach(function (btn) {
+        var slug  = btn.getAttribute('data-btn-slug');
+        var style = getStyleBySlug(slug);
+        if (!style) return;
+
+        var hoverCss   = buildHoverStyle(style);
+        if (!hoverCss) return;
+
+        var originalBg    = btn.style.backgroundColor;
+        var originalColor = btn.style.color;
+        var originalBorder = btn.style.borderColor;
+
+        btn.addEventListener('mouseenter', function () {
+          if (btn.disabled) return;
+          if (style.hover_background_color) btn.style.backgroundColor = style.hover_background_color;
+          if (style.hover_text_color)       btn.style.color = style.hover_text_color;
+          if (style.hover_border_color)     btn.style.borderColor = style.hover_border_color;
+        });
+
+        btn.addEventListener('mouseleave', function () {
+          btn.style.backgroundColor = originalBg;
+          btn.style.color = originalColor;
+          btn.style.borderColor = originalBorder;
+        });
+      });
+    }
+
+    /**
+     * Disable a button (sets disabled attribute and opacity).
+     * @param {HTMLButtonElement} btn
+     */
+    function disable(btn) {
+      if (!btn) return;
+      btn.disabled = true;
+      btn.setAttribute('aria-disabled', 'true');
+    }
+
+    /**
+     * Enable a button (removes disabled attribute).
+     * @param {HTMLButtonElement} btn
+     */
+    function enable(btn) {
+      if (!btn) return;
+      btn.disabled = false;
+      btn.removeAttribute('aria-disabled');
+    }
+
+    /**
+     * Set loading state on a button.
+     * @param {HTMLButtonElement} btn
+     * @param {boolean} isLoading
+     */
+    function setLoading(btn, isLoading) {
+      if (!btn) return;
+      if (isLoading) {
+        btn._originalHTML = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;display:inline-block"></span>';
+        disable(btn);
+      } else {
+        if (btn._originalHTML) btn.innerHTML = btn._originalHTML;
+        enable(btn);
+      }
+    }
+
+    return {
+      getStyles:          getStyles,
+      getStyleBySlug:     getStyleBySlug,
+      buildInlineStyle:   buildInlineStyle,
+      buildHoverStyle:    buildHoverStyle,
+      create:             create,
+      applyHoverEffects:  applyHoverEffects,
+      disable:            disable,
+      enable:             enable,
+      setLoading:         setLoading
+    };
+  })();
 
   // ════════════════════════════════════════════════════════════
   // I18N (INTERNATIONALIZATION)
@@ -767,6 +946,15 @@
 
       target.innerHTML = html;
       Admin.log('✓ HTML inserted');
+
+      // Load CSS files from <link rel="stylesheet"> elements found in the fragment.
+      // Browsers do NOT fetch external stylesheets when elements are created via innerHTML,
+      // so we must load them explicitly via Admin.asset.loadCss().
+      const links = [...target.querySelectorAll('link[rel="stylesheet"]')];
+      if (links.length > 0) {
+        Admin.log('📎 Loading', links.length, 'CSS file(s) from fragment');
+        await Promise.all(links.map(l => Admin.asset.loadCss(l.getAttribute('href'))));
+      }
 
       // Run scripts FIRST
       Admin.runScripts(target);

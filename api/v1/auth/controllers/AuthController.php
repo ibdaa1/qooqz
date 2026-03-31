@@ -49,10 +49,11 @@ class AuthController
             session_regenerate_id(true);
 
             $_SESSION['user'] = [
-                'id'       => (int)$user['id'],
-                'username' => $user['username'],
-                'email'    => $user['email'],
-                'role_id'  => (int)$user['role_id'],
+                'id'        => (int)$user['id'],
+                'username'  => $user['username'],
+                'email'     => $user['email'],
+                'role_id'   => $user['role_id'],
+                'tenant_id' => $user['tenant_id'],
             ];
 
             ResponseFormatter::success([

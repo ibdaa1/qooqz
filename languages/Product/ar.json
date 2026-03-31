@@ -125,6 +125,21 @@
       "are_you_sure": "هل أنت متأكد؟",
       "network_error": "حدث خطأ في الشبكة",
       "server_error": "حدث خطأ في الخادم"
+    },
+    "csv": {
+      "import_button": "استيراد CSV",
+      "title": "استيراد المنتجات عبر CSV",
+      "instructions": "ارفع ملف CSV لاستيراد المنتجات بالجملة مع الترجمات الإنجليزية. كل صف = منتج واحد. الحد الموصى به: 1000 صف لكل ملف.",
+      "download_sample": "تنزيل نموذج CSV",
+      "choose_file": "اختر ملف CSV",
+      "importing": "جارٍ الاستيراد…",
+      "import": "بدء الاستيراد",
+      "cancel": "إلغاء",
+      "preview_found": "تم العثور على {count} صف جاهز للاستيراد",
+      "import_complete": "اكتمل الاستيراد",
+      "created": "تم الإنشاء",
+      "failed": "فشل",
+      "columns_info_label": "صيغة أعمدة CSV:"
     }
   }
 }

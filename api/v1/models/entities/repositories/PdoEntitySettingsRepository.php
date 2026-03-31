@@ -270,7 +270,8 @@ final class PdoEntitySettingsRepository
         'max_daily_orders', 'is_visible', 'maintenance_mode', 'show_reviews',
         'show_contact_info', 'featured_in_app', 'default_payment_method',
         'allow_multiple_payment_methods', 'delivery_radius_km', 'free_delivery_min_order',
-        'notification_preferences', 'additional_settings'
+        'notification_preferences', 'additional_settings',
+        'card_style_id',
     ];
 
     public function save(int $entityId, array $data): bool

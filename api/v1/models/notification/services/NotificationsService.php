@@ -4,22 +4,22 @@ declare(strict_types=1);
 final class NotificationsService
 {
     private PdoNotificationsRepository $repo;
-    private NotificationsValidator $validator;
+    private NotificationsValidator     $validator;
 
     public function __construct(
         PdoNotificationsRepository $repo,
-        NotificationsValidator $validator
+        NotificationsValidator     $validator
     ) {
-        $this->repo = $repo;
+        $this->repo      = $repo;
         $this->validator = $validator;
     }
 
     public function list(
-        array $filters = [],
-        string $orderBy = 'sent_at',
+        array  $filters  = [],
+        string $orderBy  = 'sent_at',
         string $orderDir = 'DESC',
-        ?int $limit = null,
-        ?int $offset = null
+        ?int   $limit    = null,
+        ?int   $offset   = null
     ): array {
         $items = $this->repo->all($limit, $offset, $filters, $orderBy, $orderDir);
         $total = $this->repo->count($filters);
@@ -44,30 +44,21 @@ final class NotificationsService
     public function update(array $data): int
     {
         $this->validator->validate($data, true);
-        // Ensure notification exists
+
         $existing = $this->repo->find((int)$data['id']);
         if (!$existing) {
             throw new RuntimeException('Notification not found.');
         }
+
         return $this->repo->save($data);
     }
 
     public function delete(int $id): void
     {
-        if (!$this->repo->delete($id)) {
-            throw new RuntimeException('Failed to delete notification.');
+        $existing = $this->repo->find($id);
+        if (!$existing) {
+            throw new RuntimeException('Notification not found.');
         }
-    }
-
-    public function markAsRead(int $id): void
-    {
-        if (!$this->repo->markAsRead($id)) {
-            throw new RuntimeException('Failed to mark notification as read.');
-        }
-    }
-
-    public function getUnreadCount(int $userId): int
-    {
-        return $this->repo->countUnreadByUser($userId);
+        $this->repo->delete($id);
     }
 }

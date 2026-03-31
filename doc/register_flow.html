@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>تسجيل وإرسال رابط التفعيل عبر واتساب</title>
+<style>
+body{font-family:system-ui,Arial,Helvetica,sans-serif;direction:rtl;padding:18px;color:#222}
+.box{max-width:720px;margin:0 auto}
+label{display:block;margin-top:12px;font-weight:600}
+input,select,textarea{width:100%;padding:10px;margin-top:6px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box}
+button{padding:10px 14px;border:0;border-radius:6px;color:#fff;cursor:pointer;margin-top:10px}
+.primary{background:#0b6f00}
+.secondary{background:#6c757d}
+.success{background:#28a745}
+.whatsapp-btn{background:#25D366}
+.telegram{background:#0088cc}
+.small{padding:8px 10px;border-radius:6px;background:#eee;color:#222;border:0;cursor:pointer}
+.res{margin-top:14px;padding:12px;border-radius:6px;background:#f7f7f7}
+.ok{color:#0b6f00}.error{color:#b00020}
+.meta{font-size:13px;color:#666;margin-top:8px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.status{padding:10px;border-radius:6px;margin-top:10px}
+.sending{background:#fff3cd;color:#856404}
+.success-status{background:#d4edda;color:#155724}
+.error-status{background:#f8d7da;color:#721c24}
+.link-box{margin-top:15px;padding:15px;background:#f8f9fa;border-radius:8px;border:2px dashed #dee2e6}
+.link-box a{color:#0d6efd;text-decoration:none;word-break:break-all}
+.link-box a:hover{text-decoration:underline}
+.whatsapp-box{background:#e8f5e9;border-color:#25D366}
+.step-number{display:inline-block;width:30px;height:30px;background:#25D366;color:white;border-radius:50%;text-align:center;line-height:30px;margin-left:10px}
+.step{margin-bottom:20px;padding:15px;background:#f8f9fa;border-radius:8px}
+.session-info{font-size:12px;color:#666;padding:5px;background:#f0f0f0;border-radius:4px;margin-top:5px}
+.instructions{background:#e3f2fd;padding:15px;border-radius:8px;margin-top:20px}
+.message-box{margin-top:15px;padding:10px;background:#fff;border:1px solid #dee2e6;border-radius:6px}
+.timer{font-size:14px;color:#666;margin-top:10px}
+.quick-actions{display:flex;gap:10px;margin-top:15px;flex-wrap:wrap}
+.quick-action-btn{flex:1;min-width:150px;padding:12px;text-align:center}
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>تسجيل مستخدم وإرسال رابط التفعيل عبر واتساب</h2>
+
+  <div id="step-register">
+    <label>اسم المستخدم (مطلوب)<input id="username" /></label>
+    <label>البريد الإلكتروني (مطلوب)<input id="email" type="email" /></label>
+    <label>كلمة المرور (مطلوب)<input id="password" type="password" /></label>
+
+    <label>اللغة المفضلة
+      <select id="lang">
+        <option value="en">English (en)</option>
+        <option value="ar">العربية (ar)</option>
+      </select>
+    </label>
+
+    <label>البلد (اختياري)
+      <select id="country_id">
+        <option value="">-- اختر البلد --</option>
+      </select>
+    </label>
+
+    <label>المدينة (اختياري)
+      <select id="city_id" disabled>
+        <option value="">-- اختر المدينة --</option>
+      </select>
+    </label>
+
+    <label>رقم الهاتف (مطلوب) <input id="phone" placeholder="+971559740334" required /></label>
+    
+    <div class="row">
+      <button id="btnRegister" class="primary">سجل</button>
+    </div>
+    <div id="regResult" class="res" aria-live="polite"></div>
+  </div>
+
+  <div id="step-send" style="display:none">
+    <h3>إرسال رابط التفعيل عبر واتساب</h3>
+    
+    <div class="meta">
+      <div>المستخدم: <strong id="meta_user">—</strong></div>
+      <div>رقم الهاتف: <strong id="meta_phone">—</strong></div>
+      <div class="session-info">ملاحظة: الرابط يعمل فقط في هذا المتصفح (مرتبط بالجلسة الحالية)</div>
+    </div>
+
+    <div id="sendStatus" class="status" style="display:none"></div>
+
+    <div class="step">
+      <h4><span class="step-number">1</span> إنشاء رابط التفعيل</h4>
+      <p>اضغط على الزر أدناه لإنشاء رابط التفعيل المرتبط بجلستك الحالية:</p>
+      <button id="btnGenerateLink" class="whatsapp-btn" style="width:100%;padding:15px;font-size:16px">
+        <span style="font-size:20px;margin-left:8px">🔗</span>
+        إنشاء رابط التفعيل
+      </button>
+      <button id="btnBackToReg" class="secondary small" style="margin-top:10px">العودة للتعديل</button>
+    </div>
+
+    <div id="sendResult" class="res"></div>
+
+    <!-- Link Display Section -->
+    <div id="linkDisplay" style="display:none; margin-top:20px;">
+      <h4><span class="step-number">2</span> رابط التفعيل والإرسال السريع</h4>
+      
+      <div class="quick-actions">
+        <button id="btnOpenWhatsAppDirect" class="whatsapp-btn quick-action-btn">
+          <span style="font-size:20px">📱</span><br>
+          فتح واتساب مباشرة
+        </button>
+        <button id="btnCopyLink" class="success quick-action-btn">
+          <span style="font-size:20px">📋</span><br>
+          نسخ الرابط فقط
+        </button>
+        <button id="btnCopyMessage" class="telegram quick-action-btn">
+          <span style="font-size:20px">📝</span><br>
+          نسخ الرسالة كاملة
+        </button>
+      </div>
+      
+      <div class="link-box">
+        <p><strong>الرابط (انسخه وأرسله عبر واتساب):</strong></p>
+        <p id="verificationLink" style="word-break:break-all;padding:10px;background:#fff;border-radius:4px;border:1px solid #ddd"></p>
+        <div style="margin-top:15px">
+          <button id="btnOpenLink" class="small">فتح الرابط للتأكد</button>
+          <span id="copyStatus" style="margin-right:10px;font-size:13px;color:#666"></span>
+        </div>
+      </div>
+      
+      <div class="message-box">
+        <h5>📋 رسالة واتساب جاهزة:</h5>
+        <textarea id="whatsappMessage" rows="4" readonly style="width:100%; margin-top:8px; font-family:monospace; padding:10px; border:1px solid #ddd; border-radius:4px"></textarea>
+      </div>
+      
+      <div class="instructions">
+        <h5>🚀 خطوات الإرسال السريع:</h5>
+        <ol>
+          <li>اضغط على زر <strong>"فتح واتساب مباشرة"</strong></li>
+          <li>سيفتح تطبيق واتساب مع رسالة جاهزة</li>
+          <li>أرسل الرسالة إلى <strong>نفس رقم هاتفك</strong></li>
+          <li>اضغط على الرابط من هاتفك</li>
+          <li>سيفتح الرابط في متصفح الهاتف</li>
+          <li>سيعمل الرابط فقط إذا فتحته <strong>في نفس هذا المتصفح</strong> على جهازك</li>
+        </ol>
+        <p><strong>⏰ مدة الصلاحية:</strong> الرابط صالح لمدة <span id="expiryTime">15</span> دقيقة</p>
+        <p><strong>⚠️ ملاحظة هامة:</strong> الرابط مرتبط بهذه الجلسة في هذا المتصفح. إذا أغلقت المتصفح أو حاولت فتح الرابط في متصفح آخر، لن يعمل.</p>
+      </div>
+    </div>
+
+    <!-- Timer Section -->
+    <div id="timerSection" style="display:none; margin-top:20px; padding:10px; background:#fff3cd; border-radius:6px;">
+      <h5>⏳ مدة صلاحية الرابط:</h5>
+      <div style="text-align:center">
+        <div id="countdownTimer" style="font-size:24px; font-weight:bold; color:#d9534f">15:00</div>
+        <p style="font-size:14px; color:#666">بعد انتهاء المدة، ستحتاج إلى إنشاء رابط جديد</p>
+      </div>
+    </div>
+
+    <!-- After Generating Actions -->
+    <div id="step-actions" style="display:none; margin-top:20px;">
+      <h4>إجراءات إضافية</h4>
+      <div class="row">
+        <button id="btnRegenerateLink" class="success small">إنشاء رابط جديد</button>
+        <button id="btnCheckActivation" class="secondary small">تحقق من حالة التفعيل</button>
+        <button id="btnStartOver" class="small">بدء تسجيل جديد</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const regResult = document.getElementById('regResult'),
+      sendResult = document.getElementById('sendResult'),
+      sendStatus = document.getElementById('sendStatus'),
+      countrySelect = document.getElementById('country_id'),
+      citySelect = document.getElementById('city_id'),
+      langSelect = document.getElementById('lang'),
+      linkDisplay = document.getElementById('linkDisplay'),
+      stepActions = document.getElementById('step-actions'),
+      timerSection = document.getElementById('timerSection'),
+      countdownTimer = document.getElementById('countdownTimer');
+
+let currentUser = null;
+let currentLink = null;
+let currentSessionToken = null;
+let countdownInterval = null;
+let expiresAt = null;
+let phoneNumber = null;
+
+// helper: fetch JSON
+async function postJSON(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const text = await r.text();
+  try { return { ok:true, status:r.status, json: JSON.parse(text) }; }
+  catch(e) { return { ok:false, status:r.status, text }; }
+}
+
+// load countries/cities
+async function getJSON(url) {
+  const r = await fetch(url, {cache:'no-store'});
+  const txt = await r.text();
+  try { return JSON.parse(txt); } catch(e){ return []; }
+}
+
+async function loadCountries(prefill){ 
+    const data = await getJSON('/api/locations/countries.php'); 
+    countrySelect.innerHTML = '<option value="">-- اختر البلد --</option>'; 
+    for(const c of data){ 
+        const o=document.createElement('option'); 
+        o.value=c.id; 
+        o.textContent=c.name; 
+        countrySelect.appendChild(o); 
+        if(prefill && c.name.toLowerCase().includes(prefill.toLowerCase())) countrySelect.value=c.id; 
+    } 
+    if(countrySelect.value) await loadCities(countrySelect.value); 
+}
+
+async function loadCities(cid){ 
+    citySelect.innerHTML = '<option value="">-- اختر المدينة --</option>'; 
+    citySelect.disabled=true; 
+    if(!cid) return; 
+    const data=await getJSON('/api/locations/cities.php?country_id=' + encodeURIComponent(cid)); 
+    for(const ct of data){ 
+        const o=document.createElement('option'); 
+        o.value=ct.id; 
+        o.textContent=ct.name; 
+        citySelect.appendChild(o);
+    }
+    citySelect.disabled=false; 
+}
+
+// register
+document.getElementById('btnRegister').addEventListener('click', doRegister);
+document.getElementById('btnBackToReg').addEventListener('click', () => { 
+    document.getElementById('step-send').style.display='none'; 
+    document.getElementById('step-register').style.display='block'; 
+});
+
+document.getElementById('btnStartOver').addEventListener('click', () => {
+    location.reload();
+});
+
+document.getElementById('btnGenerateLink').addEventListener('click', generateVerificationLink);
+document.getElementById('btnRegenerateLink').addEventListener('click', generateVerificationLink);
+
+// Open WhatsApp directly
+document.getElementById('btnOpenWhatsAppDirect').addEventListener('click', openWhatsAppDirect);
+
+async function doRegister() {
+  regResult.textContent = 'جارٍ التسجيل...'; 
+  regResult.className='res';
+  
+  phoneNumber = document.getElementById('phone').value.trim();
+  if (!phoneNumber) {
+    regResult.textContent = 'رقم الهاتف مطلوب';
+    regResult.className='res error';
+    return;
+  }
+  
+  const body = {
+    username: document.getElementById('username').value.trim(),
+    email: document.getElementById('email').value.trim(),
+    password: document.getElementById('password').value,
+    preferred_language: langSelect.value || null,
+    country_id: countrySelect.value ? parseInt(countrySelect.value,10) : null,
+    city_id: citySelect.value ? parseInt(citySelect.value,10) : null,
+    phone: phoneNumber,
+    is_active: 0,
+    channel: 'whatsapp'
+  };
+  
+  if(!body.username || !body.email || !body.password){ 
+      regResult.textContent='الرجاء ملء الحقول المطلوبة'; 
+      regResult.className='res error'; 
+      return; 
+  }
+
+  const res = await postJSON('/api/users/register_user.php', body);
+  if(!res.ok){ 
+      regResult.textContent = 'خطأ في استجابة السيرفر: ' + (res.text || 'non-json'); 
+      regResult.className='res error'; 
+      return; 
+  }
+  
+  const j = res.json;
+  if(!j.ok){ 
+      regResult.textContent = 'فشل التسجيل: ' + (j.error||j.message||JSON.stringify(j)); 
+      regResult.className='res error'; 
+      return; 
+  }
+  
+  currentUser = { 
+    user_id: j.user_id, 
+    email: j.user.email, 
+    phone: j.user.phone || phoneNumber,
+    username: j.user.username 
+  };
+  
+  // Store session token in localStorage and memory
+  if (j.session_token) {
+    currentSessionToken = j.session_token;
+    localStorage.setItem('session_token', j.session_token);
+    localStorage.setItem('session_user_id', j.user_id);
+  }
+  
+  regResult.textContent = 'تم التسجيل بنجاح. تم إنشاء جلسة جديدة. الآن قم بإنشاء رابط التفعيل.'; 
+  regResult.className='res ok';
+  
+  document.getElementById('meta_user').textContent = currentUser.username;
+  document.getElementById('meta_phone').textContent = currentUser.phone;
+  
+  document.getElementById('step-register').style.display='none';
+  document.getElementById('step-send').style.display='block';
+}
+
+async function generateVerificationLink() {
+  if(!currentUser){ 
+      sendResult.textContent='لا يوجد مستخدم مسجل'; 
+      sendResult.className='res error'; 
+      return; 
+  }
+  
+  // Check if session token exists
+  if (!currentSessionToken) {
+    currentSessionToken = localStorage.getItem('session_token');
+    if (!currentSessionToken) {
+      sendResult.textContent = 'الجلسة غير موجودة. يرجى إعادة التسجيل.';
+      sendResult.className='res error';
+      return;
+    }
+  }
+  
+  // Show sending status
+  sendStatus.style.display = 'block';
+  sendStatus.className = 'status sending';
+  sendStatus.textContent = 'جارٍ إنشاء رابط التفعيل...';
+  
+  sendResult.textContent = '';
+  linkDisplay.style.display = 'none';
+  stepActions.style.display = 'none';
+  timerSection.style.display = 'none';
+  
+  // Stop any existing countdown
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+
+  const body = { 
+    user_id: currentUser.user_id, 
+    channel: 'whatsapp',
+    ttl: 900,
+    session_token: currentSessionToken
+  };
+
+  const res = await postJSON('/api/users/send_verification_code.php', body);
+  
+  // Clear sending status
+  sendStatus.style.display = 'none';
+  
+  if(!res.ok){ 
+    sendResult.textContent = 'خطأ في استجابة السيرفر: ' + (res.text||'non-json'); 
+    sendResult.className='res error'; 
+    return; 
+  }
+  
+  const j = res.json;
+  if(!j.ok){ 
+    sendResult.textContent = 'فشل إنشاء الرابط: ' + (j.error||j.message||JSON.stringify(j)); 
+    sendResult.className='res error'; 
+    return; 
+  }
+
+  currentLink = j.link;
+  expiresAt = j.expires_at;
+  
+  // Show success message
+  sendResult.textContent = '✅ ' + (j.message || 'تم إنشاء رابط التفعيل بنجاح');
+  sendResult.className = 'res ok';
+  
+  // Show the link and message
+  document.getElementById('verificationLink').textContent = currentLink;
+  document.getElementById('whatsappMessage').value = j.whatsapp_message || '';
+  document.getElementById('expiryTime').textContent = '15';
+  linkDisplay.style.display = 'block';
+  
+  // Start countdown timer
+  if (expiresAt) {
+    startCountdown(expiresAt);
+    timerSection.style.display = 'block';
+  }
+  
+  // Show actions
+  stepActions.style.display = 'block';
+}
+
+// Open WhatsApp directly with the message
+function openWhatsAppDirect() {
+  if (!phoneNumber) {
+    alert('لا يوجد رقم هاتف');
+    return;
+  }
+  
+  const message = document.getElementById('whatsappMessage').value;
+  if (!message) {
+    alert('لا توجد رسالة لإرسالها');
+    return;
+  }
+  
+  // Clean phone number for WhatsApp
+  let cleanPhone = phoneNumber.replace(/[^\d]/g, '');
+  
+  // Remove leading 0 if present
+  if (cleanPhone.startsWith('0')) {
+    cleanPhone = cleanPhone.substring(1);
+  }
+  
+  // Encode message
+  const encodedMessage = encodeURIComponent(message);
+  
+  // WhatsApp URL
+  const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+  
+  // Open in new tab
+  window.open(whatsappUrl, '_blank');
+}
+
+// Countdown timer function
+function startCountdown(expiresAt) {
+  const expiryDate = new Date(expiresAt);
+  
+  function updateTimer() {
+    const now = new Date();
+    const diff = expiryDate - now;
+    
+    if (diff <= 0) {
+      countdownTimer.textContent = '00:00';
+      clearInterval(countdownInterval);
+      sendResult.textContent = '⏰ انتهت صلاحية الرابط. يرجى إنشاء رابط جديد.';
+      sendResult.className = 'res error';
+      return;
+    }
+    
+    const minutes = Math.floor(diff / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+    
+    countdownTimer.textContent = 
+      minutes.toString().padStart(2, '0') + ':' + 
+      seconds.toString().padStart(2, '0');
+  }
+  
+  updateTimer();
+  countdownInterval = setInterval(updateTimer, 1000);
+}
+
+// Copy link button
+document.getElementById('btnCopyLink').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(currentLink);
+    document.getElementById('copyStatus').textContent = '✅ تم نسخ الرابط';
+    setTimeout(() => {
+      document.getElementById('copyStatus').textContent = '';
+    }, 3000);
+  } catch (e) {
+    document.getElementById('copyStatus').textContent = '❌ فشل النسخ، انسخ يدوياً';
+  }
+});
+
+// Copy message button
+document.getElementById('btnCopyMessage').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(document.getElementById('whatsappMessage').value);
+    document.getElementById('copyStatus').textContent = '✅ تم نسخ الرسالة';
+    setTimeout(() => {
+      document.getElementById('copyStatus').textContent = '';
+    }, 3000);
+  } catch (e) {
+    document.getElementById('copyStatus').textContent = '❌ فشل النسخ، انسخ يدوياً';
+  }
+});
+
+// Open link button
+document.getElementById('btnOpenLink').addEventListener('click', () => {
+  if (currentLink) {
+    window.open(currentLink, '_blank');
+  }
+});
+
+// Check activation status
+document.getElementById('btnCheckActivation').addEventListener('click', async () => {
+  if (!currentUser) return;
+  
+  sendResult.textContent = 'جارٍ التحقق من حالة التفعيل...';
+  sendResult.className = 'res';
+  
+  const body = { 
+    user_id: currentUser.user_id
+  };
+  const res = await postJSON('/api/users/check_activation.php', body);
+  
+  if (res.ok && res.json && res.json.is_active) {
+    sendResult.textContent = '🎉 مبروك! تم تفعيل حسابك بنجاح. يمكنك تسجيل الدخول الآن.';
+    sendResult.className = 'res ok';
+  } else {
+    sendResult.textContent = '⏳ لم يتم تفعيل الحساب بعد. تأكد من فتح الرابط في نفس هذا المتصفح.';
+    sendResult.className = 'res';
+  }
+});
+
+// cascade countries/cities
+countrySelect.addEventListener('change', async () => { 
+  if(countrySelect.value) await loadCities(countrySelect.value); 
+  else { 
+    citySelect.innerHTML='<option value="">-- اختر المدينة --</option>'; 
+    citySelect.disabled=true; 
+  } 
+});
+
+// Check for existing session on page load
+(function init(){
+  // Try to get existing session from localStorage
+  const savedSessionToken = localStorage.getItem('session_token');
+  const savedUserId = localStorage.getItem('session_user_id');
+  
+  if (savedSessionToken && savedUserId) {
+    currentSessionToken = savedSessionToken;
+    currentUser = { user_id: parseInt(savedUserId) };
+  }
+  
+  loadCountries('United Arab Emirates').catch(()=>{});
+})();
+</script>
+</body>
+</html>

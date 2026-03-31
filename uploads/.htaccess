@@ -1,0 +1,22 @@
+# Prevent execution of server-side scripts in the uploads directory.
+# This is a defense-in-depth measure: even if a malicious file bypasses the
+# application-level upload validator, Apache/LiteSpeed will refuse to execute it.
+
+# Deny direct access to PHP and other server-side script types
+<FilesMatch "\.(?i:php\d?|phtml|shtml|cgi|pl|py|rb|sh|bash|exe|bat|cmd|htaccess|htpasswd)$">
+    Require all denied
+</FilesMatch>
+
+# Disable CGI execution
+Options -ExecCGI
+
+# Prevent the server from following symlinks
+Options -FollowSymLinks
+
+# Force all served files to be treated as static downloads (no MIME sniffing)
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>
+
+# Prevent directory listing
+Options -Indexes

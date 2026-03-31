@@ -17,6 +17,27 @@ declare(strict_types=1);
  */
 
 // ════════════════════════════════════════════════════════════
+// ASSET VERSIONING HELPER
+// ════════════════════════════════════════════════════════════
+if (!function_exists('assetVer')) {
+    /**
+     * Cache-busting: returns file mtime if path given, otherwise time()
+     */
+    function assetVer(string $path = ''): string
+    {
+        if ($path === '') {
+            return (string) time();
+        }
+        static $cache = [];
+        if (!isset($cache[$path])) {
+            $full         = $_SERVER['DOCUMENT_ROOT'] . $path;
+            $cache[$path] = file_exists($full) ? (string) filemtime($full) : '0';
+        }
+        return $cache[$path];
+    }
+}
+
+// ════════════════════════════════════════════════════════════
 // INITIALIZE ADMIN_UI FROM SESSION (ONCE)
 // ════════════════════════════════════════════════════════════
 if (!isset($GLOBALS['ADMIN_UI'])) {
@@ -293,12 +314,19 @@ if (!isset($GLOBALS['ADMIN_UI'])) {
                 'phone' => $currentUser['phone'] ?? null,
                 'timezone' => $currentUser['timezone'] ?? 'UTC',
                 'is_active' => $currentUser['is_active'] ?? true,
+                'tenant_user_id' => isset($tenantUser['id']) ? (int)$tenantUser['id'] : null,
+                'entity_id' => isset($tenantUser['entity_id']) ? (int)$tenantUser['entity_id'] : null,
             ],
             'lang' => $_SESSION['preferred_language'] ?? $currentUser['preferred_language'] ?? 'en',
-            'direction' => in_array(
-                $_SESSION['preferred_language'] ?? $currentUser['preferred_language'] ?? 'en', 
-                ['ar', 'fa', 'he', 'ur']
-            ) ? 'rtl' : 'ltr',
+            'direction' => (function () use ($currentUser) {
+                $lang = $_SESSION['preferred_language'] ?? $currentUser['preferred_language'] ?? 'en';
+                foreach (['ar', 'fa', 'he', 'ur'] as $prefix) {
+                    if (strpos($lang, $prefix) === 0) {
+                        return 'rtl';
+                    }
+                }
+                return 'ltr';
+            })(),
             'csrf_token' => $_SESSION['csrf_token'] ?? '',
             'tenant_id' => $tenantId,
             'is_super_admin' => in_array('super_admin', $_SESSION['roles'] ?? [], true),
@@ -318,6 +346,10 @@ if (!isset($GLOBALS['ADMIN_UI'])) {
         // ════════════════════════════════════════════════════════════
         // LOAD THEME FROM DATABASE
         // ════════════════════════════════════════════════════════════
+        $themeLoaderPath = $_SERVER['DOCUMENT_ROOT'] . '/api/shared/ui/AdminUiThemeLoader.php';
+        if (!class_exists('AdminUiThemeLoader') && file_exists($themeLoaderPath)) {
+            require_once $themeLoaderPath;
+        }
         if ($pdo instanceof PDO) {
             try {
                 $stmt = $pdo->prepare("SELECT * FROM themes WHERE tenant_id = ? AND is_active = 1 LIMIT 1");
@@ -326,33 +358,39 @@ if (!isset($GLOBALS['ADMIN_UI'])) {
                 
                 if ($theme) {
                     $themeId = $theme['id'];
-                    
-                    // Load theme color settings
-                    $stmt = $pdo->prepare("SELECT * FROM theme_color_settings WHERE theme_id = ?");
-                    $stmt->execute([$themeId]);
+
+                    // Load color settings from DB
+                    $stmt = $pdo->prepare("SELECT * FROM color_settings WHERE tenant_id = ? AND theme_id = ? AND is_active = 1 ORDER BY category, sort_order");
+                    $stmt->execute([$tenantId, $themeId]);
                     $GLOBALS['ADMIN_UI']['theme']['color_settings'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                    
-                    // Load theme font settings
-                    $stmt = $pdo->prepare("SELECT * FROM theme_font_settings WHERE theme_id = ?");
-                    $stmt->execute([$themeId]);
+
+                    // Load font settings from DB
+                    $stmt = $pdo->prepare("SELECT * FROM font_settings WHERE tenant_id = ? AND theme_id = ? AND is_active = 1 ORDER BY category, sort_order");
+                    $stmt->execute([$tenantId, $themeId]);
                     $GLOBALS['ADMIN_UI']['theme']['font_settings'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                    
-                    // Load theme design settings
-                    $stmt = $pdo->prepare("SELECT * FROM theme_design_settings WHERE theme_id = ?");
-                    $stmt->execute([$themeId]);
+
+                    // Load design settings from DB
+                    $stmt = $pdo->prepare("SELECT * FROM design_settings WHERE tenant_id = ? AND theme_id = ? AND is_active = 1 ORDER BY category, sort_order");
+                    $stmt->execute([$tenantId, $themeId]);
                     $GLOBALS['ADMIN_UI']['theme']['design_settings'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                    
-                    // Load button styles
-                    $stmt = $pdo->prepare("SELECT * FROM theme_button_styles WHERE theme_id = ?");
-                    $stmt->execute([$themeId]);
+
+                    // Load button styles from DB
+                    $stmt = $pdo->prepare("SELECT * FROM button_styles WHERE tenant_id = ? AND theme_id = ? AND is_active = 1 ORDER BY button_type, name");
+                    $stmt->execute([$tenantId, $themeId]);
                     $GLOBALS['ADMIN_UI']['theme']['button_styles'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                    
-                    // Load card styles
-                    $stmt = $pdo->prepare("SELECT * FROM theme_card_styles WHERE theme_id = ?");
-                    $stmt->execute([$themeId]);
+
+                    // Load card styles from DB (include theme-independent rows via theme_id IS NULL)
+                    $stmt = $pdo->prepare("SELECT * FROM card_styles WHERE tenant_id = ? AND (theme_id = ? OR theme_id IS NULL) AND is_active = 1 ORDER BY card_type, name");
+                    $stmt->execute([$tenantId, $themeId]);
                     $GLOBALS['ADMIN_UI']['theme']['card_styles'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                    
-                    $GLOBALS['ADMIN_UI']['theme']['generated_css'] = $theme['generated_css'] ?? '';
+
+                    // Generate CSS dynamically from loaded data so it's always fresh
+                    if (class_exists('AdminUiThemeLoader')) {
+                        $loader = new AdminUiThemeLoader($pdo);
+                        $GLOBALS['ADMIN_UI']['theme']['generated_css'] = $loader->generateCss($GLOBALS['ADMIN_UI']['theme']);
+                    } else {
+                        $GLOBALS['ADMIN_UI']['theme']['generated_css'] = $theme['generated_css'] ?? '';
+                    }
                 }
             } catch (Throwable $e) {
                 error_log('[admin_context] Theme load error: ' . $e->getMessage());

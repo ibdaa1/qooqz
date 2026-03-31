@@ -79,8 +79,8 @@ final class TenantsValidator
     {
         $errors = [];
 
-        if (isset($filters['search']) && strlen($filters['search']) < 2) {
-            $errors['search'] = 'Search term must be at least 2 characters';
+        if (isset($filters['search']) && strlen($filters['search']) < 1) {
+            $errors['search'] = 'Search term cannot be empty';
         }
 
         if (isset($filters['status']) && !in_array($filters['status'], ['active', 'suspended'], true)) {

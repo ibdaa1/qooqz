@@ -2,215 +2,179 @@
 declare(strict_types=1);
 
 /**
- * /admin/fragments/categories.php
- * Production Version - Updated for new admin_context.php
- * 
- * ✅ Uses new permission system (role-based + resource-based)
- * ✅ Compatible with tenant_users table
- * ✅ No deprecated fields
- * ✅ Production-ready
+ * /admin/fragments/categories.php — Production v2.0
+ * ─ لا inline styles
+ * ─ لا إعادة حقن ADMIN_UI
+ * ─ لا translation script مكرّر — admin_core.js يتولى الترجمة
+ * ─ config موحّد في CATEGORIES_CONFIG فقط
+ * ─ assetVer() بدل time()
  */
 
-// ════════════════════════════════════════════════════════════
-// DETECT REQUEST TYPE
-// ════════════════════════════════════════════════════════════
-$isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
-          strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+$isAjax     = !empty($_SERVER['HTTP_X_REQUESTED_WITH'])
+              && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
 $isEmbedded = isset($_GET['embedded']) || isset($_POST['embedded']);
 $isFragment = $isAjax || $isEmbedded;
 
-// ════════════════════════════════════════════════════════════
-// LOAD CONTEXT / HEADER
-// ════════════════════════════════════════════════════════════
 if ($isFragment) {
-    // Load admin_context to provide helper functions in fragment mode
     require_once __DIR__ . '/../includes/admin_context.php';
 } else {
     require_once __DIR__ . '/../includes/header.php';
 }
 
-// ════════════════════════════════════════════════════════════
-// VERIFY USER IS LOGGED IN
-// ════════════════════════════════════════════════════════════
 if (!is_admin_logged_in()) {
     if ($isFragment) {
         http_response_code(401);
+        header('Content-Type: application/json');
         echo json_encode(['error' => 'Not authenticated']);
         exit;
-    } else {
-        header('Location: /admin/login.php');
-        exit;
     }
+    header('Location: /admin/login.php');
+    exit;
 }
 
-// ════════════════════════════════════════════════════════════
-// GET USER CONTEXT & PERMISSIONS
-// ════════════════════════════════════════════════════════════
-$user = admin_user();
-$lang = admin_lang();
-$dir = admin_dir();
-$csrf = admin_csrf();
+// ── Context ──────────────────────────────────────────────────
+$user     = admin_user();
+$lang     = admin_lang();
+$dir      = admin_dir();
+$csrf     = admin_csrf();
 $tenantId = admin_tenant_id();
 
-// ════════════════════════════════════════════════════════════
-// CHECK PERMISSIONS
-// ════════════════════════════════════════════════════════════
+// ── Permissions ──────────────────────────────────────────────
+$isSA          = is_super_admin();
+$canCreate     = $isSA || can('categories.manage') || can_create('categories');
+$canEdit       = $isSA || can('categories.manage') || can_edit_all('categories')   || can_edit_own('categories');
+$canDelete     = $isSA || can('categories.manage') || can_delete_all('categories') || can_delete_own('categories');
+$canView       = $isSA || can_view_all('categories') || can_view_own('categories') || can_view_tenant('categories');
 
-// Method 1: Using role-based permissions
-$canManageCategories = can('categories.manage') || can('categories.create');
-
-// Method 2: Using resource-based permissions (recommended for granular control)
-$canViewAll = can_view_all('categories');
-$canViewOwn = can_view_own('categories');
-$canViewTenant = can_view_tenant('categories');
-$canCreate = can_create('categories');
-$canEditAll = can_edit_all('categories');
-$canEditOwn = can_edit_own('categories');
-$canDeleteAll = can_delete_all('categories');
-$canDeleteOwn = can_delete_own('categories');
-
-// Combined permissions for UI
-$canView = $canViewAll || $canViewOwn || $canViewTenant;
-$canEdit = $canEditAll || $canEditOwn || $canManageCategories;
-$canDelete = $canDeleteAll || $canDeleteOwn || $canManageCategories;
-$canDuplicate = $canCreate;
-
-// If user has no view permission at all, deny access
-if (!$canView && !is_super_admin()) {
-    if ($isFragment) {
-        http_response_code(403);
-        echo json_encode(['error' => 'Access denied']);
-        exit;
-    } else {
-        http_response_code(403);
-        die('Access denied: You do not have permission to view categories');
-    }
+if (!$canView) {
+    http_response_code(403);
+    exit($isFragment ? json_encode(['error' => 'Access denied']) : 'Access denied');
 }
 
-// ════════════════════════════════════════════════════════════
-// TRANSLATION HELPERS
-// ════════════════════════════════════════════════════════════
-function __t($key, $fallback = '') {
-    if (function_exists('i18n_get')) {
-        $v = i18n_get($key);
-        return $v ?? ($fallback ?? $key);
-    }
-    return $fallback ?? $key;
-}
-
-function __tr($key, $replacements = []) {
-    $text = __t($key, $key);
-    foreach ($replacements as $ph => $val) {
-        $text = str_replace("{" . $ph . "}", (string)$val, $text);
-    }
-    return $text;
-}
-
-// ════════════════════════════════════════════════════════════
-// API BASE
-// ════════════════════════════════════════════════════════════
 $apiBase = '/api';
 
+// ── Translations ─────────────────────────────────────────────
+$_catStrings     = [];
+$_catAllowedLangs = ['ar','en','fr','tr','ur','de','es','fa','he','hi','zh','ja','ko','pt','ru','it','nl'];
+$_catSafeLang = in_array($lang, $_catAllowedLangs, true) ? $lang : 'en';
+$_catLangFile = __DIR__ . '/../../languages/Categories/' . $_catSafeLang . '.json';
+if (file_exists($_catLangFile)) {
+    $_catJson = json_decode(file_get_contents($_catLangFile), true);
+    $_catStrings = $_catJson ?? [];
+}
+
+function _cat(string $key, string $fallback = ''): string
+{
+    global $_catStrings;
+    $parts = explode('.', $key);
+    $val   = $_catStrings;
+    foreach ($parts as $k) {
+        if (is_array($val) && isset($val[$k])) { $val = $val[$k]; } else { return $fallback ?: $key; }
+    }
+    return is_string($val) ? $val : ($fallback ?: $key);
+}
+
+if (!function_exists('assetVer')) {
+    function assetVer(string $path): string {
+        static $cache = [];
+        if (!isset($cache[$path])) {
+            $f = $_SERVER['DOCUMENT_ROOT'] . $path;
+            $cache[$path] = file_exists($f) ? (string)filemtime($f) : '0';
+        }
+        return $cache[$path];
+    }
+}
 ?>
-<!-- Force load CSS if embedded -->
-<?php if ($isFragment): ?>
-<link rel="stylesheet" href="/admin/assets/css/pages/categories.css?v=<?= time() ?>">
-<?php endif; ?>
+<link rel="stylesheet"
+      href="/admin/assets/css/pages/categories.css?v=<?= assetVer('/admin/assets/css/pages/categories.css') ?>">
 
-<!-- Page Meta -->
 <meta data-page="categories"
-      data-i18n-files="/admin/languages/Categories/<?= rawurlencode($lang) ?>.json">
+      data-i18n-files="/languages/Categories/<?= rawurlencode($_catSafeLang) ?>.json">
 
-<!-- Page Container -->
-<div class="page-container" id="categoriesPageContainer" dir="<?= htmlspecialchars($dir) ?>">
+<div class="page-container" id="categoriesPageContainer" dir="<?= htmlspecialchars($dir, ENT_QUOTES, 'UTF-8') ?>">
 
-    <!-- Page Header -->
+    <!-- ═══ PAGE HEADER ════════════════════════════════════ -->
     <div class="page-header">
         <div class="page-header-content">
-            <h1 class="page-title" data-i18n="categories.title"><?= __t('categories.title', 'Categories') ?></h1>
-            <p class="page-subtitle" data-i18n="categories.subtitle"><?= __t('categories.subtitle', 'Manage product and content categories') ?></p>
+            <h1 class="page-title" data-i18n="categories.title">
+                <?= htmlspecialchars(_cat('categories.title', 'Categories'), ENT_QUOTES, 'UTF-8') ?>
+            </h1>
+            <p class="page-subtitle" data-i18n="categories.subtitle">
+                <?= htmlspecialchars(_cat('categories.subtitle', 'Manage product and content categories'), ENT_QUOTES, 'UTF-8') ?>
+            </p>
         </div>
         <div class="page-header-actions">
             <?php if ($canCreate): ?>
+            <button id="btnImportExcel" class="btn btn-secondary">
+                <i class="fas fa-file-excel" aria-hidden="true"></i>
+                <span data-i18n="categories.import_excel">
+                    <?= htmlspecialchars(_cat('categories.import_excel', 'Import Excel'), ENT_QUOTES, 'UTF-8') ?>
+                </span>
+            </button>
             <button id="btnAddCategory" class="btn btn-primary">
-                <i class="fas fa-plus"></i>
-                <span data-i18n="categories.add_new"><?= __t('categories.add_new', 'Add Category') ?></span>
+                <i class="fas fa-plus" aria-hidden="true"></i>
+                <span data-i18n="categories.add_new">
+                    <?= htmlspecialchars(_cat('categories.add_new', 'Add Category'), ENT_QUOTES, 'UTF-8') ?>
+                </span>
             </button>
             <?php endif; ?>
         </div>
     </div>
 
-    <!-- Form Container -->
-    <div id="categoryFormContainer" class="card form-card" style="display:none">
+    <!-- ═══ FORM CARD ══════════════════════════════════════ -->
+    <div id="categoryFormContainer" class="card cat-form-card" style="display:none;">
         <div class="card-header">
-            <h3 class="card-title" id="formTitle" data-i18n="form.add_title"><?= __t('form.add_title', 'Add Category') ?></h3>
-            <button type="button" class="btn btn-sm btn-outline" id="btnCloseForm" aria-label="<?= __t('accessibility.close', 'Close') ?>">
-                <i class="fas fa-times"></i>
+            <h3 class="card-title" id="formTitle" data-i18n="form.add_title">
+                <?= htmlspecialchars(_cat('form.add_title', 'Add Category'), ENT_QUOTES, 'UTF-8') ?>
+            </h3>
+            <button type="button" id="btnCloseForm" class="icon-btn" aria-label="Close">
+                <i class="fas fa-times" aria-hidden="true"></i>
             </button>
         </div>
         <div class="card-body">
             <form id="categoryForm" novalidate>
-                <!-- Hidden Fields -->
-                <input type="hidden" id="formId" name="id">
-                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
-                <input type="hidden" id="catImageId" name="image_id">
+                <input type="hidden" id="formId"       name="id">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" id="catImageId"   name="image_id">
 
                 <div class="form-row">
-                    <!-- Tenant (Read-only for non-super-admin) -->
+                    <!-- Tenant ID -->
                     <div class="form-group">
                         <label for="catTenantId" data-i18n="form.fields.tenant_id.label">Tenant ID</label>
-                        <input type="number" 
-                               id="catTenantId" 
-                               name="tenant_id" 
-                               class="form-control" 
-                               value="<?= $tenantId ?>" 
-                               <?= is_super_admin() ? '' : 'readonly' ?>
-                               required>
-                        <div id="tenantInfo" style="margin-top:5px; font-size:12px;"></div>
+                        <input type="number" id="catTenantId" name="tenant_id"
+                               class="form-control" value="<?= (int)$tenantId ?>"
+                               <?= $isSA ? '' : 'readonly' ?> required>
+                        <div id="tenantInfo" class="cat-field-hint"></div>
                     </div>
-
                     <!-- Name -->
                     <div class="form-group">
-                        <label for="catName" class="required" data-i18n="form.fields.name.label">
-                            <?= __t('form.fields.name.label', 'Name') ?>
+                        <label class="required" for="catName" data-i18n="form.fields.name.label">
+                            <?= htmlspecialchars(_cat('form.fields.name.label', 'Name'), ENT_QUOTES, 'UTF-8') ?>
                         </label>
-                        <input type="text"
-                               id="catName"
-                               name="name"
-                               class="form-control"
-                               required
+                        <input type="text" id="catName" name="name" class="form-control" required
                                data-i18n-placeholder="form.fields.name.placeholder"
-                               placeholder="<?= __t('form.fields.name.placeholder', 'Enter category name') ?>">
+                               placeholder="<?= htmlspecialchars(_cat('form.fields.name.placeholder', 'Enter category name'), ENT_QUOTES, 'UTF-8') ?>">
                         <div class="invalid-feedback" data-i18n="form.fields.name.required">
-                            <?= __t('form.fields.name.required', 'Name is required') ?>
+                            <?= htmlspecialchars(_cat('form.fields.name.required', 'Name is required'), ENT_QUOTES, 'UTF-8') ?>
                         </div>
                     </div>
-
                     <!-- Slug -->
                     <div class="form-group">
-                        <label for="catSlug" class="required" data-i18n="form.fields.slug.label">
-                            <?= __t('form.fields.slug.label', 'Slug') ?>
+                        <label class="required" for="catSlug" data-i18n="form.fields.slug.label">
+                            <?= htmlspecialchars(_cat('form.fields.slug.label', 'Slug'), ENT_QUOTES, 'UTF-8') ?>
                         </label>
-                        <input type="text"
-                               id="catSlug"
-                               name="slug"
-                               class="form-control"
-                               required
+                        <input type="text" id="catSlug" name="slug" class="form-control" required
                                data-i18n-placeholder="form.fields.slug.placeholder"
-                               placeholder="<?= __t('form.fields.slug.placeholder', 'Enter slug') ?>">
-                        <div class="invalid-feedback" data-i18n="form.fields.slug.required">
-                            <?= __t('form.fields.slug.required', 'Slug is required') ?>
-                        </div>
+                               placeholder="<?= htmlspecialchars(_cat('form.fields.slug.placeholder', 'Enter slug'), ENT_QUOTES, 'UTF-8') ?>">
                     </div>
-
                     <!-- Parent -->
                     <div class="form-group">
                         <label for="catParentId" data-i18n="form.fields.parent_id.label">
-                            <?= __t('form.fields.parent_id.label', 'Parent Category') ?>
+                            <?= htmlspecialchars(_cat('form.fields.parent_id.label', 'Parent Category'), ENT_QUOTES, 'UTF-8') ?>
                         </label>
                         <select id="catParentId" name="parent_id" class="form-control">
                             <option value="" data-i18n="form.fields.parent_id.none">
-                                <?= __t('form.fields.parent_id.none', 'None (Root)') ?>
+                                <?= htmlspecialchars(_cat('form.fields.parent_id.none', 'None (Root)'), ENT_QUOTES, 'UTF-8') ?>
                             </option>
                         </select>
                     </div>
@@ -220,43 +184,35 @@ $apiBase = '/api';
                     <!-- Sort Order -->
                     <div class="form-group">
                         <label for="catSortOrder" data-i18n="form.fields.sort_order.label">
-                            <?= __t('form.fields.sort_order.label', 'Sort Order') ?>
+                            <?= htmlspecialchars(_cat('form.fields.sort_order.label', 'Sort Order'), ENT_QUOTES, 'UTF-8') ?>
                         </label>
-                        <input type="number"
-                               id="catSortOrder"
-                               name="sort_order"
-                               class="form-control"
-                               value="0"
-                               data-i18n-placeholder="form.fields.sort_order.placeholder"
-                               placeholder="<?= __t('form.fields.sort_order.placeholder', 'Sort order') ?>">
+                        <input type="number" id="catSortOrder" name="sort_order" class="form-control" value="0">
                     </div>
-
                     <!-- Status -->
                     <div class="form-group">
                         <label for="catIsActive" data-i18n="form.fields.status.label">
-                            <?= __t('form.fields.status.label', 'Status') ?>
+                            <?= htmlspecialchars(_cat('form.fields.status.label', 'Status'), ENT_QUOTES, 'UTF-8') ?>
                         </label>
                         <select id="catIsActive" name="is_active" class="form-control">
                             <option value="1" data-i18n="form.fields.status.active">
-                                <?= __t('form.fields.status.active', 'Active') ?>
+                                <?= htmlspecialchars(_cat('form.fields.status.active', 'Active'), ENT_QUOTES, 'UTF-8') ?>
                             </option>
                             <option value="0" data-i18n="form.fields.status.inactive">
-                                <?= __t('form.fields.status.inactive', 'Inactive') ?>
+                                <?= htmlspecialchars(_cat('form.fields.status.inactive', 'Inactive'), ENT_QUOTES, 'UTF-8') ?>
                             </option>
                         </select>
                     </div>
-
                     <!-- Featured -->
                     <div class="form-group">
                         <label for="catIsFeatured" data-i18n="form.fields.featured.label">
-                            <?= __t('form.fields.featured.label', 'Featured') ?>
+                            <?= htmlspecialchars(_cat('form.fields.featured.label', 'Featured'), ENT_QUOTES, 'UTF-8') ?>
                         </label>
                         <select id="catIsFeatured" name="is_featured" class="form-control">
                             <option value="0" data-i18n="form.fields.featured.no">
-                                <?= __t('form.fields.featured.no', 'No') ?>
+                                <?= htmlspecialchars(_cat('form.fields.featured.no', 'No'), ENT_QUOTES, 'UTF-8') ?>
                             </option>
                             <option value="1" data-i18n="form.fields.featured.yes">
-                                <?= __t('form.fields.featured.yes', 'Yes') ?>
+                                <?= htmlspecialchars(_cat('form.fields.featured.yes', 'Yes'), ENT_QUOTES, 'UTF-8') ?>
                             </option>
                         </select>
                     </div>
@@ -265,52 +221,59 @@ $apiBase = '/api';
                 <!-- Description -->
                 <div class="form-group">
                     <label for="catDescription" data-i18n="form.fields.description.label">
-                        <?= __t('form.fields.description.label', 'Description') ?>
+                        <?= htmlspecialchars(_cat('form.fields.description.label', 'Description'), ENT_QUOTES, 'UTF-8') ?>
                     </label>
-                    <textarea id="catDescription"
-                              name="description"
-                              class="form-control"
-                              rows="3"
+                    <textarea id="catDescription" name="description" class="form-control" rows="3"
                               data-i18n-placeholder="form.fields.description.placeholder"
-                              placeholder="<?= __t('form.fields.description.placeholder', 'Enter description') ?>"></textarea>
+                              placeholder="<?= htmlspecialchars(_cat('form.fields.description.placeholder', 'Enter description'), ENT_QUOTES, 'UTF-8') ?>"></textarea>
                 </div>
 
-                <!-- Image with Type -->
+                <!-- Image -->
                 <div class="form-group">
                     <label data-i18n="form.fields.image.label">
-                        <?= __t('form.fields.image.label', 'Image') ?>
+                        <?= htmlspecialchars(_cat('form.fields.image.label', 'Image'), ENT_QUOTES, 'UTF-8') ?>
                     </label>
-                    <div class="image-upload-section">
-                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                            <img id="catImagePreview" src="/assets/images/no-image.png" style="width:100px; height:100px; object-fit:cover; border-radius:4px;">
-                            <div style="flex:1;">
-                                <button type="button" id="catSelectImageBtn" class="btn btn-secondary" data-i18n="common.select_image" style="width:100%; margin-bottom:8px;">
-                                    <?= __t('common.select_image', 'Select Image') ?>
-                                </button>
-                                <select id="catImageType" class="form-control" style="font-size:0.85rem; display:none;">
-                                    <option value="">Loading image types...</option>
-                                </select>
-                                <small id="catImageTypeDesc" style="color:#94a3b8; display:none; margin-top:4px;"></small>
-                                <div id="catImageLinks" style="margin-top:5px; font-size:0.8rem; display:flex; gap:10px;"></div>
-                            </div>
+                    <div class="cat-image-row">
+                        <img id="catImagePreview" src="/assets/images/no-image.png"
+                             class="cat-image-preview" alt="Category image">
+                        <div class="cat-image-controls">
+                            <button type="button" id="catSelectImageBtn" class="btn btn-secondary">
+                                <i class="fas fa-image" aria-hidden="true"></i>
+                                <span data-i18n="common.select_image">
+                                    <?= htmlspecialchars(_cat('common.select_image', 'Select Image'), ENT_QUOTES, 'UTF-8') ?>
+                                </span>
+                            </button>
+                            <select id="catImageType" class="form-control" style="display:none;"></select>
+                            <small id="catImageTypeDesc" class="cat-image-type-desc"></small>
+                            <div id="catImageLinks" class="cat-image-links"></div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Translations -->
-                <div class="translations-section" style="margin-top:20px;">
-                    <h4 style="margin-bottom:12px; color:var(--text-primary,#fff); border-bottom:1px solid var(--border-color,#263044); padding-bottom:8px;">
-                        <i class="fas fa-language"></i> Translations
+                <div class="cat-translations-section">
+                    <h4 class="cat-translations-title">
+                        <i class="fas fa-language" aria-hidden="true"></i>
+                        <span data-i18n="form.translations.translations_title">
+                            <?= htmlspecialchars(_cat('form.translations.translations_title', 'Translations'), ENT_QUOTES, 'UTF-8') ?>
+                        </span>
                     </h4>
-                    <div id="catTranslations" class="translation-panels"></div>
-                    <div class="form-group" style="margin-top:12px;">
-                        <label for="catLangSelect" data-i18n="form.translations.select_lang">Select Language</label>
-                        <div style="display:flex; gap:8px; align-items:flex-end;">
-                            <select id="catLangSelect" class="form-control" style="flex:1;">
-                                <option value="">Choose language</option>
+                    <div id="catTranslations" class="cat-translation-panels"></div>
+                    <div class="form-group cat-add-lang-row">
+                        <label for="catLangSelect" data-i18n="form.translations.select_lang">
+                            <?= htmlspecialchars(_cat('form.translations.select_lang', 'Select Language'), ENT_QUOTES, 'UTF-8') ?>
+                        </label>
+                        <div class="cat-lang-picker">
+                            <select id="catLangSelect" class="form-control">
+                                <option value="" data-i18n="form.translations.choose_lang">
+                                    <?= htmlspecialchars(_cat('form.translations.choose_lang', 'Choose language'), ENT_QUOTES, 'UTF-8') ?>
+                                </option>
                             </select>
                             <button type="button" id="catAddLangBtn" class="btn btn-primary">
-                                <i class="fas fa-plus"></i> Add Translation
+                                <i class="fas fa-plus" aria-hidden="true"></i>
+                                <span data-i18n="form.translations.add_translation">
+                                    <?= htmlspecialchars(_cat('form.translations.add_translation', 'Add Translation'), ENT_QUOTES, 'UTF-8') ?>
+                                </span>
                             </button>
                         </div>
                     </div>
@@ -318,16 +281,21 @@ $apiBase = '/api';
 
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary" id="btnSubmitForm">
-                        <i class="fas fa-save"></i>
-                        <span data-i18n="form.buttons.save"><?= __t('form.buttons.save', 'Save') ?></span>
+                        <i class="fas fa-save" aria-hidden="true"></i>
+                        <span data-i18n="form.buttons.save">
+                            <?= htmlspecialchars(_cat('form.buttons.save', 'Save'), ENT_QUOTES, 'UTF-8') ?>
+                        </span>
                     </button>
-                    <button type="button" class="btn btn-outline" id="btnCancelForm" data-i18n="form.buttons.cancel">
-                        <?= __t('form.buttons.cancel', 'Cancel') ?>
+                    <button type="button" id="btnCancelForm" class="btn btn-secondary" data-i18n="form.buttons.cancel">
+                        <?= htmlspecialchars(_cat('form.buttons.cancel', 'Cancel'), ENT_QUOTES, 'UTF-8') ?>
                     </button>
                     <?php if ($canDelete): ?>
-                    <button type="button" id="btnDeleteCategory" class="btn btn-danger" style="display:none">
-                        <i class="fas fa-trash"></i>
-                        <span data-i18n="table.actions.delete"><?= __t('table.actions.delete', 'Delete') ?></span>
+                    <button type="button" id="btnDeleteCategory"
+                            class="btn btn-danger cat-delete-btn" style="display:none;">
+                        <i class="fas fa-trash" aria-hidden="true"></i>
+                        <span data-i18n="table.actions.delete">
+                            <?= htmlspecialchars(_cat('table.actions.delete', 'Delete'), ENT_QUOTES, 'UTF-8') ?>
+                        </span>
                     </button>
                     <?php endif; ?>
                 </div>
@@ -335,320 +303,285 @@ $apiBase = '/api';
         </div>
     </div>
 
-    <!-- Filters -->
-    <div class="card filter-card">
+    <!-- ═══ FILTERS ════════════════════════════════════════ -->
+    <div class="card">
         <div class="card-body">
             <div class="filters-grid">
                 <div class="filter-group">
-                    <label for="searchInput" data-i18n="filters.search">
-                        <?= __t('filters.search', 'Search') ?>
+                    <label class="filter-label" for="searchInput" data-i18n="filters.search">
+                        <?= htmlspecialchars(_cat('filters.search', 'Search'), ENT_QUOTES, 'UTF-8') ?>
                     </label>
-                    <input type="text"
-                           id="searchInput"
-                           class="form-control"
+                    <input type="text" id="searchInput" class="form-control"
                            data-i18n-placeholder="filters.search_placeholder"
-                           placeholder="<?= __t('filters.search_placeholder', 'Search...') ?>">
+                           placeholder="<?= htmlspecialchars(_cat('filters.search_placeholder', 'Search...'), ENT_QUOTES, 'UTF-8') ?>">
                 </div>
-
-                <?php if (is_super_admin()): ?>
+                <?php if ($isSA): ?>
                 <div class="filter-group">
-                    <label for="tenantFilter" data-i18n="filters.tenant_id">
-                        <?= __t('filters.tenant_id', 'Tenant ID') ?>
+                    <label class="filter-label" for="tenantFilter" data-i18n="filters.tenant_id">
+                        <?= htmlspecialchars(_cat('filters.tenant_id', 'Tenant ID'), ENT_QUOTES, 'UTF-8') ?>
                     </label>
-                    <input type="number"
-                           id="tenantFilter"
-                           class="form-control"
-                           value="<?= $tenantId ?>"
-                           data-i18n-placeholder="filters.tenant_placeholder"
-                           placeholder="<?= __t('filters.tenant_placeholder', 'Filter by tenant') ?>">
+                    <input type="number" id="tenantFilter" class="form-control"
+                           value="<?= (int)$tenantId ?>">
                 </div>
                 <?php endif; ?>
-
                 <div class="filter-group">
-                    <label for="parentFilter" data-i18n="filters.parent_id">
-                        <?= __t('filters.parent_id', 'Parent ID') ?>
+                    <label class="filter-label" for="parentFilter" data-i18n="filters.parent_id">
+                        <?= htmlspecialchars(_cat('filters.parent_id', 'Parent'), ENT_QUOTES, 'UTF-8') ?>
                     </label>
                     <select id="parentFilter" class="form-control">
                         <option value="" data-i18n="filters.parent_options.all">
-                            <?= __t('filters.parent_options.all', 'All Parents') ?>
+                            <?= htmlspecialchars(_cat('filters.parent_options.all', 'All Parents'), ENT_QUOTES, 'UTF-8') ?>
                         </option>
                     </select>
                 </div>
-
                 <div class="filter-group">
-                    <label for="statusFilter" data-i18n="filters.status">
-                        <?= __t('filters.status', 'Status') ?>
+                    <label class="filter-label" for="statusFilter" data-i18n="filters.status">
+                        <?= htmlspecialchars(_cat('filters.status', 'Status'), ENT_QUOTES, 'UTF-8') ?>
                     </label>
                     <select id="statusFilter" class="form-control">
-                        <option value="" data-i18n="filters.status_options.all">
-                            <?= __t('filters.status_options.all', 'All Status') ?>
+                        <option value="">
+                            <?= htmlspecialchars(_cat('filters.status_options.all', 'All'), ENT_QUOTES, 'UTF-8') ?>
                         </option>
-                        <option value="1" data-i18n="filters.status_options.active">
-                            <?= __t('filters.status_options.active', 'Active') ?>
+                        <option value="1">
+                            <?= htmlspecialchars(_cat('filters.status_options.active', 'Active'), ENT_QUOTES, 'UTF-8') ?>
                         </option>
-                        <option value="0" data-i18n="filters.status_options.inactive">
-                            <?= __t('filters.status_options.inactive', 'Inactive') ?>
+                        <option value="0">
+                            <?= htmlspecialchars(_cat('filters.status_options.inactive', 'Inactive'), ENT_QUOTES, 'UTF-8') ?>
                         </option>
                     </select>
                 </div>
-
                 <div class="filter-group">
-                    <label for="featuredFilter" data-i18n="filters.featured">
-                        <?= __t('filters.featured', 'Featured') ?>
+                    <label class="filter-label" for="featuredFilter" data-i18n="filters.featured">
+                        <?= htmlspecialchars(_cat('filters.featured', 'Featured'), ENT_QUOTES, 'UTF-8') ?>
                     </label>
                     <select id="featuredFilter" class="form-control">
-                        <option value="" data-i18n="filters.featured_options.all">
-                            <?= __t('filters.featured_options.all', 'All') ?>
+                        <option value="">
+                            <?= htmlspecialchars(_cat('filters.featured_options.all', 'All'), ENT_QUOTES, 'UTF-8') ?>
                         </option>
-                        <option value="1" data-i18n="filters.featured_options.yes">
-                            <?= __t('filters.featured_options.yes', 'Featured') ?>
+                        <option value="1">
+                            <?= htmlspecialchars(_cat('filters.featured_options.yes', 'Featured'), ENT_QUOTES, 'UTF-8') ?>
                         </option>
-                        <option value="0" data-i18n="filters.featured_options.no">
-                            <?= __t('filters.featured_options.no', 'Not Featured') ?>
+                        <option value="0">
+                            <?= htmlspecialchars(_cat('filters.featured_options.no', 'Not Featured'), ENT_QUOTES, 'UTF-8') ?>
                         </option>
                     </select>
                 </div>
-
-                <div class="filter-actions">
-                    <button id="btnApplyFilters" class="btn btn-secondary" data-i18n="filters.apply">
-                        <?= __t('filters.apply', 'Apply') ?>
-                    </button>
-                    <button id="btnResetFilters" class="btn btn-outline" data-i18n="filters.reset">
-                        <?= __t('filters.reset', 'Reset') ?>
-                    </button>
+                <div class="filter-group">
+                    <label class="filter-label" aria-hidden="true">&nbsp;</label>
+                    <div class="filter-buttons">
+                        <button id="btnApplyFilters" class="btn btn-primary" data-i18n="filters.apply">
+                            <?= htmlspecialchars(_cat('filters.apply', 'Apply'), ENT_QUOTES, 'UTF-8') ?>
+                        </button>
+                        <button id="btnResetFilters" class="btn btn-secondary" data-i18n="filters.reset">
+                            <?= htmlspecialchars(_cat('filters.reset', 'Reset'), ENT_QUOTES, 'UTF-8') ?>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Results Count -->
-    <div id="resultsCount" class="results-count" style="padding:12px 16px; margin-bottom:12px; background:var(--card-bg,#081127); border:1px solid var(--border-color,#263044); border-radius:8px; display:none;">
-        <span style="color:var(--text-secondary,#94a3b8); font-size:0.9rem;">
-            <i class="fas fa-list"></i> 
-            <span id="resultsCountText"></span>
-        </span>
-    </div>
-
-    <!-- Table (loading / container / empty / error) -->
-    <div class="card table-card">
+    <!-- ═══ DATA TABLE ═════════════════════════════════════ -->
+    <div class="card">
         <div class="card-body">
-            <div id="tableLoading" class="loading-state">
-                <div class="spinner"></div>
-                <p data-i18n="categories.loading"><?= __t('categories.loading', 'Loading...') ?></p>
+            <div id="catLoading" class="loading-state" style="display:none;">
+                <div class="spinner" role="status"></div>
+                <p data-i18n="categories.loading">
+                    <?= htmlspecialchars(_cat('categories.loading', 'Loading...'), ENT_QUOTES, 'UTF-8') ?>
+                </p>
             </div>
-
-            <div id="tableContainer" style="display:none">
-                <div class="table-responsive">
-                    <table class="data-table" id="categoriesTable">
-                        <thead>
-                            <tr>
-                                <th data-i18n="table.headers.id"><?= __t('table.headers.id', 'ID') ?></th>
-                                <?php if (is_super_admin()): ?>
-                                <th data-i18n="table.headers.tenant"><?= __t('table.headers.tenant', 'Tenant') ?></th>
-                                <?php endif; ?>
-                                <th data-i18n="table.headers.image"><?= __t('table.headers.image', 'Image') ?></th>
-                                <th data-i18n="table.headers.name"><?= __t('table.headers.name', 'Name') ?></th>
-                                <th data-i18n="table.headers.slug"><?= __t('table.headers.slug', 'Slug') ?></th>
-                                <th data-i18n="table.headers.parent"><?= __t('table.headers.parent', 'Parent') ?></th>
-                                <th data-i18n="table.headers.sort_order"><?= __t('table.headers.sort_order', 'Sort Order') ?></th>
-                                <th data-i18n="table.headers.status"><?= __t('table.headers.status', 'Status') ?></th>
-                                <th data-i18n="table.headers.featured"><?= __t('table.headers.featured', 'Featured') ?></th>
-                                <th data-i18n="table.headers.actions"><?= __t('table.headers.actions', 'Actions') ?></th>
-                            </tr>
-                        </thead>
-                        <tbody id="tableBody"></tbody>
-                    </table>
-                </div>
-
-                <div class="pagination-wrapper">
-                    <div class="pagination-info">
-                        <span data-i18n="pagination.showing"><?= __t('pagination.showing', 'Showing') ?></span>
-                        <span id="paginationInfo">0-0 of 0</span>
-                    </div>
-                    <div class="pagination" id="pagination"></div>
-                </div>
-            </div>
-
-            <div id="emptyState" class="empty-state" style="display:none">
-                <div class="empty-icon">📁</div>
-                <h3 data-i18n="table.empty.title"><?= __t('table.empty.title', 'No Categories Found') ?></h3>
-                <p data-i18n="table.empty.message"><?= __t('table.empty.message', 'Start by adding categories') ?></p>
+            <div id="catEmpty" class="empty-state" style="display:none;">
+                <div class="empty-icon"><i class="fas fa-folder-open" aria-hidden="true"></i></div>
+                <h3 data-i18n="table.empty.title">
+                    <?= htmlspecialchars(_cat('table.empty.title', 'No Categories Found'), ENT_QUOTES, 'UTF-8') ?>
+                </h3>
+                <p data-i18n="table.empty.message">
+                    <?= htmlspecialchars(_cat('table.empty.message', 'Start by adding categories'), ENT_QUOTES, 'UTF-8') ?>
+                </p>
                 <?php if ($canCreate): ?>
-                <button class="btn btn-primary" onclick="if(window.Categories)window.Categories.add()">
-                    <i class="fas fa-plus"></i>
-                    <span data-i18n="table.empty.add_first"><?= __t('table.empty.add_first', 'Add First Category') ?></span>
+                <button id="btnAddCategoryEmpty" class="btn btn-primary">
+                    <i class="fas fa-plus" aria-hidden="true"></i>
+                    <span data-i18n="table.empty.add_first">
+                        <?= htmlspecialchars(_cat('table.empty.add_first', 'Add First Category'), ENT_QUOTES, 'UTF-8') ?>
+                    </span>
                 </button>
                 <?php endif; ?>
             </div>
-
-            <div id="errorState" class="error-state" style="display:none">
-                <div class="error-icon">⚠️</div>
-                <h3 data-i18n="messages.error.load_failed"><?= __t('messages.error.load_failed', 'Error Loading Data') ?></h3>
-                <p id="errorMessage"></p>
-                <button id="btnRetry" class="btn btn-secondary" data-i18n="categories.retry">
-                    <?= __t('categories.retry', 'Retry') ?>
+            <div id="catError" class="error-state" style="display:none;">
+                <div class="error-icon"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i></div>
+                <h3 data-i18n="messages.error.load_failed">
+                    <?= htmlspecialchars(_cat('messages.error.load_failed', 'Error Loading Data'), ENT_QUOTES, 'UTF-8') ?>
+                </h3>
+                <p id="catErrorMessage"></p>
+                <button id="btnRetry" class="btn btn-primary" data-i18n="categories.retry">
+                    <?= htmlspecialchars(_cat('categories.retry', 'Retry'), ENT_QUOTES, 'UTF-8') ?>
                 </button>
+            </div>
+            <div id="catTableContainer" class="table-responsive" style="display:none;">
+                <table class="data-table" id="categoriesTable" aria-label="Categories">
+                    <thead>
+                        <tr>
+                            <th data-i18n="table.headers.id">ID</th>
+                            <?php if ($isSA): ?>
+                            <th data-i18n="table.headers.tenant">
+                                <?= htmlspecialchars(_cat('table.headers.tenant', 'Tenant'), ENT_QUOTES, 'UTF-8') ?>
+                            </th>
+                            <?php endif; ?>
+                            <th data-i18n="table.headers.image">
+                                <?= htmlspecialchars(_cat('table.headers.image', 'Image'), ENT_QUOTES, 'UTF-8') ?>
+                            </th>
+                            <th data-i18n="table.headers.name">
+                                <?= htmlspecialchars(_cat('table.headers.name', 'Name'), ENT_QUOTES, 'UTF-8') ?>
+                            </th>
+                            <th data-i18n="table.headers.slug">
+                                <?= htmlspecialchars(_cat('table.headers.slug', 'Slug'), ENT_QUOTES, 'UTF-8') ?>
+                            </th>
+                            <th data-i18n="table.headers.parent">
+                                <?= htmlspecialchars(_cat('table.headers.parent', 'Parent'), ENT_QUOTES, 'UTF-8') ?>
+                            </th>
+                            <th data-i18n="table.headers.sort_order">
+                                <?= htmlspecialchars(_cat('table.headers.sort_order', 'Sort'), ENT_QUOTES, 'UTF-8') ?>
+                            </th>
+                            <th data-i18n="table.headers.status">
+                                <?= htmlspecialchars(_cat('table.headers.status', 'Status'), ENT_QUOTES, 'UTF-8') ?>
+                            </th>
+                            <th data-i18n="table.headers.featured">
+                                <?= htmlspecialchars(_cat('table.headers.featured', 'Featured'), ENT_QUOTES, 'UTF-8') ?>
+                            </th>
+                            <th data-i18n="table.headers.actions">
+                                <?= htmlspecialchars(_cat('table.headers.actions', 'Actions'), ENT_QUOTES, 'UTF-8') ?>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="catTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="pagination-wrapper">
+            <div class="pagination-info" id="catPaginationInfo" aria-live="polite"></div>
+            <div class="pagination" id="catPagination" role="navigation" aria-label="Pagination"></div>
+        </div>
+    </div>
+
+    <!-- ═══ MEDIA STUDIO MODAL ═════════════════════════════ -->
+    <div id="catMediaModal" class="cat-modal-backdrop" style="display:none;"
+         role="dialog" aria-modal="true">
+        <div class="cat-modal-panel cat-modal-panel--xl">
+            <div class="cat-modal-header">
+                <h3 data-i18n="common.select_image">Select Image</h3>
+                <button type="button" id="catMediaClose" class="icon-btn" aria-label="Close">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="cat-modal-frame">
+                <iframe id="catMediaFrame"
+                        src=""
+                        title="Media Studio"
+                        loading="lazy"></iframe>
             </div>
         </div>
     </div>
 
-    <!-- Media Studio Modal -->
-    <div id="catMediaStudioModal" class="modal" style="display:none">
-        <div class="modal-content">
-            <span class="close" id="catMediaStudioClose">&times;</span>
-            <iframe id="catMediaStudioFrame" src="/admin/fragments/media_studio.php?embedded=1&tenant_id=<?= $tenantId ?>&lang=<?= $lang ?>" style="width:100%; height:500px; border:none;"></iframe>
+    <!-- ═══ EXCEL IMPORT MODAL ═════════════════════════════ -->
+    <div id="catExcelModal" class="cat-modal-backdrop" style="display:none;"
+         role="dialog" aria-modal="true">
+        <div class="cat-modal-panel">
+            <div class="cat-modal-header">
+                <h3>
+                    <i class="fas fa-file-excel" aria-hidden="true"></i>
+                    <span data-i18n="excel.title">
+                        <?= htmlspecialchars(_cat('excel.title', 'Import Categories from Excel / CSV'), ENT_QUOTES, 'UTF-8') ?>
+                    </span>
+                </h3>
+                <button type="button" id="catExcelClose" class="icon-btn" aria-label="Close">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="cat-modal-body">
+                <div class="info-hint-box">
+                    <strong><i class="fas fa-info-circle"></i>
+                        <span data-i18n="excel.columns_info_label">Excel Column Format:</span>
+                    </strong><br>
+                    <code>name</code> (required) &nbsp;|&nbsp;
+                    <code>parent_name</code> &nbsp;|&nbsp;
+                    <code>level</code> &nbsp;|&nbsp;
+                    <code>slug</code> &nbsp;|&nbsp;
+                    <code>description</code> &nbsp;|&nbsp;
+                    <code>sort_order</code> &nbsp;|&nbsp;
+                    <code>is_active</code> &nbsp;|&nbsp;
+                    <code>is_featured</code><br>
+                    <small data-i18n="excel.columns_info">
+                        Plus language columns: en_name, en_slug, ar_name, ar_slug …
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label class="filter-label" data-i18n="excel.choose_file">
+                        <?= htmlspecialchars(_cat('excel.choose_file', 'Choose File (CSV or XLSX)'), ENT_QUOTES, 'UTF-8') ?>
+                    </label>
+                    <div class="cat-excel-file-row">
+                        <input type="file" id="catExcelFileInput" accept=".xlsx,.xls,.csv"
+                               class="form-control">
+                        <button type="button" id="catExcelDownloadSample" class="btn btn-secondary">
+                            <i class="fas fa-download" aria-hidden="true"></i>
+                            <span data-i18n="excel.download_sample">Sample</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="catExcelPreviewInfo" class="success-hint-box" style="display:none;">
+                    <span id="catExcelPreviewText"></span>
+                </div>
+
+                <div id="catExcelProgressArea" style="display:none;">
+                    <div class="cat-excel-progress-header">
+                        <span id="catExcelProgressLabel" data-i18n="excel.importing">Importing…</span>
+                        <span id="catExcelProgressPct">0%</span>
+                    </div>
+                    <div class="cat-progress-track">
+                        <div id="catExcelProgressBar" class="cat-progress-bar"></div>
+                    </div>
+                    <pre id="catExcelProgressLog" class="cat-excel-log"></pre>
+                </div>
+
+                <div id="catExcelResultSummary" style="display:none;" class="cat-excel-result"></div>
+
+                <div class="form-actions">
+                    <button type="button" id="catExcelImportStart" class="btn btn-primary" disabled>
+                        <i class="fas fa-upload" aria-hidden="true"></i>
+                        <span data-i18n="excel.import">Start Import</span>
+                    </button>
+                    <button type="button" id="catExcelImportCancel" class="btn btn-secondary" data-i18n="excel.cancel">
+                        <?= htmlspecialchars(_cat('excel.cancel', 'Cancel'), ENT_QUOTES, 'UTF-8') ?>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
-</div>
+</div><!-- /.page-container -->
 
-<!-- Expose client-side globals for the module -->
-<script type="text/javascript">
-window.APP_CONFIG = window.APP_CONFIG || {};
-window.APP_CONFIG.API_BASE = window.APP_CONFIG.API_BASE || '<?= $apiBase ?>';
-window.APP_CONFIG.TENANT_ID = window.APP_CONFIG.TENANT_ID || <?= $tenantId ?>;
-window.APP_CONFIG.CSRF_TOKEN = window.APP_CONFIG.CSRF_TOKEN || '<?= addslashes($csrf) ?>';
-window.APP_CONFIG.USER_ID = window.APP_CONFIG.USER_ID || <?= admin_user_id() ?>;
-
-window.USER_LANGUAGE = window.USER_LANGUAGE || '<?= addslashes($lang) ?>';
-window.USER_DIRECTION = window.USER_DIRECTION || '<?= addslashes($dir) ?>';
-window.CSRF_TOKEN = window.CSRF_TOKEN || '<?= addslashes($csrf) ?>';
-
-// Page permissions available to JS
-window.PAGE_PERMISSIONS = <?= json_encode([
-    'canCreate' => $canCreate,
-    'canEdit' => $canEdit,
-    'canDelete' => $canDelete,
-    'canDuplicate' => $canDuplicate,
-    'canViewAll' => $canViewAll,
-    'canViewOwn' => $canViewOwn,
-    'canViewTenant' => $canViewTenant,
-    'canEditAll' => $canEditAll,
-    'canEditOwn' => $canEditOwn,
-    'canDeleteAll' => $canDeleteAll,
-    'canDeleteOwn' => $canDeleteOwn,
-    'isSuperAdmin' => is_super_admin()
-], JSON_UNESCAPED_UNICODE) ?>;
-</script>
-
-<script type="text/javascript">
+<!-- ══ Single unified config ════════════════════════════════ -->
+<script>
 window.CATEGORIES_CONFIG = {
-    apiUrl: '<?= $apiBase ?>/categories',
-    languagesApi: '<?= $apiBase ?>/languages',
-    tenantsApi: '<?= $apiBase ?>/tenants',
-    csrfToken: '<?= addslashes($csrf) ?>',
-    lang: '<?= addslashes($lang) ?>',
-    itemsPerPage: 25
+    apiUrl:          <?= json_encode($apiBase . '/categories',   JSON_UNESCAPED_SLASHES) ?>,
+    languagesApi:    <?= json_encode($apiBase . '/languages',    JSON_UNESCAPED_SLASHES) ?>,
+    tenantsApi:      <?= json_encode($apiBase . '/tenants',      JSON_UNESCAPED_SLASHES) ?>,
+    imageTypesApi:   <?= json_encode($apiBase . '/image-types',  JSON_UNESCAPED_SLASHES) ?>,
+    imagesApi:       <?= json_encode($apiBase . '/images',       JSON_UNESCAPED_SLASHES) ?>,
+    csrfToken:       <?= json_encode($csrf) ?>,
+    tenantId:        <?= (int)$tenantId ?>,
+    lang:            <?= json_encode($_catSafeLang) ?>,
+    dir:             <?= json_encode($dir) ?>,
+    strings:         <?= json_encode($_catStrings, JSON_UNESCAPED_UNICODE) ?>,
+    isSuperAdmin:    <?= json_encode($isSA) ?>,
+    permissions: {
+        canCreate:    <?= json_encode($canCreate) ?>,
+        canEdit:      <?= json_encode($canEdit) ?>,
+        canDelete:    <?= json_encode($canDelete) ?>
+    }
 };
 </script>
+<script src="/admin/assets/js/pages/categories.js?v=<?= assetVer('/admin/assets/js/pages/categories.js') ?>"></script>
 
-<!-- Translation loader (runs early) -->
-<script type="text/javascript">
-(function(){
-    async function applyTranslations() {
-        try {
-            const lang = window.USER_LANGUAGE || 'en';
-            const url = `/languages/Categories/${encodeURIComponent(lang)}.json`;
-            console.log('[Categories] Loading translations from', url);
-            const res = await fetch(url, { credentials: 'same-origin' });
-            if (!res.ok) throw new Error('Translation fetch failed: ' + res.status);
-            const translations = await res.json();
-            window.CATEGORIES_TRANSLATIONS = translations;
-            // apply translations to elements with data-i18n
-            const container = document.getElementById('categoriesPageContainer');
-            if (!container) return;
-            container.querySelectorAll('[data-i18n]').forEach(el => {
-                const key = el.getAttribute('data-i18n');
-                const txt = key.split('.').reduce((o,k) => (o && o[k] !== undefined) ? o[k] : null, translations);
-                if (txt !== null && txt !== undefined) {
-                    if (el.tagName === 'INPUT' && el.hasAttribute('placeholder')) {
-                        el.placeholder = txt;
-                    } else {
-                        el.textContent = txt;
-                    }
-                }
-            });
-            // placeholders
-            container.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{
-                const key = el.getAttribute('data-i18n-placeholder');
-                const txt = key.split('.').reduce((o,k) => (o && o[k] !== undefined) ? o[k] : null, translations);
-                if (txt !== null && txt !== undefined) el.placeholder = txt;
-            });
-            console.log('[Categories] Translations applied');
-        } catch (err) {
-            console.warn('[Categories] Translation load/apply failed:', err);
-        }
-    }
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', applyTranslations);
-    } else {
-        setTimeout(applyTranslations, 50);
-    }
-})();
-</script>
-
-<!-- Page Permissions JSON for scripts that prefer it in DOM -->
-<script id="pagePermissions" type="application/json">
-<?= json_encode([
-    'canCreate' => $canCreate,
-    'canEdit' => $canEdit,
-    'canDelete' => $canDelete,
-    'canDuplicate' => $canDuplicate,
-    'canViewAll' => $canViewAll,
-    'canViewOwn' => $canViewOwn,
-    'canViewTenant' => $canViewTenant,
-    'canEditAll' => $canEditAll,
-    'canEditOwn' => $canEditOwn,
-    'canDeleteAll' => $canDeleteAll,
-    'canDeleteOwn' => $canDeleteOwn,
-    'isSuperAdmin' => is_super_admin()
-], JSON_UNESCAPED_UNICODE) ?>
-</script>
-
-<script id="CATEGORIES_INITIAL_PAYLOAD" type="application/json">
-<?= json_encode(['items' => [], 'meta' => ['page' => 1, 'per_page' => 25, 'total' => 0]]) ?>
-</script>
-
-<!-- Load AdminFramework + Page module when embedded; otherwise load normally -->
-<?php if ($isFragment): ?>
-<script src="/admin/assets/js/admin_framework.js?v=<?= time() ?>"></script>
-<script src="/admin/assets/js/pages/categories.js?v=<?= time() ?>"></script>
-
-<script>
-(function(){
-    console.log('[Categories] Embedded mode - waiting for framework & module...');
-    let attempts = 0, maxAttempts = 50;
-    const interval = setInterval(function(){
-        attempts++;
-        if (window.AdminFramework && window.Categories && typeof window.Categories.init === 'function') {
-            clearInterval(interval);
-            console.log('[Categories] Module ready - initializing...');
-            try {
-                const maybePromise = window.Categories.init();
-                if (maybePromise && typeof maybePromise.then === 'function') {
-                    maybePromise.then(()=>console.log('[Categories] Initialized')).catch(e=>console.error('[Categories] Init failed', e));
-                } else {
-                    console.log('[Categories] Initialized (sync)');
-                }
-            } catch (e) {
-                console.error('[Categories] Init threw', e);
-            }
-        } else if (attempts > maxAttempts) {
-            clearInterval(interval);
-            console.error('[Categories] Timeout waiting for module. Framework present:', !!window.AdminFramework, 'Module present:', !!window.Categories);
-        } else if (attempts % 10 === 0) {
-            console.log('[Categories] waiting...', attempts, '/', maxAttempts);
-        }
-    }, 100);
-})();
-</script>
-<?php else: ?>
-<script src="/admin/assets/js/pages/categories.js?v=<?= time() ?>"></script>
-<?php endif; ?>
-
-<?php
-// Load footer if standalone
-if (!$isFragment) {
-    require_once __DIR__ . '/../includes/footer.php';
-}
-?>
+<?php if (!$isFragment) require_once __DIR__ . '/../includes/footer.php'; ?>

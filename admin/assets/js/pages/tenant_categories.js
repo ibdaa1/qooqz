@@ -1,1283 +1,665 @@
-(function(){
+/**
+ * /admin/assets/js/pages/tenant_categories.js — Production v2.0
+ *
+ * ─ التغييرات عن النسخة السابقة ─────────────────────────────
+ * • translations تُحمَّل من CONFIG.strings (مُحقَنة من PHP) بدلاً
+ *   من fetch منفصل — يُقلّل طلب HTTP ويضمن التزامن مع PHP
+ * • notify() بـ tc- prefix يتطابق مع CSS
+ * • showState() IDs: tcLoading/tcEmpty/tcError/tcTableContainer
+ * • btn-outline للتعديل → btn-primary
+ * • credentials: 'same-origin' على كل fetch
+ * • ESC يُغلق form card
+ * • Admin.page.register + window.page للـ fragment navigation
+ * • pagination بـ .pagination بدل pagination-buttons
+ * ─────────────────────────────────────────────────────────────
+ */
+(function () {
     'use strict';
-    
-    const CONFIG = window.TENANT_CATEGORIES_CONFIG || {};
-    const AF = window.AdminFramework || {};
-    const API = CONFIG.apiUrl || '/api/categories-tenants';
-    const TENANTS_API = CONFIG.tenantsUrl || '/api/tenants';
-    const CATEGORIES_API = CONFIG.categoriesUrl || '/api/categories';
-    const TRANSLATIONS_URL = CONFIG.translationsUrl || '/languages/Tenant_categories/en.json';
-    
+
+    const CFG           = window.TENANT_CATEGORIES_CONFIG || {};
+    const API           = CFG.apiUrl        || '/api/categories-tenants';
+    const TENANTS_API   = CFG.tenantsUrl    || '/api/tenants';
+    const CATEGORIES_API = CFG.categoriesUrl || '/api/categories';
+
+    // ── i18n ──────────────────────────────────────────────────
+    // الترجمات مُحقَنة من PHP في CONFIG.strings — لا fetch إضافي
+    const S = CFG.strings || {};
+    function t(key, fallback) {
+        const parts = key.split('.');
+        let val = S;
+        for (const k of parts) {
+            if (val && typeof val === 'object' && k in val) val = val[k];
+            else return fallback || key;
+        }
+        return typeof val === 'string' ? val : (fallback || key);
+    }
+
+    // ── State ─────────────────────────────────────────────────
     const state = {
-        page: 1,
-        perPage: 25,
-        filters: {},
-        items: [],
-        tenants: [],
-        categories: [],
-        permissions: CONFIG.permissions || {},
-        isSuperAdmin: CONFIG.isSuperAdmin || false
+        page:         1,
+        perPage:      25,
+        filters:      {},
+        items:        [],
+        tenants:      [],
+        categories:   [],
+        isSuperAdmin: CFG.isSuperAdmin || false,
+        permissions:  CFG.permissions  || {},
     };
-    
+
     let el = {};
-    let translations = {};
-    
-    // تحميل الترجمات
-    async function loadTranslations() {
-        try {
-            const response = await fetch(TRANSLATIONS_URL);
-            if (response.ok) {
-                translations = await response.json();
-            } else {
-                console.warn('Translations file not found, using defaults');
-            }
-        } catch (error) {
-            console.error('Error loading translations:', error);
+
+    // ════════════════════════════════════════════════════════
+    // TOAST NOTIFICATIONS  (tc- prefix → matches CSS)
+    // ════════════════════════════════════════════════════════
+    function notify(message, type = 'info') {
+        const AF = window.AdminFramework;
+        if (AF) {
+            if (type === 'success' && AF.success) return AF.success(message);
+            if (type === 'error'   && AF.error)   return AF.error(message);
+            if (type === 'warning' && AF.warning)  return AF.warning(message);
+            if (AF.notify) return AF.notify(message, type);
+        }
+
+        let container = document.getElementById('tcNotifications');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'tcNotifications';
+            container.className = 'tc-notifications';
+            const page = document.getElementById('tenantCategoriesPage');
+            (page || document.body).insertBefore(container, (page || document.body).firstChild);
+        }
+
+        const toast = document.createElement('div');
+        toast.className = `tc-toast tc-toast-${type}`;
+        toast.setAttribute('role', 'alert');
+
+        const msg = document.createElement('span');
+        msg.textContent = message;
+        toast.appendChild(msg);
+
+        const close = document.createElement('button');
+        close.className = 'tc-toast-close';
+        close.setAttribute('aria-label', 'Close');
+        close.textContent = '\u00d7';
+        close.addEventListener('click', () => toast.remove());
+        toast.appendChild(close);
+
+        container.appendChild(toast);
+        setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4500);
+    }
+
+    // ════════════════════════════════════════════════════════
+    // TABLE STATE
+    // ════════════════════════════════════════════════════════
+    function showState(which, msg = '') {
+        const loading   = document.getElementById('tcLoading');
+        const empty     = document.getElementById('tcEmpty');
+        const error     = document.getElementById('tcError');
+        const container = document.getElementById('tcTableContainer');
+        const errMsg    = document.getElementById('tcErrorMessage');
+
+        [loading, empty, error, container].forEach(e => { if (e) e.style.display = 'none'; });
+
+        switch (which) {
+            case 'loading': if (loading)   loading.style.display   = 'flex';  break;
+            case 'empty':   if (empty)     empty.style.display     = 'flex';  break;
+            case 'error':
+                if (error)  error.style.display = 'flex';
+                if (errMsg && msg) errMsg.textContent = msg;
+                break;
+            default:        if (container) container.style.display = 'block'; break;
         }
     }
-    
-    // دالة الترجمة
-    function t(key, placeholders = {}) {
-        let text = translations[key] || key;
-        Object.keys(placeholders).forEach(p => {
-            text = text.replace(new RegExp(`{${p}}`, 'g'), placeholders[p]);
-        });
-        return text;
+
+    // ════════════════════════════════════════════════════════
+    // HELPERS
+    // ════════════════════════════════════════════════════════
+    function esc(txt) {
+        if (txt == null) return '';
+        const d = document.createElement('div');
+        d.textContent = String(txt);
+        return d.innerHTML;
     }
-    
-    // تحديث النصوص بالترجمة
-    function applyTranslations() {
-        const container = document.getElementById('tenantCategoriesPage');
-        if (!container) return;
-        
-        container.querySelectorAll('[data-i18n]').forEach(el => {
-            const key = el.getAttribute('data-i18n');
-            if (key.includes('_placeholder')) {
-                el.setAttribute('placeholder', t(key));
-            } else {
-                el.textContent = t(key);
-            }
-        });
-    }
-    
-    // دالة الإشعارات
-    function showNotification(message, type = 'success') {
-        console.log('Attempting to show notification:', message, type);
-        if (!el.notificationsContainer) {
-            console.error('Notifications container not found');
-            return;
-        }
-        console.log('Notifications container found:', el.notificationsContainer);
-        
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        notification.textContent = message;
-        
-        el.notificationsContainer.appendChild(notification);
-        console.log('Notification appended');
-        
-        // إزالة تلقائياً بعد 5 ثوان
-        setTimeout(() => {
-            notification.classList.add('fade-out');
-            setTimeout(() => notification.remove(), 300);
-        }, 5000);
-        
-        // إزالة عند النقر
-        notification.onclick = () => {
-            notification.classList.add('fade-out');
-            setTimeout(() => notification.remove(), 300);
+
+    async function apiFetch(url, options = {}) {
+        const defaults = {
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type':     'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-Token':     CFG.csrfToken || '',
+            },
         };
+        const config = {
+            ...defaults,
+            ...options,
+            headers: { ...defaults.headers, ...(options.headers || {}) },
+        };
+        const res  = await fetch(url, config);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || data.error || `HTTP ${res.status}`);
+        return data;
     }
-    
-    // تحميل التنانتس والكاتيجوريز
+
+    // ════════════════════════════════════════════════════════
+    // DROPDOWNS
+    // ════════════════════════════════════════════════════════
     async function loadDropdowns() {
         try {
-            const [tenantsRes, categoriesRes] = await Promise.all([
-                fetch(`${TENANTS_API}?format=json&limit=1000`, { credentials: 'same-origin' }),
-                fetch(`${CATEGORIES_API}?format=json&limit=1000&lang=${CONFIG.lang}`, { credentials: 'same-origin' })
-            ]);
-            
-            if (tenantsRes.ok) {
-                const tenantsData = await tenantsRes.json();
-                if (tenantsData.success && tenantsData.data) {
-                    const items = tenantsData.data.items || tenantsData.data;
-                    if (Array.isArray(items)) {
-                        state.tenants = items;
-                        populateDatalist('tenantsList', state.tenants, 'id', 'name');
-                        populateDatalist('filterTenantsList', state.tenants, 'id', 'name');
-                    }
+            const catParams = new URLSearchParams({
+                format: 'json', limit: 1000,
+                lang: CFG.lang || 'en',
+                skip_tc_filter: 1, parent_id: 0,
+            });
+
+            const promises = [
+                apiFetch(`${CATEGORIES_API}?${catParams}`),
+            ];
+            if (state.isSuperAdmin) {
+                promises.push(apiFetch(`${TENANTS_API}?format=json&limit=1000`));
+            }
+
+            const [catResult, tenantResult] = await Promise.all(promises);
+
+            // Categories
+            const cats = catResult?.data?.items || catResult?.data || [];
+            if (Array.isArray(cats)) {
+                state.categories = cats;
+                populateSelect('tenantCategoryCategoryId', cats);
+                populateDatalist('filterCategoriesList', cats);
+            }
+
+            // Tenants (super admin only)
+            if (tenantResult) {
+                const tenants = tenantResult?.data?.items || tenantResult?.data || [];
+                if (Array.isArray(tenants)) {
+                    state.tenants = tenants;
+                    populateDatalist('tenantsList',       tenants);
+                    populateDatalist('filterTenantsList', tenants);
                 }
             }
-            
-            if (categoriesRes.ok) {
-                const categoriesData = await categoriesRes.json();
-                if (categoriesData.success && categoriesData.data) {
-                    const items = categoriesData.data.items || categoriesData.data;
-                    if (Array.isArray(items)) {
-                        state.categories = items;
-                        populateDatalist('categoriesList', state.categories, 'id', 'name');
-                        populateDatalist('filterCategoriesList', state.categories, 'id', 'name');
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('[TenantCategories] Load dropdowns error:', error);
+        } catch (e) {
+            console.error('[TenantCategories] loadDropdowns:', e);
         }
     }
-    
-    function populateDatalist(datalistId, data, valueKey, textKey) {
-        const datalist = document.getElementById(datalistId);
-        if (!datalist || !Array.isArray(data)) return;
-        datalist.innerHTML = '';
-        data.forEach(item => {
-            const option = document.createElement('option');
-            option.value = item[textKey] || item[valueKey];
-            option.setAttribute('data-id', item[valueKey]);
-            datalist.appendChild(option);
+
+    function populateSelect(selectId, items) {
+        const select = document.getElementById(selectId);
+        if (!select || !Array.isArray(items)) return;
+        const placeholder = select.querySelector('option[value=""]');
+        select.innerHTML = '';
+        if (placeholder) select.appendChild(placeholder);
+        items.forEach(item => {
+            const o = document.createElement('option');
+            o.value       = item.id;
+            o.textContent = `${item.name || item.id} (#${item.id})`;
+            select.appendChild(o);
         });
     }
-    
+
+    function populateDatalist(datalistId, items) {
+        const dl = document.getElementById(datalistId);
+        if (!dl || !Array.isArray(items)) return;
+        dl.innerHTML = '';
+        items.forEach(item => {
+            const o = document.createElement('option');
+            o.value = item.name || item.id;
+            o.setAttribute('data-id', item.id);
+            dl.appendChild(o);
+        });
+    }
+
     function getIdFromDatalist(datalistId, displayValue) {
-        const datalist = document.getElementById(datalistId);
-        if (!datalist) return null;
-        const options = datalist.querySelectorAll('option');
-        for (let option of options) {
-            if (option.value === displayValue) {
-                return option.getAttribute('data-id');
-            }
+        const dl      = document.getElementById(datalistId);
+        const trimmed = (displayValue || '').trim();
+        if (!dl || !trimmed) return null;
+        for (const o of dl.querySelectorAll('option')) {
+            if (o.value === trimmed) return o.getAttribute('data-id');
         }
+        if (/^\d+$/.test(trimmed)) return trimmed;
         return null;
     }
-    
+
     function setDisplayFromId(hiddenId, displayId, datalistId, idValue) {
-        const datalist = document.getElementById(datalistId);
-        if (!datalist) return;
-        const options = datalist.querySelectorAll('option');
-        for (let option of options) {
-            if (option.getAttribute('data-id') === idValue.toString()) {
-                document.getElementById(displayId).value = option.value;
-                document.getElementById(hiddenId).value = idValue;
+        if (!idValue) return;
+        const dl = document.getElementById(datalistId);
+        if (!dl) return;
+        for (const o of dl.querySelectorAll('option')) {
+            if (o.getAttribute('data-id') === String(idValue)) {
+                const displayEl = document.getElementById(displayId);
+                const hiddenEl  = document.getElementById(hiddenId);
+                if (displayEl) displayEl.value = o.value;
+                if (hiddenEl)  hiddenEl.value  = idValue;
                 return;
             }
         }
     }
-    
-    // تحميل البيانات
+
+    // ════════════════════════════════════════════════════════
+    // LOAD DATA
+    // ════════════════════════════════════════════════════════
     async function loadData(page = 1) {
+        showState('loading');
+        state.page = page;
+
+        const params = new URLSearchParams({ page, limit: state.perPage, format: 'json' });
+        Object.entries(state.filters).forEach(([k, v]) => {
+            if (v !== '' && v != null) params.set(k, v);
+        });
+        if (!state.isSuperAdmin && CFG.tenantId) {
+            params.set('tenant_id', CFG.tenantId);
+        }
+
         try {
-            showLoading();
-            
-            state.page = page;
-            const params = new URLSearchParams({
-                page: page,
-                limit: state.perPage,
-                format: 'json',
-                ...state.filters
+            const result = await apiFetch(`${API}?${params}`, {
+                headers: { 'Accept': 'application/json' },
             });
-            
-            const response = await fetch(`${API}?${params}`, {
-                credentials: 'same-origin',
-                headers: { 'Accept': 'application/json' }
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
-            const result = await response.json();
-            
-            const meta = { total: (result.data ? result.data.length : 0), page: 1, per_page: state.perPage, last_page: 1 };
-            
+
             if (result.success && result.data) {
-                state.items = result.data;
-                renderTable();
-                updatePagination(meta);
-                updateResultsCount(meta.total);
-                showTable();
+                state.items = Array.isArray(result.data) ? result.data : (result.data.items || []);
+                const total = Array.isArray(result.data)
+                    ? result.data.length
+                    : (result.data.meta?.total || state.items.length);
+
+                if (state.items.length === 0) {
+                    showState('empty');
+                } else {
+                    showState('table');
+                    renderTable();
+                    renderPagination(total);
+                }
             } else {
-                showEmpty();
+                showState('empty');
             }
-        } catch (error) {
-            console.error('[TenantCategories] Load error:', error);
-            showError(t('error_loading'));
+        } catch (e) {
+            console.error('[TenantCategories] loadData:', e);
+            showState('error', e.message || t('error_loading', 'Failed to load data'));
         }
     }
-    
-    // عرض الجدول
+
+    // ════════════════════════════════════════════════════════
+    // RENDER TABLE
+    // ════════════════════════════════════════════════════════
     function renderTable() {
-        if (!el.tableBody || state.items.length === 0) {
-            showEmpty();
-            return;
-        }
-        
-        let html = '';
-        state.items.forEach(item => {
-            const statusClass = item.is_active ? 'badge-success' : 'badge-danger';
-            const statusText = item.is_active ? t('toggle_active') : t('toggle_inactive');
-            const createdDate = new Date(item.created_at).toLocaleDateString();
-            
-            html += `
-                <tr>
-                    <td>${item.id}</td>
-                    ${state.isSuperAdmin ? `<td>${item.tenant_id}</td>` : ''}
-                    <td><strong>${escapeHtml(item.tenant_name || '-')}</strong></td>
-                    <td>${item.category_id}</td>
-                    <td><strong>${escapeHtml(item.category_name || '-')}</strong></td>
-                    <td>${item.sort_order}</td>
-                    ${state.isSuperAdmin ? `<td>
-                        <button class="btn btn-sm ${item.is_active ? 'btn-success' : 'btn-danger'}" 
-                                onclick="TenantCategories.toggleStatus(${item.id}, ${item.is_active ? 0 : 1})" 
-                                style="padding: 4px 8px; font-size: 12px;">
-                            ${statusText}
-                        </button>
-                    </td>` : ''}
-                    <td>${createdDate}</td>
+        if (!el.tableBody) return;
+        el.tableBody.innerHTML = state.items.map(item => {
+            const date = item.created_at
+                ? new Date(item.created_at).toLocaleDateString()
+                : '—';
+
+            // ✅ btn-primary للتعديل (موحَّد)
+            const editBtn = state.permissions.canEdit
+                ? `<button class="btn btn-sm btn-primary tc-edit-btn"
+                           data-id="${esc(item.id)}"
+                           aria-label="${t('edit_button','Edit')}">
+                       <i class="fas fa-edit" aria-hidden="true"></i>
+                   </button>`
+                : '';
+            const delBtn = state.permissions.canDelete
+                ? `<button class="btn btn-sm btn-danger tc-del-btn"
+                           data-id="${esc(item.id)}"
+                           aria-label="${t('delete_button','Delete')}">
+                       <i class="fas fa-trash" aria-hidden="true"></i>
+                   </button>`
+                : '';
+
+            const statusBtn = state.isSuperAdmin
+                ? `<button class="tc-toggle-btn ${item.is_active ? 'tc-toggle-active' : 'tc-toggle-inactive'}"
+                           data-id="${esc(item.id)}"
+                           data-new-status="${item.is_active ? 0 : 1}">
+                       ${item.is_active ? t('toggle_active','Active') : t('toggle_inactive','Inactive')}
+                   </button>`
+                : '';
+
+            return `
+                <tr data-id="${esc(item.id)}">
+                    <td>${esc(item.id)}</td>
+                    ${state.isSuperAdmin ? `<td>${esc(item.tenant_id)}</td>` : ''}
+                    <td><strong>${esc(item.tenant_name || '—')}</strong></td>
+                    <td>${esc(item.category_id)}</td>
+                    <td><strong>${esc(item.category_name || '—')}</strong></td>
+                    <td>${esc(item.sort_order ?? 0)}</td>
+                    ${state.isSuperAdmin ? `<td>${statusBtn}</td>` : ''}
+                    <td>${esc(date)}</td>
                     <td>
-                        <div class="table-actions" style="display: flex; gap: 8px;">
-                            ${state.permissions.canEdit ? `
-                                <button class="btn btn-sm btn-outline" onclick="TenantCategories.edit(${item.id})" 
-                                        style="padding: 4px 8px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 4px; font-size: 12px;">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                            ` : ''}
-                            ${state.permissions.canDelete ? `
-                                <button class="btn btn-sm btn-danger" onclick="TenantCategories.remove(${item.id})" 
-                                        style="padding: 4px 8px; background-color: #ef4444; color: white; border: none; border-radius: 4px; font-size: 12px;">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            ` : ''}
+                        <div class="table-actions">
+                            ${editBtn}
+                            ${delBtn}
                         </div>
                     </td>
-                </tr>
-            `;
-        });
-        
-        el.tableBody.innerHTML = html;
+                </tr>`;
+        }).join('');
+
+        // Delegate events
+        el.tableBody.querySelectorAll('.tc-edit-btn').forEach(b =>
+            b.addEventListener('click', () => editItem(b.dataset.id)));
+        el.tableBody.querySelectorAll('.tc-del-btn').forEach(b =>
+            b.addEventListener('click', () => deleteItem(b.dataset.id)));
+        el.tableBody.querySelectorAll('.tc-toggle-btn').forEach(b =>
+            b.addEventListener('click', () => toggleStatus(b.dataset.id, b.dataset.newStatus)));
     }
-    
-    // عرض النموذج
-    function showForm(isEdit = false, data = null) {
-        if (!el.formContainer) return;
-        
-        el.formContainer.style.display = 'block';
-        el.form.reset();
-        el.formId.value = '';
-        
-        el.formTitle.textContent = isEdit ? t('form_edit_title') : t('form_add_title');
-        
-        if (isEdit && data) {
-            el.formId.value = data.id;
-            if (state.isSuperAdmin) {
-                setDisplayFromId('tenantCategoryTenantIdHidden', 'tenantCategoryTenantId', 'tenantsList', data.tenant_id);
-            }
-            setDisplayFromId('tenantCategoryCategoryIdHidden', 'tenantCategoryCategoryId', 'categoriesList', data.category_id);
-            el.sortOrder.value = data.sort_order || 0;
-            if (state.isSuperAdmin) {
-                el.isActive.value = data.is_active || 1;
-            }
-            el.btnDelete.style.display = 'inline-block';
-        } else {
-            el.btnDelete.style.display = 'none';
+
+    // ════════════════════════════════════════════════════════
+    // PAGINATION
+    // ════════════════════════════════════════════════════════
+    function renderPagination(total) {
+        const totalPages = Math.max(1, Math.ceil(total / state.perPage));
+        const start = total > 0 ? (state.page - 1) * state.perPage + 1 : 0;
+        const end   = Math.min(state.page * state.perPage, total);
+
+        const infoEl = document.getElementById('tcPaginationInfo');
+        if (infoEl) {
+            infoEl.textContent = total > 0
+                ? `${start}–${end} / ${total}`
+                : t('no_records', 'No records');
         }
-        
-        el.formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-    
-    // حفظ البيانات
-    (function(){
-    'use strict';
-    
-    const CONFIG = window.TENANT_CATEGORIES_CONFIG || {};
-    const AF = window.AdminFramework || {};
-    const API = CONFIG.apiUrl || '/api/categories-tenants';
-    const TENANTS_API = CONFIG.tenantsUrl || '/api/tenants';
-    const CATEGORIES_API = CONFIG.categoriesUrl || '/api/categories';
-    const TRANSLATIONS_URL = CONFIG.translationsUrl || '/languages/Tenant_categories/en.json';
-    
-    const state = {
-        page: 1,
-        perPage: 25,
-        filters: {},
-        items: [],
-        tenants: [],
-        categories: [],
-        permissions: CONFIG.permissions || {},
-        isSuperAdmin: CONFIG.isSuperAdmin || false
-    };
-    
-    let el = {};
-    let translations = {};
-    
-    // تحميل الترجمات
-    async function loadTranslations() {
-        try {
-            const response = await fetch(TRANSLATIONS_URL);
-            if (response.ok) {
-                translations = await response.json();
-            } else {
-                console.warn('Translations file not found, using defaults');
-            }
-        } catch (error) {
-            console.error('Error loading translations:', error);
-        }
-    }
-    
-    // دالة الترجمة
-    function t(key, placeholders = {}) {
-        let text = translations[key] || key;
-        Object.keys(placeholders).forEach(p => {
-            text = text.replace(new RegExp(`{${p}}`, 'g'), placeholders[p]);
-        });
-        return text;
-    }
-    
-    // تحديث النصوص بالترجمة
-    function applyTranslations() {
-        const container = document.getElementById('tenantCategoriesPage');
-        if (!container) return;
-        
-        container.querySelectorAll('[data-i18n]').forEach(el => {
-            const key = el.getAttribute('data-i18n');
-            if (key.includes('_placeholder')) {
-                el.setAttribute('placeholder', t(key));
-            } else {
-                el.textContent = t(key);
-            }
-        });
-    }
-    
-    // دالة الإشعارات
-    function showNotification(message, type = 'success') {
-        console.log('Attempting to show notification:', message, type);
-        if (!el.notificationsContainer) {
-            console.error('Notifications container not found');
-            return;
-        }
-        console.log('Notifications container found:', el.notificationsContainer);
-        
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        notification.textContent = message;
-        
-        el.notificationsContainer.appendChild(notification);
-        console.log('Notification appended');
-        
-        // إزالة تلقائياً بعد 5 ثوان
-        setTimeout(() => {
-            notification.classList.add('fade-out');
-            setTimeout(() => notification.remove(), 300);
-        }, 5000);
-        
-        // إزالة عند النقر
-        notification.onclick = () => {
-            notification.classList.add('fade-out');
-            setTimeout(() => notification.remove(), 300);
+
+        const pagEl = document.getElementById('tcPagination');
+        if (!pagEl) return;
+        pagEl.innerHTML = '';
+        if (totalPages <= 1) return;
+
+        const makeBtn = (label, targetPage, active = false, disabled = false) => {
+            const btn = document.createElement('button');
+            btn.className = 'pagination-btn' + (active ? ' active' : '');
+            btn.innerHTML = label;
+            btn.disabled  = disabled;
+            if (!disabled) btn.addEventListener('click', () => loadData(targetPage));
+            return btn;
         };
-    }
-    
-    // تحميل التنانتس والكاتيجوريز
-    async function loadDropdowns() {
-        try {
-            const [tenantsRes, categoriesRes] = await Promise.all([
-                fetch(`${TENANTS_API}?format=json&limit=1000`, { credentials: 'same-origin' }),
-                fetch(`${CATEGORIES_API}?format=json&limit=1000&lang=${CONFIG.lang}`, { credentials: 'same-origin' })
-            ]);
-            
-            if (tenantsRes.ok) {
-                const tenantsData = await tenantsRes.json();
-                if (tenantsData.success && tenantsData.data) {
-                    const items = tenantsData.data.items || tenantsData.data;
-                    if (Array.isArray(items)) {
-                        state.tenants = items;
-                        populateDatalist('tenantsList', state.tenants, 'id', 'name');
-                        populateDatalist('filterTenantsList', state.tenants, 'id', 'name');
-                    }
-                }
-            }
-            
-            if (categoriesRes.ok) {
-                const categoriesData = await categoriesRes.json();
-                if (categoriesData.success && categoriesData.data) {
-                    const items = categoriesData.data.items || categoriesData.data;
-                    if (Array.isArray(items)) {
-                        state.categories = items;
-                        populateDatalist('categoriesList', state.categories, 'id', 'name');
-                        populateDatalist('filterCategoriesList', state.categories, 'id', 'name');
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('[TenantCategories] Load dropdowns error:', error);
-        }
-    }
-    
-    function populateDatalist(datalistId, data, valueKey, textKey) {
-        const datalist = document.getElementById(datalistId);
-        if (!datalist || !Array.isArray(data)) return;
-        datalist.innerHTML = '';
-        data.forEach(item => {
-            const option = document.createElement('option');
-            option.value = item[textKey] || item[valueKey];
-            option.setAttribute('data-id', item[valueKey]);
-            datalist.appendChild(option);
-        });
-    }
-    
-    function getIdFromDatalist(datalistId, displayValue) {
-        const datalist = document.getElementById(datalistId);
-        if (!datalist) return null;
-        const options = datalist.querySelectorAll('option');
-        for (let option of options) {
-            if (option.value === displayValue) {
-                return option.getAttribute('data-id');
+
+        pagEl.appendChild(makeBtn('&laquo;', state.page - 1, false, state.page <= 1));
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || (i >= state.page - 2 && i <= state.page + 2)) {
+                pagEl.appendChild(makeBtn(String(i), i, i === state.page, i === state.page));
+            } else if (i === state.page - 3 || i === state.page + 3) {
+                const sp = document.createElement('span');
+                sp.className = 'pagination-dots';
+                sp.textContent = '\u2026';
+                pagEl.appendChild(sp);
             }
         }
-        return null;
+        pagEl.appendChild(makeBtn('&raquo;', state.page + 1, false, state.page >= totalPages));
     }
-    
-    function setDisplayFromId(hiddenId, displayId, datalistId, idValue) {
-        const datalist = document.getElementById(datalistId);
-        if (!datalist) return;
-        const options = datalist.querySelectorAll('option');
-        for (let option of options) {
-            if (option.getAttribute('data-id') === idValue.toString()) {
-                document.getElementById(displayId).value = option.value;
-                document.getElementById(hiddenId).value = idValue;
-                return;
-            }
-        }
-    }
-    
-    // تحميل البيانات
-    async function loadData(page = 1) {
-        try {
-            showLoading();
-            
-            state.page = page;
-            const params = new URLSearchParams({
-                page: page,
-                limit: state.perPage,
-                format: 'json',
-                ...state.filters
-            });
-            
-            const response = await fetch(`${API}?${params}`, {
-                credentials: 'same-origin',
-                headers: { 'Accept': 'application/json' }
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
-            const result = await response.json();
-            
-            const meta = { total: (result.data ? result.data.length : 0), page: 1, per_page: state.perPage, last_page: 1 };
-            
-            if (result.success && result.data) {
-                state.items = result.data;
-                renderTable();
-                updatePagination(meta);
-                updateResultsCount(meta.total);
-                showTable();
-            } else {
-                showEmpty();
-            }
-        } catch (error) {
-            console.error('[TenantCategories] Load error:', error);
-            showError(t('error_loading'));
-        }
-    }
-    
-    // عرض الجدول
-    function renderTable() {
-        if (!el.tableBody || state.items.length === 0) {
-            showEmpty();
-            return;
-        }
-        
-        let html = '';
-        state.items.forEach(item => {
-            const statusClass = item.is_active ? 'badge-success' : 'badge-danger';
-            const statusText = item.is_active ? t('toggle_active') : t('toggle_inactive');
-            const createdDate = new Date(item.created_at).toLocaleDateString();
-            
-            html += `
-                <tr>
-                    <td>${item.id}</td>
-                    ${state.isSuperAdmin ? `<td>${item.tenant_id}</td>` : ''}
-                    <td><strong>${escapeHtml(item.tenant_name || '-')}</strong></td>
-                    <td>${item.category_id}</td>
-                    <td><strong>${escapeHtml(item.category_name || '-')}</strong></td>
-                    <td>${item.sort_order}</td>
-                    ${state.isSuperAdmin ? `<td>
-                        <button class="btn btn-sm ${item.is_active ? 'btn-success' : 'btn-danger'}" 
-                                onclick="TenantCategories.toggleStatus(${item.id}, ${item.is_active ? 0 : 1})" 
-                                style="padding: 4px 8px; font-size: 12px;">
-                            ${statusText}
-                        </button>
-                    </td>` : ''}
-                    <td>${createdDate}</td>
-                    <td>
-                        <div class="table-actions" style="display: flex; gap: 8px;">
-                            ${state.permissions.canEdit ? `
-                                <button class="btn btn-sm btn-outline" onclick="TenantCategories.edit(${item.id})" 
-                                        style="padding: 4px 8px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 4px; font-size: 12px;">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                            ` : ''}
-                            ${state.permissions.canDelete ? `
-                                <button class="btn btn-sm btn-danger" onclick="TenantCategories.remove(${item.id})" 
-                                        style="padding: 4px 8px; background-color: #ef4444; color: white; border: none; border-radius: 4px; font-size: 12px;">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            ` : ''}
-                        </div>
-                    </td>
-                </tr>
-            `;
-        });
-        
-        el.tableBody.innerHTML = html;
-    }
-    
-    // عرض النموذج
+
+    // ════════════════════════════════════════════════════════
+    // FORM
+    // ════════════════════════════════════════════════════════
     function showForm(isEdit = false, data = null) {
         if (!el.formContainer) return;
-        
         el.formContainer.style.display = 'block';
-        el.form.reset();
-        el.formId.value = '';
-        
-        el.formTitle.textContent = isEdit ? t('form_edit_title') : t('form_add_title');
-        
+        if (el.form) el.form.reset();
+        if (el.formId) el.formId.value = '';
+
+        if (el.formTitle) {
+            el.formTitle.textContent = isEdit
+                ? t('form_edit_title', 'Edit Tenant Category')
+                : t('form_add_title',  'Add Tenant Category');
+        }
+        if (el.btnDelete) el.btnDelete.style.display = isEdit ? 'inline-flex' : 'none';
+
         if (isEdit && data) {
-            el.formId.value = data.id;
-            if (state.isSuperAdmin) {
+            if (el.formId) el.formId.value = data.id;
+
+            if (state.isSuperAdmin && el.tenantDisplay) {
                 setDisplayFromId('tenantCategoryTenantIdHidden', 'tenantCategoryTenantId', 'tenantsList', data.tenant_id);
             }
-            setDisplayFromId('tenantCategoryCategoryIdHidden', 'tenantCategoryCategoryId', 'categoriesList', data.category_id);
-            el.sortOrder.value = data.sort_order || 0;
-            if (state.isSuperAdmin) {
-                el.isActive.value = data.is_active || 1;
-            }
-            el.btnDelete.style.display = 'inline-block';
-        } else {
-            el.btnDelete.style.display = 'none';
+
+            if (el.categorySelect) el.categorySelect.value = data.category_id;
+            if (el.sortOrder)      el.sortOrder.value      = data.sort_order ?? 0;
+            if (state.isSuperAdmin && el.isActive) el.isActive.value = data.is_active ?? 1;
         }
-        
+
         el.formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-    
-    // حفظ البيانات
+
+    function hideForm() {
+        if (el.formContainer) el.formContainer.style.display = 'none';
+        if (el.form) el.form.reset();
+    }
+
+    async function editItem(id) {
+        try {
+            const result = await apiFetch(`${API}/${id}?format=json`);
+            if (result.success && result.data) {
+                const item = Array.isArray(result.data) ? result.data[0] : result.data;
+                if (item) showForm(true, item);
+                else notify(t('alert_error', 'Error'), 'error');
+            } else {
+                notify(t('alert_error', 'Error'), 'error');
+            }
+        } catch (e) {
+            console.error('[TenantCategories] editItem:', e);
+            notify(t('alert_error', 'Error'), 'error');
+        }
+    }
+
     async function saveData(e) {
         if (e) e.preventDefault();
-        
-        const id = el.formId.value.trim();
+
+        const id     = el.formId?.value?.trim() || '';
         const isEdit = !!id;
-        
-        let tenantId = CONFIG.tenantId;
-        if (state.isSuperAdmin) {
-            const tenantDisplay = el.tenantDisplay.value.trim();
-            tenantId = getIdFromDatalist('tenantsList', tenantDisplay);
+
+        // tenant_id
+        let tenantId = CFG.tenantId;
+        if (state.isSuperAdmin && el.tenantDisplay) {
+            tenantId = getIdFromDatalist('tenantsList', el.tenantDisplay.value);
             if (!tenantId) {
-                showNotification(t('validation_tenant'), 'error');
+                notify(t('validation_tenant', 'Please select a tenant'), 'error');
                 return;
             }
         }
-        
-        const categoryDisplay = el.categoryDisplay.value.trim();
-        const categoryId = getIdFromDatalist('categoriesList', categoryDisplay);
+
+        // category_id
+        const categoryId = el.categorySelect?.value || '';
         if (!categoryId) {
-            showNotification(t('validation_category'), 'error');
+            notify(t('validation_category', 'Please select a category'), 'error');
             return;
         }
-        
+
         const data = {
-            tenant_id: parseInt(tenantId),
+            tenant_id:   parseInt(tenantId),
             category_id: parseInt(categoryId),
-            sort_order: parseInt(el.sortOrder.value) || 0
+            sort_order:  parseInt(el.sortOrder?.value || 0) || 0,
+            is_active:   state.isSuperAdmin ? (parseInt(el.isActive?.value || 1) || 1) : 1,
         };
-        
-        if (state.isSuperAdmin) {
-            data.is_active = parseInt(el.isActive.value) || 1;
-        } else {
-            data.is_active = 1;
+        if (isEdit) data.id = parseInt(id);
+
+        if (el.btnSave) {
+            el.btnSave.disabled = true;
+            el.btnSave.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
         }
-        
-        if (isEdit) {
-            data.id = parseInt(id);
-        }
-        
+
         try {
-            if (el.btnSave) {
-                el.btnSave.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + t('save_button');
-                el.btnSave.disabled = true;
-            }
-            
-            const url = isEdit ? `${API}/${data.id}` : API;
-            const method = isEdit ? 'PUT' : 'POST';
-            
-            const response = await fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': CONFIG.csrfToken || ''
-                },
-                body: JSON.stringify(data)
+            const url    = isEdit ? `${API}/${data.id}` : API;
+            const result = await apiFetch(url, {
+                method: isEdit ? 'PUT' : 'POST',
+                body:   JSON.stringify(data),
             });
-            
-            const result = await response.json();
-            
-            if (el.btnSave) {
-                el.btnSave.innerHTML = '<i class="fas fa-save"></i> ' + t('save_button');
-                el.btnSave.disabled = false;
-            }
-            
+
             if (result.success) {
-                console.log('Save success, showing notification');
-                showNotification(isEdit ? t('alert_updated') : t('alert_added'), 'success');
+                notify(isEdit
+                    ? t('alert_updated', 'Updated successfully')
+                    : t('alert_added',   'Added successfully'),
+                    'success'
+                );
                 hideForm();
                 loadData(state.page);
             } else {
-                console.log('Save failed, showing error notification');
-                showNotification(result.message || t('alert_error'), 'error');
+                notify(result.message || t('alert_error', 'Error'), 'error');
             }
-        } catch (error) {
-            console.error('[TenantCategories] Save error:', error);
+        } catch (err) {
+            console.error('[TenantCategories] saveData:', err);
+            notify(err.message || t('alert_error', 'Error'), 'error');
+        } finally {
             if (el.btnSave) {
-                el.btnSave.innerHTML = '<i class="fas fa-save"></i> ' + t('save_button');
                 el.btnSave.disabled = false;
+                el.btnSave.innerHTML = `<i class="fas fa-save" aria-hidden="true"></i> ${t('save_button','Save')}`;
             }
-            showNotification(t('alert_error'), 'error');
         }
     }
-    
-    // حذف بيانات
-    async function deleteData(id) {
-        if (!confirm(t('confirm_delete'))) {
-            return;
-        }
-        
+
+    async function deleteItem(id) {
+        if (!confirm(t('confirm_delete', 'Delete this record?'))) return;
         try {
-            const response = await fetch(`${API}/${id}`, {
+            const result = await apiFetch(`${API}/${id}`, {
                 method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': CONFIG.csrfToken || ''
-                },
-                body: JSON.stringify({ id: id })
+                body:   JSON.stringify({ id }),
             });
-            
-            const result = await response.json();
-            
             if (result.success) {
-                console.log('Delete success, showing notification');
-                showNotification(t('alert_deleted'), 'success');
+                notify(t('alert_deleted', 'Deleted successfully'), 'success');
+                hideForm();
                 loadData(state.page);
             } else {
-                console.log('Delete failed, showing error notification');
-                showNotification(result.message || t('alert_error'), 'error');
+                notify(result.message || t('alert_error', 'Error'), 'error');
             }
-        } catch (error) {
-            console.error('[TenantCategories] Delete error:', error);
-            showNotification(t('alert_error'), 'error');
+        } catch (e) {
+            console.error('[TenantCategories] deleteItem:', e);
+            notify(t('alert_error', 'Error'), 'error');
         }
     }
-    
-    // تبديل الحالة
+
     async function toggleStatus(id, newStatus) {
         try {
-            const response = await fetch(`${API}/${id}`, {
+            const result = await apiFetch(`${API}/${id}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': CONFIG.csrfToken || ''
-                },
-                body: JSON.stringify({ is_active: newStatus })
+                body:   JSON.stringify({ is_active: parseInt(newStatus) }),
             });
-            
-            const result = await response.json();
-            
             if (result.success) {
-                console.log('Toggle success, showing notification');
-                showNotification(t('alert_updated'), 'success');
+                notify(t('alert_updated', 'Updated successfully'), 'success');
                 loadData(state.page);
             } else {
-                console.log('Toggle failed, showing error notification');
-                showNotification(t('alert_error'), 'error');
+                notify(result.message || t('alert_error', 'Error'), 'error');
             }
-        } catch (error) {
-            console.error('[TenantCategories] Toggle status error:', error);
-            showNotification(t('alert_error'), 'error');
+        } catch (e) {
+            console.error('[TenantCategories] toggleStatus:', e);
+            notify(t('alert_error', 'Error'), 'error');
         }
     }
-    
-    // تطبيق الفلاتر
+
+    // ════════════════════════════════════════════════════════
+    // FILTERS
+    // ════════════════════════════════════════════════════════
     function applyFilters() {
         state.filters = {};
-        
-        if (state.isSuperAdmin && el.filterTenantHidden && el.filterTenantHidden.value) {
+        if (state.isSuperAdmin && el.filterTenantHidden?.value) {
             state.filters.tenant_id = el.filterTenantHidden.value;
         }
-        
-        if (el.filterCategoryHidden && el.filterCategoryHidden.value) {
+        if (el.filterCategoryHidden?.value) {
             state.filters.category_id = el.filterCategoryHidden.value;
         }
-        
-        if (state.isSuperAdmin && el.filterStatus && el.filterStatus.value !== '') {
+        if (state.isSuperAdmin && el.filterStatus?.value !== '') {
             state.filters.is_active = el.filterStatus.value;
         }
-        
         loadData(1);
     }
-    
-    // إعادة تعيين الفلاتر
+
     function resetFilters() {
-        if (state.isSuperAdmin && el.filterTenant) el.filterTenant.value = '';
-        if (state.isSuperAdmin && el.filterTenantHidden) el.filterTenantHidden.value = '';
-        if (el.filterCategory) el.filterCategory.value = '';
-        if (el.filterCategoryHidden) el.filterCategoryHidden.value = '';
-        if (state.isSuperAdmin && el.filterStatus) el.filterStatus.value = '';
-        
+        if (el.filterTenant)          el.filterTenant.value         = '';
+        if (el.filterTenantHidden)    el.filterTenantHidden.value   = '';
+        if (el.filterCategory)        el.filterCategory.value       = '';
+        if (el.filterCategoryHidden)  el.filterCategoryHidden.value = '';
+        if (el.filterStatus)          el.filterStatus.value         = '';
         state.filters = {};
         loadData(1);
     }
-    
-    // مساعدات العرض
-    function showLoading() {
-        if (el.tableLoading) el.tableLoading.style.display = 'block';
-        if (el.tableContainer) el.tableContainer.style.display = 'none';
-        if (el.emptyState) el.emptyState.style.display = 'none';
-        if (el.errorState) el.errorState.style.display = 'none';
-    }
-    
-    function showTable() {
-        if (el.tableLoading) el.tableLoading.style.display = 'none';
-        if (el.tableContainer) el.tableContainer.style.display = 'block';
-        if (el.emptyState) el.emptyState.style.display = 'none';
-        if (el.errorState) el.errorState.style.display = 'none';
-    }
-    
-    function showEmpty() {
-        if (el.tableLoading) el.tableLoading.style.display = 'none';
-        if (el.tableContainer) el.tableContainer.style.display = 'none';
-        if (el.emptyState) el.emptyState.style.display = 'block';
-        if (el.errorState) el.errorState.style.display = 'none';
-        if (el.tableBody) el.tableBody.innerHTML = '';
-        updateResultsCount(0);
-    }
-    
-    function showError(message) {
-        if (el.tableLoading) el.tableLoading.style.display = 'none';
-        if (el.tableContainer) el.tableContainer.style.display = 'none';
-        if (el.emptyState) el.emptyState.style.display = 'none';
-        if (el.errorState) {
-            el.errorState.style.display = 'block';
-            if (el.errorMessage) {
-                el.errorMessage.textContent = message || t('error_loading');
-            }
-        }
-    }
-    
-    function hideForm() {
-        if (el.formContainer) el.formContainer.style.display = 'none';
-        if (el.form) el.form.reset();
-    }
-    
-    function updatePagination(meta) {
-        if (!el.paginationInfo || !el.btnPrev || !el.btnNext || !el.paginationWrapper) return;
-        
-        const currentPage = meta.page || 1;
-        const perPage = meta.per_page || state.perPage;
-        const total = meta.total || 0;
-        const totalPages = Math.ceil(total / perPage) || 1;
-        
-        const from = total > 0 ? ((currentPage - 1) * perPage) + 1 : 0;
-        const to = Math.min(currentPage * perPage, total);
-        
-        el.paginationInfo.textContent = t('showing_results', { from, to, total });
-        
-        el.btnPrev.disabled = currentPage <= 1;
-        el.btnNext.disabled = currentPage >= totalPages;
-        
-        el.btnPrev.onclick = () => loadData(currentPage - 1);
-        el.btnNext.onclick = () => loadData(currentPage + 1);
-        
-        el.paginationWrapper.style.display = total > 0 ? 'flex' : 'none';
-    }
-    
-    function updateResultsCount(total) {
-        if (!el.resultsCount || !el.resultsCountText) return;
-        
-        if (total > 0) {
-            el.resultsCountText.textContent = `${total} ${t('results_found')}`;
-            el.resultsCount.style.display = 'block';
-        } else {
-            el.resultsCountText.textContent = t('no_records');
-            el.resultsCount.style.display = 'block';
-        }
-    }
-    
-    function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-    
-    // التهيئة
-    function init() {
+
+    // ════════════════════════════════════════════════════════
+    // INIT
+    // ════════════════════════════════════════════════════════
+    async function init() {
         el = {
-            pageTitle: document.querySelector('.page-title'),
-            pageSubtitle: document.querySelector('.page-subtitle'),
-            formContainer: document.getElementById('tenantCategoryFormContainer'),
-            form: document.getElementById('tenantCategoryForm'),
-            formTitle: document.getElementById('formTitle'),
-            formId: document.getElementById('tenantCategoryId'),
-            tenantDisplay: document.getElementById('tenantCategoryTenantId'),
-            tenantHidden: document.getElementById('tenantCategoryTenantIdHidden'),
-            categoryDisplay: document.getElementById('tenantCategoryCategoryId'),
-            categoryHidden: document.getElementById('tenantCategoryCategoryIdHidden'),
-            sortOrder: document.getElementById('tenantCategorySortOrder'),
-            isActive: document.getElementById('tenantCategoryIsActive'),
-            btnSave: document.getElementById('btnSaveTenantCategory'),
-            btnCancel: document.getElementById('btnCancelTenantCategoryForm'),
-            btnDelete: document.getElementById('btnDeleteTenantCategory'),
-            btnClose: document.getElementById('btnCloseTenantCategoryForm'),
-            
-            tableBody: document.getElementById('tenantCategoryTableBody'),
-            tableLoading: document.getElementById('tenantCategoryTableLoading'),
-            tableContainer: document.getElementById('tenantCategoryTableContainer'),
-            emptyState: document.getElementById('tenantCategoryEmptyState'),
-            errorState: document.getElementById('tenantCategoryErrorState'),
-            errorMessage: document.getElementById('tenantCategoryErrorMessage'),
-            
-            filterTenant: document.getElementById('tenantCategoryFilterTenant'),
-            filterTenantHidden: document.getElementById('tenantCategoryFilterTenantHidden'),
-            filterCategory: document.getElementById('tenantCategoryFilterCategory'),
-            filterCategoryHidden: document.getElementById('tenantCategoryFilterCategoryHidden'),
-            filterStatus: document.getElementById('tenantCategoryFilterStatus'),
-            btnApply: document.getElementById('btnApplyTenantCategoryFilters'),
-            btnReset: document.getElementById('btnResetTenantCategoryFilters'),
-            
-            resultsCount: document.getElementById('tenantCategoryResultsCount'),
-            resultsCountText: document.getElementById('tenantCategoryResultsCountText'),
-            paginationInfo: document.getElementById('tenantCategoryPaginationInfo'),
-            btnPrev: document.getElementById('btnPrevTenantCategoryPage'),
-            btnNext: document.getElementById('btnNextTenantCategoryPage'),
-            paginationWrapper: document.querySelector('.pagination-wrapper'),
-            btnRetry: document.getElementById('btnRetryTenantCategories'),
-            btnAdd: document.getElementById('btnAddTenantCategory'),
-            notificationsContainer: document.getElementById('notificationsContainer')
+            formContainer:         document.getElementById('tenantCategoryFormContainer'),
+            form:                  document.getElementById('tenantCategoryForm'),
+            formTitle:             document.getElementById('formTitle'),
+            formId:                document.getElementById('tenantCategoryId'),
+            tenantDisplay:         document.getElementById('tenantCategoryTenantId'),
+            tenantHidden:          document.getElementById('tenantCategoryTenantIdHidden'),
+            categorySelect:        document.getElementById('tenantCategoryCategoryId'),
+            sortOrder:             document.getElementById('tenantCategorySortOrder'),
+            isActive:              document.getElementById('tenantCategoryIsActive'),
+            btnSave:               document.getElementById('btnSaveTenantCategory'),
+            btnCancel:             document.getElementById('btnCancelTenantCategoryForm'),
+            btnClose:              document.getElementById('btnCloseTenantCategoryForm'),
+            btnDelete:             document.getElementById('btnDeleteTenantCategory'),
+            btnAdd:                document.getElementById('btnAddTenantCategory'),
+            btnAddEmpty:           document.getElementById('btnAddTenantCategoryEmpty'),
+            tableBody:             document.getElementById('tenantCategoryTableBody'),
+            filterTenant:          document.getElementById('tenantCategoryFilterTenant'),
+            filterTenantHidden:    document.getElementById('tenantCategoryFilterTenantHidden'),
+            filterCategory:        document.getElementById('tenantCategoryFilterCategory'),
+            filterCategoryHidden:  document.getElementById('tenantCategoryFilterCategoryHidden'),
+            filterStatus:          document.getElementById('tenantCategoryFilterStatus'),
+            btnApply:              document.getElementById('btnApplyTenantCategoryFilters'),
+            btnReset:              document.getElementById('btnResetTenantCategoryFilters'),
+            btnRetry:              document.getElementById('btnRetryTenantCategories'),
         };
-        
-        // Adjust notification position for RTL
-        if (CONFIG.lang === 'ar') {
-            el.notificationsContainer.style.left = '20px';
-            el.notificationsContainer.style.right = 'auto';
-        } else {
-            el.notificationsContainer.style.right = '20px';
-            el.notificationsContainer.style.left = 'auto';
+
+        // ESC closes form
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Escape') return;
+            if (el.formContainer && el.formContainer.style.display !== 'none') hideForm();
+        });
+
+        if (el.form)         el.form.onsubmit     = saveData;
+        if (el.btnAdd)       el.btnAdd.onclick     = () => showForm(false);
+        if (el.btnAddEmpty)  el.btnAddEmpty.onclick = () => showForm(false);
+        if (el.btnCancel)    el.btnCancel.onclick  = hideForm;
+        if (el.btnClose)     el.btnClose.onclick   = hideForm;
+        if (el.btnApply)     el.btnApply.onclick   = applyFilters;
+        if (el.btnReset)     el.btnReset.onclick   = resetFilters;
+        if (el.btnRetry)     el.btnRetry.onclick   = () => loadData(state.page);
+        if (el.btnDelete) {
+            el.btnDelete.onclick = () => {
+                if (el.formId?.value) deleteItem(el.formId.value);
+            };
         }
-        
-        if (!el.notificationsContainer) {
-            console.error('Notifications container not found');
-        } else {
-            console.log('Notifications container initialized:', el.notificationsContainer);
-            // Test notification - remove after testing
-            showNotification('Test notification - page loaded', 'info');
-        }
-        
-        if (el.form) el.form.onsubmit = saveData;
-        if (el.btnCancel) el.btnCancel.onclick = hideForm;
-        if (el.btnClose) el.btnClose.onclick = hideForm;
-        if (el.btnApply) el.btnApply.onclick = applyFilters;
-        if (el.btnReset) el.btnReset.onclick = resetFilters;
-        if (el.btnRetry) el.btnRetry.onclick = () => loadData(state.page);
-        if (el.btnAdd) el.btnAdd.onclick = () => showForm(false);
-        if (el.btnDelete) el.btnDelete.onclick = () => {
-            if (el.formId.value) {
-                deleteData(parseInt(el.formId.value));
-            }
-        };
-        
+
+        // Datalist input handlers
         if (el.tenantDisplay) {
-            el.tenantDisplay.addEventListener('input', function() {
+            el.tenantDisplay.addEventListener('input', function () {
                 const id = getIdFromDatalist('tenantsList', this.value);
-                el.tenantHidden.value = id || '';
-            });
-        }
-        if (el.categoryDisplay) {
-            el.categoryDisplay.addEventListener('input', function() {
-                const id = getIdFromDatalist('categoriesList', this.value);
-                el.categoryHidden.value = id || '';
+                if (el.tenantHidden) el.tenantHidden.value = id || '';
             });
         }
         if (el.filterTenant) {
-            el.filterTenant.addEventListener('input', function() {
+            el.filterTenant.addEventListener('input', function () {
                 const id = getIdFromDatalist('filterTenantsList', this.value);
-                el.filterTenantHidden.value = id || '';
+                if (el.filterTenantHidden) el.filterTenantHidden.value = id || '';
             });
         }
         if (el.filterCategory) {
-            el.filterCategory.addEventListener('input', function() {
+            el.filterCategory.addEventListener('input', function () {
                 const id = getIdFromDatalist('filterCategoriesList', this.value);
-                el.filterCategoryHidden.value = id || '';
+                if (el.filterCategoryHidden) el.filterCategoryHidden.value = id || '';
             });
         }
-        
-        loadTranslations().then(() => {
-            applyTranslations();
-            loadDropdowns().then(() => loadData());
-        });
+
+        await loadDropdowns();
+        await loadData();
     }
-    
+
+    // ════════════════════════════════════════════════════════
+    // REGISTER
+    // ════════════════════════════════════════════════════════
     window.TenantCategories = {
         init,
-        load: loadData,
-        add: () => showForm(false),
-        edit: async (id) => {
-            try {
-                const response = await fetch(`${API}/${id}?format=json`, {
-                    credentials: 'same-origin'
-                });
-                const result = await response.json();
-                if (result.success && result.data && result.data.length > 0) {
-                    showForm(true, result.data[0]);
-                } else {
-                    showNotification(t('alert_error'), 'error');
-                }
-            } catch (error) {
-                console.error('[TenantCategories] Edit error:', error);
-                showNotification(t('alert_error'), 'error');
-            }
-        },
-        remove: deleteData,
-        toggleStatus: toggleStatus
+        load:         loadData,
+        add:          () => showForm(false),
+        edit:         editItem,
+        remove:       deleteItem,
+        toggleStatus,
     };
-    
+    window.page = { run: init };
+
+    if (window.Admin?.page?.register) {
+        window.Admin.page.register('tenant_categories', init);
+    }
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
-        setTimeout(init, 100);
+        init();
     }
-    
-    window.page = window.page || {};
-    window.page.run = init;
-    
-})();
-    // حذف بيانات
-    async function deleteData(id) {
-        if (!confirm(t('confirm_delete'))) {
-            return;
-        }
-        
-        try {
-            const response = await fetch(`${API}/${id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': CONFIG.csrfToken || ''
-                },
-                body: JSON.stringify({ id: id })
-            });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                console.log('Delete success, showing notification');
-                showNotification(t('alert_deleted'), 'success');
-                loadData(state.page);
-            } else {
-                console.log('Delete failed, showing error notification');
-                showNotification(result.message || t('alert_error'), 'error');
-            }
-        } catch (error) {
-            console.error('[TenantCategories] Delete error:', error);
-            showNotification(t('alert_error'), 'error');
-        }
-    }
-    
-    // تبديل الحالة
-    async function toggleStatus(id, newStatus) {
-        try {
-            const response = await fetch(`${API}/${id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': CONFIG.csrfToken || ''
-                },
-                body: JSON.stringify({ is_active: newStatus })
-            });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                console.log('Toggle success, showing notification');
-                showNotification(t('alert_updated'), 'success');
-                loadData(state.page);
-            } else {
-                console.log('Toggle failed, showing error notification');
-                showNotification(t('alert_error'), 'error');
-            }
-        } catch (error) {
-            console.error('[TenantCategories] Toggle status error:', error);
-            showNotification(t('alert_error'), 'error');
-        }
-    }
-    
-    // تطبيق الفلاتر
-    function applyFilters() {
-        state.filters = {};
-        
-        if (state.isSuperAdmin && el.filterTenantHidden && el.filterTenantHidden.value) {
-            state.filters.tenant_id = el.filterTenantHidden.value;
-        }
-        
-        if (el.filterCategoryHidden && el.filterCategoryHidden.value) {
-            state.filters.category_id = el.filterCategoryHidden.value;
-        }
-        
-        if (state.isSuperAdmin && el.filterStatus && el.filterStatus.value !== '') {
-            state.filters.is_active = el.filterStatus.value;
-        }
-        
-        loadData(1);
-    }
-    
-    // إعادة تعيين الفلاتر
-    function resetFilters() {
-        if (state.isSuperAdmin && el.filterTenant) el.filterTenant.value = '';
-        if (state.isSuperAdmin && el.filterTenantHidden) el.filterTenantHidden.value = '';
-        if (el.filterCategory) el.filterCategory.value = '';
-        if (el.filterCategoryHidden) el.filterCategoryHidden.value = '';
-        if (state.isSuperAdmin && el.filterStatus) el.filterStatus.value = '';
-        
-        state.filters = {};
-        loadData(1);
-    }
-    
-    // مساعدات العرض
-    function showLoading() {
-        if (el.tableLoading) el.tableLoading.style.display = 'block';
-        if (el.tableContainer) el.tableContainer.style.display = 'none';
-        if (el.emptyState) el.emptyState.style.display = 'none';
-        if (el.errorState) el.errorState.style.display = 'none';
-    }
-    
-    function showTable() {
-        if (el.tableLoading) el.tableLoading.style.display = 'none';
-        if (el.tableContainer) el.tableContainer.style.display = 'block';
-        if (el.emptyState) el.emptyState.style.display = 'none';
-        if (el.errorState) el.errorState.style.display = 'none';
-    }
-    
-    function showEmpty() {
-        if (el.tableLoading) el.tableLoading.style.display = 'none';
-        if (el.tableContainer) el.tableContainer.style.display = 'none';
-        if (el.emptyState) el.emptyState.style.display = 'block';
-        if (el.errorState) el.errorState.style.display = 'none';
-        if (el.tableBody) el.tableBody.innerHTML = '';
-        updateResultsCount(0);
-    }
-    
-    function showError(message) {
-        if (el.tableLoading) el.tableLoading.style.display = 'none';
-        if (el.tableContainer) el.tableContainer.style.display = 'none';
-        if (el.emptyState) el.emptyState.style.display = 'none';
-        if (el.errorState) {
-            el.errorState.style.display = 'block';
-            if (el.errorMessage) {
-                el.errorMessage.textContent = message || t('error_loading');
-            }
-        }
-    }
-    
-    function hideForm() {
-        if (el.formContainer) el.formContainer.style.display = 'none';
-        if (el.form) el.form.reset();
-    }
-    
-    function updatePagination(meta) {
-        if (!el.paginationInfo || !el.btnPrev || !el.btnNext || !el.paginationWrapper) return;
-        
-        const currentPage = meta.page || 1;
-        const perPage = meta.per_page || state.perPage;
-        const total = meta.total || 0;
-        const totalPages = Math.ceil(total / perPage) || 1;
-        
-        const from = total > 0 ? ((currentPage - 1) * perPage) + 1 : 0;
-        const to = Math.min(currentPage * perPage, total);
-        
-        el.paginationInfo.textContent = t('showing_results', { from, to, total });
-        
-        el.btnPrev.disabled = currentPage <= 1;
-        el.btnNext.disabled = currentPage >= totalPages;
-        
-        el.btnPrev.onclick = () => loadData(currentPage - 1);
-        el.btnNext.onclick = () => loadData(currentPage + 1);
-        
-        el.paginationWrapper.style.display = total > 0 ? 'flex' : 'none';
-    }
-    
-    function updateResultsCount(total) {
-        if (!el.resultsCount || !el.resultsCountText) return;
-        
-        if (total > 0) {
-            el.resultsCountText.textContent = `${total} ${t('results_found')}`;
-            el.resultsCount.style.display = 'block';
-        } else {
-            el.resultsCountText.textContent = t('no_records');
-            el.resultsCount.style.display = 'block';
-        }
-    }
-    
-    function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-    
-    // التهيئة
-    function init() {
-        el = {
-            pageTitle: document.querySelector('.page-title'),
-            pageSubtitle: document.querySelector('.page-subtitle'),
-            formContainer: document.getElementById('tenantCategoryFormContainer'),
-            form: document.getElementById('tenantCategoryForm'),
-            formTitle: document.getElementById('formTitle'),
-            formId: document.getElementById('tenantCategoryId'),
-            tenantDisplay: document.getElementById('tenantCategoryTenantId'),
-            tenantHidden: document.getElementById('tenantCategoryTenantIdHidden'),
-            categoryDisplay: document.getElementById('tenantCategoryCategoryId'),
-            categoryHidden: document.getElementById('tenantCategoryCategoryIdHidden'),
-            sortOrder: document.getElementById('tenantCategorySortOrder'),
-            isActive: document.getElementById('tenantCategoryIsActive'),
-            btnSave: document.getElementById('btnSaveTenantCategory'),
-            btnCancel: document.getElementById('btnCancelTenantCategoryForm'),
-            btnDelete: document.getElementById('btnDeleteTenantCategory'),
-            btnClose: document.getElementById('btnCloseTenantCategoryForm'),
-            
-            tableBody: document.getElementById('tenantCategoryTableBody'),
-            tableLoading: document.getElementById('tenantCategoryTableLoading'),
-            tableContainer: document.getElementById('tenantCategoryTableContainer'),
-            emptyState: document.getElementById('tenantCategoryEmptyState'),
-            errorState: document.getElementById('tenantCategoryErrorState'),
-            errorMessage: document.getElementById('tenantCategoryErrorMessage'),
-            
-            filterTenant: document.getElementById('tenantCategoryFilterTenant'),
-            filterTenantHidden: document.getElementById('tenantCategoryFilterTenantHidden'),
-            filterCategory: document.getElementById('tenantCategoryFilterCategory'),
-            filterCategoryHidden: document.getElementById('tenantCategoryFilterCategoryHidden'),
-            filterStatus: document.getElementById('tenantCategoryFilterStatus'),
-            btnApply: document.getElementById('btnApplyTenantCategoryFilters'),
-            btnReset: document.getElementById('btnResetTenantCategoryFilters'),
-            
-            resultsCount: document.getElementById('tenantCategoryResultsCount'),
-            resultsCountText: document.getElementById('tenantCategoryResultsCountText'),
-            paginationInfo: document.getElementById('tenantCategoryPaginationInfo'),
-            btnPrev: document.getElementById('btnPrevTenantCategoryPage'),
-            btnNext: document.getElementById('btnNextTenantCategoryPage'),
-            paginationWrapper: document.querySelector('.pagination-wrapper'),
-            btnRetry: document.getElementById('btnRetryTenantCategories'),
-            btnAdd: document.getElementById('btnAddTenantCategory'),
-            notificationsContainer: document.getElementById('notificationsContainer')
-        };
-        
-        // Adjust notification position for RTL
-        if (CONFIG.lang === 'ar') {
-            el.notificationsContainer.style.left = '20px';
-            el.notificationsContainer.style.right = 'auto';
-        } else {
-            el.notificationsContainer.style.right = '20px';
-            el.notificationsContainer.style.left = 'auto';
-        }
-        
-        if (!el.notificationsContainer) {
-            console.error('Notifications container not found');
-        } else {
-            console.log('Notifications container initialized:', el.notificationsContainer);
-            // Test notification - remove after testing
-            showNotification('Test notification - page loaded', 'info');
-        }
-        
-        if (el.form) el.form.onsubmit = saveData;
-        if (el.btnCancel) el.btnCancel.onclick = hideForm;
-        if (el.btnClose) el.btnClose.onclick = hideForm;
-        if (el.btnApply) el.btnApply.onclick = applyFilters;
-        if (el.btnReset) el.btnReset.onclick = resetFilters;
-        if (el.btnRetry) el.btnRetry.onclick = () => loadData(state.page);
-        if (el.btnAdd) el.btnAdd.onclick = () => showForm(false);
-        if (el.btnDelete) el.btnDelete.onclick = () => {
-            if (el.formId.value) {
-                deleteData(parseInt(el.formId.value));
-            }
-        };
-        
-        if (el.tenantDisplay) {
-            el.tenantDisplay.addEventListener('input', function() {
-                const id = getIdFromDatalist('tenantsList', this.value);
-                el.tenantHidden.value = id || '';
-            });
-        }
-        if (el.categoryDisplay) {
-            el.categoryDisplay.addEventListener('input', function() {
-                const id = getIdFromDatalist('categoriesList', this.value);
-                el.categoryHidden.value = id || '';
-            });
-        }
-        if (el.filterTenant) {
-            el.filterTenant.addEventListener('input', function() {
-                const id = getIdFromDatalist('filterTenantsList', this.value);
-                el.filterTenantHidden.value = id || '';
-            });
-        }
-        if (el.filterCategory) {
-            el.filterCategory.addEventListener('input', function() {
-                const id = getIdFromDatalist('filterCategoriesList', this.value);
-                el.filterCategoryHidden.value = id || '';
-            });
-        }
-        
-        loadTranslations().then(() => {
-            applyTranslations();
-            loadDropdowns().then(() => loadData());
-        });
-    }
-    
-    window.TenantCategories = {
-        init,
-        load: loadData,
-        add: () => showForm(false),
-        edit: async (id) => {
-            try {
-                const response = await fetch(`${API}/${id}?format=json`, {
-                    credentials: 'same-origin'
-                });
-                const result = await response.json();
-                if (result.success && result.data && result.data.length > 0) {
-                    showForm(true, result.data[0]);
-                } else {
-                    showNotification(t('alert_error'), 'error');
-                }
-            } catch (error) {
-                console.error('[TenantCategories] Edit error:', error);
-                showNotification(t('alert_error'), 'error');
-            }
-        },
-        remove: deleteData,
-        toggleStatus: toggleStatus
-    };
-    
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        setTimeout(init, 100);
-    }
-    
-    window.page = window.page || {};
-    window.page.run = init;
-    
-})();
+
+}());

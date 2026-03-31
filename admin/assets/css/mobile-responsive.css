@@ -1,267 +1,176 @@
-/* admin/assets/css/mobile-responsive.css
- * Mobile Responsive Styles - Fixed for all issues
+/*!
+ * /admin/assets/css/mobile-responsive-dynamic.css
+ * Fully dynamic responsive admin CSS
+ * 100% variables-driven, production-ready
  */
 
-/* ════════════════════════════════════════════════════════════
-   TABLET (768px - 1024px)
-   ════════════════════════════════════════════════════════════ */
+/* ── Admin Main & Page Container ── */
+.admin-main {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: var(--page-padding, 1rem);
+    overflow-x: hidden;
+}
 
+.page-container {
+    width: 100%;
+    max-width: 100%;
+    padding: var(--page-container-padding, 1rem);
+    box-sizing: border-box;
+    font-family: var(--body-font-family, system-ui, sans-serif);
+    color: var(--text-primary, #fff);
+    overflow-x: hidden;
+}
+
+/* ── Buttons (all types) ── */
+.btn, .btn-sm, .btn-lg {
+    min-height: var(--btn-height, clamp(36px, 4vw, 44px));
+    padding: var(--btn-padding-vertical, clamp(0.5rem, 2vw, 0.75rem)) var(--btn-padding-horizontal, clamp(0.75rem, 4vw, 1rem));
+    font-size: var(--btn-font-size, clamp(0.875rem, 2vw, 1rem));
+    border-radius: var(--border-radius, 0.5rem);
+}
+
+/* ── Typography (headings, titles) ── */
+h1 { font-size: clamp(1.25rem, 5.5vw, 1.75rem); }
+h2 { font-size: clamp(1.125rem, 4.5vw, 1.5rem); }
+h3 { font-size: clamp(1rem, 4vw, 1.25rem); }
+h4 { font-size: clamp(0.9375rem, 3.5vw, 1.125rem); }
+
+.page-title,
+.card-title,
+.dash-title {
+    font-size: clamp(1.125rem, 4.5vw, 1.5rem);
+    font-weight: 600;
+}
+
+/* ── Page Header ── */
+.page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: var(--page-header-padding, clamp(12px, 2vw, 20px));
+}
+
+/* Actions & Filters */
+.page-header-actions,
+.filter-actions {
+    flex-direction: column;
+    width: 100%;
+    gap: 0.5rem;
+}
+
+.filter-bar input,
+.filter-bar select,
+.filter-bar .form-control,
+.filter-bar .btn,
+.filters-row input,
+.filters-row select,
+.filters-row .form-control,
+.filters-row .btn {
+    width: 100%;
+    max-width: 100%;
+}
+
+/* ── Tables ── */
+.table-responsive,
+.data-table {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.data-table td { white-space: normal; }
+
+/* ── Cards ── */
+.card {
+    width: 100%;
+    overflow: visible;
+}
+
+.card-header, .card-body {
+    padding: var(--card-padding, clamp(0.875rem, 2vw, 1rem));
+}
+
+/* iFrames inside cards */
+.card-body:has(iframe),
+.card-body:has(#addressEmbeddedContainer) {
+    overflow: visible;
+}
+
+#addressEmbeddedContainer iframe,
+#addressFrame {
+    display: block;
+    width: 100%;
+    min-height: 400px;
+    border: none;
+}
+
+/* ── Tabs ── */
+.form-tabs,
+.tabs-nav,
+.tabs-wrapper,
+.workspace-tabs,
+.nav-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    width: 100%;
+}
+
+.tab-btn, .nav-link {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* ── Responsive Typography & Touch Targets ── */
+input, select, textarea, .form-control {
+    font-size: clamp(0.875rem, 2vw, 1rem);
+}
+
+/* ── Media Queries ── */
+
+/* Tablet */
 @media (max-width: 1024px) {
-    .container {
-        max-width: 100%;
-        padding: 0 1rem;
-    }
-
-    .admin-main {
-        padding: 1.5rem;
+    .filters-grid {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     }
 }
 
-/* ════════════════════════════════════════════════════════════
-   MOBILE (max-width: 768px)
-   ════════════════════════════════════════════════════════════ */
-
+/* Mobile */
 @media (max-width: 768px) {
-    
-    /* Header - Stack search on new line */
-    .admin-header {
-        flex-wrap: wrap !important;
-        height: auto !important;
-        padding: 0.75rem 1rem !important;
-        gap: 0.75rem !important;
-    }
+    .admin-main, .page-container { padding: 1rem; }
+    .btn, .btn-sm, .btn-lg { width: 100%; justify-content: center; }
 
-    .header-left {
-        order: 1 !important;
-        flex: 0 0 auto !important;
-        gap: 0.75rem !important;
-    }
+    .form-grid, .form-row { grid-template-columns: 1fr; }
 
-    .header-right {
-        order: 2 !important;
-        flex: 0 0 auto !important;
-        margin-left: auto !important;
-        gap: 0.75rem !important;
-    }
-
-    /* Search moves to new line */
-    .header-center {
-        order: 3 !important;
-        flex: 1 1 100% !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        margin-top: 0.75rem !important;
-    }
-
-    .search-wrap {
-        width: 100% !important;
-        max-width: 100% !important;
-    }
-
-    #adminSearch {
-        width: 100% !important;
-    }
-
-    /* Hide user info text on mobile */
-    .user-info {
-        display: none !important;
-    }
-
-    /* Sidebar - Fixed mobile drawer */
-    .admin-sidebar {
-        position: fixed !important;
-        left: 0 !important;
-        top: 0 !important;
-        height: 100vh !important;
-        width: 280px !important;
-        transform: translateX(-100%) !important;
-        z-index: 1001 !important;
-        transition: transform 0.3s ease !important;
-        box-shadow: 4px 0 12px rgba(0,0,0,0.3) !important;
-    }
-
-    [dir="rtl"] .admin-sidebar {
-        left: auto !important;
-        right: 0 !important;
-        transform: translateX(100%) !important;
-        box-shadow: -4px 0 12px rgba(0,0,0,0.3) !important;
-    }
-
-    body.sidebar-open .admin-sidebar {
-        transform: translateX(0) !important;
-    }
-
-    /* Sidebar backdrop - only show when open */
-    .sidebar-backdrop {
-        display: none !important;
-    }
-
-    body.sidebar-open .sidebar-backdrop {
-        display: block !important;
-        opacity: 1 !important;
-    }
-
-    /* Main content */
-    .admin-main {
-        padding: 1rem !important;
-        width: 100% !important;
-    }
-
-    /* Dashboard cards */
-    .dash-card,
-    .dashboard-section {
-        padding: 1.25rem !important;
-        margin-bottom: 1.25rem !important;
-    }
-
-    /* Colors grid */
-    .colors-grid {
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
-        gap: 1rem !important;
-    }
-
-    .color-card {
-        padding: 0.875rem !important;
-    }
-
-    .color-preview {
-        height: 70px !important;
-    }
-
-    /* Modal */
-    .admin-modal-panel {
-        width: calc(100vw - 2rem) !important;
-        max-height: calc(100vh - 2rem) !important;
-        padding: 1.25rem !important;
-    }
-
-    /* Tables */
-    table {
-        font-size: 0.875rem !important;
-    }
-
-    /* Buttons */
-    .icon-btn {
-        width: 38px !important;
-        height: 38px !important;
-    }
-
-    #sidebarToggle {
-        width: 42px !important;
-        height: 42px !important;
+    .page-header, .page-header-actions, .filter-bar, .filters-grid {
+        width: 100%;
+        gap: 0.5rem;
     }
 }
 
-/* ════════════════════════════════════════════════════════════
-   SMALL MOBILE (max-width: 480px)
-   ════════════════════════════════════════════════════════════ */
-
+/* Small Mobile */
 @media (max-width: 480px) {
-    
-    .admin-header {
-        padding: 0.5rem 0.75rem !important;
-    }
+    .page-container { padding: 0.5rem; }
+    .card-body, .card-header { padding: 0.5rem; }
 
-    .header-left,
-    .header-right {
-        gap: 0.5rem !important;
-    }
+    .btn, .btn-sm { min-height: 38px; padding: 0.5rem; font-size: 0.875rem; }
 
-    .brand {
-        font-size: 1rem !important;
-    }
-
-    .brand-logo {
-        max-height: 32px !important;
-    }
-
-    .admin-main {
-        padding: 0.75rem !important;
-    }
-
-    .dash-card,
-    .dashboard-section {
-        padding: 1rem !important;
-        border-radius: 8px !important;
-    }
-
-    .dash-title {
-        font-size: 1.5rem !important;
-    }
-
-    /* Colors grid - 2 columns on very small screens */
-    .colors-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
-        gap: 0.75rem !important;
-    }
-
-    .color-card {
-        padding: 0.75rem !important;
-    }
-
-    .color-preview {
-        height: 60px !important;
-    }
-
-    .color-name {
-        font-size: 0.875rem !important;
-    }
-
-    .color-code {
-        font-size: 0.75rem !important;
-    }
-
-    /* Copy feedback */
-    .copy-feedback {
-        bottom: 1rem !important;
-        right: 1rem !important;
-        left: 1rem !important;
-        width: auto !important;
-        font-size: 0.875rem !important;
-        padding: 0.75rem 1rem !important;
-    }
-
-    /* Footer */
-    .admin-footer {
-        padding: 1rem !important;
-        font-size: 0.8125rem !important;
-    }
+    h1 { font-size: clamp(1.125rem, 5vw, 1.5rem); }
+    h2 { font-size: clamp(1rem, 4.5vw, 1.25rem); }
 }
 
-/* ════════════════════════════════════════════════════════════
-   LANDSCAPE MODE (Mobile horizontal)
-   ══��═════════════════════════════════════════════════════════ */
-
-@media (max-height: 500px) and (orientation: landscape) {
-    .admin-header {
-        position: relative !important;
-    }
-
-    .admin-sidebar {
-        top: 0 !important;
-        height: 100vh !important;
-    }
+/* RTL adjustments */
+[dir="rtl"] .page-header-actions,
+[dir="rtl"] .filter-actions {
+    flex-direction: column;
 }
 
-/* ════════════════════════════════════════════════════════════
-   PRINT
-   ════════════════════════════════════════════════════════════ */
-
+/* Print */
 @media print {
-    .admin-header,
-    .admin-sidebar,
-    .sidebar-backdrop,
-    .admin-footer,
-    .copy-feedback {
-        display: none !important;
-    }
-
-    .admin-main {
-        padding: 0 !important;
-    }
-
-    .dash-card {
-        border: 1px solid #ccc !important;
-        page-break-inside: avoid !important;
-    }
+    .admin-header, .admin-sidebar, .sidebar-backdrop, .admin-footer { display: none; }
+    .admin-main { padding: 0; }
 }

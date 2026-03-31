@@ -64,6 +64,20 @@ final class ImageTypesValidator
             $errors['is_thumbnail'] = 'Invalid thumbnail flag';
         }
 
+        // ===== icon =====
+        if (!empty($data['icon']) && mb_strlen($data['icon']) > 100) {
+            $errors['icon'] = 'Icon class must not exceed 100 characters';
+        }
+
+        // ===== color =====
+        if (!empty($data['color'])) {
+            if (mb_strlen($data['color']) > 30) {
+                $errors['color'] = 'Color must not exceed 30 characters';
+            } elseif (!preg_match('/^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|[a-zA-Z]{2,30}|rgb\([\d,\s]+\)|rgba\([\d,.\s]+\))$/', $data['color'])) {
+                $errors['color'] = 'Color must be a valid CSS color (hex, named, rgb or rgba)';
+            }
+        }
+
         return $errors;
     }
 }

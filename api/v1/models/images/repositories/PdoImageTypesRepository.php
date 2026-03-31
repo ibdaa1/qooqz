@@ -26,7 +26,9 @@ final class PdoImageTypesRepository
                 crop,
                 quality,
                 format,
-                is_thumbnail
+                is_thumbnail,
+                icon,
+                color
             FROM image_types
             ORDER BY id ASC
         ");
@@ -50,7 +52,9 @@ final class PdoImageTypesRepository
                 crop,
                 quality,
                 format,
-                is_thumbnail
+                is_thumbnail,
+                icon,
+                color
             FROM image_types
             WHERE id = :id
             LIMIT 1
@@ -76,7 +80,9 @@ final class PdoImageTypesRepository
                 crop,
                 quality,
                 format,
-                is_thumbnail
+                is_thumbnail,
+                icon,
+                color
             FROM image_types
             WHERE code = :code
             LIMIT 1
@@ -101,7 +107,9 @@ final class PdoImageTypesRepository
                 crop,
                 quality,
                 format,
-                is_thumbnail
+                is_thumbnail,
+                icon,
+                color
             ) VALUES (
                 :code,
                 :name,
@@ -111,7 +119,9 @@ final class PdoImageTypesRepository
                 :crop,
                 :quality,
                 :format,
-                :is_thumbnail
+                :is_thumbnail,
+                :icon,
+                :color
             )
         ");
 
@@ -125,6 +135,8 @@ final class PdoImageTypesRepository
             ':quality'      => $data['quality'] ?? 85,
             ':format'       => $data['format'] ?? 'webp',
             ':is_thumbnail' => (int)($data['is_thumbnail'] ?? 0),
+            ':icon'         => $data['icon']  ?? 'fa-image',
+            ':color'        => $data['color'] ?? '#6b7280',
         ]);
 
         return (int) $this->pdo->lastInsertId();
@@ -146,7 +158,9 @@ final class PdoImageTypesRepository
                 crop = :crop,
                 quality = :quality,
                 format = :format,
-                is_thumbnail = :is_thumbnail
+                is_thumbnail = :is_thumbnail,
+                icon = :icon,
+                color = :color
             WHERE id = :id
         ");
 
@@ -161,6 +175,8 @@ final class PdoImageTypesRepository
             ':quality'      => $data['quality'] ?? 85,
             ':format'       => $data['format'] ?? 'webp',
             ':is_thumbnail' => (int)($data['is_thumbnail'] ?? 0),
+            ':icon'         => $data['icon']  ?? 'fa-image',
+            ':color'        => $data['color'] ?? '#6b7280',
         ]);
     }
 

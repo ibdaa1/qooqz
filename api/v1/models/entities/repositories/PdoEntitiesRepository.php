@@ -36,10 +36,13 @@ final class PdoEntitiesRepository
                    COALESCE(et.store_name, e.store_name) AS store_name,
                    et.description,
                    et.meta_title,
-                   et.meta_description
+                   et.meta_description,
+                   tz.timezone AS timezone_name,
+                   tz.label    AS timezone_label
             FROM entities e
             LEFT JOIN entity_translations et
               ON e.id = et.entity_id AND et.language_code = :lang
+            LEFT JOIN timezones tz ON tz.id = e.timezone_id
             WHERE e.tenant_id = :tenant_id
         ";
 
@@ -102,10 +105,13 @@ final class PdoEntitiesRepository
                    COALESCE(et.store_name, e.store_name) AS store_name,
                    et.description,
                    et.meta_title,
-                   et.meta_description
+                   et.meta_description,
+                   tz.timezone AS timezone_name,
+                   tz.label    AS timezone_label
             FROM entities e
             LEFT JOIN entity_translations et
               ON e.id = et.entity_id AND et.language_code = :lang
+            LEFT JOIN timezones tz ON tz.id = e.timezone_id
             WHERE e.tenant_id = :tenant_id AND e.id = :id
             LIMIT 1
         ");
@@ -127,7 +133,7 @@ final class PdoEntitiesRepository
                 UPDATE entities SET
                     store_name = :store_name,
                     slug = :slug,
-                    is_main = :is_main,
+                    parent_id = :parent_id,
                     branch_code = :branch_code,
                     status = :status,
                     vendor_type = :vendor_type,
@@ -140,6 +146,7 @@ final class PdoEntitiesRepository
                     website_url = :website_url,
                     suspension_reason = :suspension_reason,
                     is_verified = :is_verified,
+                    timezone_id = :timezone_id,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE tenant_id = :tenant_id AND id = :id
             ");
@@ -148,7 +155,7 @@ final class PdoEntitiesRepository
                 ':tenant_id'=>$tenantId,
                 ':store_name'=>$data['store_name'] ?? null,
                 ':slug'=>$data['slug'] ?? null,
-                ':is_main'=>$data['is_main'] ?? 1,
+                ':parent_id'=>!empty($data['parent_id']) ? (int)$data['parent_id'] : null,
                 ':branch_code'=>$data['branch_code'] ?? null,
                 ':status'=>$data['status'] ?? 'pending',
                 ':vendor_type'=>$data['vendor_type'] ?? 'product_seller',
@@ -160,7 +167,8 @@ final class PdoEntitiesRepository
                 ':email'=>$data['email'],
                 ':website_url'=>$data['website_url'] ?? null,
                 ':suspension_reason'=>$data['suspension_reason'] ?? null,
-                ':is_verified'=>$data['is_verified'] ?? 0
+                ':is_verified'=>$data['is_verified'] ?? 0,
+                ':timezone_id'=>!empty($data['timezone_id']) ? (int)$data['timezone_id'] : null
             ]);
             return (int)$data['id'];
         }
@@ -168,18 +176,18 @@ final class PdoEntitiesRepository
         $stmt = $this->pdo->prepare("
             INSERT INTO entities (
                 tenant_id, user_id, store_name, slug,
-                is_main, branch_code,
+                parent_id, branch_code,
                 vendor_type, store_type,
                 registration_number, tax_number,
                 phone, mobile, email, website_url,
-                status, is_verified
+                status, is_verified, timezone_id
             ) VALUES (
                 :tenant_id, :user_id, :store_name, :slug,
-                :is_main, :branch_code,
+                :parent_id, :branch_code,
                 :vendor_type, :store_type,
                 :registration_number, :tax_number,
                 :phone, :mobile, :email, :website_url,
-                :status, :is_verified
+                :status, :is_verified, :timezone_id
             )
         ");
         $stmt->execute([
@@ -187,7 +195,7 @@ final class PdoEntitiesRepository
             ':user_id'=>$data['user_id'],
             ':store_name'=>$data['store_name'],
             ':slug'=>$data['slug'],
-            ':is_main'=>$data['is_main'] ?? 1,
+            ':parent_id'=>!empty($data['parent_id']) ? (int)$data['parent_id'] : null,
             ':branch_code'=>$data['branch_code'] ?? null,
             ':vendor_type'=>$data['vendor_type'] ?? 'product_seller',
             ':store_type'=>$data['store_type'] ?? 'individual',
@@ -198,7 +206,8 @@ final class PdoEntitiesRepository
             ':email'=>$data['email'],
             ':website_url'=>$data['website_url'] ?? null,
             ':status'=>$data['status'] ?? 'pending',
-            ':is_verified'=>$data['is_verified'] ?? 0
+            ':is_verified'=>$data['is_verified'] ?? 0,
+            ':timezone_id'=>!empty($data['timezone_id']) ? (int)$data['timezone_id'] : null
         ]);
 
         return (int)$this->pdo->lastInsertId();

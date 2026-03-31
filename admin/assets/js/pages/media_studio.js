@@ -1,1109 +1,921 @@
+/**
+ * /admin/assets/js/pages/media_studio.js — Production v2.0
+ *
+ * ─ التغييرات ─────────────────────────────────────────────────
+ * • الترجمات من CONFIG.strings فقط — لا fetch مكرّر
+ * • notify() بـ ms- prefix يتطابق مع CSS
+ * • showState() موحّدة (msLoading/msEmpty/msError/msTableContainer)
+ * • btn-outline للتعديل → btn-primary
+ * • credentials: 'same-origin' على كل fetch
+ * • ESC يُغلق الـ form cards
+ * • Admin.page.register + window.page
+ * • toggle switch: ms-toggle بدل toggle-switch
+ * • image type badge: ms-type-badge بدل image-type-badge
+ * ─────────────────────────────────────────────────────────────
+ */
 (function () {
     'use strict';
 
-    const CONFIG = window.MEDIA_STUDIO_CONFIG || {};
-    const API = CONFIG.apiUrl || '/api/images';
+    const CFG    = window.MEDIA_STUDIO_CONFIG || {};
+    const API    = CFG.apiUrl       || '/api/images';
+    const IMG_TYPES_API = CFG.imageTypesApi || '/api/image-types';
+    const SET_MAIN_API  = CFG.setMainApi    || '/api/images/set_main';
 
+    // ── i18n — من CONFIG.strings فقط ─────────────────────────
+    const S = CFG.strings || {};
+    function t(key, fallback) {
+        return typeof S[key] === 'string' ? S[key] : (fallback || key);
+    }
+
+    // ── State ─────────────────────────────────────────────────
     const state = {
-        page: 1,
-        perPage: 25,
-        filters: {},
-        items: [],
-        imageTypes: [],
-        permissions: CONFIG.permissions || {},
-        isSuperAdmin: CONFIG.isSuperAdmin || false,
-        selectedItems: [],
-        isLoading: false,
-        abortController: null
+        page:                1,
+        perPage:             25,
+        filters:             {},
+        items:               [],
+        imageTypes:          [],
+        selectedItems:       [],
+        studioCopyMode:      false,
+        studioCopySelectedId:null,
     };
 
     let el = {};
-    let translations = {};
 
-    // Load translations
-    async function loadTranslations() {
-        try {
-            const response = await fetch(CONFIG.translationsUrl);
-            if (response.ok) {
-                translations = await response.json();
-            } else {
-                console.warn('[MediaStudio] Translations file not found, using defaults');
-            }
-        } catch (error) {
-            console.error('[MediaStudio] Load translations error:', error);
-        }
-    }
-
-    // Translation helper
-    function t(key, placeholders = {}) {
-        let text = translations[key] || key;
-        Object.keys(placeholders).forEach(p => {
-            text = text.replace(new RegExp(`{${p}}`, 'g'), placeholders[p]);
-        });
-        return text;
-    }
-
-    // Apply translations
-    function applyTranslations() {
-        const container = document.getElementById('mediaStudioPage');
-        if (!container) return;
-
-        container.querySelectorAll('[data-i18n]').forEach(el => {
-            const key = el.getAttribute('data-i18n');
-            if (key.includes('_placeholder')) {
-                el.setAttribute('placeholder', t(key));
-            } else {
-                el.textContent = t(key);
-            }
-        });
-    }
-
-    // Notifications
-    function showNotification(message, type = 'success') {
-        if (!el.notificationsContainer) {
-            console.warn('[MediaStudio] Notifications container not found');
-            alert(`${type}: ${message}`);
-            return;
-        }
-
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        notification.textContent = message;
-
-        el.notificationsContainer.appendChild(notification);
-
-        // Remove after 5 seconds
-        setTimeout(() => {
-            notification.classList.add('fade-out');
-            setTimeout(() => notification.remove(), 300);
-        }, 5000);
-
-        // Remove on click
-        notification.onclick = () => {
-            notification.classList.add('fade-out');
-            setTimeout(() => notification.remove(), 300);
+    // ════════════════════════════════════════════════════════
+    // FETCH HELPER
+    // ════════════════════════════════════════════════════════
+    async function apiFetch(url, options = {}) {
+        const defaults = {
+            credentials: 'same-origin',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-Token':     CFG.csrfToken || '',
+            },
         };
+        // لا نُضيف Content-Type إذا body هو FormData
+        if (options.body && !(options.body instanceof FormData)) {
+            defaults.headers['Content-Type'] = 'application/json';
+        }
+        const config = {
+            ...defaults,
+            ...options,
+            headers: { ...defaults.headers, ...(options.headers || {}) },
+        };
+        const res  = await fetch(url, config);
+        const data = await res.json().catch(() => ({}));
+        return data; // لا نُلقي خطأ — نُعيد البيانات ونتعامل معها في الدالة
     }
 
-    // Load image types
+    function esc(txt) {
+        if (txt == null) return '';
+        const d = document.createElement('div');
+        d.textContent = String(txt);
+        return d.innerHTML;
+    }
+
+    // ════════════════════════════════════════════════════════
+    // TOAST NOTIFICATIONS  (ms- prefix → matches CSS)
+    // ════════════════════════════════════════════════════════
+    function notify(message, type = 'info') {
+        const AF = window.AdminFramework;
+        if (AF && !CFG.embedded) {
+            if (type === 'success' && AF.success) return AF.success(message);
+            if (type === 'error'   && AF.error)   return AF.error(message);
+            if (type === 'warning' && AF.warning)  return AF.warning(message);
+            if (AF.notify) return AF.notify(message, type);
+        }
+
+        let container = document.getElementById('msNotifications');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'msNotifications';
+            container.className = 'ms-notifications';
+            document.body.appendChild(container);
+        }
+        const toast = document.createElement('div');
+        toast.className = `ms-toast ms-toast-${type}`;
+        toast.setAttribute('role', 'alert');
+
+        const msg = document.createElement('span');
+        msg.textContent = message;
+        toast.appendChild(msg);
+
+        const close = document.createElement('button');
+        close.className = 'ms-toast-close';
+        close.setAttribute('aria-label', 'Close');
+        close.textContent = '\u00d7';
+        close.addEventListener('click', () => toast.remove());
+        toast.appendChild(close);
+
+        container.appendChild(toast);
+        setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4500);
+    }
+
+    // ════════════════════════════════════════════════════════
+    // TABLE STATE
+    // ════════════════════════════════════════════════════════
+    function showState(which, msg = '') {
+        const loading   = document.getElementById('msLoading');
+        const empty     = document.getElementById('msEmpty');
+        const error     = document.getElementById('msError');
+        const container = document.getElementById('msTableContainer');
+        const errMsg    = document.getElementById('msErrorMessage');
+
+        [loading, empty, error, container].forEach(e => { if (e) e.style.display = 'none'; });
+
+        switch (which) {
+            case 'loading': if (loading)   loading.style.display   = 'flex';  break;
+            case 'empty':   if (empty)     empty.style.display     = 'flex';  break;
+            case 'error':
+                if (error)  error.style.display = 'flex';
+                if (errMsg && msg) errMsg.textContent = msg;
+                break;
+            default:        if (container) container.style.display = 'block'; break;
+        }
+    }
+
+    // ════════════════════════════════════════════════════════
+    // IMAGE TYPES
+    // ════════════════════════════════════════════════════════
     async function loadImageTypes() {
         try {
-            const response = await fetch('/api/image-types', { credentials: 'same-origin' });
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success && data.data) {
-                    state.imageTypes = data.data;
-                    populateDatalist('imageTypesList', state.imageTypes, 'id', 'name');
-                    populateDatalist('uploadImageTypesList', state.imageTypes, 'id', 'name');
-                    populateDatalist('filterImageTypesList', state.imageTypes, 'id', 'name');
-                }
-            } else {
-                console.warn('[MediaStudio] Load image types failed:', response.status);
+            const data = await apiFetch(IMG_TYPES_API);
+            if (data.success && data.data) {
+                state.imageTypes = data.data;
+                populateDatalist('imageTypesList', state.imageTypes);
+                populateDatalist('filterImageTypesList', state.imageTypes);
             }
-        } catch (error) {
-            console.error('[MediaStudio] Load image types error:', error);
+        } catch (e) {
+            console.warn('[MediaStudio] loadImageTypes:', e);
         }
     }
 
-    function populateDatalist(datalistId, data, valueKey, textKey) {
-        const datalist = document.getElementById(datalistId);
-        if (!datalist || !Array.isArray(data)) return;
-        datalist.innerHTML = '';
-        data.forEach(item => {
-            const option = document.createElement('option');
-            option.value = item[textKey] || item[valueKey];
-            option.setAttribute('data-id', item[valueKey]);
-            datalist.appendChild(option);
+    function populateDatalist(datalistId, items) {
+        const dl = document.getElementById(datalistId);
+        if (!dl || !Array.isArray(items)) return;
+        dl.innerHTML = '';
+        items.forEach(item => {
+            const o = document.createElement('option');
+            o.value = item.name || item.id;
+            o.setAttribute('data-id', item.id);
+            dl.appendChild(o);
         });
     }
 
     function getIdFromDatalist(datalistId, displayValue) {
-        const datalist = document.getElementById(datalistId);
-        if (!datalist) return null;
-        const options = datalist.querySelectorAll('option');
-        for (let option of options) {
-            if (option.value === displayValue) {
-                return option.getAttribute('data-id');
-            }
+        const dl = document.getElementById(datalistId);
+        const trimmed = (displayValue || '').trim();
+        if (!dl || !trimmed) return null;
+        for (const o of dl.querySelectorAll('option')) {
+            if (o.value === trimmed) return o.getAttribute('data-id');
         }
+        if (/^\d+$/.test(trimmed)) return trimmed;
         return null;
     }
 
     function setDisplayFromId(hiddenId, displayId, datalistId, idValue) {
-        const datalist = document.getElementById(datalistId);
-        if (!datalist) return;
-        const options = datalist.querySelectorAll('option');
-        for (let option of options) {
-            if (option.getAttribute('data-id') === idValue.toString()) {
-                document.getElementById(displayId).value = option.value;
-                document.getElementById(hiddenId).value = idValue;
+        if (!idValue) return;
+        const dl = document.getElementById(datalistId);
+        if (!dl) return;
+        for (const o of dl.querySelectorAll('option')) {
+            if (o.getAttribute('data-id') === String(idValue)) {
+                const d = document.getElementById(displayId);
+                const h = document.getElementById(hiddenId);
+                if (d) d.value = o.value;
+                if (h) h.value = idValue;
                 return;
             }
         }
     }
 
-    // Load data
-    // Handle Selection Confirm
-    async function handleSelectionConfirm() {
-        if (state.selectedItems.length === 0) {
-            showNotification(t('no_items_selected_alert', { defaultValue: 'Please select an image first' }), 'error');
-            return;
-        }
+    function getImageTypeBadge(imageTypeId) {
+        const type = state.imageTypes.find(tp => tp.id == imageTypeId);
+        if (!type) return `<span class="ms-type-badge ms-type-badge--unknown">Unknown</span>`;
+        const icon  = type.icon  || 'fa-image';
+        const color = type.color || 'var(--primary-color, #3b82f6)';
+        return `<span class="ms-type-badge" style="background:${esc(color)};color:#fff;" title="${esc(type.name)}">
+                    <i class="fas ${esc(icon)}" aria-hidden="true"></i> ${esc(type.name)}
+                </span>`;
+    }
 
-        // Fetch details of selected items
-        const selectedObjects = state.items.filter(item => state.selectedItems.includes(item.id));
+    // ════════════════════════════════════════════════════════
+    // LOAD DATA
+    // ════════════════════════════════════════════════════════
+    async function loadData(page = 1) {
+        showState('loading');
+        state.page = page;
 
-        if (selectedObjects.length === 0) return;
+        const params = new URLSearchParams({ page, limit: state.perPage, format: 'json', ...state.filters });
 
-        // Auto-assign owner_id and image_type_id if present in CONFIG.autoFill
-        // This ensures that "selecting" an image also "registers" it to the context
-        if (CONFIG.autoFill && (CONFIG.autoFill.owner_id || CONFIG.autoFill.image_type_id)) {
-            const updates = [];
-            const newOwnerId = CONFIG.autoFill.owner_id ? parseInt(CONFIG.autoFill.owner_id) : null;
-            const newTypeId = CONFIG.autoFill.image_type_id ? parseInt(CONFIG.autoFill.image_type_id) : null;
-
-            selectedObjects.forEach(img => {
-                let needsUpdate = false;
-                const payload = {
-                    id: img.id,
-                    tenant_id: CONFIG.tenantId
-                };
-
-                if (newOwnerId && img.owner_id != newOwnerId) {
-                    payload.owner_id = newOwnerId;
-                    needsUpdate = true;
-                    img.owner_id = newOwnerId; // Optimistic update
-                }
-                if (newTypeId && img.image_type_id != newTypeId) {
-                    payload.image_type_id = newTypeId;
-                    needsUpdate = true;
-                    img.image_type_id = newTypeId; // Optimistic update
-                }
-
-                if (needsUpdate) {
-                    updates.push(payload);
-                }
+        try {
+            const result = await apiFetch(`${API}?${params}`, {
+                headers: { 'Accept': 'application/json' },
             });
 
-            if (updates.length > 0) {
-                try {
-                    if (el.btnSelectConfirm) {
-                        el.btnSelectConfirm.disabled = true;
-                        el.btnSelectConfirm.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-                    }
-                    if (el.btnConfirmSelectionBar) {
-                        el.btnConfirmSelectionBar.disabled = true;
-                        el.btnConfirmSelectionBar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-                    }
+            if (result.success && result.data?.data?.length) {
+                state.items = result.data.data;
+                showState('table');
+                renderTable();
+                renderPagination(result.data.meta || {});
+            } else if (result.success) {
+                state.items = [];
+                showState('empty');
+            } else {
+                showState('error', result.message || t('error_loading', 'Failed to load'));
+            }
+        } catch (e) {
+            console.error('[MediaStudio] loadData:', e);
+            showState('error', e.message || t('error_loading', 'Failed to load'));
+        }
+    }
 
-                    // Process updates sequentially or parallel
-                    // Using parallel for speed
-                    await Promise.all(updates.map(data => {
-                        const formData = new FormData();
-                        Object.keys(data).forEach(key => formData.append(key, data[key]));
-                        formData.append('_method', 'PUT'); // Simulate PUT
-                        formData.append('csrf_token', CONFIG.csrfToken || '');
+    // ════════════════════════════════════════════════════════
+    // RENDER TABLE
+    // ════════════════════════════════════════════════════════
+    function renderTable() {
+        const tbody = document.getElementById('imageTableBody');
+        if (!tbody) return;
 
-                        return fetch(`${API}/${data.id}`, {
-                            method: 'POST',
-                            body: formData,
-                            credentials: 'same-origin'
-                        });
-                    }));
+        tbody.innerHTML = state.items.map(item => {
+            const date = item.created_at ? new Date(item.created_at).toLocaleDateString() : '—';
 
-                    console.log('[MediaStudio] Auto-assigned images to current context');
+            // ✅ btn-primary للتعديل
+            const editBtn = CFG.permissions?.canEdit
+                ? `<button class="btn btn-sm btn-primary ms-edit-btn" data-id="${esc(item.id)}" aria-label="${t('edit','Edit')}">
+                       <i class="fas fa-edit" aria-hidden="true"></i>
+                   </button>`
+                : '';
+            const delBtn = CFG.permissions?.canDelete
+                ? `<button class="btn btn-sm btn-danger ms-del-btn" data-id="${esc(item.id)}" aria-label="${t('delete','Delete')}">
+                       <i class="fas fa-trash" aria-hidden="true"></i>
+                   </button>`
+                : '';
 
-                } catch (err) {
-                    console.error('[MediaStudio] Failed to auto-assign images:', err);
-                    showNotification(t('alert_error_assign', { defaultValue: 'Failed to assign images to current context' }), 'error');
-                    // Continue anyway? Or stop? User said "MUST register", so maybe we should stop if critical.
-                    // But dispatching the ID might be enough for the parent form to save it too.
-                } finally {
-                    if (el.btnSelectConfirm) {
-                        el.btnSelectConfirm.disabled = false;
-                        el.btnSelectConfirm.innerHTML = '<i class="fas fa-check"></i> ' + (t('confirm_select', { defaultValue: 'Confirm Selection' }));
-                    }
-                    if (el.btnConfirmSelectionBar) {
-                        el.btnConfirmSelectionBar.disabled = false;
-                        el.btnConfirmSelectionBar.innerHTML = '<i class="fas fa-check"></i> Confirm Selection';
-                    }
-                }
+            const visBadge = item.visibility === 'public'
+                ? `<span class="badge badge-active">${esc(item.visibility)}</span>`
+                : `<span class="badge badge-secondary">${esc(item.visibility)}</span>`;
+
+            return `
+                <tr data-id="${esc(item.id)}">
+                    <td><input type="checkbox" class="ms-checkbox" value="${esc(item.id)}" aria-label="Select"></td>
+                    <td><img src="${esc(item.thumb_url || item.url)}" alt="${esc(item.filename || '')}" loading="lazy"></td>
+                    <td>${esc(item.id)}</td>
+                    <td>${esc(item.filename || '—')}</td>
+                    <td>${esc(item.owner_id)}</td>
+                    <td>${getImageTypeBadge(item.image_type_id)}</td>
+                    <td>${visBadge}</td>
+                    <td>
+                        <label class="ms-toggle">
+                            <input type="checkbox" class="ms-main-toggle" data-id="${esc(item.id)}" ${item.is_main == 1 ? 'checked' : ''}>
+                            <span class="ms-toggle-slider"></span>
+                        </label>
+                    </td>
+                    <td>${esc(item.sort_order ?? 0)}</td>
+                    <td>${esc(date)}</td>
+                    <td>
+                        <div class="table-actions">
+                            ${editBtn}
+                            ${delBtn}
+                        </div>
+                    </td>
+                </tr>`;
+        }).join('');
+
+        // Events
+        tbody.querySelectorAll('.ms-main-toggle').forEach(toggle => {
+            toggle.addEventListener('change', handleMainToggle);
+        });
+        tbody.querySelectorAll('.ms-edit-btn').forEach(b =>
+            b.addEventListener('click', () => editImage(b.dataset.id)));
+        tbody.querySelectorAll('.ms-del-btn').forEach(b =>
+            b.addEventListener('click', () => deleteData(b.dataset.id)));
+        tbody.querySelectorAll('.ms-checkbox').forEach(cb =>
+            cb.addEventListener('change', updateSelectedItems));
+    }
+
+    // ════════════════════════════════════════════════════════
+    // PAGINATION
+    // ════════════════════════════════════════════════════════
+    function renderPagination(meta) {
+        const total      = meta.total || 0;
+        const perPage    = meta.per_page || state.perPage;
+        const totalPages = Math.max(1, Math.ceil(total / perPage));
+        const start = total > 0 ? (state.page - 1) * perPage + 1 : 0;
+        const end   = Math.min(state.page * perPage, total);
+
+        const infoEl = document.getElementById('msPaginationInfo');
+        if (infoEl) infoEl.textContent = total > 0 ? `${start}–${end} / ${total}` : t('no_records', 'No records');
+
+        const pagEl = document.getElementById('msPagination');
+        if (!pagEl) return;
+        pagEl.innerHTML = '';
+        if (totalPages <= 1) return;
+
+        const makeBtn = (label, target, active = false, disabled = false) => {
+            const btn = document.createElement('button');
+            btn.className = 'pagination-btn' + (active ? ' active' : '');
+            btn.innerHTML = label;
+            btn.disabled  = disabled;
+            if (!disabled) btn.addEventListener('click', () => loadData(target));
+            return btn;
+        };
+
+        pagEl.appendChild(makeBtn('&laquo;', state.page - 1, false, state.page <= 1));
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || (i >= state.page - 2 && i <= state.page + 2)) {
+                pagEl.appendChild(makeBtn(String(i), i, i === state.page, i === state.page));
+            } else if (i === state.page - 3 || i === state.page + 3) {
+                const sp = document.createElement('span');
+                sp.className = 'pagination-dots';
+                sp.textContent = '\u2026';
+                pagEl.appendChild(sp);
             }
         }
+        pagEl.appendChild(makeBtn('&raquo;', state.page + 1, false, state.page >= totalPages));
+    }
 
-        // Dispatch Event
-        const eventDetail = (CONFIG.selectionLimit === 1) ? selectedObjects[0] : selectedObjects;
+    // ════════════════════════════════════════════════════════
+    // SELECTION
+    // ════════════════════════════════════════════════════════
+    function updateSelectedItems() {
+        const checked = document.querySelectorAll('#imageTableBody .ms-checkbox:checked');
+        state.selectedItems = Array.from(checked).map(cb => parseInt(cb.value));
 
-        console.log('[MediaStudio] Dispatching selection:', eventDetail);
+        // Delete selected button
+        if (el.btnDeleteSelected) {
+            el.btnDeleteSelected.style.display = state.selectedItems.length > 0 ? 'inline-flex' : 'none';
+        }
 
-        // Dispatch to window (for standalone)
+        // Selection bar
+        if (CFG.mode === 'select' && el.selectionBar) {
+            el.selectionBar.classList.toggle('visible', state.selectedItems.length > 0);
+            if (el.selectionCount) el.selectionCount.textContent = state.selectedItems.length;
+        }
+
+        // Row highlight
+        document.querySelectorAll('#imageTableBody tr').forEach(tr => {
+            const cb = tr.querySelector('.ms-checkbox');
+            tr.classList.toggle('selected', cb?.checked);
+        });
+    }
+
+    async function handleSelectionConfirm() {
+        if (state.selectedItems.length === 0) {
+            notify(t('no_items_selected_alert', 'Please select an image first'), 'error');
+            return;
+        }
+        const selectedObjects = state.items.filter(item => state.selectedItems.includes(item.id));
+        if (!selectedObjects.length) return;
+
+        // Auto-assign if autoFill provided
+        const newOwnerId = CFG.autoFill?.owner_id  ? parseInt(CFG.autoFill.owner_id)  : null;
+        const newTypeId  = CFG.autoFill?.image_type_id ? parseInt(CFG.autoFill.image_type_id) : null;
+
+        if (newOwnerId || newTypeId) {
+            const updates = selectedObjects
+                .filter(img => (newOwnerId && img.owner_id != newOwnerId) || (newTypeId && img.image_type_id != newTypeId))
+                .map(img => {
+                    const fd = new FormData();
+                    fd.append('csrf_token', CFG.csrfToken || '');
+                    fd.append('_method', 'PUT');
+                    if (newOwnerId) fd.append('owner_id', newOwnerId);
+                    if (newTypeId)  fd.append('image_type_id', newTypeId);
+                    fd.append('tenant_id', CFG.tenantId);
+                    return fetch(`${API}/${img.id}`, { method: 'POST', body: fd, credentials: 'same-origin' });
+                });
+            if (updates.length) await Promise.allSettled(updates);
+        }
+
+        const eventDetail = CFG.selectionLimit === 1 ? selectedObjects[0] : selectedObjects;
         window.dispatchEvent(new CustomEvent('ImageStudio:selected', { detail: eventDetail }));
-
-        // Dispatch to parent (for iframe)
         if (window.parent && window.parent !== window) {
             window.parent.dispatchEvent(new CustomEvent('ImageStudio:selected', { detail: eventDetail }));
             window.parent.dispatchEvent(new CustomEvent('ImageStudio:close', {}));
         } else {
-            // If standalone, maybe close window?
-            showNotification(t('selection_confirmed', { defaultValue: 'Selection confirmed' }), 'success');
-            if (window.opener) window.close();
+            notify(t('selection_confirmed', 'Selection confirmed'), 'success');
         }
     }
 
-    // Load data
-    async function loadData(page = 1) {
-        if (state.isLoading) {
-            console.warn('[MediaStudio] Already loading, skipping');
-            return;
+    // ════════════════════════════════════════════════════════
+    // ADD / UPLOAD FORM
+    // ════════════════════════════════════════════════════════
+    function showAddForm() {
+        hideEditForm();
+        if (!el.addImageContainer) return;
+
+        if (CFG.autoFill) {
+            if (el.uploadOwnerId)          el.uploadOwnerId.value          = CFG.autoFill.owner_id      || '';
+            if (el.uploadImageTypeIdHidden)el.uploadImageTypeIdHidden.value = CFG.autoFill.image_type_id || '';
+            if (el.uploadTenantId)         el.uploadTenantId.value         = CFG.autoFill.tenant_id     || CFG.tenantId;
+            if (el.uploadUserId)           el.uploadUserId.value           = CFG.autoFill.user_id       || '';
         }
 
-        // Cancel previous request
-        if (state.abortController) {
-            state.abortController.abort();
-        }
-
-        state.abortController = new AbortController();
-        state.isLoading = true;
-
-        try {
-            showLoading();
-
-            state.page = page;
-            const params = new URLSearchParams({
-                page: page,
-                limit: state.perPage,
-                format: 'json',
-                ...state.filters
-            });
-
-            console.log('[MediaStudio] Loading data with params:', params.toString());
-
-            const response = await fetch(`${API}?${params}`, {
-                credentials: 'same-origin',
-                headers: { 'Accept': 'application/json' },
-                signal: state.abortController.signal
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            console.log('[MediaStudio] API response:', result);
-
-            if (result.success && result.data && Array.isArray(result.data.data)) {
-                state.items = result.data.data;
-                console.log('[MediaStudio] Loaded items:', state.items.length);
-                renderTable();
-                updatePagination(result.data.meta || {});
-                updateResultsCount(result.data.meta?.total || 0);
-                showTable();
-            } else {
-                console.warn('[MediaStudio] No data or failed:', result);
-                state.items = [];
-                showEmpty();
-            }
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                console.log('[MediaStudio] Request aborted');
-                return;
-            }
-            console.error('[MediaStudio] Load error:', error);
-            state.items = [];
-            showError(t('error_loading'));
-        } finally {
-            state.isLoading = false;
-            state.abortController = null;
-        }
+        if (el.uploadForm) el.uploadForm.reset();
+        if (el.uploadFileList) { el.uploadFileList.innerHTML = ''; el.uploadFileList.style.display = 'none'; }
+        switchAddTab('upload');
+        el.addImageContainer.style.display = 'block';
+        setTimeout(() => el.addImageContainer.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
     }
-    // Render table
-    function renderTable() {
-        if (!el.tableBody || !Array.isArray(state.items) || state.items.length === 0) {
-            console.warn('[MediaStudio] No table body or items');
-            showEmpty();
-            return;
-        }
 
-        console.log('[MediaStudio] Rendering table with items:', state.items);
+    function hideAddForm() {
+        if (el.addImageContainer) el.addImageContainer.style.display = 'none';
+        if (el.uploadForm) el.uploadForm.reset();
+        if (el.uploadFileList) { el.uploadFileList.innerHTML = ''; el.uploadFileList.style.display = 'none'; }
+        exitStudioCopyMode();
+    }
 
-        let html = '';
-        state.items.forEach(item => {
-            const isMain = item.is_main == 1;
-            const createdDate = new Date(item.created_at).toLocaleDateString();
-            const imageTypeName = getImageTypeName(item.image_type_id);
-
-            html += `
-                <tr data-id="${item.id}">
-                    <td><input type="checkbox" class="image-checkbox" value="${item.id}"></td>
-                    <td>
-                        <img src="${item.thumb_url || item.url}" alt="${item.filename || ''}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">
-                    </td>
-                    <td>${item.id}</td>
-                    <td>${escapeHtml(item.filename || '')}</td>
-                    <td>${item.owner_id}</td>
-                    <td>${escapeHtml(imageTypeName)}</td>
-                    <td><span class="badge badge-${item.visibility === 'public' ? 'success' : 'secondary'}">${item.visibility}</span></td>
-                    <td>
-                        <label class="toggle-switch">
-                            <input type="checkbox" class="is-main-toggle" data-id="${item.id}" ${isMain ? 'checked' : ''}>
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </td>
-                    <td>${item.sort_order}</td>
-                    <td>${createdDate}</td>
-                    <td>
-                        <div class="table-actions">
-                            ${state.permissions.canEdit ? `<button class="btn btn-sm btn-outline edit-btn" data-id="${item.id}" title="${t('edit')}"><i class="fas fa-edit"></i></button>` : ''}
-                            ${state.permissions.canDelete ? `<button class="btn btn-sm btn-danger delete-btn" data-id="${item.id}" title="${t('delete')}"><i class="fas fa-trash"></i></button>` : ''}
-                        </div>
-                    </td>
-                </tr>
-            `;
+    function switchAddTab(tabName) {
+        if (el.addTabUpload) el.addTabUpload.style.display = tabName === 'upload' ? 'block' : 'none';
+        if (el.addTabStudio) el.addTabStudio.style.display = tabName === 'studio' ? 'block' : 'none';
+        document.querySelectorAll('.ms-tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tabName);
         });
-
-        el.tableBody.innerHTML = html;
-
-        // Bind events for toggles
-        el.tableBody.querySelectorAll('.is-main-toggle').forEach(toggle => {
-            toggle.addEventListener('change', handleMainToggle);
-        });
-
-        console.log('[MediaStudio] Table rendered');
     }
 
-    // Show form
-    function showForm(isEdit = false, data = null) {
+    // ════════════════════════════════════════════════════════
+    // EDIT FORM
+    // ════════════════════════════════════════════════════════
+    function showEditForm(isEdit = false, data = null) {
+        hideAddForm();
         if (!el.formContainer) return;
 
-        el.formContainer.style.display = 'block';
-        el.uploadFormContainer.style.display = 'none';
-        el.form.reset();
-        el.formId.value = '';
+        if (el.imageForm) el.imageForm.reset();
+        if (el.formId) el.formId.value = '';
 
-        el.formTitle.textContent = isEdit ? t('form_edit_title') : t('form_add_title');
+        const title = document.getElementById('imageFormTitle');
+        if (title) title.textContent = isEdit ? t('form_edit_title', 'Edit Image') : t('form_add_title', 'Add Image');
+        if (el.btnDelete) el.btnDelete.style.display = isEdit ? 'inline-flex' : 'none';
 
         if (isEdit && data) {
-            el.formId.value = data.id;
-            if (el.ownerId) el.ownerId.value = data.owner_id;
-            setDisplayFromId('imageTypeIdHidden', 'imageTypeId', 'imageTypesList', data.image_type_id);
-            if (el.filename) el.filename.value = data.filename || '';
-            if (el.url) el.url.value = data.url || '';
-            if (el.thumbUrl) el.thumbUrl.value = data.thumb_url || '';
-            if (el.mimeType) el.mimeType.value = data.mime_type || '';
-            if (el.size) el.size.value = data.size || '';
-            if (el.visibility) el.visibility.value = data.visibility || 'private';
-            if (el.isMain) el.isMain.value = data.is_main || 0;
-            if (el.sortOrder) el.sortOrder.value = data.sort_order || 0;
-            if (el.imageTenantId) el.imageTenantId.value = data.tenant_id || CONFIG.tenantId;
-            if (el.imageUserId) el.imageUserId.value = data.user_id || CONFIG.autoFill?.user_id || '';
-            if (el.btnDelete) el.btnDelete.style.display = 'inline-block';
-        } else {
-            // Auto-fill from config
-            if (CONFIG.autoFill) {
-                if (el.ownerId) el.ownerId.value = CONFIG.autoFill.owner_id || '';
-                setDisplayFromId('imageTypeIdHidden', 'imageTypeId', 'imageTypesList', CONFIG.autoFill.image_type_id || '');
-                if (el.imageTenantId) el.imageTenantId.value = CONFIG.autoFill.tenant_id || CONFIG.tenantId;
-                if (el.imageUserId) el.imageUserId.value = CONFIG.autoFill.user_id || '';
+            if (el.formId)       el.formId.value      = data.id;
+            if (el.ownerId)      el.ownerId.value      = data.owner_id || '';
+            setDisplayFromId('imageTypeIdHidden', 'imageTypeDisplay', 'imageTypesList', data.image_type_id);
+            if (el.filename)     el.filename.value     = data.filename   || '';
+            if (el.url)          el.url.value          = data.url        || '';
+            if (el.thumbUrl)     el.thumbUrl.value     = data.thumb_url  || '';
+            if (el.mimeType)     el.mimeType.value     = data.mime_type  || 'image/jpeg';
+            if (el.visibility)   el.visibility.value   = data.visibility || 'private';
+            if (el.isMain)       el.isMain.value       = data.is_main    ? '1' : '0';
+            if (el.sortOrder)    el.sortOrder.value    = data.sort_order || 0;
+            if (el.imageTenantId)el.imageTenantId.value = data.tenant_id || CFG.tenantId;
+            if (el.imageUserId)  el.imageUserId.value  = data.user_id   || CFG.autoFill?.user_id || '';
+        } else if (CFG.autoFill) {
+            if (el.ownerId)       el.ownerId.value       = CFG.autoFill.owner_id   || '';
+            if (el.imageTenantId) el.imageTenantId.value = CFG.autoFill.tenant_id  || CFG.tenantId;
+            if (el.imageUserId)   el.imageUserId.value   = CFG.autoFill.user_id    || '';
+            setDisplayFromId('imageTypeIdHidden', 'imageTypeDisplay', 'imageTypesList', CFG.autoFill.image_type_id || '');
+        }
+
+        el.formContainer.style.display = 'block';
+        setTimeout(() => el.formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    }
+
+    function hideEditForm() {
+        if (el.formContainer) el.formContainer.style.display = 'none';
+        if (el.imageForm) el.imageForm.reset();
+    }
+
+    async function editImage(id) {
+        try {
+            const result = await apiFetch(`${API}/${id}?format=json`);
+            if (result.success && result.data) {
+                showEditForm(true, result.data);
+            } else {
+                notify(t('alert_error', 'Error'), 'error');
             }
-            if (el.btnDelete) el.btnDelete.style.display = 'none';
+        } catch (e) {
+            console.error('[MediaStudio] editImage:', e);
+            notify(t('alert_error', 'Error'), 'error');
         }
-
-        el.formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // Show upload form
-    function showUploadForm() {
-        if (!el.uploadFormContainer) return;
-
-        el.uploadFormContainer.style.display = 'block';
-        el.formContainer.style.display = 'none';
-        el.uploadForm.reset();
-
-        // Auto-fill
-        if (CONFIG.autoFill) {
-            if (el.uploadOwnerId) el.uploadOwnerId.value = CONFIG.autoFill.owner_id || '';
-            setDisplayFromId('uploadImageTypeIdHidden', 'uploadImageTypeId', 'uploadImageTypesList', CONFIG.autoFill.image_type_id || '');
-            if (el.uploadTenantId) el.uploadTenantId.value = CONFIG.autoFill.tenant_id || CONFIG.tenantId;
-            if (el.uploadUserId) el.uploadUserId.value = CONFIG.autoFill.user_id || '';
-        }
-
-        el.uploadFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-
-    // Save data
+    // ════════════════════════════════════════════════════════
+    // SAVE (edit form)
+    // ════════════════════════════════════════════════════════
     async function saveData(e) {
         if (e) e.preventDefault();
 
-        const idValue = el.formId.value.trim();
-        const isEdit = !!idValue;
+        const idValue    = el.formId?.value?.trim() || '';
+        const isEdit     = !!idValue;
+        const ownerId    = parseInt(el.ownerId?.value || 0);
+        const typeId     = parseInt(getIdFromDatalist('imageTypesList', el.imageTypeDisplay?.value) || 0);
+        const urlValue   = el.url?.value?.trim() || '';
 
-        // 1️⃣ التحقق من الحقول الأساسية
-        const ownerId = parseInt(el.ownerId.value);
-        if (!ownerId || ownerId <= 0) {
-            showNotification(t('Owner ID must be a positive integer'), 'error');
-            return;
-        }
+        if (!ownerId)  { notify(t('Owner ID is required', 'Owner ID is required'), 'error'); return; }
+        if (!typeId)   { notify(t('Image type is required', 'Image type is required'), 'error'); return; }
+        if (!urlValue) { notify(t('URL is required', 'URL is required'), 'error'); return; }
 
-        const imageTypeId = parseInt(getIdFromDatalist('imageTypesList', el.imageTypeDisplay.value));
-        if (!imageTypeId || imageTypeId <= 0) {
-            showNotification(t('Image type ID must be a positive integer'), 'error');
-            return;
-        }
+        const fd = new FormData();
+        fd.append('csrf_token',    CFG.csrfToken || '');
+        fd.append('owner_id',      ownerId);
+        fd.append('image_type_id', typeId);
+        fd.append('tenant_id',     parseInt(el.imageTenantId?.value || CFG.tenantId));
+        fd.append('user_id',       parseInt(el.imageUserId?.value || 0));
+        fd.append('url',           urlValue);
+        if (el.thumbUrl?.value)  fd.append('thumb_url',  el.thumbUrl.value.trim());
+        if (el.filename?.value)  fd.append('filename',   el.filename.value.trim());
+        if (el.mimeType?.value)  fd.append('mime_type',  el.mimeType.value.trim());
+        fd.append('visibility',    el.visibility?.value  || 'private');
+        fd.append('is_main',       el.isMain?.value      || '0');
+        fd.append('sort_order',    parseInt(el.sortOrder?.value || 0));
 
-        const urlValue = el.url.value.trim();
-        if (!urlValue) {
-            showNotification(t('URL is required'), 'error');
-            return;
-        }
-
-        let filenameValue = el.filename.value.trim();
-        if (!filenameValue && urlValue) {
-            // Auto-generate filename from URL
-            try {
-                const urlObj = new URL(urlValue);
-                filenameValue = urlObj.pathname.split('/').pop() || 'image_' + Date.now();
-            } catch (e) {
-                filenameValue = 'image_' + Date.now();
-            }
-        }
-
-        // 2️⃣ تجهيز بيانات الإرسال
-        const data = {
-            owner_id: ownerId,
-            image_type_id: imageTypeId,
-            tenant_id: parseInt(el.imageTenantId?.value || CONFIG.tenantId),
-            user_id: parseInt(el.imageUserId?.value || CONFIG.autoFill?.user_id || 0),
-            filename: filenameValue,
-            url: urlValue,
-            thumb_url: el.thumbUrl.value.trim() || null,
-            mime_type: el.mimeType.value.trim() || 'image/jpeg',
-            size: parseInt(el.size.value) || null,
-            visibility: el.visibility.value || 'private',
-            is_main: parseInt(el.isMain.value) || 0,
-            sort_order: parseInt(el.sortOrder.value) || 0
-        };
-
+        let method = 'POST';
+        let url    = API;
         if (isEdit) {
-            const id = parseInt(idValue);
-            if (!id || id <= 0) {
-                showNotification(t('ID is required'), 'error');
-                return;
-            }
-            data.id = id;
+            fd.append('_method', 'PUT');
+            url = `${API}/${parseInt(idValue)}`;
         }
 
-        // 3️⃣ إرسال البيانات
+        if (el.btnSaveImage) { el.btnSaveImage.disabled = true; el.btnSaveImage.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+
         try {
-            if (el.btnSave) {
-                el.btnSave.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + t('save_button');
-                el.btnSave.disabled = true;
+            const result = await fetch(url, { method, body: fd, credentials: 'same-origin' }).then(r => r.json());
+            notify(result.message || (isEdit ? t('alert_updated','Updated') : t('alert_added','Added')),
+                   result.success ? 'success' : 'error');
+            if (result.success) { hideEditForm(); await loadData(state.page); }
+        } catch (err) {
+            console.error('[MediaStudio] saveData:', err);
+            notify(t('alert_error', 'Error'), 'error');
+        } finally {
+            if (el.btnSaveImage) {
+                el.btnSaveImage.disabled = false;
+                el.btnSaveImage.innerHTML = `<i class="fas fa-save" aria-hidden="true"></i> ${t('save_button','Save')}`;
             }
-
-            const url = isEdit ? `${API}/${data.id}` : API;
-            let method = isEdit ? 'PUT' : 'POST';
-
-            const formData = new FormData();
-            Object.keys(data).forEach(key => {
-                if (data[key] !== null) formData.append(key, data[key]);
-            });
-            formData.append('csrf_token', CONFIG.csrfToken || '');
-
-            // ✅ الحل: تحويل PUT إلى POST مع _method
-            if (isEdit) {
-                method = 'POST';
-                formData.append('_method', 'PUT');
-            }
-
-            const response = await fetch(url, {
-                method: method,
-                body: formData,
-                credentials: 'same-origin'
-            });
-
-            const result = await response.json();
-            console.log('[MediaStudio] Save response:', result);
-
-            if (el.btnSave) {
-                el.btnSave.innerHTML = '<i class="fas fa-save"></i> ' + t('save_button');
-                el.btnSave.disabled = false;
-            }
-
-            showNotification(result.message || (isEdit ? t('alert_updated') : t('alert_added')), result.success ? 'success' : 'error');
-
-            if (result.success) {
-                hideForm();
-                loadData(state.page);
-            }
-
-        } catch (error) {
-            console.error('[MediaStudio] Save error:', error);
-            if (el.btnSave) {
-                el.btnSave.innerHTML = '<i class="fas fa-save"></i> ' + t('save_button');
-                el.btnSave.disabled = false;
-            }
-            showNotification(t('alert_error'), 'error');
         }
     }
 
-
-    // Upload data
+    // ════════════════════════════════════════════════════════
+    // UPLOAD
+    // ════════════════════════════════════════════════════════
     async function uploadData(e) {
         if (e) e.preventDefault();
+        const files = el.uploadImages?.files;
+        if (!files?.length) { notify(t('validation_select_files', 'Please select files'), 'error'); return; }
 
-        const imageTypeDisplay = el.uploadImageTypeDisplay.value.trim();
-        const imageTypeId = getIdFromDatalist('uploadImageTypesList', imageTypeDisplay);
-        if (!imageTypeId) {
-            showNotification(t('validation_image_type'), 'error');
-            return;
-        }
+        const fd = new FormData();
+        fd.append('csrf_token',    CFG.csrfToken || '');
+        fd.append('owner_id',      parseInt(el.uploadOwnerId?.value || 0));
+        fd.append('image_type_id', parseInt(el.uploadImageTypeIdHidden?.value || 0));
+        fd.append('tenant_id',     parseInt(el.uploadTenantId?.value || CFG.tenantId));
+        fd.append('user_id',       parseInt(el.uploadUserId?.value || 0));
+        fd.append('visibility',    'public');
+        for (const f of files) fd.append('images[]', f);
 
-        const data = {
-            owner_id: parseInt(el.uploadOwnerId.value),
-            image_type_id: parseInt(imageTypeId),
-            tenant_id: parseInt(el.uploadTenantId?.value || CONFIG.tenantId),
-            user_id: parseInt(el.uploadUserId?.value || CONFIG.autoFill?.user_id || 0),
-            visibility: el.uploadVisibility.value,
-            sort_order: parseInt(el.uploadSortOrder.value)
-        };
+        if (el.btnUploadSave) { el.btnUploadSave.disabled = true; el.btnUploadSave.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
 
         try {
+            const result = await fetch(API, { method: 'POST', body: fd, credentials: 'same-origin' }).then(r => r.json());
+            notify(result.message || t('alert_uploaded', 'Uploaded'), result.success ? 'success' : 'error');
+            if (result.success) { hideAddForm(); await loadData(state.page); }
+        } catch (err) {
+            console.error('[MediaStudio] uploadData:', err);
+            notify(t('alert_error', 'Error'), 'error');
+        } finally {
             if (el.btnUploadSave) {
-                el.btnUploadSave.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + t('upload_button');
-                el.btnUploadSave.disabled = true;
-            }
-
-            const formData = new FormData();
-            Object.keys(data).forEach(key => {
-                formData.append(key, data[key]);
-            });
-            formData.append('csrf_token', CONFIG.csrfToken || '');
-
-            // Add files
-            const files = el.uploadImages.files;
-            for (let i = 0; i < files.length; i++) {
-                formData.append('images[]', files[i]);
-            }
-
-            console.log('[MediaStudio] Uploading files:', files.length);
-
-            const response = await fetch(API, {
-                method: 'POST',
-                body: formData
-            });
-
-            const result = await response.json();
-            console.log('[MediaStudio] Upload response:', result);
-
-            if (el.btnUploadSave) {
-                el.btnUploadSave.innerHTML = '<i class="fas fa-upload"></i> ' + t('upload_button');
                 el.btnUploadSave.disabled = false;
+                el.btnUploadSave.innerHTML = `<i class="fas fa-upload" aria-hidden="true"></i> ${t('upload_button','Upload')}`;
             }
-
-            showNotification(result.message || t('alert_uploaded'), result.success ? 'success' : 'error');
-
-            if (result.success) {
-                hideUploadForm();
-                loadData(state.page);
-            }
-        } catch (error) {
-            console.error('[MediaStudio] Upload error:', error);
-            if (el.btnUploadSave) {
-                el.btnUploadSave.innerHTML = '<i class="fas fa-upload"></i> ' + t('upload_button');
-                el.btnUploadSave.disabled = false;
-            }
-            showNotification(t('alert_error'), 'error');
         }
     }
 
-    // Delete data
+    // ════════════════════════════════════════════════════════
+    // DELETE
+    // ════════════════════════════════════════════════════════
     async function deleteData(id) {
-        if (!confirm(t('confirm_delete'))) {
-            return;
-        }
-
-        try {
-            console.log('[MediaStudio] Deleting item:', id);
-
-            const response = await fetch(`${API}/${id}`, {
-                method: 'DELETE',
-                headers: {
-                    'X-CSRF-Token': CONFIG.csrfToken || ''
-                }
-            });
-
-            const result = await response.json();
-            console.log('[MediaStudio] Delete response:', result);
-
-            showNotification(result.message || t('alert_deleted'), result.success ? 'success' : 'error');
-
-            if (result.success) {
-                loadData(state.page);
-            }
-        } catch (error) {
-            console.error('[MediaStudio] Delete error:', error);
-            showNotification(t('alert_error'), 'error');
-        }
+        if (!confirm(t('confirm_delete', 'Delete this image?'))) return;
+        const result = await apiFetch(`${API}/${id}`, { method: 'DELETE' });
+        notify(result.message || t('alert_deleted', 'Deleted'), result.success ? 'success' : 'error');
+        if (result.success) { hideEditForm(); await loadData(state.page); }
     }
 
-    // Delete selected
     async function deleteSelected() {
-        const selectedIds = state.selectedItems;
-        if (selectedIds.length === 0) return;
-
-        if (!confirm(t('confirm_delete_selected', { count: selectedIds.length }))) {
-            return;
-        }
-
-        try {
-            for (const id of selectedIds) {
-                await fetch(`${API}/${id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRF-Token': CONFIG.csrfToken || ''
-                    }
-                });
-            }
-
-            showNotification(t('alert_deleted_selected'), 'success');
-            loadData(state.page);
-            state.selectedItems = [];
-            updateDeleteSelectedButton();
-        } catch (error) {
-            console.error('[MediaStudio] Delete selected error:', error);
-            showNotification(t('alert_error'), 'error');
-        }
+        if (!state.selectedItems.length) return;
+        if (!confirm(t('confirm_delete_selected', 'Delete selected images?'))) return;
+        await Promise.allSettled(
+            state.selectedItems.map(id => apiFetch(`${API}/${id}`, { method: 'DELETE' }))
+        );
+        notify(t('alert_deleted_selected', 'Deleted selected'), 'success');
+        state.selectedItems = [];
+        await loadData(state.page);
     }
 
-    // Handle main toggle
     async function handleMainToggle(e) {
         const toggle = e.target;
-        const id = toggle.dataset.id;
-        const item = state.items.find(i => i.id == id);
-
+        const id     = toggle.dataset.id;
+        const item   = state.items.find(i => i.id == id);
         if (!item) return;
-
         try {
-            console.log('[MediaStudio] Toggling main for:', id, item.is_main);
-
-            const response = await fetch(`${API}/set_main`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': CONFIG.csrfToken || ''
-                },
-                body: JSON.stringify({
-                    image_id: id,
-                    owner_id: item.owner_id,
+            const result = await apiFetch(SET_MAIN_API, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    image_id:      id,
+                    owner_id:      item.owner_id,
                     image_type_id: item.image_type_id,
-                    tenant_id: CONFIG.tenantId
-                })
+                    tenant_id:     CFG.tenantId,
+                }),
             });
-
-            const result = await response.json();
-            console.log('[MediaStudio] Toggle response:', result);
-
             if (!result.success) {
-                // Revert toggle
                 toggle.checked = !toggle.checked;
-                showNotification(result.message || t('alert_error'), 'error');
+                notify(result.message || t('alert_error', 'Error'), 'error');
             }
-        } catch (error) {
-            // Revert toggle
+        } catch (_) {
             toggle.checked = !toggle.checked;
-            console.error('[MediaStudio] Toggle main error:', error);
-            showNotification(t('alert_error'), 'error');
+            notify(t('alert_error', 'Error'), 'error');
         }
     }
 
-    // Apply filters
+    // ════════════════════════════════════════════════════════
+    // FILTERS
+    // ════════════════════════════════════════════════════════
     function applyFilters() {
         state.filters = {};
-
-        const filename = el.filterFilename?.value.trim();
-        if (filename) state.filters.q = filename;
-
-        const imageTypeId = el.filterTypeHidden?.value;
-        if (imageTypeId) state.filters.image_type_id = imageTypeId;
-
-        const ownerId = el.filterOwnerId?.value;
-        if (ownerId) state.filters.owner_id = parseInt(ownerId);
-
-        const visibility = el.filterVisibility?.value;
-        if (visibility) state.filters.visibility = visibility;
-
-        console.log('[MediaStudio] Applying filters:', state.filters);
-
+        const fname = el.filterFilename?.value?.trim();
+        if (fname) state.filters.q = fname;
+        const typeId = el.filterTypeHidden?.value;
+        if (typeId) state.filters.image_type_id = typeId;
+        const owner = el.filterOwnerId?.value;
+        if (owner) state.filters.owner_id = parseInt(owner);
+        const vis = el.filterVisibility?.value;
+        if (vis) state.filters.visibility = vis;
         loadData(1);
     }
 
-    // Reset filters
     function resetFilters() {
-        if (el.filterFilename) el.filterFilename.value = '';
-        if (el.filterType) el.filterType.value = '';
+        if (el.filterFilename)   el.filterFilename.value   = '';
+        if (el.filterType)       el.filterType.value       = '';
         if (el.filterTypeHidden) el.filterTypeHidden.value = '';
-        if (el.filterOwnerId) el.filterOwnerId.value = '';
+        if (el.filterOwnerId)    el.filterOwnerId.value    = '';
         if (el.filterVisibility) el.filterVisibility.value = '';
-
         state.filters = {};
         loadData(1);
     }
 
-    // Display helpers
-    function showLoading() {
-        if (el.loading) el.loading.style.display = 'block';
-        if (el.tableContainer) el.tableContainer.style.display = 'none';
-        if (el.empty) el.empty.style.display = 'none';
-        if (el.error) el.error.style.display = 'none';
+    // ════════════════════════════════════════════════════════
+    // STUDIO COPY MODE
+    // ════════════════════════════════════════════════════════
+    function enterStudioCopyMode() {
+        state.studioCopyMode = true;
+        if (el.addImageContainer) el.addImageContainer.style.display = 'none';
+        if (el.studioCopyBar)     el.studioCopyBar.style.display     = 'flex';
+        if (el.btnConfirmCopy)    el.btnConfirmCopy.disabled         = true;
+        state.studioCopySelectedId = null;
+        document.querySelectorAll('#imageTableBody tr').forEach(tr => tr.classList.remove('studio-copy-selected'));
     }
 
-    function showTable() {
-        if (el.loading) el.loading.style.display = 'none';
-        if (el.tableContainer) el.tableContainer.style.display = 'block';
-        if (el.empty) el.empty.style.display = 'none';
-        if (el.error) el.error.style.display = 'none';
+    function exitStudioCopyMode() {
+        if (!state.studioCopyMode) return;
+        state.studioCopyMode       = false;
+        state.studioCopySelectedId = null;
+        if (el.studioCopyBar) el.studioCopyBar.style.display = 'none';
+        document.querySelectorAll('#imageTableBody tr').forEach(tr => tr.classList.remove('studio-copy-selected'));
     }
 
-    function showEmpty() {
-        if (el.loading) el.loading.style.display = 'none';
-        if (el.tableContainer) el.tableContainer.style.display = 'none';
-        if (el.empty) el.empty.style.display = 'block';
-        if (el.error) el.error.style.display = 'none';
-        if (el.tableBody) el.tableBody.innerHTML = '';
-        updateResultsCount(0);
-    }
+    async function confirmStudioCopy() {
+        const srcId  = state.studioCopySelectedId;
+        const srcImg = state.items.find(img => img.id === srcId);
+        if (!srcId || !srcImg) { notify(t('no_items_selected_alert', 'Select an image first'), 'error'); return; }
 
-    function showError(message) {
-        if (el.loading) el.loading.style.display = 'none';
-        if (el.tableContainer) el.tableContainer.style.display = 'none';
-        if (el.empty) el.empty.style.display = 'none';
-        if (el.error) {
-            el.error.style.display = 'block';
-            if (el.errorMessage) el.errorMessage.textContent = message || t('error_loading');
+        const fd = new FormData();
+        fd.append('csrf_token',    CFG.csrfToken || '');
+        fd.append('owner_id',      CFG.autoFill?.owner_id      || srcImg.owner_id);
+        fd.append('image_type_id', CFG.autoFill?.image_type_id || srcImg.image_type_id);
+        fd.append('tenant_id',     CFG.tenantId);
+        fd.append('user_id',       CFG.autoFill?.user_id       || srcImg.user_id || 0);
+        fd.append('url',           srcImg.url);
+        fd.append('thumb_url',     srcImg.thumb_url   || '');
+        fd.append('filename',      srcImg.filename    || '');
+        fd.append('mime_type',     srcImg.mime_type   || 'image/jpeg');
+        fd.append('size',          srcImg.size        || 0);
+        fd.append('visibility',    srcImg.visibility  || 'private');
+        fd.append('is_main',       srcImg.is_main     || 0);
+        fd.append('sort_order',    srcImg.sort_order  || 0);
+
+        if (el.btnConfirmCopy) { el.btnConfirmCopy.disabled = true; el.btnConfirmCopy.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+
+        const result = await fetch(API, { method: 'POST', body: fd, credentials: 'same-origin' }).then(r => r.json()).catch(() => ({}));
+
+        if (el.btnConfirmCopy) {
+            el.btnConfirmCopy.disabled = false;
+            el.btnConfirmCopy.innerHTML = `<i class="fas fa-check" aria-hidden="true"></i> ${t('use_image','Use This Image')}`;
         }
+
+        notify(result.message || (result.success ? t('alert_added','Added') : t('alert_error','Error')),
+               result.success ? 'success' : 'error');
+        if (result.success) { exitStudioCopyMode(); await loadData(state.page); }
     }
 
-    function hideForm() {
-        if (el.formContainer) el.formContainer.style.display = 'none';
-        if (el.form) el.form.reset();
+    // ════════════════════════════════════════════════════════
+    // FILE LIST DISPLAY
+    // ════════════════════════════════════════════════════════
+    function updateFileList(files) {
+        if (!el.uploadFileList) return;
+        if (!files?.length) { el.uploadFileList.style.display = 'none'; el.uploadFileList.innerHTML = ''; return; }
+        el.uploadFileList.style.display = 'block';
+        el.uploadFileList.innerHTML = Array.from(files).map(f =>
+            `<div class="ms-file-item"><i class="fas fa-image" aria-hidden="true"></i> <span>${esc(f.name)}</span> <small>(${Math.round(f.size / 1024)} KB)</small></div>`
+        ).join('');
     }
 
-    function hideUploadForm() {
-        if (el.uploadFormContainer) el.uploadFormContainer.style.display = 'none';
-        if (el.uploadForm) el.uploadForm.reset();
-    }
-
-    function updatePagination(meta) {
-        if (!el.paginationInfo || !el.btnPrev || !el.btnNext || !el.paginationWrapper) return;
-
-        const currentPage = meta.page || 1;
-        const perPage = meta.per_page || state.perPage;
-        const total = meta.total || 0;
-        const totalPages = Math.ceil(total / perPage) || 1;
-
-        const from = total > 0 ? ((currentPage - 1) * perPage) + 1 : 0;
-        const to = Math.min(currentPage * perPage, total);
-
-        el.paginationInfo.textContent = t('showing_results', { from, to, total });
-
-        el.btnPrev.disabled = currentPage <= 1;
-        el.btnNext.disabled = currentPage >= totalPages;
-
-        el.btnPrev.onclick = () => loadData(currentPage - 1);
-        el.btnNext.onclick = () => loadData(currentPage + 1);
-
-        el.paginationWrapper.style.display = total > 0 ? 'flex' : 'none';
-    }
-
-    function updateResultsCount(total) {
-        if (!el.resultsCount || !el.resultsCountText) return;
-
-        if (total > 0) {
-            el.resultsCountText.textContent = `${total} ${t('results_found')}`;
-            el.resultsCount.style.display = 'block';
-        } else {
-            el.resultsCountText.textContent = t('no_records');
-            el.resultsCount.style.display = 'block';
-        }
-    }
-
-    function updateDeleteSelectedButton() {
-        if (el.btnDeleteSelected) {
-            el.btnDeleteSelected.style.display = state.selectedItems.length > 0 ? 'inline-block' : 'none';
-        }
-    }
-
-    function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    function getImageTypeName(id) {
-        const type = state.imageTypes.find(t => t.id == id);
-        return type ? type.name : 'Unknown';
-    }
-
-    // Initialize
-    function init() {
+    // ════════════════════════════════════════════════════════
+    // INIT
+    // ════════════════════════════════════════════════════════
+    async function init() {
         el = {
-            pageTitle: document.querySelector('.page-title'),
-            pageSubtitle: document.querySelector('.page-subtitle'),
-            formContainer: document.getElementById('imageFormContainer'),
-            uploadFormContainer: document.getElementById('uploadFormContainer'),
-            form: document.getElementById('imageForm'),
-            uploadForm: document.getElementById('uploadForm'),
-            formTitle: document.getElementById('formTitle'),
-            formId: document.getElementById('imageId'),
-            ownerId: document.getElementById('imageOwnerId'),
-            imageTypeDisplay: document.getElementById('imageTypeId'),
-            imageTypeHidden: document.getElementById('imageTypeIdHidden'),
-            filename: document.getElementById('imageFilename'),
-            url: document.getElementById('imageUrl'),
-            thumbUrl: document.getElementById('imageThumbUrl'),
-            mimeType: document.getElementById('imageMimeType'),
-            size: document.getElementById('imageSize'),
-            visibility: document.getElementById('imageVisibility'),
-            isMain: document.getElementById('imageIsMain'),
-            sortOrder: document.getElementById('imageSortOrder'),
-            imageTenantId: document.getElementById('imageTenantId'),
-            imageUserId: document.getElementById('imageUserId'),
-            uploadOwnerId: document.getElementById('uploadOwnerId'),
-            uploadImageTypeDisplay: document.getElementById('uploadImageTypeId'),
-            uploadImageTypeHidden: document.getElementById('uploadImageTypeIdHidden'),
-            uploadVisibility: document.getElementById('uploadVisibility'),
-            uploadSortOrder: document.getElementById('uploadSortOrder'),
-            uploadTenantId: document.getElementById('uploadTenantId'),
-            uploadUserId: document.getElementById('uploadUserId'),
-            uploadImages: document.getElementById('uploadImages'),
-            btnSave: document.getElementById('btnSaveImage'),
-            btnUploadSave: document.getElementById('btnUploadSave'),
-            btnCancel: document.getElementById('btnCancelImageForm'),
-            btnCancelUpload: document.getElementById('btnCancelUploadForm'),
-            btnDelete: document.getElementById('btnDeleteImage'),
-            btnClose: document.getElementById('btnCloseImageForm'),
-            btnCloseUpload: document.getElementById('btnCloseUploadForm'),
-
-            btnSelectConfirm: document.getElementById('btnSelectConfirm'),
-
-            table: document.getElementById('imagesTable'),
-            tableBody: document.getElementById('imageTableBody'),
-            loading: document.getElementById('imageGridLoading'),
-            tableContainer: document.getElementById('imageGridContainer'),
-            empty: document.getElementById('imageEmptyState'),
-            error: document.getElementById('imageErrorState'),
-            errorMessage: document.getElementById('imageErrorMessage'),
-
-            filterFilename: document.getElementById('imageFilterFilename'),
-            filterType: document.getElementById('imageFilterType'),
-            filterTypeHidden: document.getElementById('imageFilterTypeHidden'),
-            filterOwnerId: document.getElementById('imageFilterOwnerId'),
-            filterVisibility: document.getElementById('imageFilterVisibility'),
-            btnApply: document.getElementById('btnApplyImageFilters'),
-            btnReset: document.getElementById('btnResetImageFilters'),
-            btnDeleteSelected: document.getElementById('btnDeleteSelected'),
-
-            resultsCount: document.getElementById('imageResultsCount'),
-            resultsCountText: document.getElementById('imageResultsCountText'),
-            paginationInfo: document.getElementById('imagePaginationInfo'),
-            btnPrev: document.getElementById('btnPrevImagePage'),
-            btnNext: document.getElementById('btnNextImagePage'),
-            paginationWrapper: document.getElementById('imagePaginationWrapper'),
-            btnRetry: document.getElementById('btnRetryImages'),
-            btnAdd: document.getElementById('btnAddImage'),
-            btnUpload: document.getElementById('btnUploadImages'),
-            btnSelectConfirm: document.getElementById('btnSelectConfirm'),
-
-            // Selection Bar
-            selectionBar: document.getElementById('selectionBar'),
-            selectionCount: document.getElementById('selectionCount'),
-            btnConfirmSelectionBar: document.getElementById('btnConfirmSelectionBar'),
-
-            selectAll: document.getElementById('selectAllImages'),
-            notificationsContainer: document.getElementById('notificationsContainer')
+            addImageContainer:     document.getElementById('addImageContainer'),
+            addTabUpload:          document.getElementById('addTabUpload'),
+            addTabStudio:          document.getElementById('addTabStudio'),
+            studioCopyBar:         document.getElementById('studioCopyBar'),
+            btnConfirmCopy:        document.getElementById('btnConfirmCopy'),
+            btnCancelCopy:         document.getElementById('btnCancelCopy'),
+            formContainer:         document.getElementById('imageFormContainer'),
+            imageForm:             document.getElementById('imageForm'),
+            uploadForm:            document.getElementById('uploadForm'),
+            formId:                document.getElementById('imageId'),
+            ownerId:               document.getElementById('imageOwnerId'),
+            imageTypeDisplay:      document.getElementById('imageTypeDisplay'),
+            imageTypeHidden:       document.getElementById('imageTypeIdHidden'),
+            filename:              document.getElementById('imageFilename'),
+            url:                   document.getElementById('imageUrl'),
+            thumbUrl:              document.getElementById('imageThumbUrl'),
+            mimeType:              document.getElementById('imageMimeType'),
+            visibility:            document.getElementById('imageVisibility'),
+            isMain:                document.getElementById('imageIsMain'),
+            sortOrder:             document.getElementById('imageSortOrder'),
+            imageTenantId:         document.getElementById('imageTenantId'),
+            imageUserId:           document.getElementById('imageUserId'),
+            uploadOwnerId:         document.getElementById('uploadOwnerId'),
+            uploadImageTypeIdHidden:document.getElementById('uploadImageTypeIdHidden'),
+            uploadTenantId:        document.getElementById('uploadTenantId'),
+            uploadUserId:          document.getElementById('uploadUserId'),
+            uploadImages:          document.getElementById('uploadImages'),
+            uploadDropZone:        document.getElementById('uploadDropZone'),
+            uploadFileList:        document.getElementById('uploadFileList'),
+            btnSaveImage:          document.getElementById('btnSaveImage'),
+            btnUploadSave:         document.getElementById('btnUploadSave'),
+            btnCancelImageForm:    document.getElementById('btnCancelImageForm'),
+            btnCancelUploadForm:   document.getElementById('btnCancelUploadForm'),
+            btnDelete:             document.getElementById('btnDeleteImage'),
+            btnCloseImageForm:     document.getElementById('btnCloseImageForm'),
+            btnCloseAddForm:       document.getElementById('btnCloseAddForm'),
+            btnEnterStudioCopy:    document.getElementById('btnEnterStudioCopy'),
+            btnCancelStudioTab:    document.getElementById('btnCancelStudioTab'),
+            btnSelectConfirm:      document.getElementById('btnSelectConfirm'),
+            btnConfirmSelectionBar:document.getElementById('btnConfirmSelectionBar'),
+            selectionBar:          document.getElementById('selectionBar'),
+            selectionCount:        document.getElementById('selectionCount'),
+            selectAll:             document.getElementById('selectAllImages'),
+            filterFilename:        document.getElementById('imageFilterFilename'),
+            filterType:            document.getElementById('imageFilterType'),
+            filterTypeHidden:      document.getElementById('imageFilterTypeHidden'),
+            filterOwnerId:         document.getElementById('imageFilterOwnerId'),
+            filterVisibility:      document.getElementById('imageFilterVisibility'),
+            btnApply:              document.getElementById('btnApplyImageFilters'),
+            btnReset:              document.getElementById('btnResetImageFilters'),
+            btnDeleteSelected:     document.getElementById('btnDeleteSelected'),
+            btnAddImageEmpty:      document.getElementById('btnAddImageEmpty'),
+            btnRetry:              document.getElementById('btnRetryImages'),
         };
 
-        // Handle Embedded Mode
-        if (CONFIG.embedded) {
-            document.body.classList.add('embedded-mode');
+        // ESC closes forms
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Escape') return;
+            if (el.addImageContainer?.style.display !== 'none') { hideAddForm(); return; }
+            if (el.formContainer?.style.display !== 'none') { hideEditForm(); return; }
+            exitStudioCopyMode();
+        });
 
-            // If in select mode, show select button
-            if (CONFIG.mode === 'select') {
-                if (el.btnSelectConfirm) {
-                    el.btnSelectConfirm.style.display = 'inline-block';
-                    el.btnSelectConfirm.onclick = handleSelectionConfirm;
-                }
-                // Hide actions that might be irrelevant in select mode if needed
-            }
+        // Form events
+        if (el.imageForm)           el.imageForm.addEventListener('submit', saveData);
+        if (el.uploadForm)          el.uploadForm.addEventListener('submit', uploadData);
+        if (el.btnCancelImageForm)  el.btnCancelImageForm.onclick  = hideEditForm;
+        if (el.btnCloseImageForm)   el.btnCloseImageForm.onclick   = hideEditForm;
+        if (el.btnCancelUploadForm) el.btnCancelUploadForm.onclick = hideAddForm;
+        if (el.btnCloseAddForm)     el.btnCloseAddForm.onclick     = hideAddForm;
+        if (el.btnCancelStudioTab)  el.btnCancelStudioTab.onclick  = hideAddForm;
+        if (el.btnEnterStudioCopy)  el.btnEnterStudioCopy.onclick  = enterStudioCopyMode;
+        if (el.btnConfirmCopy)      el.btnConfirmCopy.onclick      = confirmStudioCopy;
+        if (el.btnCancelCopy)       el.btnCancelCopy.onclick       = exitStudioCopyMode;
+        if (el.btnDelete)           el.btnDelete.onclick = () => { if (el.formId?.value) deleteData(el.formId.value); };
 
-            // Auto-Run Actions
-            if (CONFIG.action === 'add') {
-                showForm(false);
-            } else if (CONFIG.action === 'upload') {
-                showUploadForm();
-            }
-        }
-
-        // Bind events
-        if (el.form) el.form.onsubmit = saveData;
-
-        if (el.uploadForm) el.uploadForm.onsubmit = uploadData;
-        if (el.btnCancel) el.btnCancel.onclick = hideForm;
-        if (el.btnCancelUpload) el.btnCancelUpload.onclick = hideUploadForm;
-        if (el.btnClose) el.btnClose.onclick = hideForm;
-        if (el.btnCloseUpload) el.btnCloseUpload.onclick = hideUploadForm;
-        if (el.btnApply) el.btnApply.onclick = applyFilters;
-        if (el.btnReset) el.btnReset.onclick = resetFilters;
-        if (el.btnRetry) el.btnRetry.onclick = () => loadData(state.page);
-        if (el.btnAdd) el.btnAdd.onclick = () => showForm(false);
-        if (el.btnUpload) el.btnUpload.onclick = showUploadForm;
-        if (el.btnDelete) el.btnDelete.onclick = () => {
-            if (el.formId.value) {
-                deleteData(parseInt(el.formId.value));
-            }
-        };
+        // Header / filter buttons
+        document.querySelectorAll('#btnAddImage, #btnAddImageEmpty').forEach(b =>
+            b?.addEventListener('click', showAddForm));
+        if (el.btnApply)  el.btnApply.onclick   = applyFilters;
+        if (el.btnReset)  el.btnReset.onclick   = resetFilters;
+        if (el.btnRetry)  el.btnRetry.onclick   = () => loadData(state.page);
         if (el.btnDeleteSelected) el.btnDeleteSelected.onclick = deleteSelected;
 
+        // Selection
+        if (el.btnSelectConfirm)      el.btnSelectConfirm.onclick      = handleSelectionConfirm;
+        if (el.btnConfirmSelectionBar)el.btnConfirmSelectionBar.onclick = handleSelectionConfirm;
+        if (el.selectAll) {
+            el.selectAll.addEventListener('change', () => {
+                document.querySelectorAll('#imageTableBody .ms-checkbox').forEach(cb => {
+                    cb.checked = el.selectAll.checked;
+                });
+                updateSelectedItems();
+            });
+        }
+
+        // Tabs
+        document.querySelectorAll('.ms-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => switchAddTab(btn.dataset.tab));
+        });
+
+        // Drag & drop
+        if (el.uploadDropZone) {
+            el.uploadDropZone.addEventListener('dragover', e => { e.preventDefault(); el.uploadDropZone.classList.add('drag-over'); });
+            el.uploadDropZone.addEventListener('dragleave', () => el.uploadDropZone.classList.remove('drag-over'));
+            el.uploadDropZone.addEventListener('drop', e => {
+                e.preventDefault();
+                el.uploadDropZone.classList.remove('drag-over');
+                if (e.dataTransfer.files.length) {
+                    const dt = new DataTransfer();
+                    Array.from(e.dataTransfer.files).forEach(f => dt.items.add(f));
+                    el.uploadImages.files = dt.files;
+                    updateFileList(dt.files);
+                }
+            });
+        }
+        if (el.uploadImages) el.uploadImages.addEventListener('change', () => updateFileList(el.uploadImages.files));
+
+        // Image type datalist
         if (el.imageTypeDisplay) {
             el.imageTypeDisplay.addEventListener('input', function () {
                 const id = getIdFromDatalist('imageTypesList', this.value);
-                el.imageTypeHidden.value = id || '';
-            });
-        }
-        if (el.uploadImageTypeDisplay) {
-            el.uploadImageTypeDisplay.addEventListener('input', function () {
-                const id = getIdFromDatalist('uploadImageTypesList', this.value);
-                el.uploadImageTypeHidden.value = id || '';
+                if (el.imageTypeHidden) el.imageTypeHidden.value = id || '';
             });
         }
         if (el.filterType) {
             el.filterType.addEventListener('input', function () {
                 const id = getIdFromDatalist('filterImageTypesList', this.value);
-                el.filterTypeHidden.value = id || '';
+                if (el.filterTypeHidden) el.filterTypeHidden.value = id || '';
             });
         }
 
-        // Select all checkbox
-        if (el.selectAll) {
-            el.selectAll.addEventListener('change', function () {
-                const checkboxes = el.tableBody.querySelectorAll('.image-checkbox');
-                checkboxes.forEach(cb => cb.checked = this.checked);
-                updateSelectedItems();
-            });
-        }
-
-        // Table event delegation
-        if (el.tableBody) {
-            el.tableBody.addEventListener('change', function (e) {
-                if (e.target.classList.contains('image-checkbox')) {
-                    // Start: Selection Limit Logic
-                    if (e.target.checked && CONFIG.mode === 'select' && CONFIG.selectionLimit === 1) {
-                        // Uncheck others
-                        el.tableBody.querySelectorAll('.image-checkbox').forEach(cb => {
-                            if (cb !== e.target) cb.checked = false;
-                        });
-                    }
-                    // End: Selection Limit Logic
-                    updateSelectedItems();
+        // Table delegation — studio copy + row click in select mode
+        document.getElementById('imageTableBody')?.addEventListener('click', e => {
+            if (state.studioCopyMode
+                && !e.target.closest('button')
+                && !e.target.closest('input')
+                && !e.target.closest('a')) {
+                const tr = e.target.closest('tr');
+                if (tr) {
+                    document.querySelectorAll('#imageTableBody tr').forEach(r => r.classList.remove('studio-copy-selected'));
+                    tr.classList.add('studio-copy-selected');
+                    state.studioCopySelectedId = parseInt(tr.dataset.id);
+                    if (el.btnConfirmCopy) el.btnConfirmCopy.disabled = false;
                 }
-            });
-            el.tableBody.addEventListener('click', function (e) {
-                // If in select mode, clicking the row (not buttons) should select the checkbox
-                if (CONFIG.mode === 'select' && !e.target.closest('button') && !e.target.closest('input') && !e.target.closest('a')) {
-                    const tr = e.target.closest('tr');
-                    if (tr) {
-                        const cb = tr.querySelector('.image-checkbox');
-                        if (cb) {
-                            cb.checked = !cb.checked;
-                            // Trigger change event manually if needed, or just update state
-                            if (cb.checked && CONFIG.selectionLimit === 1) {
-                                el.tableBody.querySelectorAll('.image-checkbox').forEach(other => {
-                                    if (other !== cb) other.checked = false;
-                                });
-                            }
-                            updateSelectedItems();
+                return;
+            }
+            if (CFG.mode === 'select'
+                && !e.target.closest('button')
+                && !e.target.closest('input')
+                && !e.target.closest('a')) {
+                const tr = e.target.closest('tr');
+                if (tr) {
+                    const cb = tr.querySelector('.ms-checkbox');
+                    if (cb) {
+                        cb.checked = !cb.checked;
+                        if (cb.checked && CFG.selectionLimit === 1) {
+                            document.querySelectorAll('#imageTableBody .ms-checkbox').forEach(c => {
+                                if (c !== cb) c.checked = false;
+                            });
                         }
+                        updateSelectedItems();
                     }
                 }
-
-                if (e.target.closest('.edit-btn')) {
-                    const id = e.target.closest('.edit-btn').dataset.id;
-                    editImage(id);
-                } else if (e.target.closest('.delete-btn')) {
-                    const id = e.target.closest('.delete-btn').dataset.id;
-                    deleteData(id);
-                }
-            });
-        }
-
-        if (el.btnConfirmSelectionBar) el.btnConfirmSelectionBar.onclick = handleSelectionConfirm;
-
-        loadTranslations().then(() => {
-            applyTranslations();
-            loadImageTypes().then(() => loadData());
-        });
-    }
-
-    async function editImage(id) {
-        try {
-            console.log('[MediaStudio] Editing item:', id);
-
-            const response = await fetch(`${API}/${id}?format=json`, {
-                credentials: 'same-origin'
-            });
-            const result = await response.json();
-            console.log('[MediaStudio] Edit response:', result);
-
-            if (result.success && result.data) {
-                showForm(true, result.data);
-            } else {
-                showNotification(t('alert_error'), 'error');
             }
-        } catch (error) {
-            console.error('[MediaStudio] Edit error:', error);
-            showNotification(t('alert_error'), 'error');
-        }
-    }
-
-    function updateSelectedItems() {
-        const checkboxes = el.tableBody.querySelectorAll('.image-checkbox:checked');
-        state.selectedItems = Array.from(checkboxes).map(cb => parseInt(cb.value));
-        updateDeleteSelectedButton();
-
-        // Update Selection Bar
-        if (CONFIG.mode === 'select' && el.selectionBar) {
-            if (state.selectedItems.length > 0) {
-                el.selectionBar.classList.add('visible');
-                if (el.selectionCount) el.selectionCount.textContent = state.selectedItems.length;
-            } else {
-                el.selectionBar.classList.remove('visible');
-            }
-        }
-
-        // Highlight rows
-        el.tableBody.querySelectorAll('tr').forEach(tr => tr.classList.remove('selected'));
-        checkboxes.forEach(cb => {
-            const tr = cb.closest('tr');
-            if (tr) tr.classList.add('selected');
         });
+
+        // Embedded mode setup
+        if (CFG.embedded) {
+            document.body.classList.add('embedded-mode');
+            if (CFG.mode === 'select' && el.btnSelectConfirm) {
+                el.btnSelectConfirm.style.display = 'inline-flex';
+            }
+            if (CFG.action === 'add' || CFG.action === 'upload') showAddForm();
+        }
+
+        await loadImageTypes();
+        await loadData();
     }
 
-    window.MediaStudio = {
-        init,
-        load: loadData,
-        add: () => showForm(false),
-        upload: showUploadForm,
-        edit: editImage,
-        remove: deleteData
-    };
+    // ════════════════════════════════════════════════════════
+    // REGISTER
+    // ════════════════════════════════════════════════════════
+    window.MediaStudio = { init, load: loadData, add: showAddForm, edit: editImage, remove: deleteData };
+    window.page = { run: init };
+
+    if (window.Admin?.page?.register) {
+        window.Admin.page.register('media_studio', init);
+    }
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
-        setTimeout(init, 100);
+        init();
     }
 
-    window.page = window.page || {};
-    window.page.run = init;
-
-})();
+}());

@@ -32,9 +32,17 @@ final class DriverLocationService
     public function create(int $tenantId, array $data): int
     {
         $this->validator->validate($data);
-        
-        // Optional: Logic to update existing location instead of creating duplicate if provider_id is unique
-        // For now, strictly following CRUD pattern.
+
+        // If the provider already has a location record, update it instead of inserting a duplicate
+        if (isset($data['provider_id']) && (int)$data['provider_id'] > 0) {
+            $existing = $this->repo->findByProviderId($tenantId, (int)$data['provider_id']);
+            if ($existing) {
+                $data['id'] = $existing['id'];
+                $this->repo->update($tenantId, $data);
+                return (int)$existing['id'];
+            }
+        }
+
         return $this->repo->create($tenantId, $data);
     }
 

@@ -12,8 +12,21 @@ function _aui_log(string $m): void {
     @file_put_contents($logFile, '[' . date('c') . '] bootstrap_admin_ui: ' . $m . PHP_EOL, FILE_APPEND | LOCK_EX);
 }
 
-// Start session if not active
 if (session_status() !== PHP_SESSION_ACTIVE) {
+    // Use the same session storage path as the main API bootstrap (session.php).
+    // Without this, PHP falls back to the system default (/tmp) while login
+    // sessions are stored in /api/storage/sessions → user always appears logged out.
+    $apiSessionPath = __DIR__ . '/storage/sessions';
+    if (!is_dir($apiSessionPath)) {
+        if (!mkdir($apiSessionPath, 0700, true) && !is_dir($apiSessionPath)) {
+            _aui_log('Failed to create session directory: ' . $apiSessionPath);
+        }
+    }
+    if (is_dir($apiSessionPath)) {
+        ini_set('session.save_path', $apiSessionPath);
+    }
+
+    session_name('APP_SESSID');
     session_start([
         'cookie_secure' => !empty($_SERVER['HTTPS']),
         'cookie_httponly' => true,
@@ -90,7 +103,13 @@ if ($db instanceof PDO) {
         if (!$userId && !empty($_SESSION['user_id'])) { $userId = (int)$_SESSION['user_id']; }
         
         if ($userId > 0) {
-            $stmt = $db->prepare("SELECT * FROM users WHERE id = ? LIMIT 1");
+            $stmt = $db->prepare("
+                SELECT u.*, tu.role_id, tu.tenant_id 
+                FROM users u 
+                LEFT JOIN tenant_users tu ON u.id = tu.user_id 
+                WHERE u.id = ? 
+                LIMIT 1
+            ");
             $stmt->execute([$userId]);
             $dbUser = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($dbUser) {
@@ -124,14 +143,55 @@ if ($db instanceof PDO) {
                     'id' => $dbUser['id'],
                     'username' => $dbUser['username'],
                     'email' => $dbUser['email'],
-                    'role_id' => $dbUser['role_id'],
-                    'tenant_id' => $dbUser['tenant_id'],
+                    'role_id' => $dbUser['role_id'] ?? null,
+                    'tenant_id' => $dbUser['tenant_id'] ?? 1,
                     'preferred_language' => $dbUser['preferred_language'] ?? 'en',
                     'is_active' => !empty($dbUser['is_active'])
                 ];
                 $_SESSION['roles'] = $roles;
                 $_SESSION['permissions'] = $permissions;
-                
+
+                // Load resource_permissions for this user's role+tenant
+                $resourcePermissions = [];
+                try {
+                    $rpTenantId = (int)($dbUser['tenant_id'] ?? 1);
+                    $stmt = $db->prepare("
+                        SELECT rp.resource_type,
+                               p.key_name AS permission_key,
+                               rp.can_view_all, rp.can_view_own, rp.can_view_tenant,
+                               rp.can_create, rp.can_edit_all, rp.can_edit_own,
+                               rp.can_delete_all, rp.can_delete_own,
+                               rp.role_id, rp.tenant_id
+                        FROM resource_permissions rp
+                        LEFT JOIN permissions p ON p.id = rp.permission_id
+                        WHERE (rp.role_id = :role_id OR rp.role_id IS NULL)
+                          AND (rp.tenant_id = :tenant_id OR rp.tenant_id IS NULL)
+                        ORDER BY rp.resource_type,
+                                 (rp.role_id IS NULL) DESC,
+                                 (rp.tenant_id IS NULL) DESC
+                    ");
+                    $stmt->execute([':role_id' => $roleId, ':tenant_id' => $rpTenantId]);
+                    $flagCols = ['can_view_all','can_view_own','can_view_tenant','can_create','can_edit_all','can_edit_own','can_delete_all','can_delete_own'];
+                    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $rpRow) {
+                        $rt = (string)$rpRow['resource_type'];
+                        if (!isset($resourcePermissions[$rt])) {
+                            $resourcePermissions[$rt] = array_fill_keys($flagCols, false);
+                            $resourcePermissions[$rt]['permission_key'] = $rpRow['permission_key'] ?? null;
+                        }
+                        foreach ($flagCols as $flag) {
+                            if ($rpRow[$flag] !== null) {
+                                $resourcePermissions[$rt][$flag] = (bool)$rpRow[$flag];
+                            }
+                        }
+                        if (!empty($rpRow['permission_key'])) {
+                            $resourcePermissions[$rt]['permission_key'] = $rpRow['permission_key'];
+                        }
+                    }
+                } catch (Throwable $e) {
+                    _aui_log('Failed to load resource_permissions: ' . $e->getMessage());
+                }
+                $_SESSION['resource_permissions'] = $resourcePermissions;
+
                 $currentUser = $_SESSION['user'];
             }
         }
@@ -149,6 +209,7 @@ if (!empty($currentUser)) {
         'role_id' => $currentUser['role_id'] ?? null,
         'roles' => $_SESSION['roles'] ?? [],
         'permissions' => $_SESSION['permissions'] ?? [],
+        'resource_permissions' => $_SESSION['resource_permissions'] ?? [],
         'is_active' => $currentUser['is_active'] ?? false,
         'preferred_language' => $currentUser['preferred_language'] ?? 'en',
         'tenant_id' => $currentUser['tenant_id'] ?? 1

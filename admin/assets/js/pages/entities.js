@@ -21,10 +21,12 @@
         settings: CONFIG.settingsApi || '/api/entity_settings',
         workingHours: CONFIG.workingHoursApi || '/api/entities_working_hours',
         languages: CONFIG.languagesApi || '/api/languages',
+        timezones: CONFIG.timezonesApi || '/api/timezones',
         tenants: CONFIG.tenantsApi || '/api/tenants',
         entityTypes: CONFIG.entityTypesApi || '/api/entity_types',
         addresses: CONFIG.addressesApi || '/api/addresses',
-        images: '/api/images'
+        images: '/api/images',
+        products: CONFIG.productsApi || '/api/products'
     };
 
     const state = {
@@ -33,9 +35,11 @@
         total: 0,
         entities: [],
         languages: [],
+        timezones: [],
         tenants: [],
         entityTypes: [],
         attributes: [],
+        allEntities: [],
         filters: {},
         currentEntity: null,
         entityAttributes: [],
@@ -464,6 +468,18 @@
                 populateDropdown(el.entityLangSelect, state.languages, 'code', 'name', t('form.translations.select_lang', 'Select language'));
             }
 
+            // Load timezones
+            try {
+                const tzResult = await apiCall(API.timezones);
+                if (tzResult.success) {
+                    const tzData = Array.isArray(tzResult.data) ? tzResult.data : (tzResult.data?.items || tzResult.data?.data || []);
+                    state.timezones = tzData;
+                    populateTimezoneSelect(state.timezones);
+                }
+            } catch (tzErr) {
+                console.warn('[Entities] Failed to load timezones:', tzErr);
+            }
+
             // Load attributes
             const attributesResult = await apiCall(`${API.attributes}?format=json&lang=${state.language}`);
             if (attributesResult.success) {
@@ -471,9 +487,36 @@
                 state.attributes = attrData;
                 populateAttributeSelect(state.attributes);
             }
+
+            // Load parent entities for the searchable dropdown
+            try {
+                const entitiesResult = await apiCall(`${API.entities}?limit=500&lang=${state.language}&tenant_id=${state.tenantId}`);
+                if (entitiesResult.success) {
+                    const entData = entitiesResult.data?.items || entitiesResult.data || [];
+                    state.allEntities = Array.isArray(entData) ? entData : [];
+                    populateParentEntitySelect(state.allEntities);
+                }
+            } catch (entErr) {
+                console.warn('[Entities] Failed to load parent entities list:', entErr);
+            }
         } catch (err) {
             console.warn('[Entities] Failed to load dropdown data:', err);
         }
+    }
+
+    function populateTimezoneSelect(timezones) {
+        const sel = el.entityTimezoneId;
+        if (!sel) return;
+        const current = sel.value;
+        // Keep the first blank option
+        while (sel.options.length > 1) sel.remove(1);
+        timezones.forEach(function (tz) {
+            const opt = document.createElement('option');
+            opt.value = tz.id;
+            opt.textContent = (tz.label || tz.timezone) + ' (' + tz.timezone + ')';
+            sel.appendChild(opt);
+        });
+        if (current) sel.value = current;
     }
 
     function populateDropdown(selectEl, data, valueKey, textKey, placeholder = '') {
@@ -508,6 +551,36 @@
             opt.dataset.type = attr.attribute_type || 'text';
             el.entityAttrSelect.appendChild(opt);
         });
+    }
+
+    function populateParentEntitySelect(entities) {
+        const sel = el.entityParentSelect || document.getElementById('entityParentSelect');
+        if (!sel) return;
+        const currentVal = sel.value;
+        sel.innerHTML = '<option value="">' + t('form.fields.parent_entity.placeholder', '— Select parent entity —') + '</option>';
+        entities.forEach(ent => {
+            const opt = document.createElement('option');
+            opt.value = ent.id;
+            const name = ent.store_name || ent.original_store_name || ('Entity #' + ent.id);
+            const code = ent.branch_code ? ' (' + esc(ent.branch_code) + ')' : '';
+            opt.textContent = name + code + ' — #' + ent.id;
+            sel.appendChild(opt);
+        });
+        if (currentVal) sel.value = currentVal;
+    }
+
+    function filterParentEntitySelect(query) {
+        if (!state.allEntities) return;
+        const q = (query || '').toLowerCase().trim();
+        const filtered = q
+            ? state.allEntities.filter(function(ent) {
+                const name = (ent.store_name || ent.original_store_name || '').toLowerCase();
+                const code = (ent.branch_code || '').toLowerCase();
+                const id = String(ent.id);
+                return name.includes(q) || code.includes(q) || id.includes(q);
+            })
+            : state.allEntities;
+        populateParentEntitySelect(filtered);
     }
 
     // ════════════════════════════════════════════════════════════
@@ -577,7 +650,7 @@
                     <td>${verifiedBadge}</td>
                     <td>
                         <div class="table-actions">
-                            ${canEdit ? `<button class="btn btn-sm btn-secondary" onclick="Entities.edit(${entity.id})" title="${t('table.actions.edit', 'Edit')}">
+                            ${canEdit ? `<button class="btn btn-sm btn-primary" onclick="Entities.edit(${entity.id})" title="${t('table.actions.edit', 'Edit')}">
                                 <i class="fas fa-edit"></i>
                             </button>` : ''}
                             ${canDelete ? `<button class="btn btn-sm btn-danger" onclick="Entities.remove(${entity.id})" title="${t('table.actions.delete', 'Delete')}">
@@ -623,7 +696,7 @@
             if (el.formTitle) el.formTitle.textContent = t('form.edit_title', 'Edit Entity');
             if (el.formId) el.formId.value = entity.id || '';
 
-            if (el.entityStoreName) el.entityStoreName.value = entity.original_store_name || entity.store_name || '';
+            if (el.enEntityName && !el.enEntityName.value) el.enEntityName.value = entity.original_store_name || entity.store_name || '';
             if (el.entitySlug) el.entitySlug.value = entity.slug || '';
             if (el.entityType) {
                 const hasParent = entity.parent_id && entity.parent_id !== '0' && entity.parent_id !== 0;
@@ -631,6 +704,9 @@
                 toggleParentIdField(hasParent);
             }
             if (el.entityParentId) el.entityParentId.value = entity.parent_id || '';
+            if (el.entityParentSelect && entity.parent_id) {
+                el.entityParentSelect.value = entity.parent_id;
+            }
             if (entity.parent_id) {
                 validateParentId(entity.parent_id);
             }
@@ -641,6 +717,11 @@
             if (el.entityTaxNumber) el.entityTaxNumber.value = entity.tax_number || '';
             if (el.entityStatus) el.entityStatus.value = entity.status || 'pending';
             if (el.entityIsVerified) el.entityIsVerified.value = entity.is_verified || '0';
+            if (el.entityTimezoneId) {
+                // Timezones may be loaded async; set after a tick if empty
+                const setTz = () => { if (el.entityTimezoneId) el.entityTimezoneId.value = entity.timezone_id || ''; };
+                if (state.timezones.length > 0) { setTz(); } else { setTimeout(setTz, 600); }
+            }
 
             if (el.entityPhone) el.entityPhone.value = entity.phone || '';
             if (el.entityMobile) el.entityMobile.value = entity.mobile || '';
@@ -666,6 +747,11 @@
 
             if (el.entityAttributesList) el.entityAttributesList.innerHTML = '';
             if (el.entityTranslations) el.entityTranslations.innerHTML = '';
+            // Clear English inline fields
+            if (el.enEntityName) el.enEntityName.value = '';
+            if (el.enEntityDescription) el.enEntityDescription.value = '';
+            if (el.enEntityMetaTitle) el.enEntityMetaTitle.value = '';
+            if (el.enEntityMetaDescription) el.enEntityMetaDescription.value = '';
             renderWorkingHours(getDefaultWorkingHours());
             clearMediaPreviews();
             clearAddress();
@@ -718,12 +804,18 @@
         if (group) {
             group.style.display = showParent ? '' : 'none';
         }
-        if (!showParent && el.entityParentId) {
-            el.entityParentId.value = '';
+        if (!showParent) {
+            if (el.entityParentId) el.entityParentId.value = '';
             const result = el.parentValidationResult || document.getElementById('parentValidationResult');
             if (result) {
                 result.style.display = 'none';
                 result.innerHTML = '';
+            }
+            // Clear search filter and reset dropdown
+            const searchEl = el.entityParentSearch || document.getElementById('entityParentSearch');
+            if (searchEl) searchEl.value = '';
+            if (state.allEntities && state.allEntities.length) {
+                populateParentEntitySelect(state.allEntities);
             }
         }
     }
@@ -822,8 +914,8 @@
             }
 
             const entityData = {
-                store_name: formData.get('store_name'),
-                slug: formData.get('slug') || generateSlug(formData.get('store_name')),
+                store_name: formData.get('en_store_name') || formData.get('store_name') || '',
+                slug: formData.get('slug') || generateSlug(formData.get('en_store_name') || formData.get('store_name')) || ('entity-' + Date.now()),
                 parent_id: (formData.get('entity_type') === 'branch' && formData.get('parent_id')) ? parseInt(formData.get('parent_id'), 10) : null,
                 branch_code: formData.get('branch_code') || null,
                 vendor_type: formData.get('vendor_type') || 'product_seller',
@@ -834,6 +926,7 @@
                 user_id: formData.get('user_id') || state.userId,
                 status: formData.get('status') || 'pending',
                 is_verified: formData.get('is_verified') || '0',
+                timezone_id: formData.get('timezone_id') ? parseInt(formData.get('timezone_id'), 10) : null,
 
                 phone: formData.get('phone'),
                 mobile: formData.get('mobile') || null,
@@ -1110,8 +1203,9 @@
 
     function validateForm() {
         let isValid = true;
+        let firstInvalidField = null;
 
-        const requiredFields = [el.entityStoreName, el.entityPhone, el.entityEmail];
+        const requiredFields = [el.enEntityName, el.entityPhone, el.entityEmail];
 
         requiredFields.forEach(field => {
             if (!field || !field.value.trim()) {
@@ -1119,9 +1213,21 @@
                 if (field) {
                     field.classList.add('is-invalid');
                     field.addEventListener('input', () => field.classList.remove('is-invalid'), { once: true });
+                    if (!firstInvalidField) firstInvalidField = field;
                 }
             }
         });
+
+        // Switch to the tab containing the first invalid field so the user can see it
+        if (firstInvalidField) {
+            const tabContent = firstInvalidField.closest('.tab-content');
+            if (tabContent && tabContent.id && tabContent.id.startsWith('tab-')) {
+                const tabId = tabContent.id.slice(4);
+                const tabBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+                if (tabBtn) tabBtn.click();
+            }
+            setTimeout(() => firstInvalidField.focus(), 50);
+        }
 
         return isValid;
     }
@@ -1165,9 +1271,9 @@
                 case 'number':
                 case 'boolean':
                 default:
-                    inputField = `<input type="${attr.attribute_type === 'number' ? 'number' : 'text'}" 
-                                         class="form-control" 
-                                         value="${esc(attr.value || '')}" 
+                    inputField = `<input type="${attr.attribute_type === 'number' ? 'number' : 'text'}"
+                                         class="form-control"
+                                         value="${esc(attr.value || '')}"
                                          onchange="Entities.updateAttributeValue(${idx}, this.value)">`;
                     break;
             }
@@ -1221,7 +1327,7 @@
                     <div style="display:flex; align-items:center; gap:12px;">
                         <strong style="min-width:100px;">${esc(wh.day_name)}</strong>
                         <label style="display:flex; align-items:center; gap:4px;">
-                            <input type="checkbox" class="is-open-checkbox" 
+                            <input type="checkbox" class="is-open-checkbox"
                                    data-day="${wh.day_of_week}"
                                    ${wh.is_open ? 'checked' : ''}
                                    onchange="Entities.toggleWorkingDay(${wh.day_of_week}, this.checked)">
@@ -1233,23 +1339,23 @@
                 <div style="display:flex; gap:12px; align-items:center; ${!wh.is_open ? 'opacity:0.5; pointer-events:none;' : ''}">
                     <div class="form-group" style="flex:1;">
                         <label>${t('form.working_hours.open_time', 'Open Time')}</label>
-                        <input type="time" class="form-control open-time-input" 
+                        <input type="time" class="form-control open-time-input"
                                data-day="${wh.day_of_week}"
                                value="${esc(wh.open_time || '')}"
                                onchange="Entities.updateWorkingTime(${wh.day_of_week}, 'open_time', this.value)">
                     </div>
                     <div class="form-group" style="flex:1;">
                         <label>${t('form.working_hours.close_time', 'Close Time')}</label>
-                        <input type="time" class="form-control close-time-input" 
+                        <input type="time" class="form-control close-time-input"
                                data-day="${wh.day_of_week}"
                                value="${esc(wh.close_time || '')}"
                                onchange="Entities.updateWorkingTime(${wh.day_of_week}, 'close_time', this.value)">
                     </div>
                     <div style="display:flex; gap:4px; padding-top:8px;">
-                        <button type="button" class="btn btn-sm btn-outline" onclick="Entities.setAllDay(${wh.day_of_week})">
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="Entities.setAllDay(${wh.day_of_week})">
                             ${t('form.working_hours.all_day', '24 Hours')}
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline" onclick="Entities.setClosedAllDay(${wh.day_of_week})">
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="Entities.setClosedAllDay(${wh.day_of_week})">
                             ${t('form.working_hours.closed_all_day', 'Closed')}
                         </button>
                     </div>
@@ -1371,7 +1477,7 @@
         _currentImageType = imageType;
 
         if (el.mediaModal && el.mediaFrame) {
-            el.mediaModal.style.display = 'block';
+            el.mediaModal.style.display = 'flex';
             el.mediaFrame.src = `${CONFIG.mediaStudioBase}?embedded=1&tenant_id=${state.tenantId}&lang=${state.language}&owner_id=${state.currentEntity.id}&image_type_id=${imageType}`;
 
             el.mediaFrame.dataset.imageType = imageType;
@@ -1576,170 +1682,87 @@
     // ════════════════════════════════════════════════════════════
     // ADDRESS MANAGEMENT (IFRAME INTEGRATION)
     // ════════════════════════════════════════════════════════════
-    function loadAddressFragment(entityId) {
+    async function loadAddressFragment(entityId) {
         if (!el.addressEmbeddedContainer) return;
-
         const ownerId = entityId || state.currentEntity?.id;
+ 
         if (!ownerId) {
-            el.addressEmbeddedContainer.innerHTML = `
-                <div class="alert alert-warning">
-                    ${t('messages.save_entity_first', 'Please save the entity first to manage addresses')}
-                </div>
-            `;
+            el.addressEmbeddedContainer.innerHTML = `<div class="info-box"><i class="fas fa-info-circle info-box-icon"></i> ${t('messages.save_entity_first')}</div>`;
             return;
         }
-
-        // Check if iframe is already loaded for this entity
-        const existingFrame = document.getElementById('addressFrame');
-        if (existingFrame && existingFrame.dataset.ownerId === String(ownerId)) {
-            return;
-        }
-
-        el.addressEmbeddedContainer.innerHTML = `
-            <div class="loading-state" id="addressLoading">
-                <div class="spinner"></div>
-                <p>${t('common.loading', 'Loading address form...')}</p>
-            </div>
-        `;
-
-        const iframe = document.createElement('iframe');
-        iframe.id = 'addressFrame';
-        iframe.dataset.ownerId = String(ownerId);
-        iframe.style.cssText = 'width:100%; height:500px; border:none;';
-        iframe.onload = () => {
-            document.getElementById('addressLoading')?.remove();
-
-            try {
-                iframe.contentWindow.postMessage({
-                    type: 'set-parent',
-                    parentWindow: window.location.href,
-                    entityId: ownerId
-                }, '*');
-            } catch (err) {
-                console.warn('[Entities] Failed to send message to address iframe:', err);
+        if (el.addressEmbeddedContainer.dataset.loadedFor === String(ownerId)) return;
+ 
+        el.addressEmbeddedContainer.innerHTML = `<div class="loading-state" style="display:flex;gap:12px;align-items:center;padding:20px;"><div class="spinner"></div><p>${t('common.loading')}</p></div>`;
+ 
+        try {
+            const base = CONFIG.addressesFragment || '/admin/fragments/addresses.php';
+            const url  = `${base}?embedded=1&tenant_id=${encodeURIComponent(state.tenantId)}&lang=${encodeURIComponent(state.language)}&owner_type=entity&owner_id=${encodeURIComponent(ownerId)}`;
+ 
+            const res = await fetch(url, {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const html = await res.text();
+ 
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+ 
+            // انقل <link> إلى document.head (مرة واحدة)
+            doc.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
+                const href = link.getAttribute('href') || '';
+                if (!href) return;
+                const abs = new URL(href, window.location.origin).href;
+                if (!document.querySelector(`link[href="${abs}"],link[href="${href}"]`)) {
+                    const l = document.createElement('link');
+                    l.rel = 'stylesheet'; l.href = abs;
+                    document.head.appendChild(l);
+                }
+            });
+ 
+            // انقل <style> من head (CSS variables من DB)
+            doc.querySelectorAll('head style').forEach(s => {
+                const id = s.getAttribute('id') || '';
+                if (id && document.getElementById(id)) return;
+                const ns = document.createElement('style');
+                if (id) ns.id = id;
+                ns.textContent = s.textContent;
+                document.head.appendChild(ns);
+            });
+ 
+            // ضع body في container
+            const body = doc.body.cloneNode(true);
+            body.querySelectorAll('link, script').forEach(n => n.remove());
+            el.addressEmbeddedContainer.innerHTML = body.innerHTML;
+            el.addressEmbeddedContainer.dataset.loadedFor = String(ownerId);
+ 
+            // شغّل scripts بالترتيب
+            const tmp = new DOMParser().parseFromString(html, 'text/html');
+            for (const src of tmp.querySelectorAll('script')) {
+                const s = document.createElement('script');
+                if (src.src) {
+                    const abs = new URL(src.src, window.location.origin).href;
+                    if (document.querySelector(`script[src="${abs}"]`)) continue;
+                    s.src = abs; s.async = false;
+                    await new Promise(r => { s.onload = s.onerror = r; document.head.appendChild(s); });
+                } else if (src.textContent.trim()) {
+                    s.textContent = src.textContent;
+                    document.body.appendChild(s);
+                }
             }
-        };
-
-        iframe.onerror = () => {
+ 
+            if (window.Addresses?.init) await window.Addresses.init();
+ 
+        } catch (err) {
+            console.error('[Entities] loadAddressFragment:', err);
             el.addressEmbeddedContainer.innerHTML = `
-                <div class="error-state">
-                    <div class="error-icon">⚠️</div>
-                    <h3>${t('messages.error.load_failed', 'Failed to load address form')}</h3>
-                    <p>${t('messages.try_again', 'Please try again')}</p>
-                </div>
-            `;
-        };
-
-        // Append iframe to DOM first, then set src to trigger loading
-        el.addressEmbeddedContainer.appendChild(iframe);
-        const addressFragmentUrl = CONFIG.addressesFragment || '/admin/fragments/addresses.php';
-        iframe.src = `${addressFragmentUrl}?embedded=1&tenant_id=${state.tenantId}&lang=${state.language}&owner_type=entity&owner_id=${ownerId}`;
-    }
-
-    function clearAddress() {
-        if (el.addressEmbeddedContainer) {
-            el.addressEmbeddedContainer.innerHTML = `
-                <div class="loading-state" id="addressLoading">
-                    <div class="spinner"></div>
-                    <p>${t('common.loading', 'Loading address form...')}</p>
-                </div>
-            `;
-        }
-        state.addressData = null;
-    }
-
-    async function requestAddressDataFromIframe() {
-        const iframe = document.getElementById('addressFrame');
-        if (!iframe || !iframe.contentWindow) {
-            return null;
-        }
-
-        return new Promise((resolve) => {
-            const messageHandler = (e) => {
-                if (e.data && e.data.type === 'current-address-data') {
-                    window.removeEventListener('message', messageHandler);
-                    resolve(e.data.addressData);
-                }
-            };
-
-            setTimeout(() => {
-                window.removeEventListener('message', messageHandler);
-                resolve(null);
-            }, 5000);
-
-            window.addEventListener('message', messageHandler);
-
-            try {
-                iframe.contentWindow.postMessage({
-                    type: 'get-address-data'
-                }, '*');
-            } catch (err) {
-                console.warn('[Entities] Failed to request address data:', err);
-                window.removeEventListener('message', messageHandler);
-                resolve(null);
-            }
-        });
-    }
-
-    function handleAddressMessage(e) {
-        if (!e.data || typeof e.data !== 'object') return;
-
-        switch (e.data.type) {
-            case 'address-saved':
-                state.addressData = e.data.addressData || {};
-                showNotification(t('messages.address_saved', 'Address saved successfully'), 'success');
-
-                if (e.source && e.source.postMessage) {
-                    e.source.postMessage({
-                        type: 'address-saved-ack',
-                        success: true,
-                        timestamp: Date.now()
-                    }, e.origin || '*');
-                }
-                break;
-
-            case 'address-deleted':
-                showNotification(t('messages.address_deleted', 'Address deleted successfully'), 'success');
-                state.addressData = null;
-                break;
-
-            case 'address-form-closed':
-                console.log('[Entities] Address form closed');
-                break;
-
-            case 'address-loaded':
-                console.log('[Entities] Address data loaded in iframe');
-                break;
-
-            case 'error':
-                showNotification(e.data.message || t('messages.error.unknown', 'An error occurred'), 'error');
-                break;
-
-            case 'get-entity-info':
-                if (e.source && e.source.postMessage && state.currentEntity) {
-                    e.source.postMessage({
-                        type: 'entity-info',
-                        entityId: state.currentEntity.id,
-                        entityName: state.currentEntity.store_name,
-                        tenantId: state.tenantId,
-                        language: state.language
-                    }, e.origin || '*');
-                }
-                break;
-
-            case 'media-selected':
-                // Handle media selection from media studio
-                const imageType = e.data.imageTypeId ?
-                    (e.data.imageTypeId == IMAGE_TYPES.LOGO ? 'logo' :
-                        e.data.imageTypeId == IMAGE_TYPES.COVER ? 'cover' :
-                            e.data.imageTypeId == IMAGE_TYPES.LICENSE ? 'license' : null) : null;
-
-                if (imageType && e.data.images && e.data.images[0]) {
-                    const imageUrl = e.data.images[0].url || e.data.images[0].thumb_url;
-                    handleImageSelected(imageType, imageUrl);
-                    closeMediaStudio();
-                }
-                break;
+                <div class="error-state" style="display:flex;flex-direction:column;align-items:center;padding:20px;gap:8px;">
+                    <div style="font-size:2rem;">⚠️</div>
+                    <p>${esc(err.message)}</p>
+                    <button class="btn btn-secondary" onclick="Entities.reloadAddress()">
+                        <i class="fas fa-redo"></i> Retry
+                    </button>
+                </div>`;
+            delete el.addressEmbeddedContainer.dataset.loadedFor;
         }
     }
 
@@ -1816,8 +1839,25 @@
     function collectTranslations() {
         const translations = {};
 
+        // ── 1. Collect from the inline English section (always present) ──
+        const enName        = el.enEntityName?.value?.trim() || '';
+        const enDesc        = el.enEntityDescription?.value?.trim() || '';
+        const enMetaTitle   = el.enEntityMetaTitle?.value?.trim() || '';
+        const enMetaDesc    = el.enEntityMetaDescription?.value?.trim() || '';
+
+        if (enName || enDesc || enMetaTitle || enMetaDesc) {
+            translations['en'] = {
+                store_name:       enName,
+                description:      enDesc,
+                meta_title:       enMetaTitle,
+                meta_description: enMetaDesc
+            };
+        }
+
+        // ── 2. Collect from dynamic translation panels (other languages) ──
         document.querySelectorAll('.translation-panel').forEach(panel => {
             const lang = panel.dataset.lang;
+            if (lang === 'en') return; // already handled above
             const storeName = panel.querySelector('.trans-store-name')?.value || '';
             const desc = panel.querySelector('.trans-desc')?.value || '';
             const metaTitle = panel.querySelector('.trans-meta-title')?.value || '';
@@ -1843,6 +1883,14 @@
                 const items = Array.isArray(result.data) ? result.data : (result.data?.items || []);
                 if (el.entityTranslations) el.entityTranslations.innerHTML = '';
                 items.forEach(trans => {
+                    // Populate the English inline fields instead of a panel
+                    if (trans.language_code === 'en') {
+                        if (el.enEntityName) el.enEntityName.value = trans.store_name || '';
+                        if (el.enEntityDescription) el.enEntityDescription.value = trans.description || '';
+                        if (el.enEntityMetaTitle) el.enEntityMetaTitle.value = trans.meta_title || '';
+                        if (el.enEntityMetaDescription) el.enEntityMetaDescription.value = trans.meta_description || '';
+                        return;
+                    }
                     const langName = state.languages.find(l => l.code === trans.language_code)?.name || trans.language_code;
                     const panel = createTranslationPanel(trans.language_code, langName, {
                         id: trans.id,
@@ -2132,10 +2180,11 @@
             formId: $id('formId'),
 
             // Form fields - Basic
-            entityStoreName: $id('entityStoreName'),
             entitySlug: $id('entitySlug'),
             entityType: $id('entityType'),
             entityParentId: $id('entityParentId'),
+            entityParentSelect: $id('entityParentSelect'),
+            entityParentSearch: $id('entityParentSearch'),
             parentIdGroup: $id('parentIdGroup'),
             btnValidateParent: $id('btnValidateParent'),
             parentValidationResult: $id('parentValidationResult'),
@@ -2146,8 +2195,15 @@
             entityTaxNumber: $id('entityTaxNumber'),
             entityStatus: $id('entityStatus'),
             entityIsVerified: $id('entityIsVerified'),
+            entityTimezoneId: $id('entityTimezoneId'),
             entityTenantId: $id('entityTenantId'),
             entityUserId: $id('entityUserId'),
+
+            // English content fields
+            enEntityName: $id('enEntityName'),
+            enEntityDescription: $id('enEntityDescription'),
+            enEntityMetaTitle: $id('enEntityMetaTitle'),
+            enEntityMetaDescription: $id('enEntityMetaDescription'),
 
             // Form fields - Contact
             entityPhone: $id('entityPhone'),
@@ -2256,6 +2312,21 @@
         if (el.entityParentId) {
             el.entityParentId.onblur = function() {
                 if (this.value) validateParentId(this.value);
+            };
+        }
+        // Sync searchable parent select → number input
+        if (el.entityParentSelect) {
+            el.entityParentSelect.onchange = function() {
+                if (this.value && el.entityParentId) {
+                    el.entityParentId.value = this.value;
+                    validateParentId(this.value);
+                }
+            };
+        }
+        // Filter parent entity dropdown as user types
+        if (el.entityParentSearch) {
+            el.entityParentSearch.oninput = function() {
+                filterParentEntitySelect(this.value);
             };
         }
 

@@ -690,7 +690,7 @@
         _currentImageType = targetField;
         
         if (el.mediaModal && el.mediaFrame) {
-            el.mediaModal.style.display = 'block';
+            el.mediaModal.style.display = 'flex';
             // Use actual category ID if editing, or generate a temporary ID for new categories
             const categoryId = el.formId?.value || `temp_${Date.now()}`;
             el.mediaFrame.src = `/admin/fragments/media_studio.php?embedded=1&tenant_id=${state.tenantId || 1}&lang=${state.language}&owner_id=${categoryId}&image_type_id=${IMAGE_TYPE_ID}`;

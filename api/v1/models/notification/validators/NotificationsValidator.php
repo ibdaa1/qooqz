@@ -3,11 +3,13 @@ declare(strict_types=1);
 
 final class NotificationsValidator
 {
+    private const VALID_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
+
     public function validate(array $data, bool $isUpdate = false): void
     {
         if (!$isUpdate) {
-            if (empty($data['user_id'])) {
-                throw new InvalidArgumentException('Field "user_id" is required.');
+            if (empty($data['tenant_id']) || !is_numeric($data['tenant_id'])) {
+                throw new InvalidArgumentException('Field "tenant_id" is required and must be numeric.');
             }
             if (empty($data['title'])) {
                 throw new InvalidArgumentException('Field "title" is required.');
@@ -21,27 +23,25 @@ final class NotificationsValidator
             }
         }
 
-        // Validate numeric fields
-        if (isset($data['user_id']) && !is_numeric($data['user_id'])) {
-            throw new InvalidArgumentException('Field "user_id" must be numeric.');
-        }
-        if (isset($data['entity_id']) && $data['entity_id'] !== '' && !is_numeric($data['entity_id'])) {
-            throw new InvalidArgumentException('Field "entity_id" must be numeric.');
-        }
-        if (isset($data['notification_type_id']) && $data['notification_type_id'] !== '' && !is_numeric($data['notification_type_id'])) {
-            throw new InvalidArgumentException('Field "notification_type_id" must be numeric.');
-        }
-
-        // is_read must be 0 or 1 if provided
-        if (isset($data['is_read']) && !in_array((int)$data['is_read'], [0, 1], true)) {
-            throw new InvalidArgumentException('Field "is_read" must be 0 or 1.');
-        }
-
-        // Title max 500
         if (isset($data['title']) && strlen($data['title']) > 500) {
             throw new InvalidArgumentException('Field "title" must not exceed 500 characters.');
         }
 
-        // message and data are mediumtext/longtext, no length checks.
+        if (isset($data['priority']) && $data['priority'] !== '' &&
+            !in_array($data['priority'], self::VALID_PRIORITIES, true)) {
+            throw new InvalidArgumentException(
+                'Field "priority" must be one of: ' . implode(', ', self::VALID_PRIORITIES) . '.'
+            );
+        }
+
+        if (isset($data['expires_at']) && $data['expires_at'] !== '') {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?)?$/', $data['expires_at'])) {
+                throw new InvalidArgumentException('Field "expires_at" must be a valid datetime (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS).');
+            }
+        }
+
+        if (isset($data['data']) && $data['data'] !== '' && json_decode($data['data']) === null && json_last_error() !== JSON_ERROR_NONE) {
+            throw new InvalidArgumentException('Field "data" must be valid JSON if provided.');
+        }
     }
 }

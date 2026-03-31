@@ -129,7 +129,7 @@
         if (btnCancel) btnCancel.onclick = () => {
             if (form) form.style.display = 'none';
         };
-        if (btnSave) btnSave.onclick = () => saveSetting(prefix);
+        if (btnSave) btnSave.onclick = () => saveSetting(prefix, btnSave);
     }
 
     // ════════════════════════════════════════
@@ -323,7 +323,10 @@
     // ════════════════════════════════════════
     // SAVE / DELETE THEME
     // ════════════════════════════════════════
+    let saveThemeInFlight = false;
+
     async function saveTheme() {
+        if (saveThemeInFlight) { console.warn('[ThemesSystem] saveTheme already running, skipping'); return; }
         const name = (el.themeName && el.themeName.value || '').trim();
         let slug = (el.themeSlug && el.themeSlug.value || '').trim();
         if (!name) {
@@ -353,6 +356,10 @@
 
         if (isEdit) payload.id = parseInt(themeId);
 
+        const btn = el.btnSave;
+        saveThemeInFlight = true;
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ...'; }
+
         try {
             const url = isEdit ? API.themes + '?id=' + themeId : API.themes;
             const res = await fetch(url, {
@@ -362,7 +369,6 @@
             });
             const json = await res.json();
             if (json.success) {
-                const savedId = isEdit ? parseInt(themeId) : (json.data && json.data.id);
                 showAlert('success', t('theme_manager.messages.success.save', 'Theme saved successfully'));
                 await loadThemes();
                 hideForm();
@@ -372,6 +378,9 @@
         } catch (e) {
             console.error('[ThemesSystem] saveTheme error:', e);
             showAlert('error', t('theme_manager.messages.error.save_failed', 'Failed to save'));
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> ' + t('theme_manager.form.buttons.save', 'Save'); }
+            saveThemeInFlight = false;
         }
     }
 
@@ -468,7 +477,7 @@
         if (!listEl) return;
 
         if (!items || items.length === 0) {
-            listEl.innerHTML = '<div class="empty-settings">No items found</div>';
+            listEl.innerHTML = '<div class="empty-settings">' + t('theme_manager_settings.empty', 'No items found') + '</div>';
             return;
         }
 
@@ -503,13 +512,13 @@
                 display = '<strong>' + escapeHtml(item.title || item.section_type || '') + '</strong>' +
                           ' <span class="badge badge-secondary">' + escapeHtml(item.section_type || '') + '</span>' +
                           ' <span class="badge badge-info">' + escapeHtml(item.layout_type || '') + '</span>' +
-                          (item.is_active ? ' <span class="badge badge-success">Active</span>' : ' <span class="badge badge-secondary">Inactive</span>');
+                          (item.is_active ? ' <span class="badge badge-success">' + t('theme_manager.status.active', 'Active') + '</span>' : ' <span class="badge badge-secondary">' + t('theme_manager.status.inactive', 'Inactive') + '</span>');
             } else if (type === 'system') {
                 display = '<strong>' + escapeHtml(item.setting_key || '') + '</strong>' +
                           ' <span class="badge badge-secondary">' + escapeHtml(item.setting_type || 'text') + '</span>' +
                           ' <span class="badge badge-info">' + escapeHtml(item.category || '') + '</span>' +
                           '<div class="setting-value">' + escapeHtml(String(item.setting_value || '').substring(0, 100)) + '</div>' +
-                          (item.is_public ? ' <span class="badge badge-success">Public</span>' : '');
+                          (item.is_public ? ' <span class="badge badge-success">' + t('theme_manager_settings.form.public', 'Public') + '</span>' : '');
             }
 
             return '<div class="settings-item" data-id="' + itemId + '">' +
@@ -732,7 +741,15 @@
         } else if (prefix === 'card') {
             if ($('cardName')) $('cardName').value = item.name || '';
             if ($('cardSlug')) $('cardSlug').value = item.slug || '';
-            if ($('cardType')) $('cardType').value = item.card_type || 'product';
+            // Derive card_type from slug prefix when the stored value is empty (legacy rows).
+            // Only use the derived value if it matches a known allowed type.
+            const knownCardTypes = ['product','category','vendor','blog','feature','testimonial',
+                                    'auction','notification','discount','jobs','plan','other'];
+            const derivedFromSlug = ((item.slug || '').split('-')[0] || '').toLowerCase();
+            const cardTypeFallback = (item.card_type && item.card_type !== '')
+                ? item.card_type
+                : (knownCardTypes.includes(derivedFromSlug) ? derivedFromSlug : 'product');
+            if ($('cardType')) $('cardType').value = cardTypeFallback;
             if ($('cardBgColor')) $('cardBgColor').value = item.background_color || '#FFFFFF';
             if ($('cardBorderColor')) $('cardBorderColor').value = item.border_color || '#E0E0E0';
             if ($('cardBorderWidth')) $('cardBorderWidth').value = item.border_width || 1;
@@ -768,7 +785,10 @@
         }
     }
 
-    async function saveSetting(prefix) {
+    let saveSettingInFlight = false;
+
+    async function saveSetting(prefix, btn) {
+        if (saveSettingInFlight) { console.warn('[ThemesSystem] saveSetting already running, skipping'); return; }
         const apiUrl = getApiForType(prefix);
         if (!apiUrl) return;
 
@@ -778,6 +798,9 @@
         const data = collectSettingData(prefix);
 
         if (isEdit) data.id = parseInt(itemId);
+
+        saveSettingInFlight = true;
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ...'; }
 
         try {
             const url = isEdit ? apiUrl + '?id=' + itemId : apiUrl;
@@ -800,6 +823,9 @@
         } catch (e) {
             console.error('[ThemesSystem] saveSetting(' + prefix + ') error:', e);
             showAlert('error', 'Failed to save');
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = 'Save'; }
+            saveSettingInFlight = false;
         }
     }
 
@@ -890,5 +916,12 @@
         editSetting: editSetting,
         deleteSetting: deleteSetting
     };
+
+    // Auto-init when script loads (same pattern as permissions-system.js)
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 
 })();

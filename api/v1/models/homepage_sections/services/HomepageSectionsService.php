@@ -74,4 +74,23 @@ final class HomepageSectionsService
     {
         return $this->repo->getActiveSections($tenantId, $lang, $themeId);
     }
+
+    public function getTranslations(int $tenantId, int $id): array
+    {
+        $row = $this->repo->find($tenantId, $id);
+        if (!$row) {
+            throw new RuntimeException('Homepage section not found');
+        }
+        return $this->repo->getTranslations($id);
+    }
+
+    public function saveTranslations(int $tenantId, int $id, array $translations, ?int $userId = null): array
+    {
+        $row = $this->repo->find($tenantId, $id);
+        if (!$row) {
+            throw new RuntimeException('Homepage section not found');
+        }
+        $this->repo->saveTranslations($id, $translations);
+        return $this->repo->getTranslations($id);
+    }
 }

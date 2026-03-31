@@ -90,12 +90,13 @@ final class PdoProductTranslationsRepository
     // ================================
     public function save(array $data): int
     {
-        $isUpdate = !empty($data['id']);
+        $productId    = isset($data['product_id'])    ? (int)$data['product_id']    : null;
+        $languageCode = $data['language_code'] ?? null;
 
         // Extract only valid translation columns to prevent SQLSTATE[HY093]
         $params = [
-            ':product_id'        => $data['product_id'] ?? null,
-            ':language_code'     => $data['language_code'] ?? null,
+            ':product_id'        => $productId,
+            ':language_code'     => $languageCode,
             ':name'              => $data['name'] ?? '',
             ':short_description' => $data['short_description'] ?? null,
             ':description'       => $data['description'] ?? null,
@@ -105,8 +106,26 @@ final class PdoProductTranslationsRepository
             ':meta_keywords'     => $data['meta_keywords'] ?? null,
         ];
 
+        $isUpdate = !empty($data['id']);
+
+        // If no explicit id is given, look up by (product_id, language_code) so we
+        // can UPDATE instead of INSERT and avoid duplicate-key errors.
+        if (!$isUpdate && $productId !== null && $languageCode !== null) {
+            $find = $this->pdo->prepare(
+                "SELECT id FROM product_translations
+                 WHERE product_id = :pid AND language_code = :lc
+                 LIMIT 1"
+            );
+            $find->execute([':pid' => $productId, ':lc' => $languageCode]);
+            $existingId = $find->fetchColumn();
+            if ($existingId !== false) {
+                $data['id'] = (int)$existingId;
+                $isUpdate   = true;
+            }
+        }
+
         if ($isUpdate) {
-            $params[':id'] = $data['id'];
+            $params[':id'] = (int)$data['id'];
             $stmt = $this->pdo->prepare("
                 UPDATE product_translations SET
                     product_id = :product_id,

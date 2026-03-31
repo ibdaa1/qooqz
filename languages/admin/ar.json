@@ -17,6 +17,7 @@
   "menu.vendors": "البائعون",
   "menu.delivery_companies": "شركات التوصيل",
   "nav.orders": "الطلبات",
+  "nav.pos": "الكاشير",
   "menu.payments": "المدفوعات",
   "menu.shipping": "الشحن",
   "nav.users": "المستخدمون",
@@ -41,5 +42,8 @@
   "quick_actions_title": "إجراءات سريعة",
   "manage_orders": "تتبع ومعالجة الطلبات",
   "theme_preview_title": "إعدادات الثيم النشط",
-  "theme_preview_subtitle": "الألوان، الخطوط والأنماط محملة من قاعدة البيانات"
+  "theme_preview_subtitle": "الألوان، الخطوط والأنماط محملة من قاعدة البيانات",
+  "menu.tickets": "تذاكر الدعم",
+  "menu.ticket_categories": "فئات التذاكر",
+  "menu.homepage_sections": "أقسام الصفحات"
 }
