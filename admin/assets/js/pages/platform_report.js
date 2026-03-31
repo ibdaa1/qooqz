@@ -587,6 +587,11 @@
         const chartConfig = getChartConfig(type, timeSeries, labels, primaryColor, successColor);
 
         mainChart = new Chart(canvas.getContext('2d'), chartConfig);
+
+        // Force resize to ensure correct dimensions (fixes desktop rendering)
+        setTimeout(function () {
+            if (mainChart) mainChart.resize();
+        }, 200);
     }
 
     function getChartConfig(type, timeSeries, labels, primaryColor, successColor) {
@@ -891,7 +896,10 @@
     // EXPORT
     // ═══════════════════════════════════════════
     async function requestExport(format) {
-        if (!currentReportData) return;
+        if (!currentReportData) {
+            alert(t('no_data', 'No data available for the selected period'));
+            return;
+        }
 
         // Also log export to backend for tracking
         try {
@@ -1063,10 +1071,10 @@
         html += '<title>' + h(t('report_type', 'Report')) + ': ' + h(t(data.report_type, data.report_type)) + '</title>';
         html += '<style>';
         html += '* { margin: 0; padding: 0; box-sizing: border-box; }';
-        html += 'body { font-family: "Segoe UI", Tahoma, sans-serif; padding: 24px; direction: ' + (isRtl ? 'rtl' : 'ltr') + '; }';
-        html += 'h1 { font-size: 18px; margin-bottom: 8px; color: #1f2937; }';
-        html += 'p { font-size: 13px; color: #6b7280; margin-bottom: 16px; }';
-        html += 'table { border-collapse: collapse; width: 100%; margin-top: 12px; }';
+        html += 'body { font-family: "Segoe UI", Tahoma, Arial, sans-serif; padding: 24px; direction: ' + (isRtl ? 'rtl' : 'ltr') + '; text-align: ' + (isRtl ? 'right' : 'left') + '; }';
+        html += 'h1 { font-size: 18px; margin-bottom: 8px; color: #1f2937; text-align: ' + (isRtl ? 'right' : 'left') + '; }';
+        html += 'p { font-size: 13px; color: #6b7280; margin-bottom: 16px; text-align: ' + (isRtl ? 'right' : 'left') + '; }';
+        html += 'table { border-collapse: collapse; width: 100%; margin-top: 12px; direction: ' + (isRtl ? 'rtl' : 'ltr') + '; }';
         html += 'th, td { border: 1px solid #d1d5db; padding: 8px 12px; text-align: ' + (isRtl ? 'right' : 'left') + '; font-size: 13px; }';
         html += 'th { background-color: #4F46E5; color: #fff; font-weight: 600; }';
         html += 'tr:nth-child(even) { background-color: #f9fafb; }';
@@ -1137,7 +1145,11 @@
         const el = $('#prReportResults');
         const exp = $('#prExportSection');
         const noData = $('#prNoData');
-        if (el) el.style.display = show ? 'block' : 'none';
+        if (el) {
+            el.style.display = show ? 'block' : 'none';
+            // Force browser reflow to fix rendering on desktop
+            if (show) el.offsetHeight;
+        }
         if (exp) exp.style.display = show ? 'flex' : 'none';
         if (noData) noData.style.display = 'none';
     }

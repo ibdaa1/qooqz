@@ -311,6 +311,12 @@
 .pr-chart-wrapper {
     position: relative;
     height: 350px;
+    width: 100%;
+}
+
+.pr-chart-wrapper canvas {
+    width: 100% !important;
+    max-width: 100%;
 }
 
 /* ═══════════════════════════════════════════
@@ -400,6 +406,19 @@
     text-align: right;
 }
 
+/* Date inputs must stay LTR so dates read correctly (YYYY-MM-DD) */
+.pr-container[dir="rtl"] input[type="date"] {
+    direction: ltr;
+    text-align: right;
+}
+
+/* Select dropdowns: keep text right-aligned */
+.pr-container[dir="rtl"] select.pr-input {
+    text-align: right;
+    padding-inline-end: 28px;
+    padding-inline-start: 12px;
+}
+
 .pr-container[dir="rtl"] .pr-btn {
     flex-direction: row-reverse;
 }
@@ -431,6 +450,16 @@
 
 .pr-container[dir="rtl"] .pr-no-data {
     direction: rtl;
+}
+
+/* Metric label text-transform for RTL */
+.pr-container[dir="rtl"] .pr-metric-label {
+    text-transform: none;
+}
+
+/* Ensure table header uppercase only for LTR */
+.pr-container[dir="rtl"] .pr-data-table th {
+    text-transform: none;
 }
 
 /* ═══════════════════════════════════════════

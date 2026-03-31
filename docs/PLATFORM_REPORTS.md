@@ -12,7 +12,13 @@ The Platform Report module provides comprehensive analytics and reporting for th
 |------|---------|
 | `api/v1/routes/platform_report.php` | API route handler (GET/POST) |
 | `api/v1/models/platform_report/controllers/PlatformReportController.php` | Controller (delegates to service) |
+| `api/v1/models/platform_report/controllers/ExportController.php` | Export controller (audit logging) |
+| `api/v1/models/platform_report/controllers/ScheduleController.php` | Schedule controller |
 | `api/v1/models/platform_report/services/PlatformReportService.php` | Service layer (orchestrates reports) |
+| `api/v1/models/platform_report/services/Report/GenerateReportService.php` | Report generation service |
+| `api/v1/models/platform_report/services/Report/AggregationService.php` | Aggregation service |
+| `api/v1/models/platform_report/services/Export/ExportReportService.php` | Export service (server audit) |
+| `api/v1/models/platform_report/services/Schedule/ScheduleService.php` | Schedule service |
 | `api/v1/models/platform_report/repositories/PdoPlatformReportRepository.php` | Repository (all SQL queries) |
 | `api/v1/models/platform_report/validators/PlatformReportValidator.php` | Input validation |
 
@@ -21,9 +27,10 @@ The Platform Report module provides comprehensive analytics and reporting for th
 | File | Purpose |
 |------|---------|
 | `admin/fragments/platform_report.php` | HTML template (filters, cards, chart, table) |
-| `admin/assets/js/pages/platform_report.js` | JavaScript (API calls, rendering, Chart.js) |
-| `admin/assets/css/pages/platform_report.css` | Styles |
-| `languages/PlatformReport/{lang}.json` | Translation strings |
+| `admin/assets/js/pages/platform_report.js` | JavaScript (API calls, rendering, Chart.js, exports) |
+| `admin/assets/css/pages/platform_report.css` | Styles (RTL, responsive, theming) |
+| `languages/PlatformReport/en.json` | English translation strings |
+| `languages/PlatformReport/ar.json` | Arabic translation strings |
 
 ### Database Tables
 
@@ -32,7 +39,7 @@ The Platform Report module provides comprehensive analytics and reporting for th
 | `report_types` | Lookup table for available report types |
 | `platform_report_stats` | Cached aggregated metrics (JSON) |
 | `report_schedules` | Automated report scheduling |
-| `report_exports` | Export request tracking |
+| `report_exports` | Export request tracking / audit log |
 
 Schema: `database/migrations/create_platform_report_tables.sql`
 
@@ -199,7 +206,7 @@ Content-Type: application/json
 
 ### Filters
 - **Report Type:** Dropdown with 10 report types (platform_health is super admin only)
-- **Date Range:** Start date and end date pickers
+- **Date Range:** Start date and end date pickers (HTML5 `type="date"` inputs)
 - **Group By:** Day, week, or month aggregation
 - **Tenant:** Searchable text input with autocomplete (super admin only, supports millions of tenants)
 - **Entity/Store:** Dropdown that auto-reloads when tenant changes
@@ -210,11 +217,61 @@ Content-Type: application/json
 - **Data Table:** Detailed table for top products, top entities, top ads, or metric key-value pairs
 
 ### Export
-- **CSV:** Generates and downloads a UTF-8 CSV file with BOM (for Arabic/RTL support in Excel)
-- **Excel:** Generates and downloads an XLS file (HTML table format with RTL support and themed styling)
-- **PDF:** Opens a print-ready window with formatted report for printing/saving as PDF
-- All exports include report metadata (type, period) and respect RTL text direction for Arabic
-- Export requests are also logged to `report_exports` table for audit tracking
+
+Reports are generated and downloaded **client-side** (no server-side file creation):
+
+- **CSV:** UTF-8 file with BOM prefix (`\uFEFF`) for Arabic/Excel compatibility. Includes report metadata header (type, period) followed by data rows. Filename: `report_[type].csv`
+- **Excel:** HTML table format that Excel can open (`.xls`). Includes styled headers (blue with white text), border formatting, and RTL direction for Arabic. Includes UTF-8 BOM. Filename: `report_[type].xls`
+- **PDF:** Opens a browser print dialog in a new window with formatted report. Includes print-ready styles with striped rows. 500ms delay before `window.print()` to allow rendering. If popups are blocked, shows an alert message.
+
+All exports include:
+- Report type and period metadata
+- RTL text direction for Arabic content
+- Proper text alignment (`text-align: right` for RTL)
+- Server-side audit logging via `POST /api/platform_report?action=export` to `report_exports` table
+
+## RTL (Right-to-Left) Support
+
+### Detection
+The PHP fragment detects RTL languages and sets `dir="rtl"` on the container:
+```php
+$dir = in_array($lang, ['ar', 'he', 'fa', 'ur']) ? 'rtl' : 'ltr';
+```
+
+### CSS RTL Rules
+- Container: `direction: rtl; text-align: right`
+- Table cells: `text-align: right`
+- Metric cards: `flex-direction: row-reverse` (icon moves to right side)
+- Filter labels: `text-align: right`
+- Buttons: `flex-direction: row-reverse` (emoji moves to right)
+- Export section: `direction: rtl`
+- Section titles: `text-align: right`
+- **Date inputs:** `direction: ltr; text-align: right` (dates must read left-to-right even in RTL context)
+- **Select dropdowns:** `text-align: right` with appropriate padding
+- **Text transforms:** Disabled (`text-transform: none`) for Arabic labels and table headers
+
+### JavaScript RTL
+- Chart.js Y-axis positions are swapped: primary axis on right, secondary on left
+- Number formatting uses `ar-SA` locale for Arabic (`toLocaleString`)
+- Export files include `dir="rtl"` attribute on body/html elements
+- Export tables include `direction: rtl` and `text-align: right` CSS
+
+### Translation
+- All UI strings are loaded from `languages/PlatformReport/{lang}.json`
+- Arabic translations cover 139+ keys
+- Missing translations fall back to English key name
+
+## Responsive Design
+
+| Breakpoint | Layout Changes |
+|------------|---------------|
+| **1024px+** | Full desktop layout with auto-fit grids, 350px chart height |
+| **768px** | Filters stack vertically, summary cards single-column, chart 250px, export buttons stack |
+| **480px** | Compact metrics grid (2 columns), smaller fonts, chart 200px, reduced padding |
+
+- Tables use `overflow-x: auto` for horizontal scrolling on small screens
+- Chart uses `responsive: true` and `maintainAspectRatio: false`
+- Canvas width forced to `100%` for proper desktop rendering
 
 ## Tenant Search
 
@@ -229,23 +286,18 @@ The tenant filter uses a debounced searchable text input instead of a dropdown, 
 All SQL queries use unique named parameters to avoid PDO's restriction on reusing named parameters in native prepared statements. Complex queries with multiple subqueries are split into separate executions.
 
 ### Chart.js Loading
-Chart.js is loaded asynchronously from CDN via `ensureChartJs()` promise. The function checks if `Chart` is already defined, and if not, dynamically injects a script tag. This avoids the "Chart is not defined" error in fragment/SPA mode.
+Chart.js is loaded asynchronously from CDN via `ensureChartJs()` promise. The function checks if `Chart` is already defined, and if not, dynamically injects a script tag. This avoids the "Chart is not defined" error in fragment/SPA mode. After chart creation, a 200ms delayed `resize()` call ensures proper dimensions on desktop.
 
-### RTL (Right-to-Left) Support
-- The PHP fragment detects RTL languages (ar, he, fa, ur) and sets `dir="rtl"` on the container
-- CSS provides comprehensive RTL rules: table alignment, metric card layout reversal, filter direction, section titles
-- Chart.js Y-axis positions are swapped for RTL (primary axis on right, secondary on left)
-- Export files (Excel, PDF) respect RTL direction for Arabic content
-- Number formatting uses `ar-SA` locale for Arabic language
-
-### Responsive Design
-- **1024px+:** Full desktop layout with auto-fit grids
-- **768px:** Filters stack vertically, summary cards go single-column, chart height reduced
-- **480px:** Compact metrics grid (2 columns), smaller fonts, reduced padding
-- Tables use `overflow-x: auto` for horizontal scrolling on small screens
-- Export buttons stack vertically on mobile
+### Fragment Mode (SPA)
+The report page works in both standalone and fragment (AJAX-loaded) modes:
+- CSS is loaded via `<link>` tags that `admin_core.js` processes explicitly
+- The inline `<script>` sets `window.__PR_CONFIG` with PHP variables
+- The external `platform_report.js` uses a polling mechanism (`setInterval`) to detect when `#platformReportApp` is in the DOM
+- `window.page = { run: bootstrap }` is exposed for SPA navigation
 
 ### Error Handling
 - SQL errors are caught and returned as JSON error responses
 - `delivery_orders` queries are wrapped in try/catch (table may not exist in all deployments)
 - Frontend shows "No data" message on API errors
+- Export buttons show an alert if clicked before generating a report
+- PDF export shows a "popup blocked" alert if `window.open` returns null
