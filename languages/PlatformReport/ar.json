@@ -119,5 +119,14 @@
     "schedules": "الجداول",
     "status": "الحالة",
     "date": "التاريخ",
-    "actions": "الإجراءات"
+    "actions": "الإجراءات",
+    "total_deliveries": "إجمالي التوصيلات",
+    "pending_deliveries": "توصيلات قيد الانتظار",
+    "assigned_deliveries": "توصيلات مخصصة",
+    "in_transit_deliveries": "قيد التوصيل",
+    "completed_deliveries": "توصيلات مكتملة",
+    "cancelled_deliveries": "توصيلات ملغية",
+    "total_delivery_fees": "رسوم التوصيل",
+    "total_provider_payouts": "مدفوعات مزودي الخدمة",
+    "avg_delivery_minutes": "متوسط التوصيل (دقيقة)"
 }

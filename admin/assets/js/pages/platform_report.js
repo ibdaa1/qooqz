@@ -332,6 +332,12 @@
                     { icon: '🧾', label: t('pos_orders'), value: fmt(m.pos_orders), color: 'pr-purple' },
                     { icon: '⏱️', label: t('avg_delivery_hours'), value: fmt(m.avg_delivery_hours), color: 'pr-orange' },
                     { icon: '🔄', label: t('refunded_orders'), value: fmt(m.refunded_orders), color: 'pr-red' },
+                    { icon: '🚚', label: t('total_deliveries', 'Total Deliveries'), value: fmt(m.total_deliveries), color: 'pr-blue' },
+                    { icon: '📍', label: t('pending_deliveries', 'Pending Deliveries'), value: fmt(m.pending_deliveries), color: 'pr-yellow' },
+                    { icon: '🚛', label: t('in_transit_deliveries', 'In Transit'), value: fmt(m.in_transit_deliveries), color: 'pr-purple' },
+                    { icon: '✅', label: t('completed_deliveries', 'Completed Deliveries'), value: fmt(m.completed_deliveries), color: 'pr-green' },
+                    { icon: '💰', label: t('total_delivery_fees', 'Delivery Fees'), value: fmtCurrency(m.total_delivery_fees), color: 'pr-orange' },
+                    { icon: '⏱️', label: t('avg_delivery_minutes', 'Avg Delivery (min)'), value: fmt(m.avg_delivery_minutes), color: 'pr-purple' },
                 ];
 
             case 'products_performance':
@@ -429,6 +435,16 @@
             return;
         }
         canvas.parentElement.style.display = 'block';
+
+        // Ensure Chart.js is loaded
+        if (typeof Chart === 'undefined') {
+            console.warn('Chart.js not loaded yet, retrying...');
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js';
+            script.onload = function () { renderChart(type, timeSeries); };
+            document.head.appendChild(script);
+            return;
+        }
 
         const labels = timeSeries.map(d => d.period);
 

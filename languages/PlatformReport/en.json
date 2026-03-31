@@ -119,5 +119,14 @@
     "schedules": "Schedules",
     "status": "Status",
     "date": "Date",
-    "actions": "Actions"
+    "actions": "Actions",
+    "total_deliveries": "Total Deliveries",
+    "pending_deliveries": "Pending Deliveries",
+    "assigned_deliveries": "Assigned Deliveries",
+    "in_transit_deliveries": "In Transit",
+    "completed_deliveries": "Completed Deliveries",
+    "cancelled_deliveries": "Cancelled Deliveries",
+    "total_delivery_fees": "Delivery Fees",
+    "total_provider_payouts": "Provider Payouts",
+    "avg_delivery_minutes": "Avg Delivery (min)"
 }
