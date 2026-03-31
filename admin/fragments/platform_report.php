@@ -61,13 +61,13 @@ if (!function_exists('__t')) {
     }
 }
 
-// Load language file (try exact match, then language prefix, then English fallback)
+// Load language file – try exact locale, then language prefix, then English fallback
 $_PR_LANG = [];
 $langFile = __DIR__ . '/../../languages/PlatformReport/' . $lang . '.json';
 if (!file_exists($langFile)) {
     // Try language prefix (e.g., 'ar' from 'ar_SA')
-    $langPrefix = strtok($lang, '_');
-    $langFile = __DIR__ . '/../../languages/PlatformReport/' . $langPrefix . '.json';
+    $langParts = explode('_', $lang);
+    $langFile = __DIR__ . '/../../languages/PlatformReport/' . $langParts[0] . '.json';
     if (!file_exists($langFile)) {
         $langFile = __DIR__ . '/../../languages/PlatformReport/en.json';
     }
