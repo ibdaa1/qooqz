@@ -550,10 +550,28 @@
 
         // Ensure Chart.js is loaded
         if (typeof Chart === 'undefined') {
-            console.warn('Chart.js not loaded yet, retrying...');
-            const script = document.createElement('script');
+            // Avoid adding duplicate script tags
+            if (document.querySelector('script[data-chartjs-fallback]')) {
+                console.warn('Chart.js fallback already loading, waiting...');
+                setTimeout(function () {
+                    if (typeof Chart !== 'undefined') {
+                        renderChart(type, timeSeries);
+                    } else {
+                        canvas.parentElement.style.display = 'none';
+                        console.error('Chart.js failed to load');
+                    }
+                }, 3000);
+                return;
+            }
+            console.warn('Chart.js not loaded yet, loading fallback...');
+            var script = document.createElement('script');
             script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js';
+            script.setAttribute('data-chartjs-fallback', '1');
             script.onload = function () { renderChart(type, timeSeries); };
+            script.onerror = function () {
+                console.error('Chart.js CDN failed to load');
+                canvas.parentElement.style.display = 'none';
+            };
             document.head.appendChild(script);
             return;
         }

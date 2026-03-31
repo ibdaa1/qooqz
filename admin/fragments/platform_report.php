@@ -251,8 +251,8 @@ if (file_exists($langFile)) {
         strings: <?= json_encode($_PR_LANG) ?>
     };
 </script>
-<!-- Chart.js CDN (async to prevent page blocking) -->
-<script async src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<!-- Chart.js CDN (must load before platform_report.js) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="/admin/assets/js/pages/platform_report.js"></script>
 
 <?php
