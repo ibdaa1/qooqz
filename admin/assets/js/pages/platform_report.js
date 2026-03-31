@@ -901,8 +901,8 @@
                 end_date: currentReportData.period?.end,
                 tenant_id: currentReportData.tenant_id || '',
                 export_format: format
-            }).catch(function () { /* silent */ });
-        } catch (_) { /* silent */ }
+            }).catch(function (err) { console.error('Export audit log failed:', err); });
+        } catch (err) { console.error('Export audit log failed:', err); }
 
         // Generate actual downloadable file client-side
         try {
@@ -1098,7 +1098,10 @@
             printWin.document.write(html);
             printWin.document.close();
             printWin.focus();
+            // Allow time for content to render before triggering print dialog
             setTimeout(function () { printWin.print(); }, 500);
+        } else {
+            alert(t('popup_blocked', 'Please allow popups to export PDF'));
         }
     }
 

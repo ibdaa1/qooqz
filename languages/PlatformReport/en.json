@@ -132,5 +132,9 @@
     "delivery_performance": "Delivery Performance",
     "failed_deliveries": "Failed Deliveries",
     "total_delivery_revenue": "Delivery Revenue",
-    "delivery_fees": "Delivery Fees"
+    "delivery_fees": "Delivery Fees",
+    "popup_blocked": "Please allow popups to export PDF",
+    "export_failed": "Export failed",
+    "metric": "Metric",
+    "period": "Period"
 }

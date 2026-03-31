@@ -132,5 +132,8 @@
     "delivery_performance": "أداء التوصيل",
     "failed_deliveries": "توصيلات فاشلة",
     "total_delivery_revenue": "إيرادات التوصيل",
-    "delivery_fees": "رسوم التوصيل"
+    "delivery_fees": "رسوم التوصيل",
+    "popup_blocked": "يرجى السماح بالنوافذ المنبثقة لتصدير PDF",
+    "export_failed": "فشل التصدير",
+    "metric": "المقياس"
 }
