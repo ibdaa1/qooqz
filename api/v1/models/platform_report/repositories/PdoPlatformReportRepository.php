@@ -98,13 +98,17 @@ final class PdoPlatformReportRepository
     // LIVE AGGREGATIONS – Sales Overview
     // ════════════════════════════════════════════════════════════
 
-    public function aggregateSalesOverview(string $start, string $end, ?int $tenantId = null): array
+    public function aggregateSalesOverview(string $start, string $end, ?int $tenantId = null, ?int $entityId = null): array
     {
         $where = 'WHERE o.created_at BETWEEN :s AND :e';
         $params = [':s' => $start, ':e' => $end];
         if ($tenantId !== null) {
             $where .= ' AND o.tenant_id = :tid';
             $params[':tid'] = $tenantId;
+        }
+        if ($entityId !== null) {
+            $where .= ' AND o.entity_id = :eid';
+            $params[':eid'] = $entityId;
         }
 
         $sql = "SELECT
@@ -131,13 +135,17 @@ final class PdoPlatformReportRepository
     // LIVE AGGREGATIONS – Revenue & Profit
     // ════════════════════════════════════════════════════════════
 
-    public function aggregateRevenueProfit(string $start, string $end, ?int $tenantId = null): array
+    public function aggregateRevenueProfit(string $start, string $end, ?int $tenantId = null, ?int $entityId = null): array
     {
         $where = 'WHERE o.created_at BETWEEN :s AND :e';
         $params = [':s' => $start, ':e' => $end];
         if ($tenantId !== null) {
             $where .= ' AND o.tenant_id = :tid';
             $params[':tid'] = $tenantId;
+        }
+        if ($entityId !== null) {
+            $where .= ' AND o.entity_id = :eid';
+            $params[':eid'] = $entityId;
         }
 
         $sql = "SELECT
@@ -169,13 +177,17 @@ final class PdoPlatformReportRepository
     // LIVE AGGREGATIONS – Orders Performance
     // ════════════════════════════════════════════════════════════
 
-    public function aggregateOrdersPerformance(string $start, string $end, ?int $tenantId = null): array
+    public function aggregateOrdersPerformance(string $start, string $end, ?int $tenantId = null, ?int $entityId = null): array
     {
         $where = 'WHERE o.created_at BETWEEN :s AND :e';
         $params = [':s' => $start, ':e' => $end];
         if ($tenantId !== null) {
             $where .= ' AND o.tenant_id = :tid';
             $params[':tid'] = $tenantId;
+        }
+        if ($entityId !== null) {
+            $where .= ' AND o.entity_id = :eid';
+            $params[':eid'] = $entityId;
         }
 
         $sql = "SELECT
@@ -245,13 +257,17 @@ final class PdoPlatformReportRepository
         return array_merge($productStats, $eventStats);
     }
 
-    public function getTopProducts(string $start, string $end, ?int $tenantId = null, int $limit = 10): array
+    public function getTopProducts(string $start, string $end, ?int $tenantId = null, ?int $entityId = null, int $limit = 10): array
     {
         $where = 'WHERE oi.created_at BETWEEN :s AND :e';
         $params = [':s' => $start, ':e' => $end];
         if ($tenantId !== null) {
             $where .= ' AND oi.tenant_id = :tid';
             $params[':tid'] = $tenantId;
+        }
+        if ($entityId !== null) {
+            $where .= ' AND oi.entity_id = :eid';
+            $params[':eid'] = $entityId;
         }
 
         $sql = "SELECT oi.product_id, oi.product_name,
@@ -506,16 +522,56 @@ final class PdoPlatformReportRepository
     }
 
     // ════════════════════════════════════════════════════════════
+    // LIVE AGGREGATIONS – Delivery Stats
+    // ════════════════════════════════════════════════════════════
+
+    public function aggregateDeliveryStats(string $start, string $end, ?int $tenantId = null, ?int $entityId = null): array
+    {
+        $where = 'WHERE do2.created_at BETWEEN :s AND :e';
+        $params = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $where .= ' AND do2.tenant_id = :tid';
+            $params[':tid'] = $tenantId;
+        }
+
+        $sql = "SELECT
+                    COUNT(do2.id) AS total_deliveries,
+                    SUM(CASE WHEN do2.delivery_status = 'pending' THEN 1 ELSE 0 END) AS pending_deliveries,
+                    SUM(CASE WHEN do2.delivery_status = 'assigned' OR do2.delivery_status = 'accepted' THEN 1 ELSE 0 END) AS assigned_deliveries,
+                    SUM(CASE WHEN do2.delivery_status = 'picked_up' OR do2.delivery_status = 'on_the_way' THEN 1 ELSE 0 END) AS in_transit_deliveries,
+                    SUM(CASE WHEN do2.delivery_status = 'delivered' THEN 1 ELSE 0 END) AS completed_deliveries,
+                    SUM(CASE WHEN do2.delivery_status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_deliveries,
+                    COALESCE(SUM(do2.delivery_fee), 0) AS total_delivery_fees,
+                    COALESCE(SUM(do2.provider_payout), 0) AS total_provider_payouts,
+                    COALESCE(AVG(TIMESTAMPDIFF(MINUTE, do2.assigned_at, do2.delivered_at)), 0) AS avg_delivery_minutes
+                FROM delivery_orders do2
+                {$where}";
+
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        } catch (\PDOException $e) {
+            // delivery_orders table may not exist
+            return [];
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════
     // CHART DATA – Time Series
     // ════════════════════════════════════════════════════════════
 
-    public function getOrdersTimeSeries(string $start, string $end, ?int $tenantId = null, string $groupBy = 'day'): array
+    public function getOrdersTimeSeries(string $start, string $end, ?int $tenantId = null, string $groupBy = 'day', ?int $entityId = null): array
     {
         $where = 'WHERE o.created_at BETWEEN :s AND :e';
         $params = [':s' => $start, ':e' => $end];
         if ($tenantId !== null) {
             $where .= ' AND o.tenant_id = :tid';
             $params[':tid'] = $tenantId;
+        }
+        if ($entityId !== null) {
+            $where .= ' AND o.entity_id = :eid';
+            $params[':eid'] = $entityId;
         }
 
         $dateFormat = match($groupBy) {
@@ -574,13 +630,17 @@ final class PdoPlatformReportRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
-    public function getProductsTimeSeries(string $start, string $end, ?int $tenantId = null, string $groupBy = 'day'): array
+    public function getProductsTimeSeries(string $start, string $end, ?int $tenantId = null, string $groupBy = 'day', ?int $entityId = null): array
     {
         $where = 'WHERE oi.created_at BETWEEN :s AND :e';
         $params = [':s' => $start, ':e' => $end];
         if ($tenantId !== null) {
             $where .= ' AND oi.tenant_id = :tid';
             $params[':tid'] = $tenantId;
+        }
+        if ($entityId !== null) {
+            $where .= ' AND oi.entity_id = :eid';
+            $params[':eid'] = $entityId;
         }
 
         $dateFormat = match($groupBy) {

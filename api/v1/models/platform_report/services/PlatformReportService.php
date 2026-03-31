@@ -46,8 +46,8 @@ final class PlatformReportService
         $start = $startDate . ' 00:00:00';
         $end   = $endDate . ' 23:59:59';
 
-        $metrics = $this->getMetrics($reportType, $start, $end, $tenantId);
-        $timeSeries = $this->getTimeSeries($reportType, $start, $end, $tenantId, $groupBy);
+        $metrics = $this->getMetrics($reportType, $start, $end, $tenantId, $entityId);
+        $timeSeries = $this->getTimeSeries($reportType, $start, $end, $tenantId, $groupBy, $entityId);
 
         return [
             'success'     => true,
@@ -132,15 +132,18 @@ final class PlatformReportService
     // PRIVATE HELPERS
     // ════════════════════════════════════════════════════════════
 
-    private function getMetrics(string $type, string $start, string $end, ?int $tenantId): array
+    private function getMetrics(string $type, string $start, string $end, ?int $tenantId, ?int $entityId = null): array
     {
         return match ($type) {
-            'sales_overview'       => $this->repo->aggregateSalesOverview($start, $end, $tenantId),
-            'revenue_profit'       => $this->repo->aggregateRevenueProfit($start, $end, $tenantId),
-            'orders_performance'   => $this->repo->aggregateOrdersPerformance($start, $end, $tenantId),
+            'sales_overview'       => $this->repo->aggregateSalesOverview($start, $end, $tenantId, $entityId),
+            'revenue_profit'       => $this->repo->aggregateRevenueProfit($start, $end, $tenantId, $entityId),
+            'orders_performance'   => array_merge(
+                $this->repo->aggregateOrdersPerformance($start, $end, $tenantId, $entityId),
+                $this->repo->aggregateDeliveryStats($start, $end, $tenantId, $entityId)
+            ),
             'products_performance' => array_merge(
                 $this->repo->aggregateProductsPerformance($start, $end, $tenantId),
-                ['top_products' => $this->repo->getTopProducts($start, $end, $tenantId)]
+                ['top_products' => $this->repo->getTopProducts($start, $end, $tenantId, $entityId)]
             ),
             'ads_performance'      => $this->repo->aggregateAdsPerformance($start, $end, $tenantId),
             'returns_complaints'   => $this->repo->aggregateReturnsComplaints($start, $end, $tenantId),
@@ -151,13 +154,15 @@ final class PlatformReportService
         };
     }
 
-    private function getTimeSeries(string $type, string $start, string $end, ?int $tenantId, string $groupBy): array
+    private function getTimeSeries(string $type, string $start, string $end, ?int $tenantId, string $groupBy, ?int $entityId = null): array
     {
         return match ($type) {
-            'sales_overview', 'revenue_profit', 'orders_performance', 'entities_performance', 'platform_health'
-                => $this->repo->getOrdersTimeSeries($start, $end, $tenantId, $groupBy),
+            'sales_overview', 'revenue_profit', 'entities_performance', 'platform_health'
+                => $this->repo->getOrdersTimeSeries($start, $end, $tenantId, $groupBy, $entityId),
+            'orders_performance'
+                => $this->repo->getOrdersTimeSeries($start, $end, $tenantId, $groupBy, $entityId),
             'products_performance'
-                => $this->repo->getProductsTimeSeries($start, $end, $tenantId, $groupBy),
+                => $this->repo->getProductsTimeSeries($start, $end, $tenantId, $groupBy, $entityId),
             'ads_performance'
                 => $this->repo->getAdsTimeSeries($start, $end, $tenantId, $groupBy),
             'returns_complaints'
