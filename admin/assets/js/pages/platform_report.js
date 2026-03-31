@@ -258,8 +258,12 @@
                 items.forEach(function (tenant) {
                     const item = document.createElement('div');
                     item.className = 'pr-autocomplete-item';
-                    item.innerHTML = h(tenant.name || ('Tenant #' + tenant.id)) +
-                        ' <span class="pr-ac-id">#' + h(String(tenant.id)) + '</span>';
+                    const nameText = document.createTextNode(tenant.name || ('Tenant #' + tenant.id));
+                    item.appendChild(nameText);
+                    const idSpan = document.createElement('span');
+                    idSpan.className = 'pr-ac-id';
+                    idSpan.textContent = '#' + tenant.id;
+                    item.appendChild(idSpan);
                     item.addEventListener('click', function () {
                         hiddenInput.value = tenant.id;
                         searchInput.value = tenant.name || ('Tenant #' + tenant.id);

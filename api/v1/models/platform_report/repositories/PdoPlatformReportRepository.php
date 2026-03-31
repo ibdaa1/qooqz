@@ -312,13 +312,11 @@ final class PdoPlatformReportRepository
     public function aggregateAdsPerformance(string $start, string $end, ?int $tenantId = null): array
     {
         // Active campaigns count (separate query to avoid param reuse)
-        $acWhere = $tenantId !== null ? 'WHERE ac.tenant_id = :tid' : '';
         $acParams = [];
         if ($tenantId !== null) {
+            $sqlCamp = "SELECT COUNT(*) FROM ad_campaigns ac WHERE ac.tenant_id = :tid AND ac.status = 'active'";
             $acParams[':tid'] = $tenantId;
-        }
-        $sqlCamp = "SELECT COUNT(*) FROM ad_campaigns ac {$acWhere} AND ac.status = 'active'";
-        if (!$tenantId) {
+        } else {
             $sqlCamp = "SELECT COUNT(*) FROM ad_campaigns ac WHERE ac.status = 'active'";
         }
         $stmtCamp = $this->pdo->prepare($sqlCamp);
