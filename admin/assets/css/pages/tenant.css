@@ -533,10 +533,66 @@
 /* ═══════════════════════════════════════════════════════════
    RTL
    ══════════════════════════════════════════════════════════ */
-[dir="rtl"] #tenantsPageContainer .form-group label i { margin-inline-end: 0; }
+[dir="rtl"] #tenantsPageContainer { text-align: right; direction: rtl; }
+[dir="rtl"] #tenantsPageContainer .form-group label i { margin-inline-end: 0; margin-inline-start: 0.35rem; }
+[dir="rtl"] #tenantsPageContainer .page-header { direction: rtl; }
+[dir="rtl"] #tenantsPageContainer .page-header-content { text-align: right; }
 [dir="rtl"] #tenantsPageContainer .page-header-actions { flex-direction: row-reverse; }
+[dir="rtl"] #tenantsPageContainer .page-title i { margin-left: 0.5rem; margin-right: 0; }
+
+/* RTL: table */
 [dir="rtl"] #tenantsPageContainer .data-table thead th,
 [dir="rtl"] #tenantsPageContainer .data-table tbody td { text-align: right; }
+[dir="rtl"] #tenantsPageContainer .data-table thead th:last-child,
+[dir="rtl"] #tenantsPageContainer .data-table tbody td:last-child { text-align: left; }
+
+/* RTL: filters & search */
+[dir="rtl"] #tenantsPageContainer .filter-bar,
+[dir="rtl"] #tenantsPageContainer .filter-row { direction: rtl; }
+[dir="rtl"] #tenantsPageContainer .search-input,
+[dir="rtl"] #tenantsPageContainer input[type="text"],
+[dir="rtl"] #tenantsPageContainer input[type="search"] { text-align: right; direction: rtl; }
+[dir="rtl"] #tenantsPageContainer select { text-align: right; }
+
+/* RTL: form */
+[dir="rtl"] #tenantsPageContainer .form-card { direction: rtl; text-align: right; }
+[dir="rtl"] #tenantsPageContainer .form-group label { text-align: right; }
+[dir="rtl"] #tenantsPageContainer .form-group input,
+[dir="rtl"] #tenantsPageContainer .form-group select,
+[dir="rtl"] #tenantsPageContainer .form-group textarea { text-align: right; direction: rtl; }
+[dir="rtl"] #tenantsPageContainer .form-actions { flex-direction: row-reverse; }
+
+/* RTL: buttons with icons */
+[dir="rtl"] #tenantsPageContainer .btn i { margin-left: 0.35rem; margin-right: 0; }
+
+/* RTL: pagination */
+[dir="rtl"] #tenantsPageContainer .pagination { direction: rtl; }
+[dir="rtl"] #tenantsPageContainer .pagination-info { text-align: right; }
+
+/* RTL: cards & modals */
+[dir="rtl"] #tenantsPageContainer .card-header { direction: rtl; text-align: right; }
+[dir="rtl"] #tenantsPageContainer .card-header .card-title i { margin-left: 0.5rem; margin-right: 0; }
+
+/* RTL: status badges */
+[dir="rtl"] #tenantsPageContainer .badge { direction: rtl; }
+
+/* RTL: empty / error states */
+[dir="rtl"] #tenantsPageContainer .empty-state,
+[dir="rtl"] #tenantsPageContainer .error-state { text-align: center; direction: rtl; }
+
+/* RTL: tabs */
+[dir="rtl"] #tenantsPageContainer .tab-nav { direction: rtl; }
+[dir="rtl"] #tenantsPageContainer .tab-nav .tab-link i { margin-left: 0.35rem; margin-right: 0; }
+
+/* RTL: domain list */
+[dir="rtl"] #tenantsPageContainer .domain-list { direction: rtl; text-align: right; }
+[dir="rtl"] #tenantsPageContainer .domain-item { flex-direction: row-reverse; }
+
+/* RTL: text-transform none for Arabic labels */
+[dir="rtl"] #tenantsPageContainer .form-group label,
+[dir="rtl"] #tenantsPageContainer .page-title,
+[dir="rtl"] #tenantsPageContainer .page-subtitle,
+[dir="rtl"] #tenantsPageContainer .data-table thead th { text-transform: none; }
 
 /* ═══════════════════════════════════════════════════════════
    CATEGORY TREE  (checkbox tree, Amazon-style)
