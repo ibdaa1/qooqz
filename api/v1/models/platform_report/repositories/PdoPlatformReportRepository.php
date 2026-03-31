@@ -527,11 +527,17 @@ final class PdoPlatformReportRepository
 
     public function aggregateDeliveryStats(string $start, string $end, ?int $tenantId = null, ?int $entityId = null): array
     {
+        $join = '';
         $where = 'WHERE do2.created_at BETWEEN :s AND :e';
         $params = [':s' => $start, ':e' => $end];
         if ($tenantId !== null) {
             $where .= ' AND do2.tenant_id = :tid';
             $params[':tid'] = $tenantId;
+        }
+        if ($entityId !== null) {
+            $join = 'INNER JOIN orders o ON o.id = do2.order_id';
+            $where .= ' AND o.entity_id = :eid';
+            $params[':eid'] = $entityId;
         }
 
         $sql = "SELECT
@@ -545,6 +551,7 @@ final class PdoPlatformReportRepository
                     COALESCE(SUM(do2.provider_payout), 0) AS total_provider_payouts,
                     COALESCE(AVG(TIMESTAMPDIFF(MINUTE, do2.assigned_at, do2.delivered_at)), 0) AS avg_delivery_minutes
                 FROM delivery_orders do2
+                {$join}
                 {$where}";
 
         try {
