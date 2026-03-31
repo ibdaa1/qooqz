@@ -202,7 +202,9 @@
         try {
             const params = {};
             const hiddenTenant = $('#prTenantId');
-            const tid = (hiddenTenant && hiddenTenant.value) || CFG.tenantId || '';
+            let tid = (hiddenTenant && hiddenTenant.value) || '';
+            // Non-super-admin falls back to their own tenant; super admin uses explicit selection only
+            if (!tid && !CFG.isSuperAdmin && CFG.tenantId) tid = CFG.tenantId;
             if (tid) params.tenant_id = tid;
             const resp = await apiGet('dashboard', params);
             if (resp.success && resp.data) {
@@ -243,9 +245,10 @@
         searchInput.addEventListener('input', function () {
             clearTimeout(tenantSearchTimer);
             const query = this.value.trim();
+            // Clear previous tenant selection when user modifies search text
+            hiddenInput.value = '';
             if (query.length < 1) {
                 dropdown.style.display = 'none';
-                hiddenInput.value = '';
                 loadEntities();
                 return;
             }
@@ -340,13 +343,15 @@
             const sel = $('#prEntityId');
             if (!sel) return;
 
-            // Determine tenant ID: override > hidden input > config
+            // Determine tenant ID: override > hidden input > config (non-super-admin only)
             let tid = tenantIdOverride;
             if (tid === undefined) {
                 const hiddenTenant = $('#prTenantId');
                 tid = hiddenTenant ? hiddenTenant.value : '';
             }
-            if (!tid && CFG.tenantId) tid = CFG.tenantId;
+            // Only non-super-admin uses CFG.tenantId as fallback;
+            // super admin must explicitly select a tenant
+            if (!tid && !CFG.isSuperAdmin && CFG.tenantId) tid = CFG.tenantId;
 
             // Clear existing options
             sel.innerHTML = '<option value="">' + t('all_entities', 'All Entities') + '</option>';
@@ -384,7 +389,9 @@
         const endDate = $('#prEndDate')?.value;
         const groupBy = $('#prGroupBy')?.value || 'day';
         const tenantIdEl = $('#prTenantId');
-        const tenantId = tenantIdEl ? tenantIdEl.value : (CFG.tenantId || '');
+        // Use hidden input value; non-super-admin falls back to CFG.tenantId
+        let tenantId = tenantIdEl ? tenantIdEl.value : '';
+        if (!tenantId && !CFG.isSuperAdmin && CFG.tenantId) tenantId = CFG.tenantId;
         const entityIdEl = $('#prEntityId');
         const entityId = entityIdEl ? entityIdEl.value : '';
 
