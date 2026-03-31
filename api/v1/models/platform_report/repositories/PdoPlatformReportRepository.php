@@ -154,7 +154,7 @@ final class PdoPlatformReportRepository
                     COALESCE(SUM(o.grand_total) - SUM(o.discount_amount + o.coupon_discount), 0) AS net_revenue,
                     COALESCE(SUM(o.tax_amount), 0) AS total_tax,
                     COALESCE(SUM(o.shipping_cost), 0) AS total_shipping,
-                    (SELECT COALESCE(SUM(ci.commission_amount), 0)
+                    (SELECT COALESCE(SUM(ci.total_commission), 0)
                      FROM commission_invoices ci
                      WHERE ci.created_at BETWEEN :s2 AND :e2
                      " . ($tenantId !== null ? 'AND ci.tenant_id = :tid2' : '') . "
@@ -218,25 +218,42 @@ final class PdoPlatformReportRepository
 
     public function aggregateProductsPerformance(string $start, string $end, ?int $tenantId = null): array
     {
-        $tWhere = $tenantId !== null ? 'AND p.tenant_id = :tid' : '';
-        $tWhere2 = $tenantId !== null ? 'AND oi.tenant_id = :tid2' : '';
-        $params = [':s' => $start, ':e' => $end];
+        // Product counts (no date range needed)
+        $pWhere = $tenantId !== null ? 'WHERE p.tenant_id = :tid' : '';
+        $pParams = [];
         if ($tenantId !== null) {
-            $params[':tid'] = $tenantId;
-            $params[':tid2'] = $tenantId;
+            $pParams[':tid'] = $tenantId;
         }
 
-        $sql = "SELECT
-                    (SELECT COUNT(*) FROM products p WHERE 1=1 {$tWhere}) AS total_products,
-                    (SELECT COUNT(*) FROM products p WHERE p.is_active = 1 {$tWhere}) AS active_products,
-                    (SELECT COUNT(*) FROM products p WHERE p.stock_status = 'out_of_stock' {$tWhere}) AS out_of_stock,
-                    (SELECT COUNT(*) FROM products p WHERE p.stock_quantity <= p.low_stock_threshold AND p.stock_quantity > 0 {$tWhere}) AS low_stock,
-                    (SELECT COUNT(DISTINCT oi.product_id) FROM order_items oi WHERE oi.created_at BETWEEN :s AND :e {$tWhere2}) AS products_sold_count,
-                    (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi WHERE oi.created_at BETWEEN :s AND :e {$tWhere2}) AS total_units_sold";
+        $sql1 = "SELECT
+                    COUNT(*) AS total_products,
+                    SUM(CASE WHEN p.is_active = 1 THEN 1 ELSE 0 END) AS active_products,
+                    SUM(CASE WHEN p.stock_status = 'out_of_stock' THEN 1 ELSE 0 END) AS out_of_stock,
+                    SUM(CASE WHEN p.stock_quantity <= p.low_stock_threshold AND p.stock_quantity > 0 THEN 1 ELSE 0 END) AS low_stock
+                 FROM products p {$pWhere}";
 
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
-        $productStats = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $stmt1 = $this->pdo->prepare($sql1);
+        $stmt1->execute($pParams);
+        $productCounts = $stmt1->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        // Order items stats (date range + tenant)
+        $oiWhere = 'WHERE oi.created_at BETWEEN :s AND :e';
+        $oiParams = [':s' => $start, ':e' => $end];
+        if ($tenantId !== null) {
+            $oiWhere .= ' AND oi.tenant_id = :tid';
+            $oiParams[':tid'] = $tenantId;
+        }
+
+        $sql2 = "SELECT
+                    COUNT(DISTINCT oi.product_id) AS products_sold_count,
+                    COALESCE(SUM(oi.quantity), 0) AS total_units_sold
+                 FROM order_items oi {$oiWhere}";
+
+        $stmt2 = $this->pdo->prepare($sql2);
+        $stmt2->execute($oiParams);
+        $salesStats = $stmt2->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $productStats = array_merge($productCounts, $salesStats);
 
         // Core events for product analytics (views, clicks, add_to_cart, favorites)
         $evParams = [':s' => $start, ':e' => $end];
@@ -294,6 +311,21 @@ final class PdoPlatformReportRepository
 
     public function aggregateAdsPerformance(string $start, string $end, ?int $tenantId = null): array
     {
+        // Active campaigns count (separate query to avoid param reuse)
+        $acWhere = $tenantId !== null ? 'WHERE ac.tenant_id = :tid' : '';
+        $acParams = [];
+        if ($tenantId !== null) {
+            $acParams[':tid'] = $tenantId;
+        }
+        $sqlCamp = "SELECT COUNT(*) FROM ad_campaigns ac {$acWhere} AND ac.status = 'active'";
+        if (!$tenantId) {
+            $sqlCamp = "SELECT COUNT(*) FROM ad_campaigns ac WHERE ac.status = 'active'";
+        }
+        $stmtCamp = $this->pdo->prepare($sqlCamp);
+        $stmtCamp->execute($acParams);
+        $activeCampaigns = (int)$stmtCamp->fetchColumn();
+
+        // Ad stats with date range
         $tWhere = $tenantId !== null ? 'AND ac.tenant_id = :tid' : '';
         $params = [':s' => $start, ':e' => $end];
         if ($tenantId !== null) {
@@ -301,7 +333,6 @@ final class PdoPlatformReportRepository
         }
 
         $sql = "SELECT
-                    (SELECT COUNT(*) FROM ad_campaigns ac WHERE ac.status = 'active' {$tWhere}) AS active_campaigns,
                     COALESCE(SUM(ast.views), 0) AS total_impressions,
                     COALESCE(SUM(ast.clicks), 0) AS total_clicks,
                     CASE WHEN SUM(ast.views) > 0
@@ -317,6 +348,7 @@ final class PdoPlatformReportRepository
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
         $adsData = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $adsData['active_campaigns'] = $activeCampaigns;
 
         // Top ads by views
         $tWhere2 = $tenantId !== null ? 'AND ac2.tenant_id = :tid2' : '';
@@ -395,20 +427,22 @@ final class PdoPlatformReportRepository
 
     public function aggregateEntitiesPerformance(string $start, string $end, ?int $tenantId = null): array
     {
-        $tWhere = $tenantId !== null ? 'AND e.tenant_id = :tid' : '';
-        $params = [':s' => $start, ':e' => $end];
+        // Entity counts (no date range, avoid param reuse with COUNT+CASE)
+        $eWhere = $tenantId !== null ? 'WHERE e.tenant_id = :tid' : '';
+        $eParams = [];
         if ($tenantId !== null) {
-            $params[':tid'] = $tenantId;
+            $eParams[':tid'] = $tenantId;
         }
 
         $sql = "SELECT
-                    (SELECT COUNT(*) FROM entities e WHERE 1=1 {$tWhere}) AS total_entities,
-                    (SELECT COUNT(*) FROM entities e WHERE e.status = 'approved' {$tWhere}) AS active_entities,
-                    (SELECT COUNT(*) FROM entities e WHERE e.status = 'pending' {$tWhere}) AS pending_entities,
-                    (SELECT COUNT(*) FROM entities e WHERE e.status = 'suspended' {$tWhere}) AS suspended_entities";
+                    COUNT(*) AS total_entities,
+                    SUM(CASE WHEN e.status = 'approved' THEN 1 ELSE 0 END) AS active_entities,
+                    SUM(CASE WHEN e.status = 'pending' THEN 1 ELSE 0 END) AS pending_entities,
+                    SUM(CASE WHEN e.status = 'suspended' THEN 1 ELSE 0 END) AS suspended_entities
+                FROM entities e {$eWhere}";
 
         $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
+        $stmt->execute($eParams);
         $entityStats = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
         // Top entities by revenue
@@ -503,22 +537,33 @@ final class PdoPlatformReportRepository
 
     public function aggregatePlatformHealth(string $start, string $end): array
     {
-        $params = [':s' => $start, ':e' => $end];
-
-        $sql = "SELECT
+        // Platform counts (no date range needed)
+        $sql1 = "SELECT
                     (SELECT COUNT(*) FROM users) AS total_users,
                     (SELECT COUNT(*) FROM users WHERE is_active = 1) AS active_users,
                     (SELECT COUNT(*) FROM tenants) AS total_tenants,
                     (SELECT COUNT(*) FROM tenants WHERE status = 'active') AS active_tenants,
                     (SELECT COUNT(*) FROM entities) AS total_entities,
                     (SELECT COUNT(*) FROM products) AS total_products,
-                    (SELECT COUNT(*) FROM orders WHERE created_at BETWEEN :s AND :e) AS period_orders,
-                    (SELECT COALESCE(SUM(grand_total), 0) FROM orders WHERE created_at BETWEEN :s AND :e) AS period_revenue,
                     (SELECT COUNT(*) FROM subscriptions WHERE status = 'active') AS active_subscriptions";
 
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $stmt1 = $this->pdo->prepare($sql1);
+        $stmt1->execute();
+        $platformCounts = $stmt1->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        // Period order stats (date range)
+        $params = [':s' => $start, ':e' => $end];
+        $sql2 = "SELECT
+                    COUNT(*) AS period_orders,
+                    COALESCE(SUM(grand_total), 0) AS period_revenue
+                 FROM orders
+                 WHERE created_at BETWEEN :s AND :e";
+
+        $stmt2 = $this->pdo->prepare($sql2);
+        $stmt2->execute($params);
+        $orderStats = $stmt2->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        return array_merge($platformCounts, $orderStats);
     }
 
     // ════════════════════════════════════════════════════════════
@@ -547,6 +592,7 @@ final class PdoPlatformReportRepository
                     SUM(CASE WHEN do2.delivery_status = 'picked_up' OR do2.delivery_status = 'on_the_way' THEN 1 ELSE 0 END) AS in_transit_deliveries,
                     SUM(CASE WHEN do2.delivery_status = 'delivered' THEN 1 ELSE 0 END) AS completed_deliveries,
                     SUM(CASE WHEN do2.delivery_status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_deliveries,
+                    SUM(CASE WHEN do2.delivery_status = 'failed' THEN 1 ELSE 0 END) AS failed_deliveries,
                     COALESCE(SUM(do2.delivery_fee), 0) AS total_delivery_fees,
                     COALESCE(SUM(do2.provider_payout), 0) AS total_provider_payouts,
                     COALESCE(AVG(TIMESTAMPDIFF(MINUTE, do2.assigned_at, do2.delivered_at)), 0) AS avg_delivery_minutes
